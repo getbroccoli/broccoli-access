@@ -44,19 +44,6 @@ Planned; each is reshaped when the one before it ends.
 
 1. **See who has access to what:** Google Workspace, apps selected after the scan, and people suspended in Google who still have accounts. See [circle 1](circle1.md).
 
-### Backlog
-
-   - add more apps, Slack first
-   - people gone from the directory;
-   - accounts that match nobody;
-   - when each app was last used;
-   - requests and approvals for an app;
-   - joiners get their default apps, and leavers lose every app on their last day;
-   - removing access, as a task for the app's admin with a dated record;
-   - app owners;
-   - one-click Google and Slack connections with the Broccoli apps;
-   - your own agent over MCP.
-
 ## Documents
 
 - [Circle 1](circle1.md): scope, setup and testing.

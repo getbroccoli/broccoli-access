@@ -27,6 +27,28 @@ flowchart LR
 4. The sync updates `apps` and `app_accounts` from the records of every source. The accounts of the directory app create and update `employees`. Nothing in the UI reads `import_records` directly.
 5. Flags are computed when read, never stored (see "Computed when read").
 
+## Connector modules
+
+Every connector module exports one definition in the same shape, and one shared contract test checks each of them.
+
+- **Description**:
+  - `key`, such as `google_workspace`, plus `version` and `name`;
+  - `transport`: `api` in circle 1; later circles add `scim` and `browser`;
+  - the finding kinds it registers, such as `google_directory` and `google_sign_in`;
+  - whether its app is the directory;
+  - its connection fields, each marked secret or not. Secret fields go to `encrypted_secrets`, the others to `settings`.
+- **Settings check**: a schema for its settings and secrets.
+- **Read functions**:
+  - `testConnection`: returns what Settings shows, such as the domain, or an error;
+  - `listAccounts(cursor)`: one page of accounts in the `import_records` shape, with the next cursor.
+- **Errors**: a connector fails with one of these, and never passes on the app's raw response:
+  - `authentication_failed`: its token was revoked or expired;
+  - `permission_missing`: a scope or an admin right is missing;
+  - `rate_limited`: retried by the scan before it fails;
+  - `app_unavailable`: a timeout or server error, retried by the scan before it fails;
+  - `unexpected_response`: an answer the connector does not understand.
+- Later circles add write functions (create, suspend, delete, change access) and a list of what each connector can do.
+
 ## Words
 
 - **Employee**: someone in the company's directory. The UI calls employees "people"; "user" stays the person who signs in to broccoli-access.
@@ -73,7 +95,7 @@ One row per connected app. It replaces Broccoli's `slack_connection`.
 - `connector`: the connector module's key: `google_workspace`. Unique, so there is one connection per connector.
 - `app_id`: the app this connection reads (Google Workspace).
 - `settings`: JSON the connector owns: what it needs and what Settings shows. No secrets.
-- `encrypted_secrets`: the connector's secrets as one encrypted JSON object.
+- `encrypted_secrets`: the connector's secrets as one JSON object, encrypted with the connection's id as associated data, so a secret copied into another row does not decrypt.
 - `connected_at`.
 - Google Workspace:
   - `settings` holds `googleApp` (`own_google_app`; a later circle adds `broccoli_google_app`), `clientId`, `domain`, `organizationName`, `adminEmail`, `grantedScopes`.
@@ -117,7 +139,7 @@ One row per place a scan reads from.
 - `connection_id`: set exactly when `kind` is `app_connection`, and unique.
 - `name`: what the UI calls the source, such as the Google domain.
 - `status`: `scanning`, `scanned`, `scan_failed`.
-- `failure`, set exactly when `scan_failed`: `access_revoked`, `permission_missing`, `app_unavailable`. Circle 1 builds only the happy path, but the fakes can return these.
+- `failure`, set exactly when `scan_failed`, one of the connector errors (see "Connector modules"): `authentication_failed`, `permission_missing`, `rate_limited`, `app_unavailable`, `unexpected_response`. Circle 1 builds only the happy path, but the fakes can return each of them.
 - `read_at`: when the last successful scan finished. The UI shows "Scanned today at 08:00".
 - Removed: `failure_message`, `mapping_attempt`, `file_id`, `read_by`, `picked_up_by_external_agent_at`, `external_agent_progress`, `original_read_allowed_at`, `original_read_ai_source`.
 
