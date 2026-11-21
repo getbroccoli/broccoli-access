@@ -53,7 +53,8 @@ The setup page has three steps: Connect Google Workspace, Scan your workspace, S
 ## Testing
 
 - `packages/fake-apps` holds a fake Google serving a seeded company, Acme. `pnpm dev` runs the app against them, so automated tests and everyday manual checks need no real account.
-- A real test organisation on Google Cloud Identity Free (free, up to 50 users) checks the same journeys against the real Google APIs before a change to the Google connector ships. A person checks setup with the real consent screen; scans with the stored token can run unattended.
+- Every task is tested against the fake Google, with no person in the loop.
+- The circle's last task checks the same journeys against a real test organisation on Google Cloud Identity Free (free, up to 50 users) and fixes the fake wherever real Google differs. A person sets the organisation up once; scans with its stored token then run unattended.
 
 ## Left out of circle 1
 
@@ -71,4 +72,3 @@ These are the input for circle 2:
 
 - The data model and the fake apps design are approved.
 - The Broccoli copy is the first task: current Broccoli `main` with fresh history, minus everything in [what to remove](notes/2026-11-20-what-to-remove.md).
-- The test organisation exists, with its credentials stored for live checks.
