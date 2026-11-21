@@ -1,0 +1,10 @@
+{
+  "extends": "@broccoli-access/config/tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": ["src", "test", "*.ts"]
+}

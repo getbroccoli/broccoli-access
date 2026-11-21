@@ -1,0 +1,58 @@
+{
+  "name": "broccoli-access",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.21.0",
+      "onFail": "download"
+    }
+  },
+  "prettier": "@broccoli-access/config/prettier",
+  "scripts": {
+    "dev": "sh packages/scripts/dev.sh",
+    "dev:prune": "node packages/scripts/prune.mjs",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "turbo run test:e2e",
+    "format": "prettier --write . --ignore-path .gitignore --ignore-path packages/config/.prettierignore",
+    "format:check": "prettier --check . --ignore-path .gitignore --ignore-path packages/config/.prettierignore",
+    "duplicates": "jscpd packages/api/src packages/web/src",
+    "check": "pnpm format:check && pnpm duplicates && turbo run lint typecheck test --concurrency=2",
+    "codegen": "turbo run codegen",
+    "postinstall": "pnpm codegen"
+  },
+  "devDependencies": {
+    "@broccoli-access/config": "workspace:*",
+    "jscpd": "5.4.0",
+    "prettier": "3.9.9",
+    "turbo": "2.11.7"
+  },
+  "jscpd": {
+    "minTokens": 70,
+    "format": [
+      "typescript",
+      "tsx"
+    ],
+    "ignore": [
+      "**/*.test.ts",
+      "**/*.gen.ts",
+      "**/__generated__/**",
+      "**/components/ui/**",
+      "**/core/auth/schema.ts"
+    ],
+    "reporters": [
+      "console"
+    ],
+    "threshold": 0,
+    "exitCode": 1
+  }
+}

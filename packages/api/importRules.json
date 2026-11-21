@@ -1,0 +1,105 @@
+{
+  "elements": {
+    "src/main": ["src/core/env", "src/core/logger", "src/core/server", "src/modules"],
+    "src/configureDevelopmentMail": [
+      "src/core/db",
+      "src/core/env",
+      "src/core/events",
+      "src/core/instance",
+      "src/core/logger",
+      "src/core/secrets",
+      "src/core/security"
+    ],
+    "src/modules": [
+      "src/core/instance",
+      "src/core/moduleManifest",
+      "src/core/records",
+      "src/modules/*"
+    ],
+    "src/modules/employees": ["src/core/*", "!src/core/server", "src/utils"],
+    "src/modules/imports": ["src/core/*", "!src/core/server"],
+    "src/modules/system": ["src/core/*", "!src/core/server"],
+    "src/integrations/mail": ["src/utils"],
+    "src/utils": [],
+    "src/core/server": ["src/core/*"],
+    "src/core/moduleManifest": [
+      "src/core/db",
+      "src/core/events",
+      "src/core/graphql",
+      "src/core/instance",
+      "src/core/jobs",
+      "src/core/logger",
+      "src/core/records",
+      "src/core/secrets",
+      "src/core/security"
+    ],
+    "src/core/graphql": [
+      "src/core/applicationError",
+      "src/core/logger",
+      "src/core/security",
+      "src/utils"
+    ],
+    "src/core/security": ["src/core/applicationError", "src/core/auth", "src/core/db"],
+    "src/core/instance": [
+      "src/integrations/mail",
+      "src/core/applicationError",
+      "src/core/auth",
+      "src/core/db",
+      "src/core/events",
+      "src/core/jobs",
+      "src/core/logger",
+      "src/core/secrets",
+      "src/core/security"
+    ],
+    "src/core/auth": ["src/core/db", "src/core/logger"],
+    "src/core/files": ["src/core/db"],
+    "src/core/records": [
+      "src/core/applicationError",
+      "src/core/auth",
+      "src/core/db",
+      "src/core/events",
+      "src/core/graphql",
+      "src/core/logger",
+      "src/core/pagination",
+      "src/core/security",
+      "src/utils"
+    ],
+    "src/core/jobs": ["src/core/db", "src/core/logger"],
+    "src/core/db": ["src/core/applicationError", "src/core/events", "src/core/logger"],
+    "src/core/events": ["src/core/logger"],
+    "src/core/pagination": ["src/core/applicationError"],
+    "src/core/health": ["src/core/readiness"],
+    "src/core/logger": ["src/core/env"],
+    "src/core/applicationError": [],
+    "src/core/env": ["src/utils"],
+    "src/core/readiness": [],
+    "src/core/secrets": [],
+    "test/support": [
+      "src/core/*",
+      "src/core/instance/app",
+      "src/core/instance/db",
+      "src/core/instance/domain",
+      "src/core/instance/helpers",
+      "src/integrations/*",
+      "src/modules",
+      "src/modules/*",
+      "src/modules/employees/db",
+      "src/utils"
+    ],
+    "test/e2e": ["src/core/db", "src/core/logger", "src/core/server", "test/support"]
+  },
+  "layers": {
+    "domain": ["helpers"],
+    "helpers": [],
+    "db": ["domain", "helpers"],
+    "ports": ["domain", "helpers"],
+    "app": ["db", "domain", "helpers", "ports"],
+    "adapters": ["app", "db", "domain", "helpers"],
+    "graphql": ["app", "domain", "helpers", "http"],
+    "http": ["app", "domain", "helpers"],
+    "betterAuth": ["app", "domain", "helpers"]
+  },
+  "testsMayImport": {
+    "*": ["test/support"]
+  }
+}

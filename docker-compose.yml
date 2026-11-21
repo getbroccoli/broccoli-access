@@ -1,0 +1,87 @@
+services:
+  # Broccoli Access for self-hosting: `docker compose up` needs no .env.
+  broccoli-access:
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://broccoli_access@postgres:5432/broccoli_access
+      LOG_LEVEL: ${LOG_LEVEL:-}
+      # Set it when Broccoli Access has a domain; unset trusts the address each request uses.
+      SELF_HOSTED_PUBLIC_URL: ${SELF_HOSTED_PUBLIC_URL:-}
+    volumes:
+      # Secrets such as the session signing key; back it up with the database.
+      - broccoli-access-data:/data
+    ports:
+      # HOST_WEB_PORT=0 picks a free port, so worktrees run side by side.
+      - ${HOST_WEB_PORT:-8080}:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Prints Broccoli Access's address once it is ready, then exits.
+  ready:
+    # Already pulled for postgres, and it has a shell.
+    image: postgres:18-alpine
+    environment:
+      ADDRESS: ${SELF_HOSTED_PUBLIC_URL:-http://localhost:${HOST_WEB_PORT:-8080}}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        case "$$ADDRESS" in
+          # Compose picked a free port, which only the host knows.
+          *:0) ADDRESS='the address `docker compose port broccoli-access 3000` prints' ;;
+        esac
+        printf '\n\033[1;32m🥦🥦🥦  Broccoli Access is ready!\033[0m  ➜  \033[1;36m%s\033[0m\n\n' "$$ADDRESS"
+    depends_on:
+      broccoli-access:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: broccoli_access
+      # Never publish this port: trust auth is safe only on the Compose network.
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U broccoli_access -d broccoli_access]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  # Throwaway Postgres for end-to-end tests: data on tmpfs, durability off.
+  # Start it with `docker compose up -d --wait postgres-test`.
+  postgres-test:
+    image: postgres:18-alpine
+    profiles: [test]
+    environment:
+      POSTGRES_USER: broccoli_access
+      # Published on 127.0.0.1 only.
+      POSTGRES_HOST_AUTH_METHOD: trust
+    command:
+      - postgres
+      - -c
+      - fsync=off
+      - -c
+      - synchronous_commit=off
+      - -c
+      - full_page_writes=off
+    tmpfs:
+      - /var/lib/postgresql:size=4g
+    ports:
+      # An empty HOST_PG_PORT picks a free port, so worktrees never collide.
+      - 127.0.0.1:${HOST_PG_PORT:-}:5432
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U broccoli_access -d postgres]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  broccoli-access-data:
+  postgres-data:

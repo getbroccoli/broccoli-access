@@ -1,0 +1,129 @@
+"Someone who works for the company."
+type Employee implements AnyRecord {
+  id: ID!
+  firstName: String!
+  lastName: String!
+  "Work email, lowercased; unique."
+  email: String!
+  "Path of the employee's avatar, such as `/api/employees/avatar/<id>`; null without one."
+  avatarUrl: String
+  createdAt: DateTime!
+  "Changes to this employee, newest first."
+  history("Page size, 1 to 10000." first: Int = 50, after: String): RecordChangeConnection!
+  "What the signed-in user may do to this employee."
+  access: RecordAccess!
+}
+
+# Adds the employee to the shared list of record types that keep history; the server merges them.
+enum RecordType {
+  EMPLOYEE
+}
+
+type EmployeeEdge {
+  cursor: String!
+  node: Employee!
+}
+
+type EmployeeConnection {
+  edges: [EmployeeEdge!]!
+  pageInfo: PageInfo!
+}
+
+enum EmployeeOrderField {
+  "First name, then last name, ignoring case."
+  NAME
+  EMAIL
+}
+
+input EmployeeOrder {
+  field: EmployeeOrderField!
+  direction: OrderDirection! = ASC
+}
+
+input EmployeeFilter {
+  "Matches full name or email containing it, ignoring case; at most 100 characters."
+  search: String
+}
+
+input EmployeeCreateInput {
+  firstName: String!
+  lastName: String!
+  "Unique, compared without case."
+  email: String!
+}
+
+"The fields to change; a field left out stays as it is, and null clears a field that may be empty."
+input EmployeeUpdateInput {
+  id: ID!
+  firstName: String
+  lastName: String
+  "Unique, compared without case."
+  email: String
+  "Why the change is made, kept on the history line as its reason; at most 500 characters."
+  changeReason: String
+}
+
+input EmployeeDeleteInput {
+  id: ID!
+  "Why the employee is removed, kept on the history line as its reason; at most 500 characters."
+  changeReason: String
+}
+
+type EmployeesMutations {
+  "Adds an employee. Admins only."
+  create(input: EmployeeCreateInput!): EmployeeCreatePayload!
+  "Changes an employee's fields and records the change in their history. Refused, naming each field, for a field the caller may not change; see `access`."
+  update(input: EmployeeUpdateInput!): EmployeeUpdatePayload!
+  "Removes an employee and their avatar; their history stays. Admins only; never the owner."
+  delete(input: EmployeeDeleteInput!): EmployeeDeletePayload!
+}
+
+"The new employee, or why it was refused."
+type EmployeeCreatePayload {
+  employee: Employee
+  error: EmployeeCreateError
+}
+
+union EmployeeCreateError = InvalidInputError
+
+"The changed employee and the history line it added, or why the change was refused."
+type EmployeeUpdatePayload {
+  employee: Employee
+  "The history line this update added; null when it changed nothing."
+  historyLine: RecordChange
+  error: EmployeeUpdateError
+}
+
+union EmployeeUpdateError = InvalidInputError | NotFoundError
+
+"The removed employee's id, or why the removal was refused."
+type EmployeeDeletePayload {
+  deletedEmployeeId: ID
+  error: EmployeeDeleteError
+}
+
+union EmployeeDeleteError = InvalidInputError | NotFoundError
+
+# Adds the signed-in user's employee to `me`; the server merges the types.
+type User {
+  "The signed-in user's own employee record; null for a user without one, such as the owner."
+  employee: Employee
+}
+
+# Each module declares its own root fields; the server merges them into one type.
+type Query {
+  "One employee; null when there is none."
+  employee(id: ID!): Employee
+  "Employees, one page at a time."
+  employees(
+    "Page size, 1 to 10000."
+    first: Int = 100
+    after: String
+    orderBy: EmployeeOrder = { field: NAME, direction: ASC }
+    filter: EmployeeFilter
+  ): EmployeeConnection!
+}
+
+type Mutation {
+  employees: EmployeesMutations!
+}
