@@ -77,6 +77,8 @@ async function exchangeCode(
       error_description: "Bad Request",
     });
   }
+  // Every token is stored before signing awaits, so a reset meanwhile discards them all.
+  const accessToken = accessTokenResponse(context, authorization);
   const refreshToken = authorization.issuesRefreshToken
     ? issueRefreshToken(state, authorization)
     : undefined;
@@ -84,7 +86,7 @@ async function exchangeCode(
     ? await signIdToken(context, authorization, authorization.nonce)
     : undefined;
   response.json({
-    ...accessTokenResponse(context, authorization),
+    ...accessToken,
     ...(refreshToken !== undefined && { refresh_token: refreshToken }),
     ...(idToken !== undefined && { id_token: idToken }),
   });
