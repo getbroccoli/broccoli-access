@@ -137,6 +137,35 @@ it.for(["startTime", "endTime", "both"])("filters grant events by %s", async (fi
   expect(((await response.json()) as GrantEvents).items).toEqual(expected);
 });
 
+it("rejects a startTime later than endTime", async ({ fake }) => {
+  const tokens = await signIn(fake.url, { scope: ADMIN_SCOPES });
+  const query = new URLSearchParams({
+    startTime: new Date(fake.now.getTime() - DAY).toISOString(),
+    endTime: new Date(fake.now.getTime() - 2 * DAY).toISOString(),
+  });
+
+  const response = await fetch(`${fake.url}${REPORTS_PATH}&${query.toString()}`, {
+    headers: { authorization: `Bearer ${tokens.access_token}` },
+  });
+
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({ error: { errors: [{ reason: "invalid" }] } });
+});
+
+it("rejects a startTime later than the current clock", async ({ fake }) => {
+  const tokens = await signIn(fake.url, { scope: ADMIN_SCOPES });
+  const query = new URLSearchParams({
+    startTime: new Date(fake.now.getTime() + DAY).toISOString(),
+  });
+
+  const response = await fetch(`${fake.url}${REPORTS_PATH}&${query.toString()}`, {
+    headers: { authorization: `Bearer ${tokens.access_token}` },
+  });
+
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({ error: { errors: [{ reason: "invalid" }] } });
+});
+
 it.for([0, 1001])("rejects maxResults=%i for grant events", async (maxResults, { fake }) => {
   const tokens = await signIn(fake.url, { scope: ADMIN_SCOPES });
 

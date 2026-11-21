@@ -16,25 +16,34 @@ export function grantEventRoutes(context: FakeGoogleContext): Router {
   );
 }
 
+const RFC_3339_TIME = z.iso
+  .datetime({ offset: true })
+  .transform((time) => new Date(time))
+  .optional();
+
 const EVENT_FILTER = z.object({
   eventName: z.string().optional(),
-  startTime: z.iso.datetime({ offset: true }).optional(),
-  endTime: z.iso.datetime({ offset: true }).optional(),
+  startTime: RFC_3339_TIME,
+  endTime: RFC_3339_TIME,
 });
+
+type EventFilter = z.infer<typeof EVENT_FILTER>;
 
 function listGrantEvents(context: FakeGoogleContext): RequestHandler {
   return (request, response) => {
+    const now = context.now();
     const filter = EVENT_FILTER.safeParse(request.query);
     const pageRequest = parsePageRequest(request.query, "reports.activities.list");
-    if (!filter.success || pageRequest === undefined) return sendGoogleError(response, "invalid");
+    if (!filter.success || pageRequest === undefined || !startsInTime(filter.data, now)) {
+      return sendGoogleError(response, "invalid");
+    }
     const { eventName, startTime, endTime } = filter.data;
-    const now = context.now();
     // Every event the fake logs is an `authorize` event.
     const logged = eventName === undefined || eventName === "authorize" ? context.state.events : [];
     const events = logged
       .filter((event) => isInsideGrantLog(event.time, now))
-      .filter((event) => startTime === undefined || event.time >= new Date(startTime))
-      .filter((event) => endTime === undefined || event.time <= new Date(endTime))
+      .filter((event) => startTime === undefined || event.time >= startTime)
+      .filter((event) => endTime === undefined || event.time <= endTime)
       .toSorted((a, b) => b.time.getTime() - a.time.getTime());
     const { items, nextPageToken } = pageOf(events, pageRequest);
     response.json({
@@ -43,6 +52,12 @@ function listGrantEvents(context: FakeGoogleContext): RequestHandler {
       ...(nextPageToken !== undefined && { nextPageToken }),
     });
   };
+}
+
+/** Google refuses a `startTime` that is not before both the `endTime` and the request's time. */
+function startsInTime({ startTime, endTime }: EventFilter, now: Date): boolean {
+  if (startTime === undefined) return true;
+  return startTime < now && (endTime === undefined || startTime < endTime);
 }
 
 function activity(state: GoogleState, event: GrantEvent) {
