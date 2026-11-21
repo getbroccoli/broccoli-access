@@ -26,7 +26,7 @@ The setup page has three steps: Connect Google Workspace, Scan your workspace, S
 ### 2. Scan and select your apps
 
 - The scan shows its progress: people read, apps found, and sign-in logs read for the last 6 months.
-- Then the Applications page opens on the Discovered tab with a banner: "Last step: select the apps your company uses". Each app shows its people, how it was found, and when it was first seen. The biggest apps are selected; the owner changes the selection and presses "Approve n and finish".
+- Then the Applications page opens on the Discovered tab with a banner: "Last step: select the apps your company uses". Each app shows its people, how it was found, and since when ("Before <date>" when the grant is older than Google's log). The biggest apps are selected; the owner changes the selection and presses "Approve n and finish".
 - Google Workspace itself is approved when it is connected.
 - **Done when:** the selected apps are approved, every other app is ignored, and setup is done.
 
@@ -34,13 +34,13 @@ The setup page has three steps: Connect Google Workspace, Scan your workspace, S
 
 - Tabs: Approved, Discovered, Ignored, each with its count. "Scanned today at 08:00" and a "Scan now" button.
 - Each app shows its users, how they were found ("Google directory" or "Google sign-in"), and how many people suspended in Google still have access.
-- An app's page shows its users with their status, how each was found and when first seen, and an Ignore button. An app in Discovered or Ignored can be approved.
+- An app's page shows its users with their status, how each was found and since when, and an Ignore button. An app in Discovered or Ignored can be approved.
 - **Done when:** approving or ignoring an app moves it between tabs and updates the counts.
 
 ### 4. People
 
 - Tabs: All and "Suspended with access", with a search. Each person shows their status and their apps.
-- A person's page shows their status, a warning when they are suspended in Google but still have accounts, and their current access: each approved app, how it was found and when first seen.
+- A person's page shows their status, a warning when they are suspended in Google but still have accounts, and their current access: each approved app, how it was found and since when.
 - The People item in the sidebar shows the number of people suspended with access.
 - **Done when:** a person suspended in the fake Google with accounts in approved apps appears in "Suspended with access", with the right count in the sidebar.
 

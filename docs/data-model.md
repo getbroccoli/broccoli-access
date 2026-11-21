@@ -160,7 +160,8 @@ Every account a source saw in its last scan, one row each. `raw` keeps the sourc
   - `firstName`, `lastName`, `managerEmail`: given by the directory, null elsewhere;
   - `appName`;
   - `appExternalId`: how the source names another app, such as `google:<client id>` for a Google grant. It is null when the account belongs to the connection's own app.
-  - `grantedAt`: when the person granted the app access, from the source's log. It is null when the source has no such log or the log no longer holds it (Google keeps about 6 months).
+  - `grantedAt`: when the person granted the app access, from the source's log. It is null when the log does not hold the grant or the source has no log.
+  - `grantedBefore`: set only when `grantedAt` is null because the grant is older than the log: the earliest moment the log covered at this scan (Google keeps about 6 months). The grant happened before it.
 - Kept, unused in circle 1: `photo_url`, `photo_file_id`.
 
 ```json
@@ -172,7 +173,7 @@ Every account a source saw in its last scan, one row each. `raw` keeps the sourc
     "type_version": 1,
     "source_key": "104857392018374650123",
     "raw": { "id": "104857392018374650123", "primaryEmail": "ana@acme.example", "name": { "givenName": "Ana", "familyName": "Ruiz" }, "suspended": true, "relations": [{ "type": "manager", "value": "david@acme.example" }] },
-    "values": { "email": "ana@acme.example", "status": "suspended", "firstName": "Ana", "lastName": "Ruiz", "managerEmail": "david@acme.example", "appName": "Google Workspace", "appExternalId": null, "grantedAt": null }
+    "values": { "email": "ana@acme.example", "status": "suspended", "firstName": "Ana", "lastName": "Ruiz", "managerEmail": "david@acme.example", "appName": "Google Workspace", "appExternalId": null, "grantedAt": null, "grantedBefore": null }
   },
   {
     "id": "rec_ana_figma",
@@ -181,7 +182,7 @@ Every account a source saw in its last scan, one row each. `raw` keeps the sourc
     "type_version": 1,
     "source_key": "104857392018374650123:871234567890-figma.apps.googleusercontent.com",
     "raw": { "clientId": "871234567890-figma.apps.googleusercontent.com", "displayText": "Figma", "scopes": ["openid", "email", "profile"], "userKey": "104857392018374650123" },
-    "values": { "email": "ana@acme.example", "status": "active", "firstName": null, "lastName": null, "managerEmail": null, "appName": "Figma", "appExternalId": "google:871234567890-figma.apps.googleusercontent.com", "grantedAt": "2024-06-03T09:12:00Z" }
+    "values": { "email": "ana@acme.example", "status": "active", "firstName": null, "lastName": null, "managerEmail": null, "appName": "Figma", "appExternalId": "google:871234567890-figma.apps.googleusercontent.com", "grantedAt": null, "grantedBefore": "2026-05-25T08:00:00Z" }
   }
 ]
 ```
@@ -207,12 +208,15 @@ Everyone with an account in the directory app. The table knows nothing about Goo
 Every app a source found, and the connected apps themselves.
 
 - `name`, `domain` (null when unknown).
-- `catalog_key`: unique, null for an app outside the built-in catalog. The catalog, in code, lists known apps with their name, domain and external ids.
-- `external_ids`: how sources name the app, prefixed by source, such as `google:<client id>`.
-  - A record with an `appExternalId` belongs to the app whose list holds it.
-  - If no app holds it, the record goes to the catalog app that lists the id, created if missing.
-  - Otherwise the record creates a new app named after `appName`.
-  - A record without an `appExternalId` belongs to its connection's app.
+- `catalog_key`: unique, null for an app outside the built-in catalog. The catalog, in code, lists known apps with their name, domain and the external ids known so far.
+- `external_ids`: how sources name the app, prefixed by source, such as `google:<client id>`. A record goes to the first match:
+  1. the app whose `external_ids` hold its `appExternalId`;
+  2. the catalog app that lists that id;
+  3. the catalog app whose name equals `appName`, ignoring case;
+  4. otherwise, a new app named after `appName`.
+
+  In cases 2 to 4, the id is added to the app's `external_ids`, and a catalog app is created if missing. A record without an `appExternalId` belongs to its connection's app.
+- A Google grant to the instance's own Google app (the Google Workspace connection's `clientId`) is skipped: broccoli-access is not one of the company's apps.
 - `status`: `discovered`, `approved`, `ignored`.
   - A connected app is `approved` when it is connected.
   - A found app starts `discovered`.
@@ -236,14 +240,16 @@ One person's account in one app. The name avoids Better Auth's `account` table.
 - `employee_id`: the employee with that email. It is null when the email matches nobody; circle 1 does not show those accounts.
 - `status`: `active`, `suspended`.
 - `found_via`: the finding kinds whose last scan saw the account, such as `google_directory` and `google_sign_in`. Connector modules register these kinds, and the sync rewrites the list. An account no source sees any more is deleted, and its history row remains.
-- `first_seen_at`: the earliest `grantedAt` of its records, or when a scan first saw it.
+- `granted_at`: when the person granted access, from the source's log. Null when the log does not hold it.
+- `granted_before`: set only when `granted_at` is null because the grant is older than the log: the earliest moment the log covered when a scan first saw the account. The grant happened before it, and the UI says "Before 25 May 2026". Both are null for an account that is not a grant, such as a directory account, or for a source without a log.
+- `first_seen_at`: when a scan first saw the account.
 - `created_at`.
 
 ```json
 [
-  { "id": "acc_ana_google", "app_id": "app_google_workspace", "email": "ana@acme.example", "employee_id": "emp_ana", "status": "suspended", "found_via": ["google_directory"], "first_seen_at": "2026-11-20T07:58:20Z", "created_at": "2026-11-20T07:58:20Z" },
-  { "id": "acc_ana_figma", "app_id": "app_figma", "email": "ana@acme.example", "employee_id": "emp_ana", "status": "active", "found_via": ["google_sign_in"], "first_seen_at": "2024-06-03T09:12:00Z", "created_at": "2026-11-20T07:58:31Z" },
-  { "id": "acc_ana_slack", "app_id": "app_slack", "email": "ana@acme.example", "employee_id": "emp_ana", "status": "active", "found_via": ["google_sign_in"], "first_seen_at": "2024-03-14T10:02:00Z", "created_at": "2026-11-20T07:58:31Z" }
+  { "id": "acc_ana_google", "app_id": "app_google_workspace", "email": "ana@acme.example", "employee_id": "emp_ana", "status": "suspended", "found_via": ["google_directory"], "granted_at": null, "granted_before": null, "first_seen_at": "2026-11-20T07:58:20Z", "created_at": "2026-11-20T07:58:20Z" },
+  { "id": "acc_ana_figma", "app_id": "app_figma", "email": "ana@acme.example", "employee_id": "emp_ana", "status": "active", "found_via": ["google_sign_in"], "granted_at": null, "granted_before": "2026-05-25T08:00:00Z", "first_seen_at": "2026-11-20T07:58:31Z", "created_at": "2026-11-20T07:58:31Z" },
+  { "id": "acc_chloe_claude", "app_id": "app_claude", "email": "chloe@acme.example", "employee_id": "emp_chloe", "status": "active", "found_via": ["google_sign_in"], "granted_at": "2026-09-10T14:12:00Z", "granted_before": null, "first_seen_at": "2026-11-20T07:58:31Z", "created_at": "2026-11-20T07:58:31Z" }
 ]
 ```
 
@@ -270,7 +276,7 @@ Binary files, kept for employee photos in a later circle.
 - **An employee's status**: the status of their account in the directory app. The UI shows "Suspended in Google", using the directory app's name.
 - **Suspended with access**: an employee suspended in the directory with at least one `active` account in another `approved` app. Their number is the Users badge and the "Suspended with access" tab.
 - **An app's users**: its accounts with an employee. "n still have access" counts the `active` ones whose employee is suspended in the directory.
-- **An app's first seen**: the earliest `first_seen_at` of its accounts.
+- **Since**, for an account: its `granted_at`; otherwise "Before" its `granted_before`; otherwise its `first_seen_at`. For an app: the earliest of its accounts, shown as "Before …" when that earliest one only has `granted_before`.
 
 ## Removed
 
