@@ -7,7 +7,14 @@ import { validAccessToken } from "./adminAccess";
 import { authorizationErrorHtml, consentPageHtml } from "./consentPage";
 import type { FakeGoogleContext } from "./context";
 import { sendGoogleError } from "./googleErrors";
-import { findPerson, grantAccess, type GoogleState, type OAuthClient } from "./state";
+import {
+  findGrant,
+  findPerson,
+  fullName,
+  grantAccess,
+  type GoogleState,
+  type OAuthClient,
+} from "./state";
 import { exchangeToken, GOOGLE_ISSUER } from "./tokenEndpoint";
 
 /** Google's OAuth 2.0 and OpenID Connect endpoints, as Google runs them for a web application. */
@@ -130,17 +137,15 @@ function authorize(
 ): string {
   const { state } = context;
   const scopes = parameters.scope.split(" ");
+  const earlier = findGrant(state, email, client.clientId);
   const consentsNow =
-    !hasConsented(state, email, client.clientId, scopes) ||
+    !scopes.every((scope) => earlier?.scopes.includes(scope)) ||
     (parameters.prompt ?? "").split(" ").includes("consent");
   if (consentsNow) {
-    const grant = {
-      email,
-      clientId: client.clientId,
-      appName: client.name,
-      grantedAt: context.now(),
-    };
-    grantAccess(state, { ...grant, scopes: grantedScopes(state, grant, scopes) }, context.now());
+    // Google adds newly granted scopes to what the person granted the client before.
+    const grantedScopes = [...new Set([...(earlier?.scopes ?? []), ...scopes])];
+    const grant = { email, clientId: client.clientId, appName: client.name, scopes: grantedScopes };
+    grantAccess(state, { ...grant, grantedAt: context.now() }, context.now());
   }
   const code = `4/0A${randomBytes(24).toString("base64url")}`;
   state.authorizationCodes.set(code, {
@@ -163,7 +168,7 @@ function showUserInfo(context: FakeGoogleContext): RequestHandler {
       sub: person.id,
       email: person.email,
       email_verified: true,
-      name: `${person.givenName} ${person.familyName}`,
+      name: fullName(person),
       given_name: person.givenName,
       family_name: person.familyName,
       hd: context.state.customer.domain,
@@ -201,19 +206,4 @@ function redirectBack(
   for (const [name, value] of Object.entries(answer)) url.searchParams.set(name, value);
   if (state !== undefined) url.searchParams.set("state", state);
   response.redirect(302, url.toString());
-}
-
-function hasConsented(state: GoogleState, email: string, clientId: string, scopes: string[]) {
-  const grant = state.grants.find((g) => g.email === email && g.clientId === clientId);
-  return grant !== undefined && scopes.every((scope) => grant.scopes.includes(scope));
-}
-
-/** Google adds newly granted scopes to what the person granted the client before. */
-function grantedScopes(
-  state: GoogleState,
-  { email, clientId }: { email: string; clientId: string },
-  scopes: string[],
-): string[] {
-  const earlier = state.grants.find((g) => g.email === email && g.clientId === clientId);
-  return [...new Set([...(earlier?.scopes ?? []), ...scopes])];
 }

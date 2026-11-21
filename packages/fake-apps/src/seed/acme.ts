@@ -176,6 +176,13 @@ const DATED_GRANTS = [
 /** Grants the canvas does not date are older than the 180-day grant log: at least this many days. */
 const UNLOGGED_GRANT_MIN_DAYS = 181;
 
+/** Unlogged grants spread over about two years before the log, so their dates look real. */
+const UNLOGGED_GRANT_SPREAD_DAYS = 700;
+
+/** Accounts were created one after another from this day, Acme's first Google year. */
+const FIRST_ACCOUNT_CREATED = Date.UTC(2021, 3, 1);
+const DAYS_BETWEEN_ACCOUNTS = 23;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const ACME: AcmeSeed = buildAcme();
@@ -271,7 +278,9 @@ function toSeedPerson(person: DraftPerson, index: number): SeedPerson {
     managerEmail: person.manager === null ? null : `${person.manager}@${DOMAIN}`,
     isSuperAdmin: person.localPart === "admin",
     suspended: person.suspended,
-    creationTime: new Date(Date.UTC(2021, 3, 1) + index * 23 * DAY_MS).toISOString(),
+    creationTime: new Date(
+      FIRST_ACCOUNT_CREATED + index * DAYS_BETWEEN_ACCOUNTS * DAY_MS,
+    ).toISOString(),
   };
 }
 
@@ -345,5 +354,5 @@ function grantDaysBeforeStart(grant: DraftGrant, position: number, index: number
   const app = COUNTED_APPS.find(({ name }) => name === grant.app);
   const first = app?.firstGrantDaysBeforeStart;
   if (app && first !== undefined) return first - Math.floor((position * first) / app.people);
-  return UNLOGGED_GRANT_MIN_DAYS + ((index * 37) % 700);
+  return UNLOGGED_GRANT_MIN_DAYS + ((index * 37) % UNLOGGED_GRANT_SPREAD_DAYS);
 }

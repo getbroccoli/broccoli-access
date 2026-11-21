@@ -1,10 +1,11 @@
 import { Router, type RequestHandler } from "express";
 
 import type { SeedPerson } from "../seed";
-import { adminAccess, pageOf, parsePageRequest } from "./adminAccess";
+import { adminAccess } from "./adminAccess";
 import type { FakeGoogleContext } from "./context";
 import { sendGoogleError } from "./googleErrors";
-import { findPerson, type GoogleState } from "./state";
+import { pageOf, parsePageRequest } from "./pageRequest";
+import { findPerson, fullName, type GoogleState } from "./state";
 
 /** Google's Directory API v1: the customer, its users and each user's app grants. */
 export function directoryRoutes(context: FakeGoogleContext): Router {
@@ -92,7 +93,7 @@ function directoryUser(state: GoogleState, person: SeedPerson) {
     name: {
       givenName: person.givenName,
       familyName: person.familyName,
-      fullName: `${person.givenName} ${person.familyName}`,
+      fullName: fullName(person),
     },
     isAdmin: person.isSuperAdmin,
     suspended: person.suspended,

@@ -69,7 +69,7 @@ export interface PlannedFailure {
 }
 
 /** How far back Google's grant log reaches. */
-export const GRANT_LOG_DAYS = 180;
+const GRANT_LOG_DAYS = 180;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -126,10 +126,20 @@ export function revokeGrant(state: GoogleState, email: string, clientId: string)
   return state.grants.length < before;
 }
 
+/** A person's grant to a client, if they consented to it. */
+export function findGrant(state: GoogleState, email: string, clientId: string): Grant | undefined {
+  return state.grants.find((grant) => grant.email === email && grant.clientId === clientId);
+}
+
 /** Finds a person by Google user id or by email, as Directory's `userKey` does. */
 export function findPerson(state: GoogleState, userKey: string): SeedPerson | undefined {
   const key = userKey.toLowerCase();
   return state.people.find((person) => person.id === key || person.email === key);
+}
+
+/** The name Google shows for a person, as Directory's `fullName` and the ID token's `name`. */
+export function fullName(person: SeedPerson): string {
+  return `${person.givenName} ${person.familyName}`;
 }
 
 export function isInsideGrantLog(time: Date, now: Date): boolean {

@@ -5,7 +5,13 @@ import { SignJWT } from "jose";
 import { z } from "zod";
 
 import type { FakeGoogleContext } from "./context";
-import { findPerson, type GoogleState, type OAuthClient, type TokenHolder } from "./state";
+import {
+  findPerson,
+  fullName,
+  type GoogleState,
+  type OAuthClient,
+  type TokenHolder,
+} from "./state";
 
 /** The issuer Google's ID tokens carry, which sign-in code checks; the fake signs as Google. */
 export const GOOGLE_ISSUER = "https://accounts.google.com";
@@ -43,6 +49,7 @@ type TokenRequest = z.infer<typeof TOKEN_REQUEST>;
 /** As long as Google's access tokens live. */
 const ACCESS_TOKEN_SECONDS = 3599;
 
+/** As long as Google's ID tokens live. */
 const ID_TOKEN_SECONDS = 3600;
 
 const CODE_REFUSED = { error: "invalid_grant", error_description: "Bad Request" };
@@ -158,7 +165,7 @@ async function signIdToken(
     email: person.email,
     email_verified: true,
     hd: context.state.customer.domain,
-    name: `${person.givenName} ${person.familyName}`,
+    name: fullName(person),
     given_name: person.givenName,
     family_name: person.familyName,
     ...(nonce !== undefined && { nonce }),

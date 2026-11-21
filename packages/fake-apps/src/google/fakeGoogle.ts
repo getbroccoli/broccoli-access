@@ -70,7 +70,11 @@ function fakeGoogleApp(context: FakeGoogleContext): express.Express {
   return app;
 }
 
+/** One key per run, so a restart invalidates every ID token the fake signed before. */
 async function createSigningKey(): Promise<SigningKey> {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
-  return { kid: "fake-google-1", privateKey, publicJwk: await exportJWK(publicKey) };
+  return { kid: SIGNING_KEY_ID, privateKey, publicJwk: await exportJWK(publicKey) };
 }
+
+/** The fake publishes a single key, so its id only has to match the JWT header. */
+const SIGNING_KEY_ID = "fake-google-1";

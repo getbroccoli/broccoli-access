@@ -1,4 +1,5 @@
 import type { SeedPerson } from "../seed";
+import { fullName } from "./state";
 
 /** What the consent page shows and sends back with the person's decision. */
 export interface ConsentPage {
@@ -21,7 +22,7 @@ export function consentPageHtml({ appName, scopes, accounts, parameters }: Conse
     .map(
       (person, index) =>
         `<label><input type="radio" name="account" value="${escape(person.email)}"${index === 0 ? " checked" : ""}> ` +
-        `${escape(person.givenName)} ${escape(person.familyName)} (${escape(person.email)})</label>`,
+        `${escape(fullName(person))} (${escape(person.email)})</label>`,
     )
     .join("<br>\n");
   const permissions = scopes.map((scope) => `<li>${escape(scope)}</li>`).join("\n");
