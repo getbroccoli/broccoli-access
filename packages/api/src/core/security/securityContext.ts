@@ -6,7 +6,6 @@ import {
   type Grant,
   type Operation,
   PERMISSION_PROFILES,
-  profilesOf,
   type PermissionObject,
   type PermissionProfile,
   type ProfileDefinition,
@@ -129,20 +128,6 @@ export class PrincipalSecurityContext implements SecurityContext {
     profiles?: Record<PermissionProfile, ProfileDefinition>,
   ): SecurityContext {
     return new PrincipalSecurityContext({ ...user }, false, directory, profiles);
-  }
-
-  /** The newly created owner, before setup adds or links any employees. */
-  static setupOwner({ id, email }: { id: string; email: string }): SecurityContext {
-    return new PrincipalSecurityContext(
-      {
-        userId: id,
-        email,
-        isOwner: true,
-        permissionProfiles: profilesOf(true),
-        employeeId: null,
-      },
-      false,
-    );
   }
 
   /** The browser holding setup; built by `resolveSecurityContext`. */

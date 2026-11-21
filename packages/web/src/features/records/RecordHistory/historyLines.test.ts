@@ -2,8 +2,6 @@ process.env.TZ = "America/Los_Angeles";
 
 import { expect, it } from "vitest";
 
-import { formatCalendarDate } from "@/lib/formatDate";
-
 import { authorName, causeLabel, groupByDay, summaryOf } from "./historyLines";
 import type { RecordDescription } from "../recordDescription";
 
@@ -305,22 +303,19 @@ const description: RecordDescription = {
       key: "firstName",
       label: "First name",
       section: "Personal",
-      editor: "text",
       format: (value) => value,
     },
     {
       key: "jobTitle",
       label: "Job title",
       section: "Job",
-      editor: "text",
       format: (value) => value,
     },
     {
       key: "startDate",
       label: "Start date",
       section: "Job",
-      editor: "date",
-      format: (value) => formatCalendarDate(value) ?? value,
+      format: (value) => value.split("-").reverse().join("/"),
     },
   ],
 };

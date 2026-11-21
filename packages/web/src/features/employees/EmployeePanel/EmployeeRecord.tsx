@@ -77,7 +77,6 @@ export function EmployeeRecord({ employee, onClose }: Props) {
             email={
               <FieldValue
                 field={EMAIL_FIELD}
-                recordId={employee.id}
                 saved={draft.saved.email}
                 draft={draft.draft.email}
                 error={draft.fieldErrors.email}
@@ -95,7 +94,7 @@ export function EmployeeRecord({ employee, onClose }: Props) {
                   : null
             }
           />
-          <EmployeeDetails employee={employee} draft={draft} canEdit={canEdit} />
+          <EmployeeDetails draft={draft} canEdit={canEdit} />
         </TabsPanel>
         <TabsPanel value="history" className="subtle-scrollbar flex-1 overflow-y-auto px-6 py-6">
           <EmployeeHistory employeeId={employee.id} />

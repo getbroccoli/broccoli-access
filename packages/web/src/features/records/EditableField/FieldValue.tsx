@@ -9,7 +9,6 @@ import { FieldEditor } from "./FieldEditor";
 
 type Props = {
   field: RecordField;
-  recordId: string;
   saved: string | null;
   /** The unsaved value, or undefined when the field is unchanged. */
   draft: string | null | undefined;
@@ -25,7 +24,6 @@ type Props = {
 /** A record field's value, without its label, which a click or Enter turns into its editor. */
 export function FieldValue({
   field,
-  recordId,
   saved,
   draft,
   error,
@@ -49,7 +47,6 @@ export function FieldValue({
       ) : (editing || error) && !disabled ? (
         <FieldEditor
           field={field}
-          recordId={recordId}
           value={value}
           invalid={Boolean(error)}
           describedBy={error ? errorId : undefined}

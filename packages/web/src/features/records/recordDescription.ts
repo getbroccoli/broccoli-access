@@ -1,5 +1,3 @@
-import type { ComponentType } from "react";
-
 /** One field of a record type, as its panel and its history show it. */
 export interface RecordField {
   /** The history field key, such as `firstName`. */
@@ -7,9 +5,7 @@ export interface RecordField {
   label: string;
   /** The panel section the field sits in, such as "Personal"; none for a field shown elsewhere. */
   section?: string;
-  /** A text input, a date picker, or the record type's own editor. */
-  editor: "text" | "date" | ComponentType<FieldEditorProps>;
-  /** How a stored value shows, such as a date as DD/MM/YYYY. */
+  /** How a stored value shows, such as a code as its name. */
   format: (value: string) => string;
   /** Never among the panel's sections: only in history, or elsewhere, such as a person's work email. */
   historyOnly?: boolean;
@@ -23,19 +19,4 @@ export interface RecordDescription {
   fields: RecordField[];
   /** The field whose value names the record in "added …" and "removed …". */
   titleField: string;
-}
-
-/** What a field's editor gets from the panel. */
-export interface FieldEditorProps {
-  field: RecordField;
-  /** The record the field belongs to. */
-  recordId: string;
-  value: string;
-  invalid: boolean;
-  describedBy: string | undefined;
-  onChange: (value: string) => void;
-  /** The person finished with the field; its value stays in the draft. */
-  onDone: () => void;
-  /** Escape: the field goes back to its saved value. */
-  onRevert: () => void;
 }

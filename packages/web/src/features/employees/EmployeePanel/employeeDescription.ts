@@ -9,7 +9,6 @@ export const EMPLOYEE_DESCRIPTION = {
     {
       key: "email",
       label: t("people.panel.field.email"),
-      editor: "text",
       format: (value) => value,
       historyOnly: true,
     },
@@ -23,7 +22,6 @@ function textField(key: "firstName" | "lastName"): RecordDescription["fields"][n
     key,
     label: t(`people.panel.field.${key}`),
     section: t("people.panel.section.personal"),
-    editor: "text",
     format: (value) => value,
   };
 }

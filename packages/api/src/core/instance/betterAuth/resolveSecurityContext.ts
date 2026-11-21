@@ -1,7 +1,7 @@
 import { fromNodeHeaders } from "better-auth/node";
 import type { IncomingHttpHeaders } from "node:http";
 
-import type { AuthSource } from "../../auth";
+import type { Auth } from "../../auth";
 import type { Orm } from "../../db";
 import { isCrossOrigin } from "../helpers";
 import {
@@ -23,16 +23,14 @@ const instances = createInstanceService();
  * cookie would expire before the session does.
  */
 export async function resolveSecurityContext(
-  authSource: AuthSource,
+  auth: Auth,
   orm: Orm,
   directory: EmployeeDirectory,
   requestHeaders: IncomingHttpHeaders,
 ): Promise<RequestSecurity> {
-  const auth = await authSource.current();
   // A page on another origin gets no authority from the browser's cookies, nor does a request
   // carrying a bearer token.
   if (
-    !auth ||
     isCrossOrigin(requestHeaders, auth.options.baseURL) ||
     requestHeaders.authorization !== undefined
   ) {

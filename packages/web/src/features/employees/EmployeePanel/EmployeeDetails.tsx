@@ -1,4 +1,3 @@
-import type { EmployeePanel_EmployeeFragment } from "@/__generated__/graphql";
 import { EditableField } from "@/features/records";
 import { t } from "@/i18n";
 
@@ -7,13 +6,12 @@ import type { EmployeeFieldKey } from "./employeeDraft";
 import type { useEmployeeDraft } from "./useEmployeeDraft";
 
 type Props = {
-  employee: EmployeePanel_EmployeeFragment;
   draft: ReturnType<typeof useEmployeeDraft>;
   canEdit: (key: EmployeeFieldKey) => boolean;
 };
 
 /** The person's fields in their sections, each edited in place. */
-export function EmployeeDetails({ employee, draft, canEdit }: Props) {
+export function EmployeeDetails({ draft, canEdit }: Props) {
   const fields = EMPLOYEE_DESCRIPTION.fields.filter((field) => !("historyOnly" in field));
   const sections = Map.groupBy(fields, (field) => field.section);
 
@@ -41,7 +39,6 @@ export function EmployeeDetails({ employee, draft, canEdit }: Props) {
                 <EditableField
                   key={key}
                   field={field}
-                  recordId={employee.id}
                   saved={draft.saved[key]}
                   draft={draft.draft[key]}
                   error={draft.fieldErrors[key]}
