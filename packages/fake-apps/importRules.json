@@ -1,0 +1,11 @@
+{
+  "elements": {
+    "src/index": ["src/google", "src/seed"],
+    "src/google": ["src/seed"],
+    "src/seed": [],
+    "test/support": ["src/google", "src/seed"]
+  },
+  "testsMayImport": {
+    "*": ["test/support"]
+  }
+}
