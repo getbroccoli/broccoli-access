@@ -5,6 +5,7 @@ import type { Logger } from "../../../core/logger";
 import { type Connection, type PageArgs, paginate } from "../../../core/pagination";
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
+import { parseUuid } from "../../../utils";
 import { type App, APP_SORT_VALUES, appAccountRepository, appRepository } from "../db";
 import {
   appChanges,
@@ -144,7 +145,8 @@ async function changeStatusWithHistory(
   status: AppStatus,
 ): Promise<{ app: App; changed: boolean }> {
   const repository = appRepository(tx);
-  const before = await repository.lockById(appId);
+  const id = parseUuid(appId);
+  const before = id && (await repository.lockById(id));
   if (!before) {
     throw new ApplicationError("NOT_FOUND", "No app has this id.");
   }
@@ -152,7 +154,7 @@ async function changeStatusWithHistory(
     return { app: before, changed: false };
   }
   const after = { ...before, status };
-  await repository.updateStatus([appId], status);
+  await repository.updateStatus([before.id], status);
   await appendUpdates(ctx, tx, [{ before, after }], EDITED_DIRECTLY);
   return { app: after, changed: true };
 }

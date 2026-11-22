@@ -17,7 +17,7 @@
       "src/modules/*"
     ],
     "src/modules/employees": ["src/core/*", "!src/core/server", "src/utils"],
-    "src/modules/apps": ["src/core/*", "!src/core/server"],
+    "src/modules/apps": ["src/core/*", "!src/core/server", "src/utils"],
     "src/modules/google": [
       "src/core/*",
       "!src/core/server",

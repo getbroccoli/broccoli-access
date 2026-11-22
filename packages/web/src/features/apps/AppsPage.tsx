@@ -45,6 +45,11 @@ export function AppsPage() {
   const selected =
     selection ?? new Set(discoveredApps?.filter((app) => app.preselected).map(({ id }) => id));
   const apps = data?.apps.edges.map(({ node }) => node);
+  // The banner needs the discovered apps whatever the tab, so their failure shows too.
+  const failedQueries = [
+    { failed: error && !data, refetch },
+    { failed: discovered.error && !discovered.data, refetch: discovered.refetch },
+  ].filter(({ failed }) => failed);
 
   return (
     <div className="flex flex-col">
@@ -59,10 +64,14 @@ export function AppsPage() {
           onTabChange={(next) => void navigate({ search: { status: next } })}
         />
       </div>
-      {error && !data && (
-        <div role="alert" className="flex flex-col items-start gap-3">
+      {failedQueries.length > 0 && (
+        <div role="alert" className="mb-6 flex flex-col items-start gap-3">
           <p className="text-sm text-destructive">{t("apps.loadFailed")}</p>
-          <Button type="button" variant="outline" onClick={() => void refetch()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => failedQueries.forEach((query) => void query.refetch())}
+          >
             {t("apps.retry")}
           </Button>
         </div>

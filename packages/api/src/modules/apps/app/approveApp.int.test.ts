@@ -49,6 +49,12 @@ test("refuses to approve an unknown app", async ({ orm }) => {
   });
 });
 
+test("refuses to approve an app with a malformed id", async ({ orm }) => {
+  await expect(apps(orm).approveApp(OWNER, "not-an-id")).rejects.toMatchObject({
+    code: "NOT_FOUND",
+  });
+});
+
 test("refuses to approve an app without MANAGE_WORKSPACE and changes nothing", async ({
   orm,
   seed,
