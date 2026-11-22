@@ -38,6 +38,11 @@ export interface GoogleWorkspaceSettings {
   organizationName: string;
   adminEmail: string;
   grantedScopes: string[];
+  /**
+   * The Google apps used before `clientId`: consenting left a grant to each in Google, which the
+   * scans skip like the current one's, since none is one of the company's apps.
+   */
+  previousClientIds: string[];
 }
 
 /** The stored settings of the Google Workspace connection, checked as they are read. */
@@ -53,6 +58,8 @@ export const GOOGLE_WORKSPACE_SETTINGS = z.object({
   organizationName: z.string(),
   adminEmail: z.string(),
   grantedScopes: z.array(z.string()),
+  // A connection stored before the Google app could change has none.
+  previousClientIds: z.array(z.string()).default([]),
 });
 
 /** The connection's secrets, stored encrypted: the Google app's client secret and the admin's refresh token. */
@@ -72,6 +79,19 @@ export function requireSameWorkspace(
   if (consentingDomain.toLowerCase() !== settings.domain.toLowerCase()) {
     throw new OtherWorkspaceError();
   }
+}
+
+/**
+ * The settings with `clientId` the connection's Google app: the old one joins the previous ones,
+ * each once, and the new one is never among them.
+ */
+export function withGoogleApp(
+  settings: GoogleWorkspaceSettings,
+  clientId: string,
+): GoogleWorkspaceSettings {
+  const previous = new Set([...settings.previousClientIds, settings.clientId]);
+  previous.delete(clientId);
+  return { ...settings, clientId, previousClientIds: [...previous] };
 }
 
 /** Only a Google super admin may connect the workspace and become the owner. */

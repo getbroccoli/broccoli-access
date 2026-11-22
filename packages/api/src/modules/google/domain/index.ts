@@ -12,4 +12,5 @@ export {
   parseGoogleWorkspaceSettings,
   requireSameWorkspace,
   UnknownGoogleAccountError,
+  withGoogleApp,
 } from "./googleWorkspace";

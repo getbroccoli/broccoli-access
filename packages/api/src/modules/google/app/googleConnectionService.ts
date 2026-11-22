@@ -17,6 +17,7 @@ import {
   type GoogleWorkspaceSettings,
   parseGoogleWorkspaceSettings,
   requireSameWorkspace,
+  withGoogleApp,
 } from "../domain";
 import {
   openConsentState,
@@ -219,8 +220,7 @@ export function createGoogleConnectionService(
       const settings = parseGoogleWorkspaceSettings(connection.settings);
       requireSameWorkspace(settings, admin.domain);
       const changed: GoogleWorkspaceSettings = {
-        ...settings,
-        clientId: change.clientId,
+        ...withGoogleApp(settings, change.clientId),
         organizationName: admin.organizationName,
         adminEmail: admin.email,
         grantedScopes: grant.tokens.scopes,
@@ -321,6 +321,7 @@ async function saveConnection(
     organizationName: admin.organizationName,
     adminEmail: admin.email,
     grantedScopes: grant.tokens.scopes,
+    previousClientIds: [],
   };
   const saved = await transact(async (tx) => {
     const { userId } = await owners.createOwnerAtConnect(

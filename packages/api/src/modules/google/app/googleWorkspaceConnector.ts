@@ -45,7 +45,7 @@ export function createGoogleWorkspaceConnector(addresses: {
     secrets: GOOGLE_WORKSPACE_SECRETS,
     sourceName: (settings) => parseGoogleWorkspaceSettings(settings).domain,
     async openSession(connection) {
-      const { clientId } = parseGoogleWorkspaceSettings(connection.settings);
+      const { clientId, previousClientIds } = parseGoogleWorkspaceSettings(connection.settings);
       const secrets = GOOGLE_WORKSPACE_SECRETS.parse(connection.secrets);
       const accessToken = await asConnectorError(signInError, async () =>
         google.refreshAccessToken(await google.discover(), { clientId, ...secrets }),
@@ -69,7 +69,7 @@ export function createGoogleWorkspaceConnector(addresses: {
             const page = await google.listUsers(accessToken, cursor);
             const grants = await grantAccounts(page.users, {
               readTokens,
-              ownClientId: clientId,
+              ownClientIds: new Set([clientId, ...previousClientIds]),
               log: await readGrantLog(),
             });
             const accounts = [...page.users.map(directoryAccount), ...grants];
@@ -128,16 +128,19 @@ async function grantLogSince(
   return { start, grantedAt };
 }
 
-/** The users' grants, except to the instance's own Google app, which is not one of the company's apps. */
+/**
+ * The users' grants, except to the instance's own Google apps, current and previous, which are not
+ * the company's apps.
+ */
 async function grantAccounts(
   users: readonly GoogleUser[],
   {
     readTokens,
-    ownClientId,
+    ownClientIds,
     log,
   }: {
     readTokens: (userId: string) => Promise<GoogleToken[]>;
-    ownClientId: string;
+    ownClientIds: ReadonlySet<string>;
     log: GrantLog;
   },
 ): Promise<ImportedAccount[]> {
@@ -146,7 +149,7 @@ async function grantAccounts(
     const batch = users.slice(start, start + TOKEN_LISTS_AT_ONCE);
     const tokenLists = await Promise.all(batch.map((user) => readTokens(user.id)));
     batch.forEach((user, index) => {
-      const tokens = tokenLists[index]!.filter(({ clientId }) => clientId !== ownClientId);
+      const tokens = tokenLists[index]!.filter(({ clientId }) => !ownClientIds.has(clientId));
       accounts.push(...tokens.map((token) => grantAccount(user, token, log)));
     });
   }
