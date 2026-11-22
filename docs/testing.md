@@ -178,11 +178,13 @@ Load it in its own Chromium profile, never in a profile in daily use. Chrome ign
 export AGENT_BROWSER_HEADED=1
 export AGENT_BROWSER_PROFILE="$(mktemp -d)"
 export AGENT_BROWSER_EXTENSIONS="$PWD/packages/extension/dist"
-export AGENT_BROWSER_ARGS="--no-sandbox,--disable-features=Translate,DisableLoadExtensionCommandLineSwitch"
+# Newline-separated: a comma would split the feature list.
+export AGENT_BROWSER_ARGS="--no-sandbox
+--disable-features=Translate,DisableLoadExtensionCommandLineSwitch"
 agent-browser open "$URL/settings/connections"
 ```
 
 - Settings → Connections finds the extension by loading `chrome-extension://<id>/installed.txt`. Without it the "Chrome extension" card shows Not installed.
-- "Pair this Chrome" opens the pair page in a small window, a tab for agent-browser (`agent-browser tab list`). Its Pair button asks Chrome for access to the instance's origin in Chrome's own prompt, which is browser UI outside the page: answer it on the display, such as `xdotool key Tab Return` for Allow. Chrome remembers the answer, so the prompt shows once per profile and origin.
+- "Pair this Chrome" opens the pair page in a small window, a tab for agent-browser (`agent-browser tab list`). The page clears its one-time code from the address as it opens. Its Pair button asks Chrome for access to the instance's origin in Chrome's own prompt, which is browser UI outside the page: answer it on the display, such as `xdotool key Tab Return` for Allow. Chrome remembers an allowed origin even after unpairing removes the access, so the prompt shows again only for an origin the profile never allowed; use a new profile to see it again.
 - The extension's popup is `chrome-extension://<id>/popup.html`; open it in a tab to read or drive it.
-- After code changes, build again; Chrome reads the pages from `dist` when they open, and the service worker when the browser starts.
+- After code changes, build again, then turn on "Developer mode" in `chrome://extensions` and press the extension's Reload, or start with a new profile. Chrome reads the pages from `dist` when they open, but keeps running the old service worker, even across browser restarts.

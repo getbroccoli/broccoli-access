@@ -4,6 +4,8 @@ Start Broccoli Access with `docker compose up` and open http://localhost:8080. T
 
 Set `SELF_HOSTED_PUBLIC_URL` (see `.env.example`) when Broccoli Access has a domain: only that origin may sign in, and an https address gives Secure session cookies.
 
+The Chrome extension pairs only with an https address, or with `localhost` on the same computer, because your Slack session travels to Broccoli Access through it. Serve Broccoli Access over HTTPS before you pair a Chrome.
+
 # Rebuild
 
 After pulling changes, run `docker compose up --build` to rebuild the image.
