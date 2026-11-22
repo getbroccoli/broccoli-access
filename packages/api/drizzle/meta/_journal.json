@@ -22,6 +22,13 @@
       "when": 1795315227693,
       "tag": "0002_scan_google_people",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795375878793,
+      "tag": "0003_pair_chrome_extension",
+      "breakpoints": true
     }
   ]
 }

@@ -24,6 +24,7 @@ export { TEST_SECRET_BOX } from "./testSecretBox";
 export { storedFileIds } from "./storedFileIds";
 export {
   employeeServices,
+  extensionPairings,
   mailSettings,
   googleConnection,
   googleSignIn,
