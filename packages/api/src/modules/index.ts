@@ -32,12 +32,13 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     openIdConfigurationUrl: settings.googleOpenIdConfigurationUrl,
     adminApiUrl: settings.googleAdminApiUrl,
   };
+  const connectors = [createGoogleWorkspaceConnector(googleAddresses)];
   const connectedApps = createAppConnectionService(core);
-  const apps = createAppService(core);
+  const apps = createAppService({ ...core, connectors });
   // One scan service for the job, the page and the consent, which share its progress.
   const scans = createScanService({
     ...core,
-    connectors: [createGoogleWorkspaceConnector(googleAddresses)],
+    connectors,
     apps: { ...connectedApps, ...createAppAccountService(), ...apps },
     directory: createDirectorySyncService(),
   });

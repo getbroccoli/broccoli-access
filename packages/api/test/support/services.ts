@@ -92,9 +92,15 @@ export function googleSignIn(orm: Orm, { googleUrl }: { googleUrl: string }) {
   });
 }
 
-/** App selection with real transactions and silent logs. */
+/** App selection with real transactions and silent logs, with Google Workspace as the directory. */
 export function apps(orm: Orm): AppService {
-  return createAppService({ orm, transact: testTransactor(orm), logger: createLogger("silent") });
+  return createAppService({
+    orm,
+    transact: testTransactor(orm),
+    logger: createLogger("silent"),
+    // The Google Workspace connector as app selection reads it: only its key and directory flag.
+    connectors: [{ key: "google_workspace", isDirectory: true }],
+  });
 }
 
 /** Real scan dependencies with an instant retry wait and the local fake Google. */

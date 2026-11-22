@@ -109,6 +109,20 @@ export function accountChanges(
   );
 }
 
+/**
+ * How many of an app's users still have access though the directory suspended them: their account
+ * is `active` while their employee is in `suspendedInDirectory`.
+ */
+export function countSuspendedWithAccess(
+  users: readonly Pick<AppAccount, "employeeId" | "status">[],
+  suspendedInDirectory: ReadonlySet<string>,
+): number {
+  return users.filter(
+    ({ employeeId, status }) =>
+      status === "active" && employeeId !== null && suspendedInDirectory.has(employeeId),
+  ).length;
+}
+
 /** The fields whose changes history keeps, in the order a history line lists them. */
 const HISTORY_FIELDS = [
   "email",

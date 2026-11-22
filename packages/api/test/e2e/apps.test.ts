@@ -27,22 +27,21 @@ test("the owner's consent and scan open the app list and selecting apps finishes
   });
 }, 90_000);
 
-test("approves and ignores an app through GraphQL after the scan", async ({ env }) => {
+test("updates app counts when ignoring and approving apps after setup", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
   const discovered = await scannedApps(browser);
-  const { id } = discovered.find(({ name }) => name === "Slack")!;
-
-  const approved = await browser.graphql(
-    `
-    mutation ApproveApp($input: AppApproveInput!) {
-      apps { approve(input: $input) { app { id status } error { __typename } } }
-    }
-  `,
-    { input: { id } },
+  const approvedAppIds = discovered.filter(({ preselected }) => preselected).map(({ id }) => id);
+  const claude = discovered.find(({ name }) => name === "Claude")!;
+  const chatgpt = discovered.find(({ name }) => name === "ChatGPT")!;
+  const finished = await browser.graphql(
+    "mutation FinishSetup($input: SetupFinishInput!) { apps { finishSetup(input: $input) { error { __typename } } } }",
+    { input: { approvedAppIds } },
   );
+  expect(await finished.json()).toEqual({ data: { apps: { finishSetup: { error: null } } } });
 
-  expect(await approved.json()).toEqual({
-    data: { apps: { approve: { app: { id, status: "APPROVED" }, error: null } } },
+  const initial = await browser.graphql("{ appCounts { approved discovered ignored } }");
+  expect(await initial.json()).toEqual({
+    data: { appCounts: { approved: 7, discovered: 0, ignored: 31 } },
   });
 
   const ignored = await browser.graphql(
@@ -51,11 +50,44 @@ test("approves and ignores an app through GraphQL after the scan", async ({ env 
       apps { ignore(input: $input) { app { id status } error { __typename } } }
     }
   `,
-    { input: { id } },
+    { input: { id: claude.id } },
   );
-
   expect(await ignored.json()).toEqual({
-    data: { apps: { ignore: { app: { id, status: "IGNORED" }, error: null } } },
+    data: { apps: { ignore: { app: { id: claude.id, status: "IGNORED" }, error: null } } },
+  });
+  const afterIgnoring = await browser.graphql("{ appCounts { approved discovered ignored } }");
+  expect(await afterIgnoring.json()).toEqual({
+    data: { appCounts: { approved: 6, discovered: 0, ignored: 32 } },
+  });
+
+  const approved = await browser.graphql(
+    `
+    mutation ApproveApp($input: AppApproveInput!) {
+      apps { approve(input: $input) { app { id status } error { __typename } } }
+    }
+  `,
+    { input: { id: chatgpt.id } },
+  );
+  expect(await approved.json()).toEqual({
+    data: { apps: { approve: { app: { id: chatgpt.id, status: "APPROVED" }, error: null } } },
+  });
+  const afterApproving = await browser.graphql("{ appCounts { approved discovered ignored } }");
+  expect(await afterApproving.json()).toEqual({
+    data: { appCounts: { approved: 7, discovered: 0, ignored: 31 } },
+  });
+
+  const list = await browser.graphql(
+    "{ apps(status: APPROVED) { edges { node { name connected suspendedWithAccessCount } } } }",
+  );
+  expect(await list.json()).toMatchObject({
+    data: {
+      apps: {
+        edges: expect.arrayContaining([
+          { node: { name: "Google Workspace", connected: true, suspendedWithAccessCount: 0 } },
+          { node: { name: "Slack", connected: false, suspendedWithAccessCount: 2 } },
+        ]) as unknown,
+      },
+    },
   });
 }, 90_000);
 
@@ -86,6 +118,14 @@ test("returns ConflictError when ignoring Google Workspace through GraphQL", asy
 test.for([
   ["apps", "{ apps(status: DISCOVERED) { edges { node { id } } } }"],
   ["appCounts", "{ appCounts { approved discovered ignored } }"],
+  [
+    "apps.approve",
+    'mutation { apps { approve(input: { id: "00000000-0000-4000-8000-000000000001" }) { app { id } error { __typename } } } }',
+  ],
+  [
+    "apps.ignore",
+    'mutation { apps { ignore(input: { id: "00000000-0000-4000-8000-000000000001" }) { app { id } error { __typename } } } }',
+  ],
   [
     "apps.finishSetup",
     "mutation { apps { finishSetup(input: { approvedAppIds: [] }) { setup { step } error { __typename } } } }",

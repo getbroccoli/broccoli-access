@@ -1,6 +1,26 @@
 import { expect, it } from "vitest";
 
-import { accountChanges, planAccountSync, type AppAccount } from "./appAccount";
+import {
+  accountChanges,
+  countSuspendedWithAccess,
+  planAccountSync,
+  type AppAccount,
+} from "./appAccount";
+
+it("counts only active accounts belonging to employees suspended in the directory", () => {
+  const users: Pick<AppAccount, "employeeId" | "status">[] = [
+    { employeeId: "employee-ana", status: "active" },
+    { employeeId: "employee-ben", status: "active" },
+    { employeeId: "employee-chloe", status: "suspended" },
+    { employeeId: null, status: "active" },
+    { employeeId: "employee-david", status: "active" },
+  ];
+  const suspendedInDirectory = new Set(["employee-ana", "employee-ben", "employee-chloe"]);
+
+  const count = countSuspendedWithAccess(users, suspendedInDirectory);
+
+  expect(count).toBe(2);
+});
 
 it("plans no update for a found account whose fields did not change", () => {
   const plan = planAccountSync([ACCOUNT], {

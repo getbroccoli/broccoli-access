@@ -1,5 +1,31 @@
 import { expect, test, OWNER, EMPLOYEE, SYSTEM, apps, googleScanSetup } from "#test/support";
 
+test("shows how many suspended people still have access to each approved app", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { scans, sourceId } = await googleScanSetup(orm, fakeGoogle.url);
+  await scans.runScan(SYSTEM, sourceId);
+  const service = apps(orm);
+  const discovered = await service.listApps(OWNER, { status: "discovered" });
+  const approvedAppIds = discovered.edges
+    .filter(({ node }) => node.preselected)
+    .map(({ node }) => node.id);
+  await service.finishSetup(OWNER, { approvedAppIds });
+
+  const { edges } = await service.listApps(OWNER, { status: "approved" });
+
+  expect(edges.map(({ node }) => node)).toMatchObject([
+    { name: "Google Workspace", peopleCount: 42, suspendedWithAccessCount: 0, connected: true },
+    { name: "Slack", peopleCount: 41, suspendedWithAccessCount: 2, connected: false },
+    { name: "Notion", peopleCount: 31, suspendedWithAccessCount: 1, connected: false },
+    { name: "Figma", peopleCount: 16, suspendedWithAccessCount: 1, connected: false },
+    { name: "Miro", peopleCount: 12, suspendedWithAccessCount: 0, connected: false },
+    { name: "Loom", peopleCount: 11, suspendedWithAccessCount: 0, connected: false },
+    { name: "Claude", peopleCount: 9, suspendedWithAccessCount: 0, connected: false },
+  ]);
+});
+
 test("lists discovered apps by most people first, then by name", async ({ orm, fakeGoogle }) => {
   const { scans, sourceId } = await googleScanSetup(orm, fakeGoogle.url);
   await scans.runScan(SYSTEM, sourceId);
