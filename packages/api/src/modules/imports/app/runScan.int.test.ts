@@ -103,7 +103,7 @@ test("writes the 42 Google Workspace accounts with their status and employee", a
       employeeId: people.find(({ email }) => email === person.email)!.id,
       status: person.suspended ? "suspended" : "active",
       foundVia: ["google_directory"],
-      firstSeenAt: expect.any(Date),
+      firstSeenAt: expect.any(Date) as unknown,
       grantedAt: null,
       grantedBefore: null,
     });
@@ -123,7 +123,7 @@ test("finishes scanned with the read time and counts of people and suspended acc
     id: sourceId,
     status: "scanned",
     failure: null,
-    readAt: expect.any(Date),
+    readAt: expect.any(Date) as unknown,
   });
   expect(await scans.readScan(OWNER, connectionId)).toEqual({
     id: sourceId,
