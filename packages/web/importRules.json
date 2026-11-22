@@ -26,6 +26,7 @@
     "src/features/apps": [
       "src/__generated__",
       "src/apollo",
+      "src/components/Avatar",
       "src/components/dataTable",
       "src/components/ui",
       "src/i18n",

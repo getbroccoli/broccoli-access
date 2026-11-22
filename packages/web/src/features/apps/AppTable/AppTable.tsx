@@ -12,28 +12,40 @@ import {
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 
-import type { AppRow } from "./appRow";
 import { SelectionCheckbox } from "./SelectionCheckbox";
 
-/** How many apps show before "Show n more apps": the ones a first look needs. */
-const FIRST_ROWS = 12;
-
-type Props = {
-  apps: readonly AppRow[];
-  /** The tab's columns: tabs show different facts about their apps. */
-  columns: readonly DataTableColumn<AppRow>[];
-  /** Checkboxes in front of each app, when the owner selects apps. */
-  selection?: { selected: ReadonlySet<string>; onChange: (selected: Set<string>) => void };
-  /** Shown when there are no apps. */
+type Props<Row extends { id: string }> = {
+  rows: readonly Row[];
+  /** The facts each row shows, such as a tab's facts about its apps. */
+  columns: readonly DataTableColumn<Row>[];
+  /** How many rows a first look needs; "Show n more" brings the rest. */
+  firstRows: number;
+  /** The "Show n more" link's text for `count` hidden rows. */
+  showMoreLabel: (count: number) => string;
+  /** Checkboxes in front of each row, when the owner selects apps. */
+  selection?: {
+    selected: ReadonlySet<string>;
+    onChange: (selected: Set<string>) => void;
+    /** The checkbox's label for a row, such as "Select Slack". */
+    labelOf: (row: Row) => string;
+  };
+  /** Shown when there are no rows. */
   emptyState: ReactNode;
 };
 
-/** A framed table of apps, the first ones only until the owner asks for the rest. */
-export function AppTable({ apps, columns, selection, emptyState }: Props) {
+/** A framed table of apps or of an app's users, the first rows only until the owner asks for the rest. */
+export function AppTable<Row extends { id: string }>({
+  rows,
+  columns,
+  firstRows,
+  showMoreLabel,
+  selection,
+  emptyState,
+}: Props<Row>) {
   const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? apps : apps.slice(0, FIRST_ROWS);
-  const hidden = apps.length - shown.length;
-  const allSelected = selection !== undefined && apps.every(({ id }) => selection.selected.has(id));
+  const shown = expanded ? rows : rows.slice(0, firstRows);
+  const hidden = rows.length - shown.length;
+  const allSelected = selection !== undefined && rows.every(({ id }) => selection.selected.has(id));
   const toggle = (id: string) => {
     if (!selection) {
       return;
@@ -54,9 +66,9 @@ export function AppTable({ apps, columns, selection, emptyState }: Props) {
               <TableHead className="w-12 pl-5">
                 <SelectionCheckbox
                   label={t("apps.selectAll")}
-                  checked={apps.length > 0 && allSelected}
+                  checked={rows.length > 0 && allSelected}
                   onChange={() =>
-                    selection.onChange(new Set(allSelected ? [] : apps.map(({ id }) => id)))
+                    selection.onChange(new Set(allSelected ? [] : rows.map(({ id }) => id)))
                   }
                 />
               </TableHead>
@@ -85,16 +97,16 @@ export function AppTable({ apps, columns, selection, emptyState }: Props) {
               </TableCell>
             </TableRow>
           )}
-          {shown.map((app) => {
-            const selected = selection?.selected.has(app.id) ?? false;
+          {shown.map((row) => {
+            const selected = selection?.selected.has(row.id) ?? false;
             return (
-              <TableRow key={app.id} className={cn(selected && "bg-muted/60")}>
+              <TableRow key={row.id} className={cn(selected && "bg-muted/60")}>
                 {selection && (
                   <TableCell className="pl-5">
                     <SelectionCheckbox
-                      label={t("apps.select", { name: app.name })}
+                      label={selection.labelOf(row)}
                       checked={selected}
-                      onChange={() => toggle(app.id)}
+                      onChange={() => toggle(row.id)}
                     />
                   </TableCell>
                 )}
@@ -103,7 +115,7 @@ export function AppTable({ apps, columns, selection, emptyState }: Props) {
                     key={column.id}
                     className={cn("h-[62px] first:pl-5 last:pr-5", column.className)}
                   >
-                    {column.cell(app)}
+                    {column.cell(row)}
                   </TableCell>
                 ))}
               </TableRow>
@@ -118,7 +130,7 @@ export function AppTable({ apps, columns, selection, emptyState }: Props) {
             onClick={() => setExpanded(true)}
             className="text-sm font-medium text-brand-deep underline underline-offset-2 hover:text-foreground"
           >
-            {t("apps.showMore", { count: String(hidden) })}
+            {showMoreLabel(hidden)}
           </button>
         </div>
       )}

@@ -17,6 +17,9 @@ import { FirstRunBanner } from "./FirstRunBanner";
 // it; page with `after` if a directory ever has that many apps.
 const ALL_APPS = 10_000;
 
+/** How many apps show before "Show n more apps": the ones a first look needs. */
+const FIRST_APPS = 12;
+
 const STATUSES = {
   approved: "APPROVED",
   discovered: "DISCOVERED",
@@ -87,11 +90,19 @@ export function AppsPage() {
         <AppTable
           // A new tab starts with its first apps only.
           key={tab}
-          apps={apps}
+          rows={apps}
           // Selecting apps for setup replaces moving them one by one.
           columns={firstRun ? columns : [...columns, APP_ACTIONS_COLUMN]}
+          firstRows={FIRST_APPS}
+          showMoreLabel={(count) => t("apps.showMore", { count: String(count) })}
           selection={
-            firstRun && tab === "discovered" ? { selected, onChange: setSelection } : undefined
+            firstRun && tab === "discovered"
+              ? {
+                  selected,
+                  onChange: setSelection,
+                  labelOf: ({ name }) => t("apps.select", { name }),
+                }
+              : undefined
           }
           emptyState={t("apps.empty")}
         />
