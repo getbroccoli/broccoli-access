@@ -6,6 +6,15 @@ it("parses the documented manifest", () => {
   expect(CONNECTOR_MANIFEST.parse(manifest)).toEqual(manifest);
 });
 
+it("leaves out a capability v1 does not list", () => {
+  const extended = structuredClone(manifest);
+  extended.connectors[0]!.capabilities.push("delete_accounts");
+
+  const parsed = CONNECTOR_MANIFEST.parse(extended);
+
+  expect(parsed.connectors[0]!.capabilities).toEqual(["list_accounts", "suspend", "reactivate"]);
+});
+
 it("rejects the robot runtime", () => {
   const invalid = structuredClone(manifest);
   invalid.connectors[0]!.runtimes = ["robot"];

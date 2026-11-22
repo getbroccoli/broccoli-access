@@ -56,6 +56,14 @@ it("rejects an empty cursor", async ({ connectors: { url } }) => {
   expect(result.status).toBe(400);
 });
 
+it("rejects a cursor beyond the largest safe offset", async ({ connectors: { url } }) => {
+  const cursor = Buffer.from("o9007199254740993").toString("base64url");
+
+  const result = await callConnector(url, "accounts/list", { ...linearRequest, cursor });
+
+  expect(result.status).toBe(400);
+});
+
 it("rejects an unknown connector key", async ({ connectors: { url } }) => {
   const result = await callConnector(url, "connections/test", {
     ...linearRequest,

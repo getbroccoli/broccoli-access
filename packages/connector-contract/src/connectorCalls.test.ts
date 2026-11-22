@@ -8,10 +8,19 @@ import {
   ACTION_RUN_ANSWER,
   CONNECTOR_ERROR_ANSWER,
   ACCOUNTS_LIST_REQUEST,
+  RUNTIME,
 } from "./connectorCalls.js";
 
 it("parses the documented app session", () => {
   expect(APP_SESSION.parse(appSession)).toEqual(appSession);
+});
+
+it("rejects an owner browser runtime without a WebSocket address", () => {
+  const runtime = { kind: "owner_browser", url: "http://broccoli-access:3000/x" };
+  const websocket = { ...runtime, url: "ws://broccoli-access:3000/internal/owner-browser/abc" };
+
+  expect(RUNTIME.safeParse(runtime).success).toBe(false);
+  expect(RUNTIME.safeParse(websocket).success).toBe(true);
 });
 
 it("parses the documented connection test answer", () => {
