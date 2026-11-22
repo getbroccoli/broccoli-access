@@ -25,8 +25,9 @@ async function start(): Promise<void> {
     showState("broken");
     return;
   }
-  // Only the paired instance may ask, and the extension calls only that one.
-  if ((await askWorker({ type: "readPairing" }))?.origin !== origin) {
+  // Only the paired instance may ask, and the extension calls only that one; one that dropped the
+  // pairing is forgotten here.
+  if ((await askWorker({ type: "checkPairing" }))?.origin !== origin) {
     showState("not-paired");
     return;
   }
@@ -50,6 +51,7 @@ function showRequest(origin: string, request: AppSessionRequest): void {
   }
   element("[data-origin]").textContent = shownOrigin(origin);
   element("[data-storage]").hidden = request.storageKeys.length === 0;
+  element("[data-storage-keys]").textContent = request.storageKeys.join(", ");
   element("[data-domains]").replaceChildren(
     ...request.domains.map((domain) => {
       const item = document.createElement("li");

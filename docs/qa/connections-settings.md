@@ -52,7 +52,7 @@ Load the built extension in its own profile as "The Chrome extension" in `docs/t
 - [ ] After `POST <fake connectors>/_fake/slack/sessions/expire`, with the old tab still open, "Hand over" says "Slack didn't accept this session. Check that you're signed in to Slack as an admin, then hand over again."
 - [ ] Cancel in the extension's window leaves the dialog with "Nothing was handed over. Connect Slack again when you’re ready."
 - [ ] Signed in at the fake Slack, "Hand over" closes the window, and the dialog shows "Connect the Acme workspace?" with Acme and `acme.slack.com`; Back returns to step 4.
-- [ ] In a profile without the extension, while this owner is paired in another Chrome, "Connect Slack" still opens on step 1.
+- [ ] In a profile without the extension, while this owner is paired in another Chrome, "Connect Slack" still opens on step 1; with the extension installed but not paired there, the extension's window says "This Chrome isn't paired…", and after closing it the dialog offers "Pair this Chrome".
 - [ ] "Connect Acme" closes the dialog; the card reads "Connected", "The Acme workspace, connected with the Slack session of admin@acme.example." and, once scanned, "41 members. Scanned today at HH:MM. You accepted Slack’s notice on <today>."
-- [ ] Slack's app page lists 41 users with their "In Slack" status, Elif's not active.
+- [ ] Slack's app page lists 41 users with their "In Slack" status, Elif "Disabled".
 - [ ] At 390 px wide, every step fits without horizontal scrolling.

@@ -45,7 +45,11 @@ export function ConnectAppSessionSteps({ connector, connection, onConnected }: P
         connector={connector}
         handOver={handOver.handOver}
         connection={connection}
-        onBack={handOver.reset}
+        onBack={() => {
+          // A new hand-over starts with no result of the last Connect.
+          connection[1].reset();
+          handOver.reset();
+        }}
         onConnected={onConnected}
       />
     );
@@ -74,7 +78,9 @@ export function ConnectAppSessionSteps({ connector, connection, onConnected }: P
       {step === "notice" && connector.notice !== null && (
         <NoticeStep app={app} notice={connector.notice} onAccept={() => setNoticeAccepted(true)} />
       )}
-      {step === "signIn" && <SignInStep connector={connector} handOver={handOver} />}
+      {step === "signIn" && (
+        <SignInStep connector={connector} handOver={handOver} extension={extension} />
+      )}
     </>
   );
 }

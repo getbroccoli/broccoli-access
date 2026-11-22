@@ -196,7 +196,13 @@ export function createContainerConnectionService(
       }
       const connection = { settings: {}, secrets: { [field.key]: session } };
       const details = await testedConnection(dependencies, connector, connection);
-      handOvers.keep({ userId, requestId, connector: key, appSession: session, details });
+      // The test may renew the session, which then replaces the one the owner handed over.
+      const renewed = parseAppSession(details.connection?.secrets?.[field.key], field);
+      const handOver = { userId, requestId, connector: key, appSession: renewed ?? session };
+      if (!handOvers.keep({ ...handOver, details })) {
+        logger.warn({ connector: key, userId }, "App session refused: too large to connect with");
+        throw invalidInput([{ field: "appSession", code: "too_large" }]);
+      }
       logger.info({ connector: key, userId }, "App session handed over; waiting for the owner");
     },
     // eslint-disable-next-line @typescript-eslint/require-await -- A refusal rejects, as in every other operation.
@@ -275,10 +281,17 @@ const REFUSED_VALUES: readonly ConnectorErrorCode[] = [
   "wrong_workspace",
 ];
 
-/** Whether the test found other workspace settings than those the owner confirmed at the hand-over. */
-function isOtherWorkspace(connection: Connection, details: ConnectionDetails): boolean {
+/** Whether the test found another workspace than the one the owner confirmed at the hand-over. */
+function isOtherWorkspace(
+  { workspace, settings }: Connection,
+  details: ConnectionDetails,
+): boolean {
   const found = details.connection?.settings;
-  return found !== undefined && !isDeepStrictEqual(found, connection.settings);
+  return (
+    details.organizationName !== workspace?.organizationName ||
+    details.domain !== workspace.domain ||
+    (found !== undefined && !isDeepStrictEqual(found, settings))
+  );
 }
 
 /** The listed connector with `key` and its app session field. */

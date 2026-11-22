@@ -1,6 +1,11 @@
 import { inspect } from "node:util";
 
-import express from "express";
+import {
+  CONNECTOR_MANIFEST,
+  type AppSession,
+  type ConnectionTestAnswer,
+} from "@broccoli-access/connector-contract";
+import express, { type RequestHandler } from "express";
 import { onTestFinished } from "vitest";
 
 import {
@@ -8,6 +13,7 @@ import {
   test,
   OWNER,
   SYSTEM,
+  containerConnections,
   ownerHandOver,
   startSimpleHttpServer,
   storedApps,
@@ -105,19 +111,10 @@ test("refuses to connect a workspace other than the one the owner confirmed and 
 }) => {
   const owner = OWNER.user!;
   await seed.user({ id: owner.userId, email: owner.email });
-  const manifest = await (await fetch(new URL("/v1/connectors", fakeConnectors.url))).text();
-  let settings = { teamId: "T04ACME", teamDomain: "acme", teamName: "Acme" };
-  const container = express();
-  container.get("/v1/connectors", (_req, res) => res.type("json").send(manifest));
-  container.get("/slack/signin", (_req, res) => res.redirect(fakeConnectors.url + "/slack/signin"));
-  container.post("/v1/connections/test", (_req, res) =>
-    res.json({
-      details: { organizationName: "Acme", domain: "acme.slack.com" },
-      connection: { settings },
-    }),
+  let settings = ACME_SETTINGS;
+  const { server } = await slackContainer(fakeConnectors.url, (_req, res) =>
+    res.json({ details: ACME_DETAILS, connection: { settings } }),
   );
-  const server = await startSimpleHttpServer(container);
-  onTestFinished(() => server.stop());
   const { service, handOver, sent } = await ownerHandOver(orm, server);
   settings = { teamId: "T09OTHER", teamDomain: "other", teamName: "Other" };
 
@@ -134,3 +131,120 @@ test("refuses to connect a workspace other than the one the owner confirmed and 
   expect(await storedAppConnections(orm)).toEqual([]);
   expect(sent).toEqual([]);
 });
+
+test("refuses to connect when the second test names another workspace without new settings", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const owner = OWNER.user!;
+  await seed.user({ id: owner.userId, email: owner.email });
+  let answer: ConnectionTestAnswer = {
+    details: ACME_DETAILS,
+    connection: { settings: ACME_SETTINGS },
+  };
+  const { server } = await slackContainer(fakeConnectors.url, (_req, res) => res.json(answer));
+  const { service, handOver, sent } = await ownerHandOver(orm, server);
+  answer = { details: { organizationName: "Other", domain: "other.slack.com" } };
+
+  await expect(
+    service.connect(OWNER, {
+      connector: "slack",
+      appSession: handOver.appSession,
+      noticeAccepted: true,
+    }),
+  ).rejects.toMatchObject({
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "appSession", code: "wrong_workspace" }],
+  });
+  expect(await storedAppConnections(orm)).toEqual([]);
+  expect(sent).toEqual([]);
+});
+
+test("connects with the session the first test renewed", async ({ orm, seed, fakeConnectors }) => {
+  const owner = OWNER.user!;
+  await seed.user({ id: owner.userId, email: owner.email });
+  const renewed: AppSession = {
+    cookies: [
+      {
+        name: "d",
+        value: "renewed",
+        domain: "slack.localhost",
+        path: "/",
+        httpOnly: true,
+        secure: false,
+        sameSite: "Lax",
+      },
+    ],
+    storage: { localConfig_v2: "{}" },
+  };
+  let answer: ConnectionTestAnswer = {
+    details: ACME_DETAILS,
+    connection: { settings: ACME_SETTINGS, secrets: { appSession: renewed } },
+  };
+  let received: unknown;
+  const { server } = await slackContainer(fakeConnectors.url, (req, res) => {
+    received = req.body;
+    res.json(answer);
+  });
+  const { service, handOver } = await ownerHandOver(orm, server);
+  answer = { details: ACME_DETAILS, connection: { settings: ACME_SETTINGS } };
+
+  const saved = await service.connect(OWNER, {
+    connector: "slack",
+    appSession: handOver.appSession,
+    noticeAccepted: true,
+  });
+
+  expect(received).toHaveProperty("connection.secrets.appSession.cookies.0.value", "renewed");
+  const [connection] = await storedAppConnections(orm);
+  expect(
+    JSON.parse(TEST_SECRET_BOX.decrypt(connection!.encryptedSecrets, saved.connection!.id)),
+  ).toEqual({ appSession: renewed });
+});
+
+test("refuses a sealed session holding a storage key the connector no longer names", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const owner = OWNER.user!;
+  await seed.user({ id: owner.userId, email: owner.email });
+  const { server, manifest } = await slackContainer(fakeConnectors.url, (_req, res) =>
+    res.json({ details: ACME_DETAILS, connection: { settings: ACME_SETTINGS } }),
+  );
+  const { handOver } = await ownerHandOver(orm, server);
+  const slack = manifest.connectors.find(({ key }) => key === "slack")!;
+  const field = slack.connectionFields.find((candidate) => candidate.kind === "app_session")!;
+  expect(field.storageKeys).toEqual(["localConfig_v2"]);
+  field.storageKeys = [];
+  const { service, sent } = containerConnections(orm, server.url);
+
+  await expect(
+    service.connect(OWNER, {
+      connector: "slack",
+      appSession: handOver.appSession,
+      noticeAccepted: true,
+    }),
+  ).rejects.toMatchObject({
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "appSession", code: "invalid" }],
+  });
+  expect(await storedAppConnections(orm)).toEqual([]);
+  expect(sent).toEqual([]);
+});
+
+const ACME_SETTINGS = { teamId: "T04ACME", teamDomain: "acme", teamName: "Acme" };
+const ACME_DETAILS = { organizationName: "Acme", domain: "acme.slack.com" };
+
+async function slackContainer(fakeUrl: string, connectionTest: RequestHandler) {
+  const response = await fetch(new URL("/v1/connectors", fakeUrl));
+  const manifest = CONNECTOR_MANIFEST.parse(await response.json());
+  const container = express();
+  container.get("/v1/connectors", (_req, res) => res.json(manifest));
+  container.get("/slack/signin", (_req, res) => res.redirect(fakeUrl + "/slack/signin"));
+  container.post("/v1/connections/test", express.json(), connectionTest);
+  const server = await startSimpleHttpServer(container);
+  onTestFinished(() => server.stop());
+  return { server, manifest };
+}

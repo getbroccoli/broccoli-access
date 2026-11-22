@@ -93,6 +93,9 @@ function connectFailure(
 ): string | undefined {
   if (payloadError?.__typename === "InvalidInputError") {
     const code = payloadError.fields?.find(({ field }) => field === "appSession")?.code;
+    if (code === "wrong_workspace") {
+      return t("settings.appSession.otherWorkspace", { app });
+    }
     return code === "invalid" || code === "required"
       ? t("settings.appSession.expired", { app })
       : t("settings.appSession.refused", { app });

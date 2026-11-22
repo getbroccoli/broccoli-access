@@ -6,26 +6,25 @@ import { AppSessionHandOverDocument } from "@/__generated__/graphql";
 
 /**
  * Asks the paired extension to hand over the owner's session in `connector`'s app: `start` opens
- * its window, and the session comes back from the server, sealed, once the owner confirms there.
+ * its window, and once that window closes, as the extension closes it after handing over, the
+ * session comes back from the server, sealed.
  */
 export function useAppSessionHandOver(connector: string) {
   // The hand-over's id stays after its window closes, so its result stays readable.
   const [requestId, setRequestId] = useState<string | null>(null);
-  // The extension's window while it waits for the owner; null once it closed or timed out.
+  // The extension's window while it waits for the owner; null once it closed.
   const [handOverWindow, setHandOverWindow] = useState<Window | null>(null);
   const [isWindowBlocked, setWindowBlocked] = useState(false);
+  // Read once the window has closed: the extension closes it only after the server holds the session.
   const query = useQuery(AppSessionHandOverDocument, {
     variables: { id: requestId ?? "" },
-    skip: requestId === null,
+    skip: requestId === null || handOverWindow !== null,
     fetchPolicy: "network-only",
   });
+  useCloseDetection(handOverWindow, setHandOverWindow);
   const handOver = requestId ? (query.data?.appSessionHandOver ?? null) : null;
-  if (handOverWindow && handOver) {
-    // Handed over: waiting ends here.
-    setHandOverWindow(null);
-  }
-  usePollWhileWindowOpen(handOverWindow, query.refetch, setHandOverWindow);
-  const hasEnded = requestId !== null && handOverWindow === null && !handOver && !query.loading;
+  const hasRead = query.data !== undefined || query.error !== undefined;
+  const hasEnded = requestId !== null && handOverWindow === null && hasRead && !handOver;
 
   const start = () => {
     // Opened in the click itself: Chrome blocks a window opened after the click's activation ends.
@@ -48,7 +47,7 @@ export function useAppSessionHandOver(connector: string) {
     isWindowBlocked,
     // The window closed without a session, such as after Cancel.
     wasAbandoned: hasEnded && query.error === undefined,
-    // The window closed, but the last read of the hand-over failed.
+    // The window closed, but reading the hand-over failed.
     readFailed: hasEnded && query.error !== undefined,
     reset: () => {
       setRequestId(null);
@@ -57,35 +56,31 @@ export function useAppSessionHandOver(connector: string) {
   };
 }
 
-/** How often the page asks whether the extension has handed the session over. */
-const POLL_INTERVAL_MS = 1_000;
+/** How often the page checks whether the extension's window has closed. */
+const CLOSE_CHECK_INTERVAL_MS = 500;
 
 /**
- * Asks for the hand-over every second while `handOverWindow` is open, however long the owner takes
- * there, and once more when it closes, as it does after the hand-over or Cancel.
+ * Notices when `handOverWindow` closes, however long the owner takes there; closes it when the
+ * dialog goes away first, so nothing is handed over for a request nobody reads.
  */
-function usePollWhileWindowOpen(
+function useCloseDetection(
   handOverWindow: Window | null,
-  refetch: () => Promise<unknown>,
   setHandOverWindow: (handOverWindow: Window | null) => void,
 ): void {
   useEffect(() => {
     if (!handOverWindow) {
       return;
     }
-    const poll = setInterval(() => {
-      if (!handOverWindow.closed) {
-        void refetch().catch(() => undefined);
-        return;
+    const check = setInterval(() => {
+      if (handOverWindow.closed) {
+        setHandOverWindow(null);
       }
-      clearInterval(poll);
-      // The extension closes its window once the server holds the session, so this read finds it.
-      void refetch()
-        .catch(() => undefined)
-        .finally(() => setHandOverWindow(null));
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(poll);
-  }, [handOverWindow, refetch, setHandOverWindow]);
+    }, CLOSE_CHECK_INTERVAL_MS);
+    return () => {
+      clearInterval(check);
+      handOverWindow.close();
+    };
+  }, [handOverWindow, setHandOverWindow]);
 }
 
 /** The extension's hand-over page for this instance, the connector and the hand-over's id. */

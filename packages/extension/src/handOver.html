@@ -18,11 +18,14 @@
           Hand over your <span data-app></span> session to <span data-origin></span>?
         </h1>
         <p class="text strong-text">
-          Broccoli Access at this address receives your cookies of these addresses<span data-storage
-            >, and the token <span data-app></span>'s signed-in page keeps</span
-          >:
+          Broccoli Access at this address receives your cookies of these addresses and their
+          subdomains:
         </p>
         <ul class="text strong-text domains" data-domains></ul>
+        <p class="text strong-text" data-storage>
+          And the token <span data-app></span>'s signed-in page keeps: the whole value it keeps
+          under <span data-storage-keys></span>.
+        </p>
         <p class="note">
           Chrome may ask you next to allow access to these addresses and their subdomains. It never
           reads other sites, passwords or two-step codes.
@@ -35,8 +38,8 @@
       </section>
       <section class="card-body" data-state="not-paired" hidden>
         <p class="text">
-          This Chrome isn't paired with this Broccoli Access. Pair it from Settings, then connect
-          again.
+          This Chrome isn't paired with this Broccoli Access. Pair it from Connect in Broccoli
+          Access, then connect again.
         </p>
       </section>
       <section class="card-body" data-state="broken" hidden>

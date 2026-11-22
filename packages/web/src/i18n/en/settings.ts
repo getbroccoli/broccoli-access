@@ -95,6 +95,9 @@ export const settingsEn = {
   "settings.appSession.back": "Back",
   "settings.appSession.connectWorkspace": "Connect {workspace}",
   "settings.appSession.expired": "This hand-over expired. Connect {app} again.",
+  "settings.appSession.otherWorkspace":
+    "Your {app} session now opens another workspace. Go back, switch to the right one in {app}, then Connect {app} again.",
+  "settings.appSession.pairAgainHint": "Did the extension say this Chrome isn’t paired?",
   "settings.appSession.refused":
     "{app} refused your session. Sign in to {app} again, then Connect {app} again.",
   "settings.apps.oneMember": "1 member.",

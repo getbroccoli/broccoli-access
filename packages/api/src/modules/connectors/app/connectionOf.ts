@@ -1,18 +1,21 @@
 import { invalidInput } from "../../../core/applicationError";
 import type { Logger } from "../../../core/logger";
 import type { SecurityContext } from "../../../core/security";
-import type { AppSessionHandOvers } from "./appSessionHandOvers";
+import { parseAppSession } from "../domain";
+import type { AppSessionHandOvers, ConfirmedWorkspace } from "./appSessionHandOvers";
 import { appSessionFieldOf, type ContainerConnector } from "./containerConnectors";
 
 /** Settings and secrets as the connector reads them. */
 export interface Connection {
   settings: Record<string, unknown>;
   secrets: Record<string, unknown>;
+  /** For a handed-over session: the workspace the owner confirmed, which connecting must still reach. */
+  workspace?: ConfirmedWorkspace;
 }
 
 /**
- * The connection the owner gives: the app session sealed at its hand-over, with the settings of the
- * workspace they confirmed, or the typed values.
+ * The connection the owner gives: the app session sealed at its hand-over, with the workspace they
+ * confirmed and its settings, which the test before saving sends and compares, or the typed values.
  */
 export function connectionOf(
   ctx: SecurityContext,
@@ -32,15 +35,17 @@ export function connectionOf(
   }
   const handedOver =
     ctx.user && handOvers.open(appSession, { userId: ctx.user.userId, connector: connector.key });
-  if (!handedOver) {
+  // Checked again: the connector's manifest may have narrowed since the hand-over.
+  const session = handedOver && parseAppSession(handedOver.appSession, field);
+  if (!handedOver || !session) {
     logger.warn(
       { connector: connector.key },
       "Connect refused: the hand-over is changed, expired or another's",
     );
     throw invalidInput([{ field: "appSession", code: "invalid" }]);
   }
-  // The confirmed workspace's settings go with it, so the test before saving can tell a different one.
-  return { settings: handedOver.settings, secrets: { [field.key]: handedOver.appSession } };
+  const { settings, workspace } = handedOver;
+  return { settings, secrets: { [field.key]: session }, workspace };
 }
 
 /** The trimmed values as the connection's settings and secrets, refusing a missing or unknown one. */

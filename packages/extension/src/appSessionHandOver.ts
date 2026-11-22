@@ -56,8 +56,11 @@ export async function handOverAppSession(
   return response?.status === BAD_REQUEST ? "refused" : "failed";
 }
 
-/** The instance tests the session, trying the app up to three times; Chrome stops a worker's call at five minutes. */
-const HAND_OVER_TIMEOUT_MS = 4 * 60_000;
+/**
+ * How long the worker waits for the instance to test the session: under the 30 seconds after
+ * which Chrome stops a service worker waiting on a fetch, so the owner hears how it ended.
+ */
+const HAND_OVER_TIMEOUT_MS = 25_000;
 
 const NO_CONTENT = 204;
 
@@ -110,7 +113,8 @@ async function storageOfOpenTab(
     return {};
   }
   const tabs = await chrome.tabs.query({ url: hostPatternsOf(request.domains) });
-  for (const { id } of tabs) {
+  // An incognito tab keeps its own cookies, which the worker does not read.
+  for (const { id } of tabs.filter(({ incognito }) => !incognito)) {
     const storage = id === undefined ? null : await storageOfTab(id, request);
     if (storage) {
       return storage;

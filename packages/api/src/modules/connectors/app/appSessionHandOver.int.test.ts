@@ -192,3 +192,27 @@ test.for(["expired", "tampered", "another user's"] as const)(
     expect(sent).toEqual([]);
   },
 );
+
+test("refuses a hand-over whose sealed session would not fit the Connect request", async ({
+  orm,
+  fakeConnectors,
+}) => {
+  const { service } = containerConnections(orm, fakeConnectors.url);
+  const appSession = await signInToFakeSlack(fakeConnectors);
+  const config = JSON.parse(appSession.storage.localConfig_v2!) as Record<string, unknown>;
+  appSession.storage.localConfig_v2 = JSON.stringify({ ...config, padding: "x".repeat(80_000) });
+  const requestId = "oversized";
+
+  await expect(
+    service.handOverAppSession({
+      connector: "slack",
+      requestId,
+      userId: OWNER.user!.userId,
+      appSession,
+    }),
+  ).rejects.toMatchObject({
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "appSession", code: "too_large" }],
+  });
+  expect(await service.readAppSessionHandOver(OWNER, requestId)).toBeNull();
+});
