@@ -1,13 +1,10 @@
-import type { ConnectorManifest } from "@broccoli-access/connector-contract";
-import { onTestFinished } from "vitest";
-
 import {
   containerConnections,
   EMPLOYEE,
   expect,
   LINEAR_INPUT,
   OWNER,
-  startSimpleHttpServer,
+  serveManifest,
   test,
 } from "#test/support";
 
@@ -34,14 +31,10 @@ test("leaves out Linear when its connector can suspend but cannot reactivate", a
   orm,
   fakeConnectors,
 }) => {
-  const response = await fetch(`${fakeConnectors.url}/v1/connectors`);
-  const manifest = (await response.json()) as ConnectorManifest;
-  const linear = manifest.connectors.find(({ key }) => key === "linear")!;
-  linear.capabilities = ["list_accounts", "suspend"];
-  const server = await startSimpleHttpServer((_request, response) => {
-    response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(manifest));
+  const server = await serveManifest(fakeConnectors.url, ({ connectors }) => {
+    const linear = connectors.find(({ key }) => key === "linear")!;
+    linear.capabilities = ["list_accounts", "suspend"];
   });
-  onTestFinished(() => server.stop());
   const { service } = containerConnections(orm, server.url);
 
   const managing = await service.readManagingConnectors(OWNER, ["slack", "linear"]);

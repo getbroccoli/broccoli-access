@@ -5,6 +5,7 @@ import {
   expect,
   LINEAR_INPUT,
   OWNER,
+  serveManifest,
   storedApps,
   test,
 } from "#test/support";
@@ -22,6 +23,23 @@ test("lists Linear with its catalog name, domain and connector when only Slack h
   expect(listed).toMatchObject([
     { catalogKey: "linear", name: "Linear", domain: "linear.app", connector: { key: "linear" } },
   ]);
+});
+
+test("leaves out an app whose connector cannot both suspend and reactivate", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  await seed.app();
+  const server = await serveManifest(fakeConnectors.url, ({ connectors }) => {
+    const linear = connectors.find(({ key }) => key === "linear")!;
+    linear.capabilities = ["list_accounts", "suspend"];
+  });
+  const { service } = containerConnections(orm, server.url);
+
+  const listed = await service.listAppsToConnect(OWNER);
+
+  expect(listed).toEqual([]);
 });
 
 test("leaves an ignored Linear app out of the apps to connect", async ({

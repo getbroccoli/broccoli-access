@@ -90,5 +90,6 @@ export {
   containerConnectors,
   failLinearCall,
   serveAccountList,
+  serveManifest,
   LINEAR_INPUT,
 } from "./containerConnections";
