@@ -11,11 +11,11 @@ A manual check of the sign-in page, Sign in with Google and signing out against 
 
 - [ ] `/people?q=a` lands on `/login?redirect=%2Fpeople%3Fq%3Da`, shown without the navigation.
 - [ ] The page shows the Broccoli Access mark, "Sign in to Acme", "Use your acme.example Google account." and one "Sign in with Google" button, and no password form; `/forgot-password` and `/reset-password` show "Page not found".
-- [ ] `/login` while signed in as the owner goes to Today (`/`).
+- [ ] `/login` while signed in as the owner goes to Applications (`/apps`).
 
 ## Sign in with Google
 
-- [ ] "Sign in with Google", then Mia Novak (`admin@acme.example`) and Allow on the fake's consent page, lands on Today (`/`) signed in; a reload keeps the session.
+- [ ] "Sign in with Google", then Mia Novak (`admin@acme.example`) and Allow on the fake's consent page, lands on Applications (`/apps`) signed in; a reload keeps the session.
 - [ ] Chloe (`chloe@acme.example`) comes back to the sign-in page with "That Google account can’t sign in here." and stays signed out.
 - [ ] Cancel on the fake's consent page comes back with "You cancelled at Google. Sign in again when you’re ready."
 
@@ -31,5 +31,5 @@ A manual check of the sign-in page, Sign in with Google and signing out against 
 ## Robustness
 
 - [ ] With the API stopped, a reload shows "Couldn’t reach Broccoli Access"; once it is back, "Try again" opens the page.
-- [ ] An unknown path such as `/foo` shows "Page not found" with "Go to Today".
+- [ ] An unknown path such as `/foo` shows "Page not found" with "Go to Applications".
 - [ ] At a narrow width the login card fits the screen with its side margin.

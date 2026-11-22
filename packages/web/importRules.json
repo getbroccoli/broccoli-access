@@ -8,7 +8,6 @@
       "src/features/employees",
       "src/features/settings",
       "src/features/setup",
-      "src/features/today",
       "src/i18n",
       "src/shell"
     ],
@@ -29,8 +28,11 @@
       "src/components/ui",
       "src/i18n",
       "src/lib/class-names",
+      "src/lib/lastScan",
       "src/lib/since",
-      "src/lib/useRouteAction"
+      "src/lib/usePollWhileScanning",
+      "src/lib/useRouteAction",
+      "src/shell"
     ],
     "src/features/auth": [
       "src/components/ui",
@@ -51,7 +53,6 @@
       "src/lib/initials",
       "src/lib/listPage"
     ],
-    "src/features/today": ["src/__generated__", "src/i18n", "src/shell"],
     "src/features/records": [
       "src/__generated__",
       "src/components/ui",
@@ -72,6 +73,7 @@
       "src/lib/calendarDay",
       "src/lib/class-names",
       "src/lib/lastScan",
+      "src/lib/usePollWhileScanning",
       "src/shell"
     ],
     "src/features/setup": [
@@ -102,7 +104,8 @@
     "src/lib/useSessionChange": ["src/lib/useRouteAction"],
     "src/lib/calendarDay": [],
     "src/lib/sentenceCase": [],
-    "src/lib/lastScan": ["src/i18n", "src/lib/calendarDay", "src/lib/since"]
+    "src/lib/lastScan": ["src/i18n", "src/lib/calendarDay", "src/lib/since"],
+    "src/lib/usePollWhileScanning": []
   },
   "deepImports": ["src/components/ui", "src/__generated__"]
 }

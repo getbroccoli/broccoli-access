@@ -42,7 +42,7 @@ export type SignInError = (typeof SIGN_IN_ERRORS)[number];
 
 /**
  * The search params of `/login`: where a visitor who is already signed in goes, always a local
- * path (Sign in with Google lands on Today), and why the last sign-in failed, when it did.
+ * path (Sign in with Google lands on Applications), and why the last sign-in failed, when it did.
  */
 export const loginSearch = z.object({
   redirect: z

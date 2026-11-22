@@ -10,13 +10,61 @@ query AppsPage($status: AppStatus!, $first: Int!) {
         id
         name
         domain
+        status
+        connected
         peopleCount
+        suspendedWithAccessCount
         foundVia
         since {
           at
           before
         }
         preselected
+      }
+    }
+  }
+  setup {
+    id
+    googleWorkspace {
+      id
+      scan {
+        id
+        status
+        readAt
+      }
+    }
+  }
+}
+
+mutation ApproveApp($input: AppApproveInput!) {
+  apps {
+    approve(input: $input) {
+      app {
+        id
+        status
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation IgnoreApp($input: AppIgnoreInput!) {
+  apps {
+    ignore(input: $input) {
+      app {
+        id
+        status
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
       }
     }
   }

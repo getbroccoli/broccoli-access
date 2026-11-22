@@ -40,7 +40,7 @@ A manual check of setup held by one browser, which connects Google Workspace wit
 - [ ] Below the first twelve apps, "Show 25 more apps" shows the rest.
 - [ ] Unchecking Claude makes the button "Approve 5 and finish"; checking ChatGPT makes it "Approve 6 and finish". The header checkbox selects all apps, and again none.
 - [ ] Reloading keeps the owner on Applications; `/setup`, `/people` and `/` lead back to it.
-- [ ] "Approve 6 and finish" opens Approved: Google Workspace and the six selected apps, "Discovered 0", "Ignored 31", no banner and no count in the left menu. Reloading stays there, and `/setup` opens Today.
+- [ ] "Approve 6 and finish" opens Approved: Google Workspace and the six selected apps, "Discovered 0", "Ignored 31", no banner and no count in the left menu. Reloading stays there, and `/setup` and `/` open it too.
 
 ## Starting over
 

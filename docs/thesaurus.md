@@ -17,7 +17,6 @@ The words Broccoli Access's code and docs use, and what each one means. Only Bro
 - **Data folder**: `DATA_DIR`, the folder for files that must survive restarts, such as `secrets/`.
 - **File**: bytes with a MIME type that a module stores in the `files` table, such as an employee's avatar. The module that references it decides who may see it.
 - **Record**: a module's main entity, such as an employee.
-- **Today**: the home page, where a person lands after setup and after signing in. It shows what needs them today; for now, nothing.
 - **Subject**: the employee a record is about, which permission scopes are measured against.
 - **History**: every change to a record, kept as history lines in the `record_history` table and shown on the record. The product word; "audit" stays internal and means a separate security trail.
 - **History line**: one change to one record: its change author, when, its change cause, its change reason and each changed field's old and new value. Appended in the transaction of the change, and never deleted.

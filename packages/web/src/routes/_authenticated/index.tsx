@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { TodayPage } from "@/features/today";
-
+/** Home is Applications. */
 export const Route = createFileRoute("/_authenticated/")({
-  component: TodayPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/apps", replace: true });
+  },
 });

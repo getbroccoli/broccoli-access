@@ -1,33 +1,21 @@
 import { useQuery } from "@apollo/client/react";
-import { useEffect } from "react";
 
 import { ConnectionsSettingsDocument } from "@/__generated__/graphql";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
+import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { PageHeader } from "@/shell";
 
 import { GoogleWorkspaceCard } from "./GoogleWorkspaceCard";
 
-/** How often the page asks for the scan's outcome while it runs. */
-const POLL_INTERVAL_MS = 1_000;
-
 /** Settings' Connections page: where Broccoli Access finds people and their accounts. */
 export function ConnectionsSettings() {
   // A scan started elsewhere, such as in another tab, changes the connection outside this cache.
-  const { data, error, refetch, startPolling, stopPolling } = useQuery(
-    ConnectionsSettingsDocument,
-    { fetchPolicy: "cache-and-network" },
-  );
+  const query = useQuery(ConnectionsSettingsDocument, { fetchPolicy: "cache-and-network" });
+  const { data, error, refetch } = query;
   const connection = data?.setup.googleWorkspace;
-  const isScanning = connection?.scan?.status === "SCANNING";
-  useEffect(() => {
-    if (!isScanning) {
-      return;
-    }
-    startPolling(POLL_INTERVAL_MS);
-    return stopPolling;
-  }, [isScanning, startPolling, stopPolling]);
+  usePollWhileScanning(connection?.scan?.status === "SCANNING", query);
 
   return (
     <div className="flex max-w-4xl flex-col">
