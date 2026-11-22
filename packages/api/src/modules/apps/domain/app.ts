@@ -35,6 +35,11 @@ export interface NewApp {
   externalIds: string[];
 }
 
+/** What history keeps of an app. */
+export interface AppFields extends NewApp {
+  status: AppStatus;
+}
+
 /**
  * Matches each found app as the data model orders it: the known app holding its external id, the
  * catalog app listing that id, the catalog app with its name ignoring case, else a new app named
@@ -86,11 +91,6 @@ export function appChanges(before: AppFields | null, after: AppFields | null): F
       ? []
       : [{ field, oldValue: old[field], newValue: current[field] }],
   );
-}
-
-/** What history keeps of an app. */
-export interface AppFields extends NewApp {
-  status: AppStatus;
 }
 
 /** The fields whose changes history keeps, in the order a history line lists them. */

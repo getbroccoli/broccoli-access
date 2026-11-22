@@ -206,6 +206,8 @@ async function withRetries<T>(
 
 /** The directory's people among the accounts read (its own accounts), and the other apps they name. */
 function foundCounts(accounts: readonly ImportedAccount[]): ScanCounts {
+  // Counts the apps as the source names them; once the sync commits, the page shows the matched
+  // apps, fewer when two names go to one catalog app.
   const people = accounts.filter(({ values }) => values.appExternalId === null);
   const otherApps = new Set(accounts.map(({ values }) => values.appExternalId));
   otherApps.delete(null);
