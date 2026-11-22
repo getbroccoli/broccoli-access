@@ -18,17 +18,17 @@ export const settingsEn = {
     "That Google account belongs to another Google Workspace. Sign in with a super admin account of the connected workspace.",
   "settings.googleApp.failed": "Couldn’t change the Google app. Try again.",
   "settings.email.title": "Email",
-  "settings.email.description":
-    "How Broccoli Access sends email, such as password reset links. People need email to reset a forgotten password.",
+  "settings.email.description": "Choose how Broccoli Access sends email and send yourself a test.",
   "settings.email.options": "How Broccoli Access sends email",
   "settings.email.smtp": "Your mail server (SMTP)",
   "settings.email.smtpHint": "Send through your own mail server or email provider.",
   "settings.email.resend": "Resend",
   "settings.email.resendHint": "Send with your Resend API key.",
   "settings.email.noEmail": "No email",
-  "settings.email.noEmailHint": "Broccoli Access sends no email, and Forgot password is off.",
+  "settings.email.noEmailHint":
+    "Broccoli Access sends no email. You can still sign in with Google.",
   "settings.email.smtpUrl": "SMTP URL",
-  "settings.email.smtpUrlHint": "Such as smtps://user:password@smtp.acme-corp.example:465",
+  "settings.email.smtpUrlHint": "Such as smtps://user:secret@smtp.acme-corp.example:465",
   "settings.email.resendKey": "API key",
   "settings.email.from": "From address",
   "settings.email.fromHint":
@@ -45,7 +45,7 @@ export const settingsEn = {
   "settings.email.smtpUrlRequired": "Enter your SMTP URL.",
   "settings.email.smtpUrlInvalid": "Enter a URL that starts with smtp:// or smtps://.",
   "settings.email.smtpRejected":
-    "Your mail server refused to sign in. Check the user and password in the URL.",
+    "Your mail server refused to sign in. Check the sign-in details in the URL.",
   "settings.email.resendKeyRequired": "Enter your Resend API key.",
   "settings.email.unavailable":
     "Your mail server could not be reached. Check the address and try again.",

@@ -20,13 +20,13 @@ const server = await startServer(env, logger, (core) =>
     googleAdminApiUrl: env.googleAdminApiUrl,
   }),
 );
-logger.info({ url: server.url }, "Broccoli Access API listening");
+logger.info({ port: Number(new URL(server.url).port) }, "Broccoli Access API listening");
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     logger.info({ signal }, "Shutting down");
-    server.stop().catch((error: unknown) => {
-      logger.error({ err: error }, "Shutdown failed");
+    server.stop().catch(() => {
+      logger.error({ signal }, "Shutdown failed");
       process.exitCode = 1;
     });
   });
