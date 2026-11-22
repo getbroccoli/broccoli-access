@@ -13,6 +13,13 @@ query SetupScan {
           count
           suspended
         }
+        apps {
+          state
+          count
+        }
+        signInLogs {
+          state
+        }
       }
     }
   }
