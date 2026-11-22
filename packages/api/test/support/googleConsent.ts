@@ -3,11 +3,15 @@ import assert from "node:assert/strict";
 import { ACME } from "@broccoli-access/fake-apps";
 
 /** Registers this test's callback with the local fake Google. */
-export async function registerGoogleRedirect(googleUrl: string, origin: string): Promise<void> {
+export async function registerGoogleRedirect(
+  googleUrl: string,
+  origin: string,
+  client: { clientId: string; clientSecret: string } = ACME.oauthClient,
+): Promise<void> {
   const response = await fetch(`${googleUrl}/_fake/clients`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...ACME.oauthClient, redirectUris: [`${origin}/api/google/callback`] }),
+    body: JSON.stringify({ ...client, redirectUris: [`${origin}/api/google/callback`] }),
   });
   assert.equal(response.status, 204);
 }
