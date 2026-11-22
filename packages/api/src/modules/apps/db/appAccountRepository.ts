@@ -41,6 +41,8 @@ export interface EmployeeAppAccount extends Pick<
 > {
   employeeId: string;
   appName: string;
+  /** The app's key in the built-in catalog; null for another app. */
+  catalogKey: string | null;
   appStatus: AppStatus;
 }
 
@@ -125,6 +127,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
           employeeId: sql<string>`${appAccounts.employeeId}`,
           appId: appAccounts.appId,
           appName: apps.name,
+          catalogKey: apps.catalogKey,
           appStatus: apps.status,
           status: appAccounts.status,
           foundVia: appAccounts.foundVia,
