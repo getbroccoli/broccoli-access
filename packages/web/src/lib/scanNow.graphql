@@ -1,0 +1,11 @@
+mutation ScanNow($connectionId: ID!) {
+  imports {
+    scanConnection(connectionId: $connectionId) {
+      scan {
+        id
+        status
+        readAt
+      }
+    }
+  }
+}

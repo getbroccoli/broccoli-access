@@ -1,5 +1,5 @@
 import { useQuery } from "@apollo/client/react";
-import { CaretLeft, House, SquaresFour, Users } from "@phosphor-icons/react";
+import { CaretLeft, SquaresFour, Users } from "@phosphor-icons/react";
 import { Link, useRouteContext } from "@tanstack/react-router";
 
 import { NavCountsDocument } from "@/__generated__/graphql";
@@ -72,7 +72,6 @@ function useAppItems(): NavItem[] {
     badge: discovered > 0 ? discovered : undefined,
   };
   return [
-    { to: "/", label: t("nav.today"), icon: House },
     ...(canManage ? [applications] : []),
     { to: "/people", label: t("nav.people"), icon: Users },
   ];

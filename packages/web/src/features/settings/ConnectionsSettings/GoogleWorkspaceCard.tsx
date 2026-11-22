@@ -43,16 +43,14 @@ export function GoogleWorkspaceCard({ connection }: Props) {
           })}
         </p>
         <p className="text-sm text-muted-foreground" aria-live="polite">
-          {isScanning
-            ? t("settings.connections.scanning")
-            : formatLastScan(connection.scan?.readAt ?? null)}
+          {isScanning ? t("scans.scanning") : formatLastScan(connection.scan?.readAt ?? null)}
         </p>
         {connection.scan?.status === "SCAN_FAILED" && (
           <p className="text-sm text-destructive">{t("settings.connections.scanFailed")}</p>
         )}
         {error && (
           <p role="alert" className="text-sm text-destructive">
-            {t("settings.connections.scanNowFailed")}
+            {t("scans.scanNowFailed")}
           </p>
         )}
       </div>
@@ -68,7 +66,7 @@ export function GoogleWorkspaceCard({ connection }: Props) {
             void scanNow({ variables: { connectionId: connection.id } }).catch(() => undefined)
           }
         >
-          {t("settings.connections.scanNow")}
+          {t("scans.scanNow")}
         </Button>
         <Link
           to="/settings/connections/google-app"

@@ -14,6 +14,7 @@ export {
   type AccountSyncPlan,
   accountChanges,
   type AppAccount,
+  countSuspendedWithAccess,
   type FoundAccount,
   planAccountSync,
 } from "./appAccount";

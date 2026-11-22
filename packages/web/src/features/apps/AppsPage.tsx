@@ -6,7 +6,8 @@ import { AppsPageDocument, type AppStatus } from "@/__generated__/graphql";
 import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 
-import { FOUND_APP_COLUMNS } from "./appColumns";
+import { APP_ACTIONS_COLUMN, APPROVED_APP_COLUMNS, FOUND_APP_COLUMNS } from "./appColumns";
+import { AppsHeader } from "./AppsHeader";
 import type { AppTab } from "./appsSearch";
 import { AppTable } from "./AppTable";
 import { AppTabs } from "./AppTabs";
@@ -23,8 +24,9 @@ const STATUSES = {
 } as const satisfies Record<AppTab, AppStatus>;
 
 /**
- * The company's apps by status. While setup waits for the owner to select the apps, it opens on
- * the discovered ones, preselected as the server suggests, with the banner that finishes setup.
+ * The company's apps by status, with when the last scan ran and Scan now. While setup waits for the
+ * owner to select the apps, it opens on the discovered ones, preselected as the server suggests,
+ * with the banner that finishes setup.
  */
 export function AppsPage() {
   const { setupStep } = useRouteContext({ from: "/_authenticated" });
@@ -34,6 +36,8 @@ export function AppsPage() {
   const tab = search.status ?? (firstRun ? "discovered" : "approved");
   const { data, error, refetch } = useQuery(AppsPageDocument, {
     variables: { status: STATUSES[tab], first: ALL_APPS },
+    // A scan or a change elsewhere, such as in Settings, moves apps outside this cache.
+    fetchPolicy: "cache-and-network",
   });
   const discovered = useQuery(AppsPageDocument, {
     variables: { status: "DISCOVERED", first: ALL_APPS },
@@ -51,8 +55,11 @@ export function AppsPage() {
     { failed: discovered.error && !discovered.data, refetch: discovered.refetch },
   ].filter(({ failed }) => failed);
 
+  const columns = tab === "approved" ? APPROVED_APP_COLUMNS : FOUND_APP_COLUMNS;
+
   return (
     <div className="flex flex-col">
+      <AppsHeader canScan={!firstRun} />
       {/* Finishing ignores every app left unselected, so it waits for the selection to load. */}
       {firstRun && discoveredApps && (
         <FirstRunBanner discoveredCount={discoveredApps.length} selectedIds={selected} />
@@ -81,7 +88,8 @@ export function AppsPage() {
           // A new tab starts with its first apps only.
           key={tab}
           apps={apps}
-          columns={FOUND_APP_COLUMNS}
+          // Selecting apps for setup replaces moving them one by one.
+          columns={firstRun ? columns : [...columns, APP_ACTIONS_COLUMN]}
           selection={
             firstRun && tab === "discovered" ? { selected, onChange: setSelection } : undefined
           }

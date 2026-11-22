@@ -1,4 +1,0 @@
-fragment Today_employee on Employee {
-  id
-  firstName
-}

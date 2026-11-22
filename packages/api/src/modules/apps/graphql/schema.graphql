@@ -13,6 +13,10 @@ type App {
   since: Since
   "Whether setup's selection of the company's apps starts with it: at least a fifth of the directory's people have an account in it."
   preselected: Boolean!
+  "How many of its people still have an active account in it though the directory suspended them."
+  suspendedWithAccessCount: Int!
+  "Whether a connection reads it; a connected app stays approved, so it cannot be ignored."
+  connected: Boolean!
 }
 
 "Since when someone has had an account, as far as the sources know: when they granted access; before the log began, for a grant older than the log; otherwise when a scan first saw the account."

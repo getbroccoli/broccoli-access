@@ -1,4 +1,5 @@
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
+import type { Connector } from "../../../core/connectors";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import { createSetupStepService } from "../../../core/instance";
 import type { Logger } from "../../../core/logger";
@@ -17,6 +18,7 @@ import {
   appChanges,
   appSince,
   type AppStatus,
+  countSuspendedWithAccess,
   type FoundApp,
   isPreselected,
   planAppMatches,
@@ -65,6 +67,13 @@ export interface AppService {
     ctx: SecurityContext,
     selection: { approvedAppIds: readonly string[] },
   ) => Promise<void>;
+  /**
+   * The directory's app: the app of the connection whose connector is the directory; null before
+   * it is connected. Trusted read: no `ctx`.
+   */
+  directoryAppId: (db: Orm | Tx) => Promise<string | null>;
+  /** The employees whose account in the directory's app is suspended. Trusted read: no `ctx`. */
+  findEmployeesSuspendedInDirectory: (db: Orm | Tx) => Promise<string[]>;
 }
 
 /** An app with what the app list shows of it, computed from its users' accounts. */
@@ -76,16 +85,22 @@ export interface AppSummary extends App {
   /** Null without users. */
   since: Since | null;
   preselected: boolean;
+  /** How many of its users still have an active account though the directory suspended them. */
+  suspendedWithAccessCount: number;
+  /** Whether a connection reads it; a connected app stays approved. */
+  connected: boolean;
 }
 
 interface AppDependencies {
   orm: Orm;
   transact: Transact;
   logger: Logger;
+  /** The connectors the scans read; the one whose `isDirectory` is set names the directory. */
+  connectors: readonly Pick<Connector, "key" | "isDirectory">[];
 }
 
 export function createAppService(dependencies: AppDependencies): AppService {
-  const { orm, transact, logger } = dependencies;
+  const { orm, transact, logger, connectors } = dependencies;
   return {
     async matchFoundApps(ctx, tx, { found, cause }) {
       ctx.requireSystem();
@@ -106,7 +121,7 @@ export function createAppService(dependencies: AppDependencies): AppService {
         fetch: (query) => appRepository(orm).findPage({ ...query, status }),
       });
       const summaries = await summarize(
-        orm,
+        dependencies,
         page.edges.map(({ node }) => node),
       );
       return {
@@ -128,21 +143,24 @@ export function createAppService(dependencies: AppDependencies): AppService {
       });
       logger.info({ approved, ignored }, "Setup finished: the selected apps are approved");
     },
+    directoryAppId: (db) => findDirectoryAppId(db, connectors),
+    findEmployeesSuspendedInDirectory: (db) => findEmployeesSuspendedInDirectory(db, connectors),
   };
 }
 
 /** Moves the app to `status` with its history line, and returns it as the app list shows it. */
 async function changeStatus(
-  { orm, transact, logger }: AppDependencies,
+  dependencies: AppDependencies,
   ctx: SecurityContext,
   { appId, status }: { appId: string; status: AppStatus },
 ): Promise<AppSummary> {
+  const { transact, logger } = dependencies;
   ctx.require("MANAGE_WORKSPACE");
   const { app, changed } = await transact((tx) => changeStatusWithHistory(ctx, tx, appId, status));
   if (changed) {
     logger.info({ appId, status }, "App status changed");
   }
-  const [summary] = await summarize(orm, [app]);
+  const [summary] = await summarize(dependencies, [app]);
   return summary!;
 }
 
@@ -159,7 +177,8 @@ async function changeStatusWithHistory(
   if (!before) {
     throw new ApplicationError("NOT_FOUND", "No app has this id.");
   }
-  if (status === "ignored" && (await appConnectionRepository(tx).findByApp(before.id))) {
+  const connections = await appConnectionRepository(tx).findByApps([before.id]);
+  if (status === "ignored" && connections.length > 0) {
     throw new ApplicationError("CONFLICT", "A connected app stays approved.");
   }
   if (before.status === status) {
@@ -195,15 +214,26 @@ async function settleDiscoveredApps(
   return { approved: idsWith("approved").length, ignored: idsWith("ignored").length };
 }
 
-/** The apps with their people, how those were found, since when, and whether setup preselects them. */
-async function summarize(db: Orm, apps: readonly App[]): Promise<AppSummary[]> {
-  const accounts = appAccountRepository(db);
-  const [users, directoryPeople] = await Promise.all([
-    accounts.findUsersOfApps(apps.map(({ id }) => id)),
+/**
+ * The apps with their people, how those were found, since when, whether setup preselects them, who
+ * keeps access though suspended, and whether they are connected.
+ */
+async function summarize(
+  { orm, connectors }: Pick<AppDependencies, "orm" | "connectors">,
+  apps: readonly App[],
+): Promise<AppSummary[]> {
+  const accounts = appAccountRepository(orm);
+  const appIds = apps.map(({ id }) => id);
+  const [users, directoryPeople, connections, suspended] = await Promise.all([
+    accounts.findUsersOfApps(appIds),
     // Every employee holds a directory account, so they are the directory's people.
     accounts.countEmployeesWithAccounts(),
+    appConnectionRepository(orm).findByApps(appIds),
+    findEmployeesSuspendedInDirectory(orm, connectors),
   ]);
   const usersByApp = Map.groupBy(users, ({ appId }) => appId);
+  const connectedAppIds = new Set(connections.map(({ appId }) => appId));
+  const suspendedInDirectory = new Set(suspended);
   return apps.map((app) => {
     const appUsers = usersByApp.get(app.id) ?? [];
     return {
@@ -212,8 +242,28 @@ async function summarize(db: Orm, apps: readonly App[]): Promise<AppSummary[]> {
       foundVia: [...new Set(appUsers.flatMap(({ foundVia }) => foundVia))].sort(),
       since: appSince(appUsers),
       preselected: isPreselected(appUsers.length, directoryPeople),
+      suspendedWithAccessCount: countSuspendedWithAccess(appUsers, suspendedInDirectory),
+      connected: connectedAppIds.has(app.id),
     };
   });
+}
+
+async function findDirectoryAppId(
+  db: Orm | Tx,
+  connectors: AppDependencies["connectors"],
+): Promise<string | null> {
+  const directory = connectors.find(({ isDirectory }) => isDirectory);
+  const connection =
+    directory && (await appConnectionRepository(db).findByConnector(directory.key));
+  return connection?.appId ?? null;
+}
+
+async function findEmployeesSuspendedInDirectory(
+  db: Orm | Tx,
+  connectors: AppDependencies["connectors"],
+): Promise<string[]> {
+  const appId = await findDirectoryAppId(db, connectors);
+  return appId ? appAccountRepository(db).findSuspendedEmployeeIds(appId) : [];
 }
 
 /** One history line per created app and per app that gained external ids. */

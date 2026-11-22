@@ -3,7 +3,7 @@ import { redirect } from "@tanstack/react-router";
 import type { SetupStep } from "@/__generated__/graphql";
 import type { MessageKey } from "@/i18n";
 
-/** The path of a setup page, or of Today once setup is done. */
+/** The path of a setup page, or home once setup is done. */
 export type SetupPath = "/setup" | "/setup/scan" | "/apps" | "/";
 
 interface StepDefinition {
@@ -22,7 +22,7 @@ const STEPS = [
   { id: "select_apps", title: "setup.selectApps.title", path: "/apps", step: "SELECT_APPS" },
 ] as const satisfies readonly StepDefinition[];
 
-/** Where setup ends: Today. */
+/** Where setup ends: home, which is Applications. */
 const FINISHED: SetupPath = "/";
 
 /** A setup page. */
@@ -49,7 +49,7 @@ export function stepViews(current: SetupStepId): StepView[] {
   }));
 }
 
-/** The page of a server step, or Today once setup is done. */
+/** The page of a server step, or home once setup is done. */
 export function setupStepPage(step: SetupStep): SetupPath {
   if (step === "DONE") {
     return FINISHED;

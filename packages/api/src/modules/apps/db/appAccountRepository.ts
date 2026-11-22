@@ -19,12 +19,14 @@ export interface AppAccountRepository {
   findUsersOfApps(appIds: readonly string[]): Promise<AppUserAccount[]>;
   /** How many employees hold an account in any app. */
   countEmployeesWithAccounts(): Promise<number>;
+  /** The employees whose account in the app is suspended. */
+  findSuspendedEmployeeIds(appId: string): Promise<string[]>;
 }
 
 /** What the app list reads of a user's account. */
 export type AppUserAccount = Pick<
   AppAccount,
-  "appId" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
+  "appId" | "employeeId" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
 >;
 
 export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
@@ -71,6 +73,8 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
       orm()
         .select({
           appId: appAccounts.appId,
+          employeeId: appAccounts.employeeId,
+          status: appAccounts.status,
           foundVia: appAccounts.foundVia,
           grantedAt: appAccounts.grantedAt,
           grantedBefore: appAccounts.grantedBefore,
@@ -83,6 +87,19 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .select({ employees: countDistinct(appAccounts.employeeId) })
         .from(appAccounts);
       return row!.employees;
+    },
+    findSuspendedEmployeeIds: async (appId) => {
+      const rows = await orm()
+        .selectDistinct({ employeeId: appAccounts.employeeId })
+        .from(appAccounts)
+        .where(
+          and(
+            eq(appAccounts.appId, appId),
+            eq(appAccounts.status, "suspended"),
+            isNotNull(appAccounts.employeeId),
+          ),
+        );
+      return rows.map(({ employeeId }) => employeeId!);
     },
   };
 }

@@ -9,7 +9,6 @@ import { scansEn } from "./en/scans";
 import { settingsEn } from "./en/settings";
 import { setupEn } from "./en/setup";
 import { tableEn } from "./en/table";
-import { todayEn } from "./en/today";
 
 /** English copy, one file per key prefix under `en/`. Every user-facing string is read through `t()`. */
 export const en = {
@@ -24,5 +23,4 @@ export const en = {
   ...tableEn,
   ...notFoundEn,
   ...settingsEn,
-  ...todayEn,
 } as const;

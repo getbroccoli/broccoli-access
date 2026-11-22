@@ -64,7 +64,10 @@ export function AppTable({ apps, columns, selection, emptyState }: Props) {
             {columns.map((column) => (
               <TableHead
                 key={column.id}
-                className={cn("h-12 font-normal text-muted-foreground", column.className)}
+                className={cn(
+                  "h-12 font-normal text-muted-foreground first:pl-5 last:pr-5",
+                  column.className,
+                )}
               >
                 {column.header}
               </TableHead>
@@ -96,7 +99,10 @@ export function AppTable({ apps, columns, selection, emptyState }: Props) {
                   </TableCell>
                 )}
                 {columns.map((column) => (
-                  <TableCell key={column.id} className={cn("h-[62px]", column.className)}>
+                  <TableCell
+                    key={column.id}
+                    className={cn("h-[62px] first:pl-5 last:pr-5", column.className)}
+                  >
                     {column.cell(app)}
                   </TableCell>
                 ))}

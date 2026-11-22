@@ -79,7 +79,7 @@ const MAX_BODY_BYTES = "10kb";
 
 const SCAN_PAGE = "/setup/scan";
 
-const TODAY = "/";
+const HOME = "/";
 
 const CONNECTIONS_PAGE = "/settings/connections";
 
@@ -175,7 +175,7 @@ async function finishConsent(
   }
 }
 
-/** A sign-in: signs the person in and sends them to Today, or back to login. */
+/** A sign-in: signs the person in and sends them home, or back to login. */
 async function finishSignIn(
   { signIn, http, logger }: GoogleRoutes,
   { request, response, answer }: Callback,
@@ -198,7 +198,7 @@ async function finishSignIn(
     });
     response.append("Set-Cookie", await http.startSession(userId));
     logger.info({ userId }, "Signed in with Google");
-    response.redirect(302, TODAY);
+    response.redirect(302, HOME);
   } catch (error) {
     const failure = error instanceof UnknownGoogleAccountError ? "not_allowed" : "failed";
     logRefusal(logger, error, failure, "Google sign-in refused");
