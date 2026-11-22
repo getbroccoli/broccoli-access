@@ -13,6 +13,7 @@ import {
   appAccountRepository,
   appConnectionRepository,
   appRepository,
+  type EmployeeAppAccount,
 } from "../db";
 import {
   appChanges,
@@ -74,6 +75,17 @@ export interface AppService {
   directoryAppId: (db: Orm | Tx) => Promise<string | null>;
   /** The employees whose account in the directory's app is suspended. Trusted read: no `ctx`. */
   findEmployeesSuspendedInDirectory: (db: Orm | Tx) => Promise<string[]>;
+  /**
+   * Every account that belongs to an employee, with its app's name and status and whether the
+   * app is the directory's. Trusted read: no `ctx`.
+   */
+  findEmployeeAccounts: (db: Orm | Tx) => Promise<EmployeeAccountInApp[]>;
+}
+
+/** An employee's account as the People list reads it. */
+export interface EmployeeAccountInApp extends Omit<EmployeeAppAccount, "appId"> {
+  /** Whether the app is the directory's, such as Google Workspace. */
+  inDirectory: boolean;
 }
 
 /** An app with what the app list shows of it, computed from its users' accounts. */
@@ -145,6 +157,16 @@ export function createAppService(dependencies: AppDependencies): AppService {
     },
     directoryAppId: (db) => findDirectoryAppId(db, connectors),
     findEmployeesSuspendedInDirectory: (db) => findEmployeesSuspendedInDirectory(db, connectors),
+    async findEmployeeAccounts(db) {
+      const [accounts, directoryAppId] = await Promise.all([
+        appAccountRepository(db).findEmployeeAccounts(),
+        findDirectoryAppId(db, connectors),
+      ]);
+      return accounts.map(({ appId, ...account }) => ({
+        ...account,
+        inDirectory: appId === directoryAppId,
+      }));
+    },
   };
 }
 

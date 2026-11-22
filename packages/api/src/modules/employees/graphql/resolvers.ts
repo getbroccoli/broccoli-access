@@ -1,8 +1,23 @@
-import { mutationPayload, type Resolvers, type ResolversTypes } from "../../../core/graphql";
+import DataLoader from "dataloader";
+
+import {
+  mutationPayload,
+  perRequest,
+  type Resolvers,
+  type ResolversTypes,
+  toEnum,
+} from "../../../core/graphql";
 import type { EmployeeReadService, EmployeeService } from "../app";
+import type { EmployeeAccess } from "../domain";
 import { avatarUrl } from "../http";
 
 export function createResolvers(services: EmployeeService & EmployeeReadService): Resolvers {
+  const access = perRequest(
+    (context) =>
+      new DataLoader<string, EmployeeAccess>((employeeIds) =>
+        services.readAccessOfEmployees(context.getActor(), employeeIds),
+      ),
+  );
   return {
     Query: {
       employee: (_parent, { id }, context) => services.readEmployee(context.getActor(), id),
@@ -13,6 +28,7 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
           orderBy,
           filter,
         }),
+      employeeCounts: (_parent, _args, context) => services.countEmployees(context.getActor()),
     },
     Mutation: {
       employees: () => ({}),
@@ -45,6 +61,12 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
           first: first ?? undefined,
           after,
         }),
+      status: async ({ id }, _args, context) => {
+        const { status } = await access(context).load(id);
+        return status && toEnum(status);
+      },
+      approvedAppNames: async ({ id }, _args, context) =>
+        (await access(context).load(id)).approvedAppNames,
     },
   };
 }

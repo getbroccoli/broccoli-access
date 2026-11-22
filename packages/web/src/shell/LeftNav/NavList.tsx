@@ -9,6 +9,8 @@ export interface NavItem {
   icon?: Icon;
   /** A number beside the label, such as the apps awaiting a decision. */
   badge?: number;
+  /** "warning" draws the badge in amber, for something to act on. */
+  badgeTone?: "warning";
 }
 
 type Props = { label: string; items: NavItem[] };

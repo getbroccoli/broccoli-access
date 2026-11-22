@@ -12,6 +12,16 @@ type Employee implements AnyRecord {
   history("Page size, 1 to 10000." first: Int = 50, after: String): RecordChangeConnection!
   "What the signed-in user may do to this employee."
   access: RecordAccess!
+  "Their account's status in the directory, such as Google Workspace; null without one. Admins only."
+  status: EmployeeStatus
+  "Names of the approved apps, other than the directory, where they have an active account, sorted. Admins only."
+  approvedAppNames: [String!]!
+}
+
+"Whether someone's directory account, such as their Google Workspace account, is in use."
+enum EmployeeStatus {
+  ACTIVE
+  SUSPENDED
 }
 
 # Adds the employee to the shared list of record types that keep history; the server merges them.
@@ -33,6 +43,8 @@ enum EmployeeOrderField {
   "First name, then last name, ignoring case."
   NAME
   EMAIL
+  "People suspended in the directory first, then by name; admins only."
+  STATUS
 }
 
 input EmployeeOrder {
@@ -43,6 +55,15 @@ input EmployeeOrder {
 input EmployeeFilter {
   "Matches full name or email containing it, ignoring case; at most 100 characters."
   search: String
+  "True keeps only the people suspended in the directory who still have an active account in another approved app; admins only."
+  suspendedWithAccess: Boolean
+}
+
+"How many employees there are, and how many of them are suspended with access."
+type EmployeeCounts {
+  all: Int!
+  "Suspended in the directory with an active account in another approved app."
+  suspendedWithAccess: Int!
 }
 
 input EmployeeCreateInput {
@@ -122,6 +143,8 @@ type Query {
     orderBy: EmployeeOrder = { field: NAME, direction: ASC }
     filter: EmployeeFilter
   ): EmployeeConnection!
+  "How many employees there are, and how many are suspended with access. Admins only."
+  employeeCounts: EmployeeCounts!
 }
 
 type Mutation {

@@ -24,8 +24,8 @@ export interface Employee {
   managerId: string | null;
 }
 
-/** What a list of employees can be sorted by. */
-export type EmployeeOrderField = "NAME" | "EMAIL";
+/** What a list of employees can be sorted by; STATUS puts people suspended in the directory first, then sorts by name. */
+export type EmployeeOrderField = "NAME" | "EMAIL" | "STATUS";
 
 /** How a list of employees is sorted. */
 export type EmployeeOrder = ListOrder<EmployeeOrderField>;

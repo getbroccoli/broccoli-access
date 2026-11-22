@@ -63,6 +63,7 @@ export {
 } from "./storedGoogleConnection";
 export { googleSetup, GOOGLE_SCOPES } from "./googleSetup";
 export { googleScanSetup } from "./googleScanSetup";
+export { approvedGoogleSetup } from "./approvedGoogleSetup";
 export { connectorContract, type ConnectorContractCase } from "./connectorContract";
 export { recordingJobQueue } from "./recordingJobQueue";
 export {
@@ -79,3 +80,4 @@ export {
   storedImportRecords,
   storedRecordHistory,
 } from "./storedScan";
+export { readGoogleConnection, scannedApps } from "./scannedGoogle";

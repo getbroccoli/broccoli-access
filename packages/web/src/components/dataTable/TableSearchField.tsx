@@ -37,11 +37,11 @@ export function TableSearchField({
   }, [text, query, onQueryChange]);
 
   return (
-    <div className="relative w-56">
+    <div className="relative w-full sm:w-80">
       <MagnifyingGlass
-        size={13}
+        size={16}
         aria-hidden
-        className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground"
+        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
       />
       <Input
         type="search"
@@ -50,7 +50,7 @@ export function TableSearchField({
         onChange={(event) => setText(event.target.value)}
         placeholder={placeholder}
         aria-label={label}
-        className="h-7 pl-7 text-[12.5px] md:text-[12.5px]"
+        className="h-10 pl-9 text-sm md:text-sm"
       />
     </div>
   );

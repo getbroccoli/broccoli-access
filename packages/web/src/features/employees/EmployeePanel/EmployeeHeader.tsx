@@ -11,7 +11,7 @@ import {
 import { SheetClose, SheetTitle } from "@/components/ui/sheet";
 import { t } from "@/i18n";
 
-import { Avatar } from "../Avatar";
+import { Avatar } from "@/components/Avatar";
 
 type Props = {
   employee: EmployeePanel_EmployeeFragment;

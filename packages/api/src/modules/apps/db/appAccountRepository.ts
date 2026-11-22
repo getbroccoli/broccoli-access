@@ -1,8 +1,9 @@
-import { and, arrayContains, countDistinct, eq, isNotNull, or } from "drizzle-orm";
+import { and, arrayContains, countDistinct, eq, isNotNull, or, sql } from "drizzle-orm";
 
 import { anyOf, insertBatches, type Orm, ormOf, type Tx } from "../../../core/db";
-import type { AppAccount } from "../domain";
+import type { AppAccount, AppStatus } from "../domain";
 import { appAccounts } from "./appAccountsTable";
+import { apps } from "./appsTable";
 
 /** App accounts in Postgres, through the pool or inside a transaction. */
 export interface AppAccountRepository {
@@ -21,6 +22,8 @@ export interface AppAccountRepository {
   countEmployeesWithAccounts(): Promise<number>;
   /** The employees whose account in the app is suspended. */
   findSuspendedEmployeeIds(appId: string): Promise<string[]>;
+  /** Every account with an employee, with its app's name and status. */
+  findEmployeeAccounts(): Promise<EmployeeAppAccount[]>;
 }
 
 /** What the app list reads of a user's account. */
@@ -28,6 +31,13 @@ export type AppUserAccount = Pick<
   AppAccount,
   "appId" | "employeeId" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
 >;
+
+/** An employee's account with its app's name and status, as the People list reads it. */
+export interface EmployeeAppAccount extends Pick<AppAccount, "appId" | "status"> {
+  employeeId: string;
+  appName: string;
+  appStatus: AppStatus;
+}
 
 export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
   const orm = () => ormOf(db);
@@ -101,6 +111,18 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         );
       return rows.map(({ employeeId }) => employeeId!);
     },
+    findEmployeeAccounts: () =>
+      orm()
+        .select({
+          employeeId: sql<string>`${appAccounts.employeeId}`,
+          appId: appAccounts.appId,
+          appName: apps.name,
+          appStatus: apps.status,
+          status: appAccounts.status,
+        })
+        .from(appAccounts)
+        .innerJoin(apps, eq(apps.id, appAccounts.appId))
+        .where(isNotNull(appAccounts.employeeId)),
   };
 }
 

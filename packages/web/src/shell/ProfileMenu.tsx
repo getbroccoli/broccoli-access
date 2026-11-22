@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/features/auth";
-import { Avatar } from "@/features/employees";
+import { Avatar } from "@/components/Avatar";
 import { t } from "@/i18n";
 import { useSessionChange } from "@/lib/useSessionChange";
 

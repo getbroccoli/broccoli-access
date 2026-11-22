@@ -2,4 +2,18 @@ query NavCounts {
   appCounts {
     discovered
   }
+  employeeCounts {
+    suspendedWithAccess
+  }
+  # A scan changes the counts, so the menu reads them again when one it saw running ends.
+  setup {
+    id
+    googleWorkspace {
+      id
+      scan {
+        id
+        status
+      }
+    }
+  }
 }

@@ -1,0 +1,30 @@
+query PeoplePage($filter: EmployeeFilter) {
+  setup {
+    id
+    googleWorkspace {
+      id
+      scan {
+        id
+        status
+        readAt
+      }
+    }
+  }
+  employeeCounts {
+    all
+    suspendedWithAccess
+  }
+  employees(first: 10000, orderBy: { field: STATUS }, filter: $filter) {
+    edges {
+      node {
+        id
+        firstName
+        lastName
+        email
+        avatarUrl
+        status
+        approvedAppNames
+      }
+    }
+  }
+}
