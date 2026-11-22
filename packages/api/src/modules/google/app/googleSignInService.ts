@@ -53,7 +53,7 @@ export interface SignInAnswer {
   now: Date;
 }
 
-export type GoogleSignInDependencies = Pick<
+type GoogleSignInDependencies = Pick<
   GoogleConnectionDependencies,
   "orm" | "secretBox" | "openIdConfigurationUrl" | "adminApiUrl" | "connectedApps"
 >;

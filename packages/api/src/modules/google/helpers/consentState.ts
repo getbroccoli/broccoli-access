@@ -84,6 +84,7 @@ export function randomConsentToken(): string {
 /** Never part of base64url, which the sealed part is written in. */
 const FLOW_SEPARATOR = ".";
 
+/** 256 random bits, like the setup token, beyond guessing. */
 const TOKEN_BYTES = 32;
 
 /**
