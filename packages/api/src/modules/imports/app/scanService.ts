@@ -10,12 +10,15 @@ import {
 } from "../../../core/connectors";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import type { JobQueue } from "../../../core/jobs";
+import { createSetupStepService } from "../../../core/instance";
 import type { Logger } from "../../../core/logger";
 import type { SecurityContext } from "../../../core/security";
 import { importSourceRepository } from "../db";
 import { type Scan, type ScanCounts, type ScanProgress, scanOf } from "../domain";
 import type { DirectoryPeople, ScannedApps } from "../ports";
 import { syncAccounts } from "./syncAccounts";
+
+const setupSteps = createSetupStepService();
 
 /** Scans of connected apps: queued in the caller's transaction, run as a job, read by the scan page. */
 export interface ScanService {
@@ -37,8 +40,9 @@ export interface ScanService {
   scanNow: (ctx: SecurityContext, connectionId: string) => Promise<Scan>;
   /**
    * The scan's job: reads every page of the connection's accounts, trying a rate-limited or
-   * unavailable call again, then in one transaction replaces the source's records, syncs them
-   * and marks it scanned. A connector error marks it failed and changes nothing else. System only.
+   * unavailable call again, then in one transaction replaces the source's records, syncs them,
+   * marks it scanned and moves setup from the scan to selecting the apps. A connector error marks
+   * it failed and changes nothing else. System only.
    */
   runScan: (ctx: SecurityContext, sourceId: string) => Promise<void>;
   /** The job's attempts are used up: the scan failed with `app_unavailable`. System only. */
@@ -146,7 +150,7 @@ const ATTEMPTS = 3;
 /** The wait before the second attempt, doubled before each later one, as Google advises. */
 const FIRST_RETRY_DELAY_MS = 1_000;
 
-/** Reads the connection's accounts, then saves them and their sync in one transaction. */
+/** Reads the connection's accounts, then saves them, their sync and setup's next step in one transaction. */
 async function scanSource(
   ctx: SecurityContext,
   dependencies: ScanDependencies,
@@ -164,18 +168,25 @@ async function scanSource(
   const accounts = await readAllAccounts((cursor) => retrying(() => session.listAccounts(cursor)));
   const found = foundCounts(accounts);
   progressBySource.set(sourceId, { found });
-  const saved = await transact(async (tx) => {
+  const { saved, finishedSetupScan } = await transact(async (tx) => {
     const sources = importSourceRepository(tx);
     if ((await sources.lockById(sourceId))?.status !== "scanning") {
-      return false;
+      return { saved: false, finishedSetupScan: false };
     }
     await sources.replaceRecords(sourceId, accounts);
     await syncAccounts(ctx, tx, { sourceId, connection, connector, accounts }, dependencies);
     await sources.markScanned(sourceId, new Date());
-    return true;
+    return { saved: true, finishedSetupScan: await setupSteps.finishScanStep(ctx, tx) };
   });
   logger.info(
-    { sourceId, accounts: accounts.length, people: found.people, apps: found.apps, saved },
+    {
+      sourceId,
+      accounts: accounts.length,
+      people: found.people,
+      apps: found.apps,
+      saved,
+      finishedSetupScan,
+    },
     "Scan finished",
   );
 }
