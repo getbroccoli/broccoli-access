@@ -1,7 +1,12 @@
 import { createMailSettingsService } from "../core/instance";
 import type { ModuleDependencies, Modules } from "../core/moduleManifest";
 import { recordsManifest } from "../core/records";
-import { createAppAccountService, createAppConnectionService, createAppService } from "./apps";
+import {
+  appsModule,
+  createAppAccountService,
+  createAppConnectionService,
+  createAppService,
+} from "./apps";
 import { createDirectorySyncService, employeeDirectory, employeesModule } from "./employees";
 import { createGoogleWorkspaceConnector, googleModule } from "./google";
 import { createScanService, importsModule } from "./imports";
@@ -28,11 +33,12 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     adminApiUrl: settings.googleAdminApiUrl,
   };
   const connectedApps = createAppConnectionService(core);
+  const apps = createAppService(core);
   // One scan service for the job, the page and the consent, which share its progress.
   const scans = createScanService({
     ...core,
     connectors: [createGoogleWorkspaceConnector(googleAddresses)],
-    apps: { ...connectedApps, ...createAppAccountService(), ...createAppService() },
+    apps: { ...connectedApps, ...createAppAccountService(), ...apps },
     directory: createDirectorySyncService(),
   });
   const manifests = [
@@ -49,6 +55,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       employeeDirectory: directory,
     }),
     importsModule(scans),
+    appsModule(apps),
   ];
   return {
     manifests: [...manifests, recordsManifest(core, manifests)],

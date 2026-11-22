@@ -6,6 +6,7 @@ import { hashSetupToken } from "../../src/core/instance/helpers";
 import { PrincipalSecurityContext, type SecurityContext } from "../../src/core/security";
 import { employeeDirectory, type Employee } from "../../src/modules/employees";
 import { employeeRepository } from "../../src/modules/employees/db";
+import { appRepository, type App } from "../../src/modules/apps/db";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { seedUser } from "./seedUser";
 import { testTransactor } from "./testTransactor";
@@ -96,6 +97,14 @@ export class TestSeed {
     return testTransactor(this.orm)((tx) =>
       employeeRepository(tx).insert({ ...this.#newEmployee(), ...overrides }),
     );
+  }
+
+  async app({ status = "discovered" }: { status?: App["status"] } = {}): Promise<App> {
+    const [app] = await appRepository(this.orm).insertMany(
+      [{ name: "Slack", domain: "slack.com", catalogKey: "slack", externalIds: [] }],
+      status,
+    );
+    return app!;
   }
 
   #newEmployee() {
