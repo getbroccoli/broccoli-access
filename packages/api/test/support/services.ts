@@ -15,7 +15,9 @@ import {
   createAppConnectionService,
   createAppAccountService,
   createAppService,
+  createAppUserService,
   type AppService,
+  type AppUserService,
 } from "../../src/modules/apps";
 import { createScanService, type ScanService } from "../../src/modules/imports";
 import {
@@ -98,8 +100,16 @@ export function apps(orm: Orm): AppService {
     orm,
     transact: testTransactor(orm),
     logger: createLogger("silent"),
-    // The Google Workspace connector as app selection reads it: only its key and directory flag.
-    connectors: [{ key: "google_workspace", isDirectory: true }],
+    connectors: GOOGLE_DIRECTORY,
+  });
+}
+
+/** An app's users read with the real employees module, with Google Workspace as the directory. */
+export function appUsers(orm: Orm): AppUserService {
+  return createAppUserService({
+    orm,
+    connectors: GOOGLE_DIRECTORY,
+    employees: createEmployeeReadService({ orm, accounts: apps(orm) }),
   });
 }
 
@@ -136,3 +146,6 @@ export function scans(
     wait: () => Promise.resolve(),
   });
 }
+
+/** The Google Workspace connector as app reads see it: only its key and directory flag. */
+const GOOGLE_DIRECTORY = [{ key: "google_workspace", isDirectory: true }];

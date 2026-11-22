@@ -1,0 +1,27 @@
+query AppPage($id: ID!) {
+  app(id: $id) {
+    id
+    name
+    domain
+    status
+    connected
+    peopleCount
+    suspendedWithAccessCount
+    users {
+      id
+      foundVia
+      since {
+        at
+        before
+      }
+      employee {
+        id
+        firstName
+        lastName
+        email
+        avatarUrl
+        status
+      }
+    }
+  }
+}

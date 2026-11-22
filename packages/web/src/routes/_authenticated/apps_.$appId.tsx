@@ -1,8 +1,18 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 
-/** An app's page, which a later change builds; until then it is not found. */
+import { AppPage, loadAppPage } from "@/features/apps";
+
+/** An app's page, for admins: its users, and Approve or Ignore; an unknown id is not found. */
 export const Route = createFileRoute("/_authenticated/apps_/$appId")({
-  beforeLoad: () => {
-    throw notFound();
+  beforeLoad: ({ context: { me } }) => {
+    if (!me.operations.includes("MANAGE_WORKSPACE")) {
+      throw redirect({ to: "/people", replace: true });
+    }
   },
+  loader: async ({ context: { apolloClient }, params: { appId } }) => {
+    if (!(await loadAppPage(apolloClient, appId))) {
+      throw notFound();
+    }
+  },
+  component: AppPage,
 });

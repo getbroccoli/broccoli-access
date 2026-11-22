@@ -17,6 +17,16 @@ type App {
   suspendedWithAccessCount: Int!
   "Whether a connection reads it; a connected app stays approved, so it cannot be ignored."
   connected: Boolean!
+  "Its users: the accounts in it that belong to an employee, those whose employee the directory suspended first, then by name."
+  users: [AppUser!]!
+}
+
+"An account in an app that belongs to an employee."
+type AppUser {
+  id: ID!
+  "The finding kinds that saw the account, sorted, such as `google_sign_in`; connector modules register them."
+  foundVia: [String!]!
+  since: Since!
 }
 
 "Since when someone has had an account, as far as the sources know: when they granted access; before the log began, for a grant older than the log; otherwise when a scan first saw the account."
@@ -100,6 +110,8 @@ type SetupFinishPayload {
 union SetupFinishError = InvalidInputError | ConflictError
 
 type Query {
+  "One app; null when there is none. Admins only."
+  app(id: ID!): App
   "The apps with a status, the most people first, one page at a time. Admins only."
   apps(status: AppStatus!, "Page size, 1 to 10000." first: Int = 100, after: String): AppConnection!
   "How many apps have each status. Admins only."

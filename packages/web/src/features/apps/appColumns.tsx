@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 
 import type { DataTableColumn } from "@/components/dataTable";
-import { type MessageKey, t } from "@/i18n";
+import { t } from "@/i18n";
+import { describeFoundVia } from "@/lib/foundVia";
 import { formatSince } from "@/lib/since";
 
 import { AppStatusActions } from "./AppStatusActions";
@@ -22,7 +23,7 @@ const FOUND_VIA_COLUMN: DataTableColumn<AppRow> = {
   id: "foundVia",
   header: t("apps.column.foundVia"),
   className: "w-[22%]",
-  cell: ({ foundVia }) => foundVia.map(foundViaLabel).join(", "),
+  cell: ({ foundVia }) => describeFoundVia(foundVia),
 };
 
 /** The columns of the approved apps: who uses each, how they were found, and who keeps access though suspended. */
@@ -73,14 +74,3 @@ export const APP_ACTIONS_COLUMN: DataTableColumn<AppRow> = {
   className: "w-44",
   cell: (app) => <AppStatusActions app={app} />,
 };
-
-/** The finding kinds the connector modules register, as people read them. */
-const FOUND_VIA_LABELS: Record<string, MessageKey> = {
-  google_directory: "apps.foundVia.google_directory",
-  google_sign_in: "apps.foundVia.google_sign_in",
-};
-
-function foundViaLabel(findingKind: string): string {
-  const label = FOUND_VIA_LABELS[findingKind];
-  return label ? t(label) : findingKind;
-}

@@ -18,4 +18,4 @@ export {
   type FoundAccount,
   planAccountSync,
 } from "./appAccount";
-export { type AccountDates, appSince, type Since } from "./since";
+export { type AccountDates, accountSince, appSince, type Since } from "./since";

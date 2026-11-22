@@ -26,11 +26,13 @@ export interface AppAccountRepository {
   findEmployeeAccounts(): Promise<EmployeeAppAccount[]>;
 }
 
-/** What the app list reads of a user's account. */
-export type AppUserAccount = Pick<
+/** What the app list and an app's page read of a user's account. */
+export interface AppUserAccount extends Pick<
   AppAccount,
-  "appId" | "employeeId" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
->;
+  "id" | "appId" | "email" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
+> {
+  employeeId: string;
+}
 
 /** An employee's account with its app's name and status, as the People list reads it. */
 export interface EmployeeAppAccount extends Pick<AppAccount, "appId" | "status"> {
@@ -82,8 +84,11 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
     findUsersOfApps: (appIds) =>
       orm()
         .select({
+          id: appAccounts.id,
           appId: appAccounts.appId,
-          employeeId: appAccounts.employeeId,
+          email: appAccounts.email,
+          // Never null: the query keeps only accounts with an employee.
+          employeeId: sql<string>`${appAccounts.employeeId}`,
           status: appAccounts.status,
           foundVia: appAccounts.foundVia,
           grantedAt: appAccounts.grantedAt,

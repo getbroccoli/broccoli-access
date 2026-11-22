@@ -29,6 +29,7 @@ export {
   googleSignIn,
   scans,
   apps,
+  appUsers,
 } from "./services";
 export type { EmployeeServices } from "./services";
 export { fileStorage, instances, owners, recordHistory, setupSessions } from "./statelessServices";

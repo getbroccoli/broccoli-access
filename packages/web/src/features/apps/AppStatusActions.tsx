@@ -8,10 +8,14 @@ import { t } from "@/i18n";
 import type { AppRow } from "./AppTable";
 import { forgetAppLists } from "./cache";
 
-type Props = { app: Pick<AppRow, "id" | "name" | "status" | "connected"> };
+type Props = {
+  app: Pick<AppRow, "id" | "name" | "status" | "connected">;
+  /** Small in a table row, the default in a page's header. */
+  size?: "sm" | "lg";
+};
 
 /** Approve for an app not approved, and Ignore for one not ignored, except a connected app, which stays approved. */
-export function AppStatusActions({ app }: Props) {
+export function AppStatusActions({ app, size = "sm" }: Props) {
   // The app moves to another tab and every count changes, so the lists and counts load afresh.
   const [approve, approving] = usePayloadMutation(ApproveAppDocument, { update: forgetAppLists });
   const [ignore, ignoring] = usePayloadMutation(IgnoreAppDocument, { update: forgetAppLists });
@@ -27,7 +31,7 @@ export function AppStatusActions({ app }: Props) {
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size={size}
           disabled={pending}
           aria-label={t("apps.approveApp", { name: app.name })}
           onClick={() => change(approve)}
@@ -38,8 +42,8 @@ export function AppStatusActions({ app }: Props) {
       {app.status !== "IGNORED" && !app.connected && (
         <Button
           type="button"
-          variant="ghost"
-          size="sm"
+          variant="outline"
+          size={size}
           disabled={pending}
           aria-label={t("apps.ignoreApp", { name: app.name })}
           onClick={() => change(ignore)}

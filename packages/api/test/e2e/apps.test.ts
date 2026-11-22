@@ -91,6 +91,51 @@ test("updates app counts when ignoring and approving apps after setup", async ({
   });
 }, 90_000);
 
+test("reads Figma and its users with their directory status after setup", async ({ env }) => {
+  const { browser } = await env.signInAsOwner();
+  const discovered = await scannedApps(browser);
+  const approvedAppIds = discovered.filter(({ preselected }) => preselected).map(({ id }) => id);
+  const figma = discovered.find(({ name }) => name === "Figma")!;
+  const finished = await browser.graphql(
+    "mutation FinishSetup($input: SetupFinishInput!) { apps { finishSetup(input: $input) { error { __typename } } } }",
+    { input: { approvedAppIds } },
+  );
+  expect(await finished.json()).toEqual({ data: { apps: { finishSetup: { error: null } } } });
+
+  const response = await browser.graphql(
+    `query App($id: ID!) {
+      app(id: $id) {
+        id name peopleCount suspendedWithAccessCount
+        users {
+          id foundVia since { before }
+          employee { firstName lastName email status }
+        }
+      }
+    }`,
+    { id: figma.id },
+  );
+
+  const body = (await response.json()) as { data: { app: { users: unknown[] } } };
+  expect(body).not.toHaveProperty("errors");
+  expect(body).toMatchObject({
+    data: {
+      app: { id: figma.id, name: "Figma", peopleCount: 16, suspendedWithAccessCount: 1 },
+    },
+  });
+  expect(body.data.app.users).toHaveLength(16);
+  expect(body.data.app.users[0]).toEqual({
+    id: expect.any(String) as unknown,
+    foundVia: ["google_sign_in"],
+    since: { before: true },
+    employee: {
+      firstName: "Ana",
+      lastName: "Ruiz",
+      email: "ana@acme.example",
+      status: "SUSPENDED",
+    },
+  });
+}, 90_000);
+
 test("returns ConflictError when ignoring Google Workspace through GraphQL", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
   const approved = await browser.graphql(
@@ -116,6 +161,7 @@ test("returns ConflictError when ignoring Google Workspace through GraphQL", asy
 });
 
 test.for([
+  ["app", '{ app(id: "00000000-0000-4000-8000-000000000001") { id } }'],
   ["apps", "{ apps(status: DISCOVERED) { edges { node { id } } } }"],
   ["appCounts", "{ appCounts { approved discovered ignored } }"],
   [

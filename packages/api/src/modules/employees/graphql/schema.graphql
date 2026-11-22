@@ -125,6 +125,12 @@ type EmployeeDeletePayload {
 
 union EmployeeDeleteError = InvalidInputError | NotFoundError
 
+# Adds the employee to an app's user; the server merges the types of the modules.
+type AppUser {
+  "The employee whose account it is."
+  employee: Employee!
+}
+
 # Adds the signed-in user's employee to `me`; the server merges the types.
 type User {
   "The signed-in user's own employee record; null for a user without one, such as the owner."

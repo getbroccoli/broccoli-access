@@ -1,16 +1,37 @@
+import DataLoader from "dataloader";
+
 import {
   mutationPayload,
+  perRequest,
   type Resolvers,
   type ResolversTypes,
   toEnum,
 } from "../../../core/graphql";
-import type { AppService } from "../app";
+import type { AppService, AppUser, AppUserService } from "../app";
 
 export function createResolvers(
-  apps: Pick<AppService, "listApps" | "countApps" | "approveApp" | "ignoreApp" | "finishSetup">,
+  apps: Pick<
+    AppService & AppUserService,
+    | "listApps"
+    | "readApp"
+    | "readUsersOfApps"
+    | "countApps"
+    | "approveApp"
+    | "ignoreApp"
+    | "finishSetup"
+  >,
 ): Resolvers {
+  const usersOfApps = perRequest(
+    (context) =>
+      new DataLoader<string, AppUser[]>(async (appIds) => {
+        const users = await apps.readUsersOfApps(context.getActor(), appIds);
+        const byApp = Map.groupBy(users, ({ appId }) => appId);
+        return appIds.map((appId) => byApp.get(appId) ?? []);
+      }),
+  );
   return {
     Query: {
+      app: (_parent, { id }, context) => apps.readApp(context.getActor(), id),
       apps: (_parent, { status, first, after }, context) =>
         apps.listApps(context.getActor(), {
           status: STATUSES[status],
@@ -42,6 +63,7 @@ export function createResolvers(
     },
     App: {
       status: ({ status }) => toEnum(status),
+      users: (app, _args, context) => usersOfApps(context).load(app.id),
     },
   };
 }
