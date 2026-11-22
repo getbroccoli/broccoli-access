@@ -232,7 +232,8 @@ Every account a source saw in its last scan, one row each. `raw` keeps the sourc
 Everyone with an account in the directory app. The table knows nothing about Google or any other app. The sync creates and updates employees from the directory app's accounts, matched by email.
 
 - `manager_id`: the employee whose email the directory names as manager. It replaces `employments`.
-- Kept: `first_name`, `last_name`, `email` (unique), `user_id` (the user who signs in as this employee), `avatar_file_id` (unused in circle 1; the UI shows initials), `created_at`.
+- Kept: `first_name`, `last_name`, `email` (unique), `user_id` (the user who signs in as this employee), `avatar_file_id`, `created_at`.
+- `avatar_file_id` is used from circle 1. The scan reads a directory person's thumbnail only when its `thumbnailPhotoEtag` changed since the last scan, stores the image in `files` and links it as `avatar_file_id`, with a `record_history` row (`found_by_scan`); a photo removed in Google clears the link. One extra API call per changed photo; very large directories stay out of circle 1.
 - Removed: `job_title`, `location_id`, `is_demo`.
 - An employee whose directory account disappears stays as they are in circle 1. A later circle handles it.
 
@@ -245,7 +246,7 @@ Everyone with an account in the directory app. The table knows nothing about Goo
     "email": "ana@acme.example",
     "manager_id": "emp_david",
     "user_id": null,
-    "avatar_file_id": null,
+    "avatar_file_id": "file_ana_photo",
     "created_at": "2026-11-20T07:58:20Z"
   },
   {
