@@ -14,7 +14,6 @@ colour added as `fill`. The brands remain their owners' trademarks; Simple Icons
 - `loom.svg`: Loom, source https://www.loom.com/press
 - `miro.svg`: Miro, source https://miro.com
 - `notion.svg`: Notion, source https://www.notion.so
-- `typeform.svg`: Typeform, source https://www.typeform.com
-- `zoom.svg`: Zoom, source https://brand.zoom.us/media-library/
 
-Simple Icons has no icon for the other catalog apps, which show their initial instead.
+The other catalog apps show their initial: Simple Icons has no icon for them, or only a wordmark
+that a small square cannot show (Typeform, Zoom).

@@ -28,13 +28,12 @@ export function AppPeopleCell({ users, peopleCount }: Props) {
               <TooltipTrigger
                 render={<Link to="/people/$employeeId" params={{ employeeId: employee.id }} />}
                 aria-label={t("apps.personWithEmail", { name, email: employee.email })}
-                className="relative -ml-2 rounded-full ring-2 ring-background outline-none first:ml-0 hover:z-10 focus-visible:z-10 focus-visible:ring-ring"
+                className="relative -ml-1 rounded-full ring-2 ring-background outline-none first:ml-0 hover:z-10 focus-visible:z-10 focus-visible:ring-ring"
               >
                 <Avatar
                   url={employee.avatarUrl}
                   firstName={employee.firstName}
                   lastName={employee.lastName}
-                  className="size-7"
                 />
               </TooltipTrigger>
               <TooltipContent className="flex-col items-start gap-0">
@@ -47,7 +46,7 @@ export function AppPeopleCell({ users, peopleCount }: Props) {
         {more > 0 && (
           <span
             aria-hidden
-            className="-ml-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-medium text-foreground tabular-nums ring-2 ring-background"
+            className="relative -ml-1 flex h-8 min-w-8 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-medium text-foreground tabular-nums ring-2 ring-background"
           >
             +{more}
           </span>
