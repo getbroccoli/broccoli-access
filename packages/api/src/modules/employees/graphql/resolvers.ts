@@ -8,7 +8,7 @@ import {
   toEnum,
 } from "../../../core/graphql";
 import type { EmployeeReadService, EmployeeService } from "../app";
-import type { EmployeeAccess } from "../domain";
+import type { Employee, EmployeeAccess } from "../domain";
 import { avatarUrl } from "../http";
 
 export function createResolvers(services: EmployeeService & EmployeeReadService): Resolvers {
@@ -17,6 +17,16 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
       new DataLoader<string, EmployeeAccess>((employeeIds) =>
         services.readAccessOfEmployees(context.getActor(), employeeIds),
       ),
+  );
+  const employeesById = perRequest(
+    (context) =>
+      new DataLoader<string, Employee>(async (ids) => {
+        const found = await services.readEmployees(context.getActor(), ids);
+        const byId = new Map(found.map((employee) => [employee.id, employee]));
+        return ids.map(
+          (id) => byId.get(id) ?? new Error("No employee the caller may read has this id."),
+        );
+      }),
   );
   return {
     Query: {
@@ -49,6 +59,9 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
           () => services.deleteEmployee(context.getActor(), input),
           ["INVALID_INPUT", "NOT_FOUND"],
         ),
+    },
+    AppUser: {
+      employee: (user, _args, context) => employeesById(context).load(user.employeeId),
     },
     User: {
       employee: (_user, _args, context) => services.readMyEmployee(context.getActor()),

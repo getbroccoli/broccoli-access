@@ -35,6 +35,8 @@ export interface EmployeeListArgs extends ListArgs<EmployeeOrderField> {
 export interface EmployeeReadService {
   /** The employee with this id, or null when there is none. */
   readEmployee: (ctx: SecurityContext, id: string) => Promise<Employee | null>;
+  /** The employees with these ids the caller may read, sorted by name; an unknown id is left out. */
+  readEmployees: (ctx: SecurityContext, ids: readonly string[]) => Promise<Employee[]>;
   /** The signed-in user's own employee; null for a user without one, such as the owner. */
   readMyEmployee: (ctx: SecurityContext) => Promise<Employee | null>;
   /**
@@ -75,6 +77,11 @@ export function createEmployeeReadService({
       }
       await ctx.requireInScope("employee", "read", employeeId);
       return employees.findById(employeeId);
+    },
+    async readEmployees(ctx, ids) {
+      const scope = await ctx.recordScope("employee", "read");
+      const found = await employees.findByIds(ids);
+      return found.filter(({ id }) => isInRecordScope(scope, id));
     },
     async readMyEmployee(ctx) {
       const employeeId = ctx.user?.employeeId;

@@ -1,5 +1,4 @@
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
-import type { Connector } from "../../../core/connectors";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import { createSetupStepService } from "../../../core/instance";
 import type { Logger } from "../../../core/logger";
@@ -26,6 +25,12 @@ import {
   type Since,
 } from "../domain";
 
+import {
+  type DirectoryConnectors,
+  findDirectoryAppId,
+  findEmployeesSuspendedInDirectory,
+} from "./directory";
+
 const recordHistory = createRecordHistoryService();
 const setupSteps = createSetupStepService();
 
@@ -49,6 +54,8 @@ export interface AppService {
     ctx: SecurityContext,
     args: PageArgs & { status: AppStatus },
   ) => Promise<Connection<AppSummary>>;
+  /** The app as the app list shows it; null for an unknown or malformed id. Needs MANAGE_WORKSPACE. */
+  readApp: (ctx: SecurityContext, appId: string) => Promise<AppSummary | null>;
   /** How many apps have each status. Needs MANAGE_WORKSPACE. */
   countApps: (ctx: SecurityContext) => Promise<Record<AppStatus, number>>;
   /** Approves the app, with its history line; refuses an unknown id with NOT_FOUND. Needs MANAGE_WORKSPACE. */
@@ -108,7 +115,7 @@ interface AppDependencies {
   transact: Transact;
   logger: Logger;
   /** The connectors the scans read; the one whose `isDirectory` is set names the directory. */
-  connectors: readonly Pick<Connector, "key" | "isDirectory">[];
+  connectors: DirectoryConnectors;
 }
 
 export function createAppService(dependencies: AppDependencies): AppService {
@@ -140,6 +147,16 @@ export function createAppService(dependencies: AppDependencies): AppService {
         ...page,
         edges: page.edges.map((edge, index) => ({ ...edge, node: summaries[index]! })),
       };
+    },
+    async readApp(ctx, appId) {
+      ctx.require("MANAGE_WORKSPACE");
+      const id = parseUuid(appId);
+      const app = id && (await appRepository(orm).findById(id));
+      if (!app) {
+        return null;
+      }
+      const [summary] = await summarize(dependencies, [app]);
+      return summary!;
     },
     async countApps(ctx) {
       ctx.require("MANAGE_WORKSPACE");
@@ -268,24 +285,6 @@ async function summarize(
       connected: connectedAppIds.has(app.id),
     };
   });
-}
-
-async function findDirectoryAppId(
-  db: Orm | Tx,
-  connectors: AppDependencies["connectors"],
-): Promise<string | null> {
-  const directory = connectors.find(({ isDirectory }) => isDirectory);
-  const connection =
-    directory && (await appConnectionRepository(db).findByConnector(directory.key));
-  return connection?.appId ?? null;
-}
-
-async function findEmployeesSuspendedInDirectory(
-  db: Orm | Tx,
-  connectors: AppDependencies["connectors"],
-): Promise<string[]> {
-  const appId = await findDirectoryAppId(db, connectors);
-  return appId ? appAccountRepository(db).findSuspendedEmployeeIds(appId) : [];
 }
 
 /** One history line per created app and per app that gained external ids. */

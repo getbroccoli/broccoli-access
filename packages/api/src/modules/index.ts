@@ -6,8 +6,14 @@ import {
   createAppAccountService,
   createAppConnectionService,
   createAppService,
+  createAppUserService,
 } from "./apps";
-import { createDirectorySyncService, employeeDirectory, employeesModule } from "./employees";
+import {
+  createDirectorySyncService,
+  createEmployeeReadService,
+  employeeDirectory,
+  employeesModule,
+} from "./employees";
 import { createGoogleWorkspaceConnector, googleModule } from "./google";
 import { createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
@@ -56,7 +62,10 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       employeeDirectory: directory,
     }),
     importsModule(scans),
-    appsModule(apps),
+    appsModule({
+      ...apps,
+      ...createAppUserService({ ...core, connectors, employees: createEmployeeReadService(core) }),
+    }),
   ];
   return {
     manifests: [...manifests, recordsManifest(core, manifests)],

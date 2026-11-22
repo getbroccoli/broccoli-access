@@ -37,6 +37,8 @@ export interface AppRepository {
   findPage(query: AppPageQuery): Promise<KeysetRow<App, unknown[]>[]>;
   /** How many apps have each status. */
   countByStatus(): Promise<Record<AppStatus, number>>;
+  /** The app; null when there is none. */
+  findById(id: string): Promise<App | null>;
   /** The app, locked until the transaction ends; null when there is none. */
   lockById(id: string): Promise<App | null>;
   /** The apps with `status`, locked until the transaction ends. */
@@ -101,6 +103,10 @@ export function appRepository(db: Orm | Tx): AppRepository {
           rows.find((row) => row.status === status)?.apps ?? 0,
         ]),
       ) as Record<AppStatus, number>;
+    },
+    findById: async (id) => {
+      const [app] = await orm().select().from(apps).where(eq(apps.id, id));
+      return app ?? null;
     },
     lockById: async (id) => {
       const [app] = await orm().select().from(apps).where(eq(apps.id, id)).for("update");

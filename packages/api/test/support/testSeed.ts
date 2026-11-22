@@ -6,12 +6,18 @@ import { hashSetupToken } from "../../src/core/instance/helpers";
 import { PrincipalSecurityContext, type SecurityContext } from "../../src/core/security";
 import { employeeDirectory, type Employee } from "../../src/modules/employees";
 import { employeeRepository } from "../../src/modules/employees/db";
-import { appRepository, type App } from "../../src/modules/apps/db";
+import {
+  appAccountRepository,
+  appRepository,
+  type App,
+  type AppAccountRepository,
+} from "../../src/modules/apps/db";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { seedUser } from "./seedUser";
 import { testTransactor } from "./testTransactor";
 
 type SeedEmployee = Partial<Omit<Employee, "id" | "createdAt">>;
+type SeedAppAccount = Parameters<AppAccountRepository["insertMany"]>[0][number];
 
 /**
  * Creates test data by inserting through each module's repository, skipping use
@@ -105,6 +111,22 @@ export class TestSeed {
       status,
     );
     return app!;
+  }
+
+  async appAccount({
+    appId,
+    email = `account${++this.#count}@example.com`,
+    employeeId = null,
+    status = "active",
+    foundVia = ["google_sign_in"],
+    grantedAt = null,
+    grantedBefore = null,
+    firstSeenAt = new Date("2026-01-01T00:00:00Z"),
+  }: Pick<SeedAppAccount, "appId"> & Partial<SeedAppAccount>) {
+    const [account] = await appAccountRepository(this.orm).insertMany([
+      { appId, email, employeeId, status, foundVia, grantedAt, grantedBefore, firstSeenAt },
+    ]);
+    return account!;
   }
 
   #newEmployee() {

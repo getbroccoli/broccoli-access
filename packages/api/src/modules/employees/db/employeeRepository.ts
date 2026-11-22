@@ -53,7 +53,7 @@ export interface EmployeeRepository {
   findById(id: string): Promise<Employee | null>;
   /** The employee linked to this user, or null. */
   findByUserId(userId: string): Promise<Employee | null>;
-  /** The employees among these ids that exist. */
+  /** The employees among these ids that exist, sorted by name as the employee list sorts them. */
   findByIds(ids: readonly string[]): Promise<Employee[]>;
   /** The employees with these lowercased emails, locked until the transaction ends. */
   lockByEmails(emails: readonly string[]): Promise<Employee[]>;
@@ -64,6 +64,9 @@ export interface EmployeeRepository {
   /** How many employees there are. */
   count(): Promise<number>;
 }
+
+/** The order of `findByIds`: by name, as the employee list sorts by default. */
+const NAME_ORDER: EmployeeOrder = { field: "NAME", direction: "ASC" };
 
 const EMAIL_UNIQUE_CONSTRAINT = "employees_email_unique";
 
@@ -155,7 +158,12 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
       return employee ?? null;
     },
 
-    findByIds: (ids) => orm().select().from(employees).where(isAnyOf(ids)),
+    findByIds: (ids) =>
+      orm()
+        .select()
+        .from(employees)
+        .where(isAnyOf(ids))
+        .orderBy(...orderByKeyset(keysetColumns(NAME_ORDER, []))),
 
     lockByEmails: (emails) =>
       orm().select().from(employees).where(anyOf(employees.email, emails)).for("update"),
