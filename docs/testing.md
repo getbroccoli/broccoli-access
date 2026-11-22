@@ -143,6 +143,13 @@ It builds the fake's image (`packages/fake-apps/Dockerfile`, never part of the p
 pnpm add 'github:getbroccoli/broccoli-access#connector-contract-v1.0.0&path:packages/connector-contract'
 ```
 
+pnpm sees this repository's `postinstall` in the downloaded archive and asks whether the package may run build scripts. It has none, so the consumer's `pnpm-workspace.yaml` answers no:
+
+```yaml
+allowBuilds:
+  "@broccoli-access/connector-contract": false
+```
+
 ```ts
 const { urls, stop } = await startContainers("<image>");
 afterAll(stop);
