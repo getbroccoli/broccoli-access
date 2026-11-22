@@ -2,6 +2,7 @@ import { GoogleLogo } from "@phosphor-icons/react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { t, type MessageKey } from "@/i18n";
+import { cn } from "@/lib/class-names";
 
 import type { SignInError } from "./loginSearch";
 
@@ -25,10 +26,7 @@ export function GoogleSignIn({ signInError }: Props) {
     <>
       <a
         href={SIGN_IN_PATH}
-        className={buttonVariants({
-          variant: "outline",
-          className: "h-12 w-full gap-2.5 text-base",
-        })}
+        className={cn(buttonVariants({ variant: "outline" }), "h-12 w-full gap-2.5 text-base")}
       >
         <GoogleLogo weight="fill" className="size-5" aria-hidden />
         {t("auth.signIn.withGoogle")}
