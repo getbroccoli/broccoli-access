@@ -1,21 +1,30 @@
-import { type AppsPageQuery, ScanNowDocument } from "@/__generated__/graphql";
-import { usePayloadMutation } from "@/apollo";
+import { useQuery } from "@apollo/client/react";
+import { useEffect, useRef } from "react";
+
+import { AppsScanDocument, type AppsScanQuery, ScanNowDocument } from "@/__generated__/graphql";
+import { useCache, usePayloadMutation } from "@/apollo";
 import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 import { formatLastScan } from "@/lib/lastScan";
+import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { PageHeader } from "@/shell";
 
+import { forgetAppLists } from "./cache";
+
 type Props = {
-  /** The Google Workspace connection with its scan; undefined while it loads. */
-  connection: AppsPageQuery["setup"]["googleWorkspace"] | undefined;
   /** Scan now waits until setup is done: setup's own scan just ran. */
   canScan: boolean;
 };
 
-/** The page's title with when the last scan ran, and Scan now. */
-export function AppsHeader({ connection, canScan }: Props) {
-  const [scanNow, { loading, error }] = usePayloadMutation(ScanNowDocument);
+/** The page's title with when the last scan ran, and Scan now; the apps reload once a scan ends. */
+export function AppsHeader({ canScan }: Props) {
+  // A scan started elsewhere, such as in Settings, changes the scan outside this cache.
+  const scanQuery = useQuery(AppsScanDocument, { fetchPolicy: "cache-and-network" });
+  const connection = scanQuery.data?.setup.googleWorkspace;
   const isScanning = connection?.scan?.status === "SCANNING";
+  usePollWhileScanning(isScanning, scanQuery);
+  useReloadAppsAfterScan(isScanning);
+  const [scanNow, { loading, error }] = usePayloadMutation(ScanNowDocument);
 
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-4">
@@ -49,7 +58,24 @@ export function AppsHeader({ connection, canScan }: Props) {
   );
 }
 
+type Connection = NonNullable<AppsScanQuery["setup"]["googleWorkspace"]>;
+
 /** "Scanned today at 08:00": page headers show the last scan without the full stop. */
-function lastScan(connection: NonNullable<Props["connection"]>): string {
+function lastScan(connection: Connection): string {
   return formatLastScan(connection.scan?.readAt ?? null).replace(/\.$/, "");
+}
+
+/**
+ * Reloads the app lists and counts once a scan ends: its results commit with its end, so a list
+ * read while it ran may predate them.
+ */
+function useReloadAppsAfterScan(isScanning: boolean) {
+  const cache = useCache();
+  const wasScanning = useRef(isScanning);
+  useEffect(() => {
+    if (wasScanning.current && !isScanning) {
+      forgetAppLists(cache);
+    }
+    wasScanning.current = isScanning;
+  }, [isScanning, cache]);
 }

@@ -23,6 +23,9 @@ query AppsPage($status: AppStatus!, $first: Int!) {
       }
     }
   }
+}
+
+query AppsScan {
   setup {
     id
     googleWorkspace {

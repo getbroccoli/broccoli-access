@@ -5,7 +5,6 @@ import { useState } from "react";
 import { AppsPageDocument, type AppStatus } from "@/__generated__/graphql";
 import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
-import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 
 import { APP_ACTIONS_COLUMN, APPROVED_APP_COLUMNS, FOUND_APP_COLUMNS } from "./appColumns";
 import { AppsHeader } from "./AppsHeader";
@@ -35,15 +34,11 @@ export function AppsPage() {
   const search = useSearch({ from: "/_authenticated/apps" });
   const navigate = useNavigate({ from: "/apps" });
   const tab = search.status ?? (firstRun ? "discovered" : "approved");
-  const page = useQuery(AppsPageDocument, {
+  const { data, error, refetch } = useQuery(AppsPageDocument, {
     variables: { status: STATUSES[tab], first: ALL_APPS },
     // A scan or a change elsewhere, such as in Settings, moves apps outside this cache.
     fetchPolicy: "cache-and-network",
   });
-  const { data, error, refetch } = page;
-  const connection = data?.setup.googleWorkspace;
-  // Each poll brings the apps and counts too, so the page shows the scan's results once it ends.
-  usePollWhileScanning(connection?.scan?.status === "SCANNING", page);
   const discovered = useQuery(AppsPageDocument, {
     variables: { status: "DISCOVERED", first: ALL_APPS },
     skip: !firstRun,
@@ -64,7 +59,7 @@ export function AppsPage() {
 
   return (
     <div className="flex flex-col">
-      <AppsHeader connection={connection} canScan={!firstRun} />
+      <AppsHeader canScan={!firstRun} />
       {/* Finishing ignores every app left unselected, so it waits for the selection to load. */}
       {firstRun && discoveredApps && (
         <FirstRunBanner discoveredCount={discoveredApps.length} selectedIds={selected} />
