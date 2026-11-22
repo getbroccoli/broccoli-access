@@ -41,8 +41,6 @@ export const loginSearch = z.object({
     .string()
     .transform((raw) => toLocalPath(raw, window.location.origin))
     .catch(DEFAULT_REDIRECT),
-  /** Set after a password reset, so the page says the new password works. */
-  reset: z.literal("done").optional().catch(undefined),
 });
 
 export type LoginSearch = z.infer<typeof loginSearch>;

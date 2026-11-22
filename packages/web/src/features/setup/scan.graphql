@@ -1,0 +1,10 @@
+query SetupScan {
+  setup {
+    id
+    googleWorkspace {
+      id
+      domain
+      adminEmail
+    }
+  }
+}

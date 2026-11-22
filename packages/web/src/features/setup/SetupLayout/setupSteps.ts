@@ -4,19 +4,22 @@ import type { SetupStep } from "@/__generated__/graphql";
 import type { MessageKey } from "@/i18n";
 
 /** The path of a setup page, or of Today once setup is done. */
-export type SetupPath = "/setup" | "/";
+export type SetupPath = "/setup" | "/setup/scan" | "/";
 
 interface StepDefinition {
   id: string;
   title: MessageKey;
-  path: SetupPath;
+  /** Null for a step whose page is not built yet. */
+  path: SetupPath | null;
   /** The server's setup step the page belongs to. */
   step: SetupStep;
 }
 
-/** Setup's steps in order; creating the owner's account is the only one so far. */
+/** Setup's steps in order. */
 const STEPS = [
-  { id: "owner", title: "setup.owner.title", path: "/setup", step: "OWNER" },
+  { id: "connect_google", title: "setup.connect.title", path: "/setup", step: "CONNECT_GOOGLE" },
+  { id: "scan", title: "setup.scan.title", path: "/setup/scan", step: "SCAN" },
+  { id: "select_apps", title: "setup.selectApps.title", path: null, step: "SELECT_APPS" },
 ] as const satisfies readonly StepDefinition[];
 
 /** Where setup ends: Today. */
@@ -29,6 +32,8 @@ export type StepState = "done" | "current" | "later";
 
 export interface StepView {
   id: string;
+  /** Counted from 1. */
+  number: number;
   title: MessageKey;
   state: StepState;
 }
@@ -38,6 +43,7 @@ export function stepViews(current: SetupStepId): StepView[] {
   const currentIndex = STEPS.findIndex(({ id }) => id === current);
   return STEPS.map(({ id, title }, index) => ({
     id,
+    number: index + 1,
     title,
     state: index < currentIndex ? "done" : index === currentIndex ? "current" : "later",
   }));
@@ -49,7 +55,7 @@ export function setupStepPage(step: SetupStep): SetupPath {
     return FINISHED;
   }
   const page = STEPS.find((candidate) => candidate.step === step);
-  if (!page) {
+  if (!page?.path) {
     throw new Error(`Setup has no page for the ${step} step`);
   }
   return page.path;
