@@ -1,5 +1,59 @@
 import { expect, test, scannedApps } from "#test/support";
 
+test("lists app catalog keys and the first four users beside the full people count", async ({
+  env,
+}) => {
+  const { browser } = await env.signInAsOwner();
+  await scannedApps(browser);
+
+  const response = await browser.graphql(`{
+    apps(status: DISCOVERED) {
+      edges { node {
+        name catalogKey peopleCount
+        users(first: 4) { employee { firstName lastName email } }
+      } }
+    }
+  }`);
+
+  const body = (await response.json()) as {
+    data: { apps: { edges: { node: { name: string; users: unknown[] } }[] } };
+  };
+  expect(body).not.toHaveProperty("errors");
+  expect(body.data.apps.edges.find(({ node }) => node.name === "Slack")?.node).toEqual({
+    name: "Slack",
+    catalogKey: "slack",
+    peopleCount: 41,
+    users: [
+      { employee: { firstName: "Ana", lastName: "Ruiz", email: "ana@acme.example" } },
+      { employee: { firstName: "Ben", lastName: "Ito", email: "ben@acme.example" } },
+      { employee: { firstName: "Aisha", lastName: "Khan", email: "aisha@acme.example" } },
+      { employee: { firstName: "Bruno", lastName: "Costa", email: "bruno@acme.example" } },
+    ],
+  });
+  expect(body.data.apps.edges.find(({ node }) => node.name === "Asana")?.node).toMatchObject({
+    catalogKey: null,
+  });
+  for (const { node } of body.data.apps.edges) {
+    expect(node.users.length).toBeLessThanOrEqual(4);
+  }
+}, 90_000);
+
+test("refuses an app user limit below one with a field error", async ({ env }) => {
+  const { browser } = await env.signInAsOwner();
+  const discovered = await scannedApps(browser);
+  const slack = discovered.find(({ name }) => name === "Slack")!;
+
+  const response = await browser.graphql(
+    "query ($id: ID!) { app(id: $id) { users(first: 0) { id } } }",
+    { id: slack.id },
+  );
+
+  expect(await response.json()).toHaveProperty("errors.0.extensions", {
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "first", code: "out_of_range" }],
+  });
+}, 90_000);
+
 test("the owner's consent and scan open the app list and selecting apps finishes setup", async ({
   env,
 }) => {
