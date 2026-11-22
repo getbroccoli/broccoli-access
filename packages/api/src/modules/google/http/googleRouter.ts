@@ -68,8 +68,7 @@ export function googleRouter(
     )
     .get("/google/callback", async (request, response) => {
       const answer = CONSENT_ANSWER.parse(request.query);
-      const finish = FINISHERS[consentFlowOf(answer.state ?? "")] ?? finishConsent;
-      await finish(routes, { request, response, answer });
+      await finisherOf(consentFlowOf(answer.state ?? ""))(routes, { request, response, answer });
     });
 }
 
@@ -134,7 +133,17 @@ type SignInFailure = "cancelled" | "not_allowed" | "failed";
 /** Why changing the Google app failed, as its page shows it. */
 type AppChangeFailure = "cancelled" | "not_super_admin" | "other_workspace" | "failed";
 
-type Finish = (routes: GoogleRoutes, callback: Callback) => Promise<void>;
+/** The callback's handler for the flow a `state` names; setup's takes every other one. */
+function finisherOf(flow: string): (routes: GoogleRoutes, callback: Callback) => Promise<void> {
+  switch (flow) {
+    case "sign_in_with_google" satisfies ConsentState["flow"]:
+      return finishSignIn;
+    case "change_google_app" satisfies ConsentState["flow"]:
+      return finishAppChange;
+    default:
+      return finishConsent;
+  }
+}
 
 /** Setup's consent: signs the new owner in and sends them to the scan, or back to the connect step. */
 async function finishConsent(
@@ -249,12 +258,6 @@ async function finishAppChange(
     sendBackToAppChange(response, failure);
   }
 }
-
-/** The callback's use case for each flow but setup's, which takes every other `state`. */
-const FINISHERS: Partial<Record<string, Finish>> = {
-  sign_in_with_google: finishSignIn,
-  change_google_app: finishAppChange,
-} satisfies Partial<Record<ConsentState["flow"], Finish>>;
 
 function appChangeFailureOf(error: unknown): AppChangeFailure {
   if (error instanceof OtherWorkspaceError) {
