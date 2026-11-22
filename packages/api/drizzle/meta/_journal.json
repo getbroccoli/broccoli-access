@@ -8,6 +8,13 @@
       "when": 1795301859481,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795309096957,
+      "tag": "0001_connect_google_workspace",
+      "breakpoints": true
     }
   ]
 }

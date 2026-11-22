@@ -1,8 +1,10 @@
+import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { ACME } from "@broccoli-access/fake-apps";
 import { eq, sql } from "drizzle-orm";
 import { inject } from "vitest";
 
@@ -11,13 +13,14 @@ import { connectDatabase, type Database } from "../../src/core/db";
 import { createLogger } from "../../src/core/logger";
 import type { RunningServer } from "../../src/core/server";
 import { createTestDatabase, type TestDatabase } from "./testDatabases";
+import { registerGoogleRedirect, consentAtGoogle } from "./googleConsent";
 import { TestSeed } from "./testSeed";
 import { createBrowser, type Browser } from "./browser";
 import { startTestServer, waitForStartup, type TestServerOptions } from "./testServer";
 
-export type TestEnvOptions = Omit<TestServerOptions, "dataDir">;
+export type TestEnvOptions = Omit<TestServerOptions, "dataDir"> & { googleUrl?: string };
 
-export const TEST_OWNER = { email: "owner@example.com", password: "correct horse battery staple" };
+export const TEST_OWNER = { email: "admin@acme.example" };
 
 export interface SignedInOwner {
   browser: Browser;
@@ -37,6 +40,7 @@ export class TestEnv {
     readonly db: TestDatabase,
     readonly dataDir: string,
     private server: RunningServer,
+    private readonly options: TestEnvOptions,
   ) {
     this.database = connectDatabase(db.url, createLogger("silent"));
     this.seed = new TestSeed(this.database.orm);
@@ -46,7 +50,7 @@ export class TestEnv {
   static async start(options: TestEnvOptions = {}): Promise<TestEnv> {
     const db = await createTestDatabase(inject("testRun"));
     const dataDir = await mkdtemp(join(tmpdir(), "broccoli-access-data-"));
-    return new TestEnv(db, dataDir, await startReady(db, dataDir, options));
+    return new TestEnv(db, dataDir, await startReady(db, dataDir, options), options);
   }
 
   get url(): string {
@@ -59,19 +63,20 @@ export class TestEnv {
   }
 
   /** Sets up the owner and returns a browser signed in as them. */
-  async signInAsOwner(owner = TEST_OWNER): Promise<SignedInOwner> {
-    await this.seed.owner(owner);
-    return this.signIn(owner);
-  }
-
-  async signIn(credentials: { email: string; password: string }): Promise<SignedInOwner> {
-    const browser = this.browser();
-    const response = await browser.post("/api/auth/sign-in/email", credentials);
-    if (response.status !== 200) {
-      throw new Error(`Sign-in failed with ${response.status}: ${await response.text()}`);
-    }
-    const { user } = (await response.json()) as Pick<SignedInOwner, "user">;
-    return { browser, user };
+  async signInAsOwner(): Promise<SignedInOwner> {
+    assert(this.options.googleUrl, "TestEnv needs a fake Google for owner sign-in");
+    await registerGoogleRedirect(this.options.googleUrl, this.url);
+    const browser = await this.startSetup();
+    const response = await browser.post("/api/google/connect", ACME.oauthClient);
+    assert.equal(response.status, 200, await response.clone().text());
+    const { authorizationUrl } = (await response.json()) as { authorizationUrl: string };
+    const callback = await consentAtGoogle(authorizationUrl);
+    const finished = await browser.getManual(callback.href);
+    assert.equal(finished.headers.get("location"), "/setup/scan");
+    const me = await browser.graphql("{ me { id email } }");
+    const { data } = (await me.json()) as { data: { me: SignedInOwner["user"] | null } };
+    assert(data.me);
+    return { browser, user: data.me };
   }
 
   /** A new browser holding setup. */
@@ -113,7 +118,7 @@ export class TestEnv {
   /** Stops the server and starts a new one on the same database and data folder. */
   async restart(options: TestEnvOptions = {}): Promise<void> {
     await this.server.stop();
-    this.server = await startReady(this.db, this.dataDir, options);
+    this.server = await startReady(this.db, this.dataDir, { ...this.options, ...options });
   }
 
   async stop(): Promise<void> {
@@ -129,7 +134,17 @@ async function startReady(
   dataDir: string,
   options: TestEnvOptions,
 ): Promise<RunningServer> {
-  const server = await startTestServer(db.url, { ...options, dataDir });
+  const { googleUrl, ...serverOptions } = options;
+  const server = await startTestServer(db.url, {
+    ...(googleUrl
+      ? {
+          googleOpenIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
+          googleAdminApiUrl: googleUrl,
+        }
+      : {}),
+    ...serverOptions,
+    dataDir,
+  });
   const readiness = await waitForStartup(server);
   if (readiness.status !== "ready") {
     await server.stop();

@@ -5,9 +5,5 @@ export {
   type MailIntegration,
   type MailSettingsService,
 } from "./mailSettingsService";
-export { createOwnerService } from "./ownerService";
-export {
-  createPasswordResetEmailService,
-  type PasswordResetEmailService,
-} from "./passwordResetEmailService";
+export { createOwnerService, type GoogleAdmin, type OwnerService } from "./ownerService";
 export { createSetupSessionService, type SetupHolder } from "./setupSessionService";

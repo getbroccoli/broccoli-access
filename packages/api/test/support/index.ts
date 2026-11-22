@@ -19,7 +19,7 @@ export { TEST_OWNER, TestEnv, type SignedInOwner, type TestEnvOptions } from "./
 export { TestSeed } from "./testSeed";
 export { TEST_SECRET_BOX } from "./testSecretBox";
 export { storedFileIds } from "./storedFileIds";
-export { employeeServices, mailSettings, passwordResetEmail } from "./services";
+export { employeeServices, mailSettings, googleConnection } from "./services";
 export type { EmployeeServices } from "./services";
 export { fileStorage, instances, owners, recordHistory, setupSessions } from "./statelessServices";
 export { EXAMPLE_PAYLOAD } from "./exampleEvent";
@@ -44,3 +44,11 @@ export { hostileText, storedTextSnapshot } from "./hostileText";
 export { storedTextProbe } from "./storedTextProbe";
 export { startFakeHttpServer } from "./fakeHttpServer";
 export { expectHistoryReplaysTo } from "./employeeHistory";
+export { registerGoogleRedirect, consentAtGoogle } from "./googleConsent";
+export {
+  storedApps,
+  storedAppConnections,
+  storedGoogleAccounts,
+  storedUsers,
+} from "./storedGoogleConnection";
+export { googleSetup, GOOGLE_SCOPES } from "./googleSetup";

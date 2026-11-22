@@ -1,6 +1,13 @@
+import { ACME } from "@broccoli-access/fake-apps";
 import { request } from "node:http";
 
-import { createBrowser, expect, TEST_OWNER, test } from "#test/support";
+import {
+  createBrowser,
+  expect,
+  test,
+  consentAtGoogle,
+  registerGoogleRedirect,
+} from "#test/support";
 
 test("the first browser starts setup with a private three-day cookie", async ({ env }) => {
   const browser = env.browser();
@@ -47,12 +54,16 @@ test("the setup cookie grants no access to employees", async ({ env }) => {
   expect(await response.json()).toMatchObject({ errors: [{ extensions: { code: "FORBIDDEN" } }] });
 });
 
-test("creating the owner ends the setup cookie's access", async ({ env }) => {
+test("connecting Google ends the setup cookie's access", async ({ env, fakeGoogle }) => {
+  await registerGoogleRedirect(fakeGoogle.url, env.url);
   const browser = env.browser();
   const started = await browser.post("/api/auth/setup/start", undefined);
   const oldCookie = setupCookieOf(started)!.split(";", 1)[0]!;
 
-  await browser.post("/api/auth/setup", TEST_OWNER);
+  const connection = await browser.post("/api/google/connect", ACME.oauthClient);
+  const { authorizationUrl } = (await connection.json()) as { authorizationUrl: string };
+  const callback = await consentAtGoogle(authorizationUrl);
+  await browser.getManual(callback.href);
 
   const stale = await fetch(`${env.url}/api/graphql`, {
     method: "POST",
@@ -62,13 +73,6 @@ test("creating the owner ends the setup cookie's access", async ({ env }) => {
   expect(await stale.json()).toMatchObject({
     errors: [{ extensions: { code: "UNAUTHENTICATED" } }],
   });
-});
-
-test("owner creation without the setup cookie is refused", async ({ env }) => {
-  const response = await env.browser().post("/api/auth/setup", TEST_OWNER);
-
-  expect(response.status).toBe(409);
-  expect(await response.json()).toMatchObject({ code: "SETUP_IN_PROGRESS" });
 });
 
 test("renews the setup cookie when the holder starts again", async ({ env }) => {
@@ -82,19 +86,14 @@ test("renews the setup cookie when the holder starts again", async ({ env }) => 
   expect(setupCookieOf(renewed)).toMatch(/;\s*Max-Age=259200(?:;|$)/i);
 });
 
-test.for(["/api/auth/setup/start", "/api/auth/setup"])(
-  "refuses %s once an owner exists",
-  async (path, { env }) => {
-    await env.signInAsOwner();
+test("refuses setup start once an owner exists", async ({ env }) => {
+  await env.signInAsOwner();
 
-    const response = await env
-      .browser()
-      .post(path, path.endsWith("start") ? undefined : TEST_OWNER);
+  const response = await env.browser().post("/api/auth/setup/start", undefined);
 
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ code: "OWNER_EXISTS" });
-  },
-);
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({ code: "OWNER_EXISTS" });
+});
 
 test("sets a Secure setup cookie when the public URL uses HTTPS", async ({ env }) => {
   await env.restart({ publicUrl: "https://access.example.com" });

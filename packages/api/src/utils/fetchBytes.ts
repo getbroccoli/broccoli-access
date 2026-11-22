@@ -1,7 +1,7 @@
 /**
  * Requests a binary answer, a GET unless `init` says otherwise, and returns its body.
- * Resolves null on 404. Rejects on another unsuccessful status, after `timeoutMs`, or on a
- * body over `maxBytes`.
+ * Resolves null on 404. Rejects with `UnsuccessfulAnswerError` on another unsuccessful status,
+ * after `timeoutMs`, or on a body over `maxBytes`.
  */
 export async function fetchBytes(
   url: URL,
@@ -12,9 +12,21 @@ export async function fetchBytes(
     return null;
   }
   if (!response.ok) {
-    throw new Error(`${init?.method ?? "GET"} ${url.origin} answered ${response.status}`);
+    throw new UnsuccessfulAnswerError(init?.method ?? "GET", url, response.status);
   }
   return readBytes(response, maxBytes);
+}
+
+/** An answer with an unsuccessful status other than 404, which callers may tell apart by `status`. */
+export class UnsuccessfulAnswerError extends Error {
+  constructor(
+    method: string,
+    url: URL,
+    readonly status: number,
+  ) {
+    super(`${method} ${url.origin} answered ${status}`);
+    this.name = "UnsuccessfulAnswerError";
+  }
 }
 
 /** An answer whose body exceeded the bytes its reader allowed. */

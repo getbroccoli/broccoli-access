@@ -18,10 +18,14 @@ type User {
   operations: [Operation!]!
 }
 
-"Where a new instance is in its first-run flow: the owner account is created, then setup is done."
+"Where a new instance is in its first-run flow."
 enum SetupStep {
-  "Nobody has an account yet; the browser holding setup creates the owner."
-  OWNER
+  "Nobody has an account yet; the browser holding setup connects Google Workspace, and the consenting admin becomes the owner."
+  CONNECT_GOOGLE
+  "The owner's Google Workspace is scanned."
+  SCAN
+  "The owner selects the company's apps."
+  SELECT_APPS
   "Setup is finished."
   DONE
 }
@@ -43,8 +47,6 @@ type Setup {
   holder: SetupHolder!
   "How this instance sends email. Owner only, though the rest of `Setup` is public."
   mail: MailSettings
-  "Whether \"Forgot password?\" can email a link: true while email is chosen."
-  passwordResetByEmail: Boolean!
 }
 
 "How the instance sends email."

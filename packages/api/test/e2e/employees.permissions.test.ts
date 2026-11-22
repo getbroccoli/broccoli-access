@@ -1,4 +1,4 @@
-import { expect, TEST_OWNER, test } from "#test/support";
+import { expect, test } from "#test/support";
 
 test("returns every editable field and deletion access to the owner", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
@@ -28,11 +28,9 @@ test("returns every editable field and deletion access to the owner", async ({ e
 });
 
 test("returns an employee's own writable fields", async ({ env }) => {
-  await env.seed.owner();
-  const credentials = { email: "anna@example.com", password: TEST_OWNER.password };
-  const user = await env.seed.user(credentials);
+  const { browser, user } = await env.signInAsOwner();
+  await env.seed.owner({ email: "another.owner@example.com" });
   const employee = await env.seed.employee({ userId: user.id });
-  const { browser } = await env.signIn(credentials);
 
   const response = await browser.graphql(
     `
@@ -60,12 +58,10 @@ test("returns an employee's own writable fields", async ({ env }) => {
 test("returns each listed employee's writable fields for the signed-in employee", async ({
   env,
 }) => {
-  await env.seed.owner();
-  const credentials = { email: "anna@example.com", password: TEST_OWNER.password };
-  const user = await env.seed.user(credentials);
+  const { browser, user } = await env.signInAsOwner();
+  await env.seed.owner({ email: "another.owner@example.com" });
   const anna = await env.seed.employee({ firstName: "Anna", userId: user.id });
   const coworker = await env.seed.employee({ firstName: "Carl" });
-  const { browser } = await env.signIn(credentials);
 
   const response = await browser.graphql(`
     query Employees {
@@ -99,12 +95,10 @@ test("returns each listed employee's writable fields for the signed-in employee"
 });
 
 test("refuses an employee updating a coworker's name through GraphQL", async ({ env }) => {
-  await env.seed.owner();
-  const credentials = { email: "anna@example.com", password: TEST_OWNER.password };
-  const user = await env.seed.user(credentials);
+  const { browser, user } = await env.signInAsOwner();
+  await env.seed.owner({ email: "another.owner@example.com" });
   await env.seed.employee({ userId: user.id });
   const coworker = await env.seed.employee();
-  const { browser } = await env.signIn(credentials);
 
   const response = await browser.graphql(
     `

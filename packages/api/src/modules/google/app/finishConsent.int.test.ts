@@ -1,0 +1,315 @@
+import { ACME } from "@broccoli-access/fake-apps";
+
+import {
+  expect,
+  test,
+  SETUP_HOLDER,
+  googleSetup,
+  GOOGLE_SCOPES,
+  consentAtGoogle,
+  instances,
+  storedApps,
+  storedAppConnections,
+  storedGoogleAccounts,
+  storedUsers,
+  recordHistory,
+  TEST_SECRET_BOX,
+} from "#test/support";
+
+import { ApplicationError } from "../../../core/applicationError";
+import type { Orm } from "../../../core/db";
+import { NotSuperAdminError } from "../domain";
+
+test("the consenting super admin becomes the owner with a Google account and setup advances to scan", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const callback = await consentAtGoogle(authorizationUrl);
+
+  const { userId } = await connection.finishConsent(SETUP_HOLDER, {
+    ...input,
+    code: callback.searchParams.get("code")!,
+    state: callback.searchParams.get("state")!,
+  });
+
+  expect(await storedUsers(orm)).toMatchObject([{ id: userId, email: "admin@acme.example" }]);
+  expect(await storedGoogleAccounts(orm)).toMatchObject([
+    {
+      userId,
+      providerId: "google",
+      accountId: ACME.people.find(({ email }) => email === "admin@acme.example")!.id,
+      accessToken: null,
+      refreshToken: null,
+      idToken: null,
+      password: null,
+    },
+  ]);
+  expect(await instances.readInstance(orm)).toMatchObject({
+    ownerUserId: userId,
+    step: "scan",
+    setupSession: null,
+  });
+});
+
+test("stores connection settings separately from secrets encrypted for this connection", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const callback = await consentAtGoogle(authorizationUrl);
+
+  await connection.finishConsent(SETUP_HOLDER, {
+    ...input,
+    code: callback.searchParams.get("code")!,
+    state: callback.searchParams.get("state")!,
+  });
+
+  const rows = await storedAppConnections(orm);
+  expect(rows).toHaveLength(1);
+  const saved = rows[0]!;
+  const { grantedScopes, ...settings } = saved.settings;
+  expect(settings).toEqual({
+    googleApp: "own_google_app",
+    clientId: input.clientId,
+    domain: "acme.example",
+    organizationName: "Acme",
+    adminEmail: "admin@acme.example",
+  });
+  expect(grantedScopes).toEqual(expect.arrayContaining(GOOGLE_SCOPES));
+  const secrets = JSON.parse(TEST_SECRET_BOX.decrypt(saved.encryptedSecrets, saved.id)) as Record<
+    string,
+    string
+  >;
+  expect(secrets.refreshToken).toEqual(expect.any(String));
+  expect(secrets).toEqual({ clientSecret: input.clientSecret, refreshToken: secrets.refreshToken });
+  expect(secrets.refreshToken).toBeTruthy();
+  expect(() => TEST_SECRET_BOX.decrypt(saved.encryptedSecrets, "another-connection")).toThrow();
+  expect(JSON.stringify(saved.settings)).not.toContain(input.clientSecret);
+  expect(JSON.stringify(saved.settings)).not.toContain(secrets.refreshToken);
+});
+
+test("approves Google Workspace and records both creations as edits by the new owner", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const callback = await consentAtGoogle(authorizationUrl);
+
+  const { userId } = await connection.finishConsent(SETUP_HOLDER, {
+    ...input,
+    code: callback.searchParams.get("code")!,
+    state: callback.searchParams.get("state")!,
+  });
+
+  const apps = await storedApps(orm);
+  expect(apps).toMatchObject([
+    {
+      catalogKey: "google_workspace",
+      name: "Google Workspace",
+      domain: "workspace.google.com",
+      status: "approved",
+      externalIds: [],
+    },
+  ]);
+  const connections = await storedAppConnections(orm);
+  expect(connections).toMatchObject([{ appId: apps[0]!.id }]);
+  const appHistory = await recordHistory.read(orm, "app", apps[0]!.id, {});
+  const connectionHistory = await recordHistory.read(orm, "app_connection", connections[0]!.id, {});
+  for (const history of [appHistory, connectionHistory]) {
+    expect(history.edges).toHaveLength(1);
+    expect(history.edges[0]!.node).toMatchObject({
+      operation: "CREATED",
+      author: { kind: "SIGNED_IN_USER", id: userId },
+      cause: { kind: "EDITED_DIRECTLY" },
+    });
+  }
+});
+
+test("refuses a non-admin consent without writing anything", async ({ orm, fakeGoogle }) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const callback = await consentAtGoogle(authorizationUrl, { account: "chloe@acme.example" });
+
+  await expect(
+    connection.finishConsent(SETUP_HOLDER, {
+      ...input,
+      code: callback.searchParams.get("code")!,
+      state: callback.searchParams.get("state")!,
+    }),
+  ).rejects.toBeInstanceOf(NotSuperAdminError);
+
+  await expectUnconnected(orm);
+});
+
+test("refuses consent without a refresh token without writing anything", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const url = new URL(authorizationUrl);
+  url.searchParams.delete("access_type");
+  const callback = await consentAtGoogle(url);
+
+  await expect(
+    connection.finishConsent(SETUP_HOLDER, {
+      ...input,
+      code: callback.searchParams.get("code")!,
+      state: callback.searchParams.get("state")!,
+    }),
+  ).rejects.toBeInstanceOf(ApplicationError);
+
+  await expectUnconnected(orm);
+});
+
+test("refuses consent missing a requested scope without writing anything", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const url = new URL(authorizationUrl);
+  url.searchParams.set("scope", GOOGLE_SCOPES.slice(0, -1).join(" "));
+  const callback = await consentAtGoogle(url);
+
+  await expect(
+    connection.finishConsent(SETUP_HOLDER, {
+      ...input,
+      code: callback.searchParams.get("code")!,
+      state: callback.searchParams.get("state")!,
+    }),
+  ).rejects.toBeInstanceOf(ApplicationError);
+
+  await expectUnconnected(orm);
+});
+
+test("refuses an ID token for another nonce without writing anything", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const url = new URL(authorizationUrl);
+  url.searchParams.set("nonce", "another-nonce");
+  const callback = await consentAtGoogle(url);
+
+  await expect(
+    connection.finishConsent(SETUP_HOLDER, {
+      ...input,
+      code: callback.searchParams.get("code")!,
+      state: callback.searchParams.get("state")!,
+    }),
+  ).rejects.toBeInstanceOf(ApplicationError);
+
+  await expectUnconnected(orm);
+});
+
+test("refuses a tampered state without writing anything", async ({ orm, fakeGoogle }) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const callback = await consentAtGoogle(authorizationUrl);
+  const state = callback.searchParams.get("state")!;
+  const tampered = `${state[0] === "A" ? "B" : "A"}${state.slice(1)}`;
+
+  await expect(
+    connection.finishConsent(SETUP_HOLDER, {
+      ...input,
+      code: callback.searchParams.get("code")!,
+      state: tampered,
+    }),
+  ).rejects.toBeInstanceOf(ApplicationError);
+
+  await expectUnconnected(orm);
+});
+
+test("refuses an expired state without writing anything", async ({ orm, fakeGoogle }) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const callback = await consentAtGoogle(authorizationUrl);
+
+  await expect(
+    connection.finishConsent(SETUP_HOLDER, {
+      ...input,
+      code: callback.searchParams.get("code")!,
+      state: callback.searchParams.get("state")!,
+      now: new Date(input.now.getTime() + 11 * 60_000),
+    }),
+  ).rejects.toBeInstanceOf(ApplicationError);
+
+  await expectUnconnected(orm);
+});
+
+test("refuses another browser's state without writing anything", async ({
+  orm,
+  seed,
+  fakeGoogle,
+}) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const callback = await consentAtGoogle(authorizationUrl);
+
+  await seed.setupSession({
+    token: "another-browser",
+    expiresAt: new Date("2026-11-24T12:00:00Z"),
+  });
+
+  await expect(
+    connection.finishConsent(SETUP_HOLDER, {
+      ...input,
+      code: callback.searchParams.get("code")!,
+      state: callback.searchParams.get("state")!,
+      setupToken: "another-browser",
+    }),
+  ).rejects.toBeInstanceOf(ApplicationError);
+
+  await expectUnconnected(orm);
+});
+
+test("refuses reused state without changing the successful connection", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const callback = await consentAtGoogle(authorizationUrl);
+  const finish = {
+    ...input,
+    code: callback.searchParams.get("code")!,
+    state: callback.searchParams.get("state")!,
+  };
+  await connection.finishConsent(SETUP_HOLDER, finish);
+  const before = {
+    instance: await instances.readInstance(orm),
+    users: await storedUsers(orm),
+    accounts: await storedGoogleAccounts(orm),
+    apps: await storedApps(orm),
+    connections: await storedAppConnections(orm),
+  };
+
+  await expect(connection.finishConsent(SETUP_HOLDER, finish)).rejects.toBeInstanceOf(
+    ApplicationError,
+  );
+
+  expect({
+    instance: await instances.readInstance(orm),
+    users: await storedUsers(orm),
+    accounts: await storedGoogleAccounts(orm),
+    apps: await storedApps(orm),
+    connections: await storedAppConnections(orm),
+  }).toEqual(before);
+});
+
+async function expectUnconnected(orm: Orm): Promise<void> {
+  expect(await storedUsers(orm)).toEqual([]);
+  expect(await storedGoogleAccounts(orm)).toEqual([]);
+  expect(await storedApps(orm)).toEqual([]);
+  expect(await storedAppConnections(orm)).toEqual([]);
+  expect(await instances.readInstance(orm)).toMatchObject({
+    ownerUserId: null,
+    step: "connect_google",
+  });
+}

@@ -103,7 +103,6 @@ it("rejects startup and closes the database pool when a module router throws", a
             },
           },
         ],
-        passwordResetEmail: { queue: () => Promise.resolve() },
       };
     },
   );

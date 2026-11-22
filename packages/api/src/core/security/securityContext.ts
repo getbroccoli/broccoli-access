@@ -43,6 +43,9 @@ export interface SecurityContext {
   /** Broccoli Access's own work, which no user starts; refuses everyone else with FORBIDDEN. */
   requireSystem(): void;
 
+  /** Setup's own work, such as connecting Google; refuses everyone but the setup holder with FORBIDDEN. */
+  requireSetupHolder(): void;
+
   /**
    * Refuses with FORBIDDEN unless the caller's grants reach every record of the object for the
    * action: creating a record tied to nobody yet, and ids that name no record.
@@ -157,6 +160,12 @@ export class PrincipalSecurityContext implements SecurityContext {
   requireSystem(): void {
     if (!this.isSystem) {
       throw new ApplicationError("FORBIDDEN", "Only Broccoli Access can do this.");
+    }
+  }
+
+  requireSetupHolder(): void {
+    if (!this.isSetupHolder) {
+      throw new ApplicationError("FORBIDDEN", "Only the browser holding setup can do this.");
     }
   }
 

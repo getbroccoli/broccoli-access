@@ -26,6 +26,6 @@ export function employeesModule(
     typeDefs: readSdl(import.meta.url, "./graphql/schema.graphql"),
     resolvers: createResolvers(services),
     recordTypes: { employee: employeeRecordType(dependencies.orm) },
-    router: (resolveSecurity) => express.Router().use(avatarRouter(services, resolveSecurity)),
+    router: ({ resolveSecurity }) => express.Router().use(avatarRouter(services, resolveSecurity)),
   };
 }

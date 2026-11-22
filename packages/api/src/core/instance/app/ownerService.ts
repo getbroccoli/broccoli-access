@@ -3,8 +3,13 @@ import type { Orm, Tx } from "../../db";
 import type { SecurityContext } from "../../security";
 import { instanceRepository } from "../db";
 
-export interface OwnerUser {
-  user: { id: string; email: string };
+/** The Google account of the admin who connects Google Workspace at setup. */
+export interface GoogleAdmin {
+  /** Google's user id, the `sub` of their ID token. */
+  googleUserId: string;
+  /** Lowercased. */
+  email: string;
+  name: string;
 }
 
 /** The instance's owner, created once by setup. */
@@ -12,35 +17,35 @@ export interface OwnerService {
   /** The owner's id and sign-in email, or null before an owner exists. Trusted read: no `ctx`. */
   readOwner: (db: Orm | Tx) => Promise<{ userId: string; email: string } | null>;
   /**
-   * Setup's only step: makes the user that `createOwner` creates the owner, for the browser
-   * holding setup only, then completes setup and ends the setup session. Refuses with
-   * `OwnerExistsError`, `SetupInProgressError`, or CONFLICT once setup is done.
+   * Setup's connect step, for the browser holding setup: creates the admin's user with their Google
+   * account, makes them the owner, moves setup to the scan and ends the setup session, joining
+   * `tx`. Refuses with `OwnerExistsError`, `SetupInProgressError`, or CONFLICT at another step.
    */
-  createOwnerAtSetup: <Owner extends OwnerUser>(
+  createOwnerAtConnect: (
     ctx: SecurityContext,
     tx: Tx,
-    session: { token: string | null; now: Date },
-    createOwner: () => Promise<Owner>,
-  ) => Promise<Owner>;
+    session: { setupToken: string | null; now: Date },
+    admin: GoogleAdmin,
+  ) => Promise<{ userId: string }>;
 }
 
 export function createOwnerService(): OwnerService {
   return {
     readOwner: (db) => instanceRepository(db).readOwner(),
-    async createOwnerAtSetup(ctx, tx, { token, now }, createOwner) {
-      ctx.requireSystem();
+    async createOwnerAtConnect(ctx, tx, { setupToken, now }, admin) {
+      ctx.requireSetupHolder();
       const repository = instanceRepository(tx);
-      // The row lock makes a concurrent setup wait and then fail with `OwnerExistsError`.
+      // The row lock makes a concurrent connection wait and then fail with `OwnerExistsError`.
       const current = await repository.lockInstance();
-      current.requireHeldSetup(token, now);
-      const done = current.completeOwnerStep();
-      if (!done) {
-        throw new ApplicationError("CONFLICT", "Setup is already done.");
+      current.requireHeldSetup(setupToken, now);
+      const scan = current.finishConnectStep();
+      if (!scan) {
+        throw new ApplicationError("CONFLICT", "Google Workspace is already connected.");
       }
-      const owner = await createOwner();
-      await repository.setOwner(done.claimOwner(owner.user.id).ownerUserId!, done.step);
+      const userId = await repository.createGoogleUser(admin);
+      await repository.setOwner(scan.claimOwner(userId).ownerUserId!, scan.step);
       await repository.clearSetupSession();
-      return owner;
+      return { userId };
     },
   };
 }

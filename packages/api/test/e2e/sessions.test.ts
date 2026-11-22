@@ -1,3 +1,4 @@
+import { ACME } from "@broccoli-access/fake-apps";
 import { inject, onTestFinished } from "vitest";
 
 import {
@@ -7,7 +8,8 @@ import {
   startDisconnectingProxy,
   startTestServer,
   test,
-  TEST_OWNER,
+  consentAtGoogle,
+  registerGoogleRedirect,
   waitForStartup,
 } from "#test/support";
 
@@ -72,18 +74,26 @@ test("does not resend the cookie of a fresh session", async ({ env }) => {
   );
 });
 
-test("masks a database failure while reading the session", async () => {
+test("masks a database failure while reading the session", async ({ fakeGoogle }) => {
   const database = await createTestDatabase(inject("testRun"));
   onTestFinished(() => database.drop());
   const proxy = await startDisconnectingProxy(database.url);
   onTestFinished(() => proxy.disconnect());
-  const server = await startTestServer(proxy.url);
+  const server = await startTestServer(proxy.url, {
+    googleOpenIdConfigurationUrl: `${fakeGoogle.url}/.well-known/openid-configuration`,
+    googleAdminApiUrl: fakeGoogle.url,
+  });
   onTestFinished(() => server.stop());
   expect(await waitForStartup(server)).toEqual({ httpStatus: 200, status: "ready" });
   const browser = createBrowser(server.url);
   expect((await browser.post("/api/auth/setup/start", undefined)).status).toBe(200);
-  const setupResponse = await browser.post("/api/auth/setup", TEST_OWNER);
-  expect(setupResponse.status).toBe(200);
+  await registerGoogleRedirect(fakeGoogle.url, server.url);
+  const started = await browser.post("/api/google/connect", ACME.oauthClient);
+  expect(started.status).toBe(200);
+  const { authorizationUrl } = (await started.json()) as { authorizationUrl: string };
+  const callback = await consentAtGoogle(authorizationUrl);
+  const connected = await browser.getManual(callback.href);
+  expect(connected.headers.get("location")).toBe("/setup/scan");
 
   await proxy.disconnect();
   const response = await browser.graphql("{ employees(first: 1) { edges { cursor } } }");

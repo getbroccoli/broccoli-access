@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 import { eq, sql } from "drizzle-orm";
 
-import { user } from "../../auth";
+import { account, user } from "../../auth";
 import { type Orm, ormOf, type Tx } from "../../db";
 import {
   Instance,
@@ -22,6 +24,12 @@ export interface InstanceRepository {
   saveSetupSession(session: SetupSession): Promise<void>;
   clearSetupSession(): Promise<void>;
   setOwner(userId: string, step: SetupStep): Promise<void>;
+  /** Creates a user who signs in with their Google account, which keeps no tokens; returns their id. */
+  createGoogleUser(googleUser: {
+    googleUserId: string;
+    email: string;
+    name: string;
+  }): Promise<string>;
   /** Moves the step from `from` to `to`; does nothing at any other step. Returns whether it moved. */
   advanceStep(from: SetupStep, to: SetupStep): Promise<boolean>;
   /** The mail choice, no email until the owner chooses, and the origin its links use. */
@@ -78,6 +86,15 @@ export function instanceRepository(db: Orm | Tx): InstanceRepository {
 
     setOwner: async (userId: string, step: SetupStep): Promise<void> => {
       await orm().update(instance).set({ ownerUserId: userId, setupStep: step });
+    },
+
+    createGoogleUser: async ({ googleUserId, email, name }) => {
+      const userId = randomUUID();
+      await orm().insert(user).values({ id: userId, name, email, emailVerified: true });
+      await orm()
+        .insert(account)
+        .values({ id: randomUUID(), accountId: googleUserId, providerId: "google", userId });
+      return userId;
     },
 
     advanceStep: async (from: SetupStep, to: SetupStep): Promise<boolean> => {

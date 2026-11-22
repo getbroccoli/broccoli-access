@@ -1,5 +1,5 @@
 // Public values.
-export { authDatabase, createBetterAuth } from "./createBetterAuth";
+export { createBetterAuth } from "./createBetterAuth";
 export { authHandler } from "./authHandler";
 export { account, session, user } from "./schema";
 

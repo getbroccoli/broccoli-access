@@ -10,7 +10,7 @@ export const instance = pgTable(
   {
     id: boolean("id").primaryKey().default(true),
     ownerUserId: text("owner_user_id").references(() => user.id),
-    setupStep: text("setup_step", { enum: SETUP_STEPS }).notNull().default("owner"),
+    setupStep: text("setup_step", { enum: SETUP_STEPS }).notNull().default("connect_google"),
     /** Before the owner exists: the hash of the setup holder's token. */
     setupTokenHash: text("setup_token_hash"),
     setupExpiresAt: timestamp("setup_expires_at", { withTimezone: true }),
@@ -24,7 +24,10 @@ export const instance = pgTable(
   },
   (table) => [
     check("instance_singleton", sql`${table.id}`),
-    check("instance_setup_step", sql`${table.setupStep} in ('owner', 'done')`),
+    check(
+      "instance_setup_step",
+      sql`${table.setupStep} in ('connect_google', 'scan', 'select_apps', 'done')`,
+    ),
     check(
       "instance_setup_session",
       sql`num_nonnulls(${table.setupTokenHash}, ${table.setupExpiresAt}) in (0, 2)`,

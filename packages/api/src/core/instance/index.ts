@@ -3,18 +3,18 @@ export {
   createInstanceService,
   createMailSettingsService,
   createOwnerService,
-  createPasswordResetEmailService,
   createSetupSessionService,
 } from "./app";
-export { refuseBearerAuth, resolveSecurityContext } from "./betterAuth";
+export { readSetupToken, refuseBearerAuth, resolveSecurityContext } from "./betterAuth";
 export { selfHostedServer } from "./selfHostedServer";
 export { MAIL_SOURCES } from "./domain";
 
 // Public types.
 export type {
+  GoogleAdmin,
   InstanceMailer,
   MailIntegration,
   MailSettingsService,
-  PasswordResetEmailService,
+  OwnerService,
 } from "./app";
 export type { MailChoice, MailConfig, MailSource } from "./domain";

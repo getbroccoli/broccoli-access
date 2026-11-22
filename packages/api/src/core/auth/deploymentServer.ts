@@ -9,4 +9,6 @@ export interface DeploymentServer {
   router: Router;
   /** The origin browsers reach this instance at, for links that leave Broccoli Access and come back. */
   publicOrigin: (request: Request) => Promise<string>;
+  /** Signs in a user a module has verified; returns the `Set-Cookie` headers for its response. */
+  startSession: (userId: string) => Promise<string[]>;
 }
