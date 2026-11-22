@@ -91,7 +91,7 @@
     "src/lib/useSessionChange": ["src/lib/useRouteAction"],
     "src/lib/calendarDay": [],
     "src/lib/sentenceCase": [],
-    "src/lib/lastScan": ["src/i18n", "src/lib/calendarDay"]
+    "src/lib/lastScan": ["src/i18n", "src/lib/calendarDay", "src/lib/since"]
   },
   "deepImports": ["src/components/ui", "src/__generated__"]
 }
