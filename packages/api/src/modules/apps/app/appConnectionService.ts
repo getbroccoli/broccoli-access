@@ -13,7 +13,7 @@ import {
   appConnectionRepository,
   appRepository,
 } from "../db";
-import { appChanges, connectedAppOf } from "../domain";
+import { appChanges, CATALOG_KEYS, catalogApp, type CatalogApp, connectedAppOf } from "../domain";
 
 const recordHistory = createRecordHistoryService();
 
@@ -52,6 +52,14 @@ export interface AppConnectionService {
   readConnection: (db: Orm | Tx, connector: string) => Promise<AppConnection | null>;
   /** Every connection without its secrets. Trusted read: no `ctx`. */
   readConnections: (db: Orm | Tx) => Promise<AppConnection[]>;
+  /**
+   * The catalog apps among `catalogKeys` that have no app yet, whatever its status; a key the
+   * catalog lacks has none. Trusted read: no `ctx`.
+   */
+  readCatalogAppsWithoutApp: (
+    db: Orm | Tx,
+    catalogKeys: readonly string[],
+  ) => Promise<CatalogApp[]>;
   /** The connection with id `connectionId` without its secrets, or null. Trusted read: no `ctx`. */
   readConnectionById: (db: Orm | Tx, connectionId: string) => Promise<AppConnection | null>;
   /**
@@ -121,6 +129,13 @@ export function createAppConnectionService({
     },
     readConnection: (db, connector) => appConnectionRepository(db).findByConnector(connector),
     readConnections: (db) => appConnectionRepository(db).findAll(),
+    async readCatalogAppsWithoutApp(db, catalogKeys) {
+      const known = await appRepository(db).findByCatalogKeys(catalogKeys);
+      const knownKeys = new Set(known.map(({ catalogKey }) => catalogKey));
+      return catalogKeys
+        .filter((key) => CATALOG_KEYS.has(key) && !knownKeys.has(key))
+        .map(catalogApp);
+    },
     readConnectionById: (db, connectionId) => appConnectionRepository(db).findById(connectionId),
     async readSecrets(db, connectionId) {
       const encrypted = await appConnectionRepository(db).findEncryptedSecrets(connectionId);

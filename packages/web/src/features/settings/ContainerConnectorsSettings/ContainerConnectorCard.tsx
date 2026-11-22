@@ -1,11 +1,14 @@
 import type { ContainerConnectorsSettingsQuery } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
+import {
+  ConnectContainerConnectorDialog,
+  connectingFieldName,
+  connectsWithText,
+} from "@/features/apps";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { ScanNowButton } from "@/shell";
 
-import { ConnectContainerConnectorDialog } from "./ConnectContainerConnectorDialog";
-import { connectingFieldName } from "./connectingFieldName";
 import { ConnectionSummary } from "./ConnectionSummary";
 
 export type ContainerConnector = ContainerConnectorsSettingsQuery["containerConnectors"][number];
@@ -57,7 +60,7 @@ export function ContainerConnectorCard({ connector }: Props) {
           className="shrink-0 items-start pb-0"
         />
       ) : (
-        isTyped(connector) && (
+        connectsWithText(connector) && (
           <div className="shrink-0">
             <ConnectContainerConnectorDialog connector={connector} />
           </div>
@@ -67,13 +70,8 @@ export function ContainerConnectorCard({ connector }: Props) {
   );
 }
 
-/** Whether the owner types every value connecting asks for; an app session comes another way. */
-function isTyped({ connectionFields }: ContainerConnector): boolean {
-  return connectionFields.every(({ kind }) => kind === "TEXT");
-}
-
 function howItConnects(connector: ContainerConnector): string {
-  if (!isTyped(connector)) {
+  if (!connectsWithText(connector)) {
     return t("settings.apps.throughAppSession", { app: connector.name });
   }
   const field = connectingFieldName(connector.connectionFields);

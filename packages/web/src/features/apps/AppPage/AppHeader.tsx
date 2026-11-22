@@ -9,25 +9,40 @@ import { cn } from "@/lib/class-names";
 import { ScanNowButton } from "@/shell";
 
 import { ApproveAppButton } from "../ApproveAppButton";
+import { ConnectAppButton } from "../ConnectAppButton";
+import { ConnectedBadge } from "../ConnectedBadge";
+import { isConnected } from "../AppTable";
 import { useAppStatusChange } from "../useAppStatusChange";
 import { AppStatusBadge } from "./AppStatusBadge";
 import { AppSubtitle } from "./AppSubtitle";
+import { CanDisableBadge } from "./CanDisableBadge";
 import { IgnoreAppButton } from "./IgnoreAppButton";
 
 type Props = {
   app: Pick<
     NonNullable<AppPageQuery["app"]>,
-    "id" | "name" | "domain" | "catalogKey" | "status" | "connected" | "containerConnection"
+    | "id"
+    | "name"
+    | "domain"
+    | "catalogKey"
+    | "status"
+    | "connected"
+    | "containerConnection"
+    | "managingConnector"
   >;
+  /** Runs once the app is connected from here. */
+  onConnected: () => void;
 };
 
 /**
- * The way back to Applications, the app with its status, domain and connection, and Approve or
- * Ignore; a connected app's admin page and Scan now.
+ * The way back to Applications, the app with its status, whether a connector can manage it, its
+ * domain and connection, and Approve or Ignore; Connect while that connector has no connection; a
+ * connected app's admin page and Scan now.
  */
-export function AppHeader({ app }: Props) {
+export function AppHeader({ app, onConnected }: Props) {
   const { approve, ignore, pending } = useAppStatusChange(app);
   const connection = app.containerConnection;
+  const connector = isConnected(app) ? null : app.managingConnector;
   return (
     <div className="flex flex-col gap-5">
       <Link
@@ -48,11 +63,8 @@ export function AppHeader({ app }: Props) {
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <h1 className="truncate text-2xl font-semibold tracking-tight">{app.name}</h1>
               <AppStatusBadge status={app.status} />
-              {app.connected && (
-                <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
-                  {t("apps.page.connected")}
-                </span>
-              )}
+              {app.managingConnector && <CanDisableBadge />}
+              {app.connected && <ConnectedBadge />}
             </div>
             <AppSubtitle app={app} />
           </div>
@@ -60,6 +72,9 @@ export function AppHeader({ app }: Props) {
         <div className="flex flex-wrap gap-2">
           <ApproveAppButton app={app} size="lg" disabled={pending} onApprove={approve} />
           <IgnoreAppButton app={app} disabled={pending} onIgnore={ignore} />
+          {connector && (
+            <ConnectAppButton connector={connector} size="lg" onConnected={onConnected} />
+          )}
           {connection?.adminUrl && (
             <a
               href={connection.adminUrl}
@@ -80,6 +95,11 @@ export function AppHeader({ app }: Props) {
           )}
         </div>
       </div>
+      {connector && (
+        <p className="rounded-lg bg-muted/50 px-3.5 py-3 text-sm text-foreground/80">
+          {t("apps.page.connectHint", { app: app.name })}
+        </p>
+      )}
     </div>
   );
 }

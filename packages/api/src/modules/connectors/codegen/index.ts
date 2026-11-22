@@ -4,6 +4,7 @@ export const codegenMappers = {
   ConnectorsMutations: "Record<PropertyKey, never>",
   ContainerConnector:
     "../../modules/connectors/app#ConnectorWithConnection as ContainerConnectorModel",
+  AppToConnect: "../../modules/connectors/app#AppToConnect as AppToConnectModel",
   ContainerConnection:
     "../../modules/connectors/app#ContainerConnection as ContainerConnectionModel",
 };

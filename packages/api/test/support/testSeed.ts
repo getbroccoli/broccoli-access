@@ -105,9 +105,14 @@ export class TestSeed {
     );
   }
 
-  async app({ status = "discovered" }: { status?: App["status"] } = {}): Promise<App> {
+  async app({
+    name = "Slack",
+    domain = "slack.com",
+    catalogKey = "slack",
+    status = "discovered",
+  }: Partial<Pick<App, "name" | "domain" | "catalogKey" | "status">> = {}): Promise<App> {
     const [app] = await appRepository(this.orm).insertMany(
-      [{ name: "Slack", domain: "slack.com", catalogKey: "slack", externalIds: [] }],
+      [{ name, domain, catalogKey, externalIds: [] }],
       status,
     );
     return app!;

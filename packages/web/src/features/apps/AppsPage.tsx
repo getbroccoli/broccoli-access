@@ -20,6 +20,13 @@ const ALL_APPS = 10_000;
 /** How many apps show before "Show n more apps": the ones a first look needs. */
 const FIRST_APPS = 12;
 
+/** What every tab's table shows besides its apps. */
+const TABLE_TEXTS = {
+  firstRows: FIRST_APPS,
+  showMoreLabel: (count: number) => t("apps.showMore", { count: String(count) }),
+  emptyState: t("apps.empty"),
+};
+
 const STATUSES = {
   approved: "APPROVED",
   discovered: "DISCOVERED",
@@ -38,12 +45,12 @@ export function AppsPage() {
   const navigate = useNavigate({ from: "/apps" });
   const tab = search.status ?? (firstRun ? "discovered" : "approved");
   const { data, error, refetch } = useQuery(AppsPageDocument, {
-    variables: { status: STATUSES[tab], first: ALL_APPS },
+    variables: { status: STATUSES[tab], first: ALL_APPS, approved: tab === "approved" },
     // A scan or a change elsewhere, such as in Settings, moves apps outside this cache.
     fetchPolicy: "cache-and-network",
   });
   const discovered = useQuery(AppsPageDocument, {
-    variables: { status: "DISCOVERED", first: ALL_APPS },
+    variables: { status: "DISCOVERED", first: ALL_APPS, approved: false },
     skip: !firstRun,
   });
   // Null until the owner changes the selection, which starts with the preselected apps.
@@ -57,8 +64,6 @@ export function AppsPage() {
     { failed: error && !data, refetch },
     { failed: discovered.error && !discovered.data, refetch: discovered.refetch },
   ].filter(({ failed }) => failed);
-
-  const columns = tab === "approved" ? APPROVED_APP_COLUMNS : FOUND_APP_COLUMNS;
 
   return (
     <div className="flex flex-col">
@@ -86,16 +91,21 @@ export function AppsPage() {
           </Button>
         </div>
       )}
-      {apps && (
+      {/* A new tab starts with its first apps only. */}
+      {apps && tab === "approved" && (
         <AppTable
-          // A new tab starts with its first apps only.
+          key={tab}
+          rows={[...apps, ...(data?.appsToConnect ?? [])]}
+          columns={APPROVED_APP_COLUMNS}
+          {...TABLE_TEXTS}
+        />
+      )}
+      {apps && tab !== "approved" && (
+        <AppTable
           key={tab}
           rows={apps}
-          // Selecting apps for setup replaces approving them one by one, and approved apps have
-          // nothing to approve.
-          columns={firstRun || tab === "approved" ? columns : [...columns, APP_ACTIONS_COLUMN]}
-          firstRows={FIRST_APPS}
-          showMoreLabel={(count) => t("apps.showMore", { count: String(count) })}
+          // Selecting apps for setup replaces approving them one by one.
+          columns={firstRun ? FOUND_APP_COLUMNS : [...FOUND_APP_COLUMNS, APP_ACTIONS_COLUMN]}
           selection={
             firstRun && tab === "discovered"
               ? {
@@ -105,7 +115,7 @@ export function AppsPage() {
                 }
               : undefined
           }
-          emptyState={t("apps.empty")}
+          {...TABLE_TEXTS}
         />
       )}
     </div>

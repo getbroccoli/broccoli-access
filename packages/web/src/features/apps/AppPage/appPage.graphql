@@ -8,6 +8,13 @@ query AppPage($id: ID!) {
     connected
     peopleCount
     suspendedWithAccessCount
+    managingConnector {
+      id
+      connection {
+        id
+      }
+      ...ConnectAppButton_connector
+    }
     containerConnection {
       id
       adminUrl

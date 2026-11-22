@@ -95,6 +95,64 @@ test("the owner connects Linear and reads its seven members with their status", 
     });
 }, 90_000);
 
+test("Applications offers Linear to connect, then shows it connected", async ({ env }) => {
+  const { browser } = await env.signInAsOwner();
+  await finishSetupWithPreselectedApps(browser);
+
+  const before = await browser.graphql(APPLICATIONS);
+  expect(await before.json()).toEqual({
+    data: {
+      appsToConnect: [
+        {
+          id: "linear",
+          name: "Linear",
+          domain: "linear.app",
+          connector: { id: "linear", connection: null },
+        },
+      ],
+      apps: {
+        edges: expect.arrayContaining([
+          { node: { catalogKey: "slack", managingConnector: { id: "slack", connection: null } } },
+          { node: { catalogKey: "google_workspace", managingConnector: null } },
+        ]) as unknown,
+      },
+    },
+  });
+
+  const connected = await browser.graphql(CONNECT, { input: LINEAR_INPUT });
+  expect(await connected.json()).toMatchObject({
+    data: { connectors: { connect: { containerConnector: { id: "linear" }, error: null } } },
+  });
+
+  const after = await browser.graphql(APPLICATIONS);
+  expect(await after.json()).toEqual({
+    data: {
+      appsToConnect: [],
+      apps: {
+        edges: expect.arrayContaining([
+          {
+            node: {
+              catalogKey: "linear",
+              managingConnector: {
+                id: "linear",
+                connection: { id: expect.any(String) as unknown },
+              },
+            },
+          },
+        ]) as unknown,
+      },
+    },
+  });
+}, 90_000);
+
+test("listing apps to connect requires a session", async ({ env }) => {
+  const response = await env.browser().graphql("{ appsToConnect { id } }");
+
+  expect(await response.json()).toMatchObject({
+    errors: [{ extensions: { code: "UNAUTHENTICATED" } }],
+  });
+});
+
 test("a refused Linear key comes back as an invalid input payload", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
 
@@ -140,6 +198,11 @@ baseTest(
     expect(await response.json()).toEqual({ data: { containerConnectors: [] } });
   },
 );
+
+const APPLICATIONS = `{
+  appsToConnect { id name domain connector { id connection { id } } }
+  apps(status: APPROVED) { edges { node { catalogKey managingConnector { id connection { id } } } } }
+}`;
 
 const CONNECT = `mutation ($input: ContainerConnectorConnectInput!) {
   connectors { connect(input: $input) {

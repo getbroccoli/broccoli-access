@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import type { ConnectorCall, ConnectorErrorCode } from "@broccoli-access/connector-contract";
+import type {
+  ConnectorCall,
+  ConnectorErrorCode,
+  ConnectorManifest,
+} from "@broccoli-access/connector-contract";
 import { ACME_LINEAR } from "@broccoli-access/fake-apps";
 import express, { type RequestHandler } from "express";
 import { onTestFinished } from "vitest";
@@ -74,6 +78,23 @@ export async function failLinearCall(
     body: JSON.stringify({ connector: "linear", call, code, count }),
   });
   assert.equal(response.status, 204);
+}
+
+/** Serves the fake connectors manifest with the test's changes. */
+export async function serveManifest(
+  fakeUrl: string,
+  change: (manifest: ConnectorManifest) => void,
+) {
+  const response = await fetch(`${fakeUrl}/v1/connectors`);
+  const manifest = (await response.json()) as ConnectorManifest;
+  change(manifest);
+  const app = express();
+  app.get("/v1/connectors", (_request, response) => {
+    response.json(manifest);
+  });
+  const server = await startSimpleHttpServer(app);
+  onTestFinished(() => server.stop());
+  return server;
 }
 
 /** Serves the fake manifest and a test-specific accounts/list answer. */

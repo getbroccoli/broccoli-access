@@ -32,7 +32,8 @@ export function AppPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <AppHeader app={app} />
+      {/* Connecting changes what only the server computes: the status, connection and users. */}
+      <AppHeader app={app} onConnected={() => void refetch()} />
       <div className="grid gap-4 sm:grid-cols-2">
         <CountCard label={t("apps.page.users")} count={app.peopleCount} />
         <CountCard

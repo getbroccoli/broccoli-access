@@ -29,6 +29,7 @@
       "src/components/AppMark",
       "src/components/Avatar",
       "src/components/dataTable",
+      "src/components/form",
       "src/components/FoundVia",
       "src/components/ui",
       "src/i18n",

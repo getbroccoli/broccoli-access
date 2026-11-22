@@ -1,8 +1,7 @@
 import type { ContainerConnectorsSettingsQuery } from "@/__generated__/graphql";
+import { connectingFieldName } from "@/features/apps";
 import { t } from "@/i18n";
 import { formatLastScan } from "@/lib/lastScan";
-
-import { connectingFieldName } from "./connectingFieldName";
 
 type Connector = ContainerConnectorsSettingsQuery["containerConnectors"][number];
 

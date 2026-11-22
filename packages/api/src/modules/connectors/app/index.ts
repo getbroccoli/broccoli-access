@@ -4,6 +4,7 @@ export { createContainerConnectors } from "./containerConnectors";
 
 // Public types.
 export type {
+  AppToConnect,
   ContainerConnection,
   ContainerConnectionDependencies,
   ContainerConnectionService,

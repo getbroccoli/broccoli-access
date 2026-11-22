@@ -3,12 +3,11 @@ query ContainerConnectorsSettings {
     id
     name
     connectionFields {
-      key
       kind
       label
-      help
       secret
     }
+    ...ConnectContainerConnectorDialog_connector
     connection {
       id
       connectionUserEmail
@@ -19,41 +18,6 @@ query ContainerConnectorsSettings {
         sourceName
         people {
           count
-        }
-      }
-    }
-  }
-}
-
-mutation ConnectContainerConnector($input: ContainerConnectorConnectInput!) {
-  connectors {
-    connect(input: $input) {
-      containerConnector {
-        id
-        connection {
-          id
-          connectionUserEmail
-          scan {
-            id
-            status
-            readAt
-            sourceName
-            people {
-              count
-            }
-          }
-        }
-      }
-      error {
-        __typename
-        ... on Error {
-          message
-        }
-        ... on InvalidInputError {
-          fields {
-            field
-            code
-          }
         }
       }
     }
