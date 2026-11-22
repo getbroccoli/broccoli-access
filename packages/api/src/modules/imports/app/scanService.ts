@@ -42,9 +42,8 @@ export interface ScanService {
   /**
    * The scan's job: reads every page of the connection's accounts and a directory's changed
    * photos, trying a rate-limited or unavailable call again, then in one transaction replaces the
-   * source's records, syncs them,
-   * marks it scanned and moves setup from the scan to selecting the apps. A connector error marks
-   * it failed and changes nothing else. System only.
+   * source's records, syncs them, marks it scanned and moves setup from the scan to selecting the
+   * apps. A connector error marks it failed and changes nothing else. System only.
    */
   runScan: (ctx: SecurityContext, sourceId: string) => Promise<void>;
   /** The job's attempts are used up: the scan failed with `app_unavailable`. System only. */
