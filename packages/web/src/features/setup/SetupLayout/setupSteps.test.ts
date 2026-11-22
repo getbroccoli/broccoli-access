@@ -4,7 +4,8 @@ import { assert, expect, it } from "vitest";
 import { requireFinishedSetup, requireSetupPage, setupStepPage } from "./setupSteps";
 
 it.each([
-  ["OWNER", "/setup"],
+  ["CONNECT_GOOGLE", "/setup"],
+  ["SCAN", "/setup/scan"],
   ["DONE", "/"],
 ] as const)("enters %s through %s", (step, expected) => {
   expect(setupStepPage(step)).toBe(expected);
@@ -15,8 +16,8 @@ it("sends a signed-out visitor without setup to login with their destination", (
   let caught: unknown;
 
   try {
-    requireSetupPage("owner", {
-      context: { me: null, holdsSetup: false, setupStep: "OWNER" },
+    requireSetupPage("connect_google", {
+      context: { me: null, holdsSetup: false, setupStep: "CONNECT_GOOGLE" },
       location: { href },
     });
   } catch (error) {
@@ -31,9 +32,9 @@ it("sends a signed-out visitor without setup to login with their destination", (
   });
 });
 
-it("opens the owner step for the browser holding setup", () => {
-  const result = requireSetupPage("owner", {
-    context: { me: null, holdsSetup: true, setupStep: "OWNER" },
+it("opens the connect step for the browser holding setup", () => {
+  const result = requireSetupPage("connect_google", {
+    context: { me: null, holdsSetup: true, setupStep: "CONNECT_GOOGLE" },
     location: { href: "/setup" },
   });
 
@@ -44,7 +45,7 @@ it("sends a signed-in owner opening setup once it is done to Today", () => {
   let caught: unknown;
 
   try {
-    requireSetupPage("owner", {
+    requireSetupPage("connect_google", {
       context: { me: { id: "owner" }, holdsSetup: false, setupStep: "DONE" },
       location: { href: "/setup" },
     });
@@ -67,12 +68,12 @@ it("returns the signed-in user when setup is done", () => {
   expect(result).toBe(me);
 });
 
-it("sends the setup holder to the owner step before entering the app", () => {
+it("sends the setup holder to the connect step before entering the app", () => {
   let caught: unknown;
 
   try {
     requireFinishedSetup({
-      context: { me: null, holdsSetup: true, setupStep: "OWNER" },
+      context: { me: null, holdsSetup: true, setupStep: "CONNECT_GOOGLE" },
       location: { href: "/people" },
     });
   } catch (error) {
@@ -84,7 +85,7 @@ it("sends the setup holder to the owner step before entering the app", () => {
 });
 
 it.each([
-  ["OWNER", false],
+  ["CONNECT_GOOGLE", false],
   ["DONE", false],
   ["DONE", true],
 ] as const)("sends a signed-out user at %s to login with holder %s", (setupStep, holdsSetup) => {
@@ -106,4 +107,28 @@ it.each([
     search: { redirect: href },
     replace: true,
   });
+});
+
+it("opens scan for the signed-in owner", () => {
+  expect(
+    requireSetupPage("scan", {
+      context: { me: { id: "owner" }, holdsSetup: false, setupStep: "SCAN" },
+      location: { href: "/setup/scan" },
+    }),
+  ).toBeUndefined();
+});
+
+it("sends a connected owner from Connect to Scan", () => {
+  let caught: unknown;
+  try {
+    requireSetupPage("connect_google", {
+      context: { me: { id: "owner" }, holdsSetup: false, setupStep: "SCAN" },
+      location: { href: "/setup" },
+    });
+  } catch (error) {
+    caught = error;
+  }
+
+  assert(isRedirect(caught));
+  expect(caught.options).toMatchObject({ to: "/setup/scan", replace: true });
 });

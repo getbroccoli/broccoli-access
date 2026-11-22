@@ -6,8 +6,4 @@ export {
   type MailSettingsService,
 } from "./mailSettingsService";
 export { createOwnerService } from "./ownerService";
-export {
-  createPasswordResetEmailService,
-  type PasswordResetEmailService,
-} from "./passwordResetEmailService";
 export { createSetupSessionService, type SetupHolder } from "./setupSessionService";

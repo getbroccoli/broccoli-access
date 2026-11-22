@@ -1,4 +1,4 @@
-export { SetupLayout, type SetupWidth } from "./SetupLayout";
+export { SetupLayout } from "./SetupLayout";
 export {
   requireFinishedSetup,
   requireSetupPage,

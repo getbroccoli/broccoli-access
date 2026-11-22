@@ -17,9 +17,17 @@
       "src/modules/*"
     ],
     "src/modules/employees": ["src/core/*", "!src/core/server", "src/utils"],
+    "src/modules/apps": ["src/core/*", "!src/core/server"],
+    "src/modules/google": [
+      "src/core/*",
+      "!src/core/server",
+      "src/integrations/google",
+      "src/utils"
+    ],
     "src/modules/imports": ["src/core/*", "!src/core/server"],
     "src/modules/system": ["src/core/*", "!src/core/server"],
     "src/integrations/mail": ["src/utils"],
+    "src/integrations/google": ["src/utils"],
     "src/utils": [],
     "src/core/server": ["src/core/*"],
     "src/core/moduleManifest": [
@@ -84,6 +92,7 @@
       "src/modules",
       "src/modules/*",
       "src/modules/employees/db",
+      "src/modules/apps/db",
       "src/utils"
     ],
     "test/e2e": ["src/core/db", "src/core/logger", "src/core/server", "test/support"]

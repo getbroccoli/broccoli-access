@@ -24,10 +24,9 @@ export class TestSeed {
 
   async owner({
     email = "owner@example.com",
-    password,
     name,
-  }: { email?: string; password?: string; name?: string } = {}): Promise<SecurityContext> {
-    const saved = await this.user({ email, password, name });
+  }: { email?: string; name?: string } = {}): Promise<SecurityContext> {
+    const saved = await this.user({ email, name });
     const instance = instanceRepository(this.orm);
     await instance.setOwner(saved.id, (await instance.readInstance()).step);
     return PrincipalSecurityContext.user(

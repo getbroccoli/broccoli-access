@@ -25,10 +25,23 @@ it("does not let callers alter the stored setup session through its snapshot", (
   );
 });
 
+it("finishes connecting Google by advancing to scan without changing the original", () => {
+  const instance = exampleInstance();
+
+  const connected = instance.finishConnectStep();
+
+  expect(connected?.step).toBe("scan");
+  expect(instance.step).toBe("connect_google");
+});
+
+it.each(["scan", "select_apps", "done"] as const)("does not finish connecting at %s", (step) => {
+  expect(exampleInstance({ step }).finishConnectStep()).toBeNull();
+});
+
 function exampleInstance(state: Partial<InstanceState> = {}): Instance {
   return new Instance({
     ownerUserId: null,
-    step: "owner",
+    step: "connect_google",
     setupSession: null,
     mailSource: null,
     ...state,

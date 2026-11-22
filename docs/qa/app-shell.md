@@ -4,8 +4,8 @@ A manual check of the left menu, the workspace menu, Settings and the profile me
 
 ## Setup
 
-1. Start the stack and create the owner as in [QA setup](setup.md).
-2. Sign in as `owner@example.com`.
+1. Start the stack, connect Google Workspace and move setup on as in [QA setup](setup.md).
+2. Use the browser that connected Google Workspace.
 
 ## App menu
 

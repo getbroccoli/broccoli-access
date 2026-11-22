@@ -1,0 +1,6 @@
+query ConnectGoogle {
+  setup {
+    id
+    googleRedirectAddress
+  }
+}

@@ -25,9 +25,8 @@ export const test = baseTest.extend<{
   transact: Transact;
   fakeGoogle: RunningFakeGoogle;
 }>({
-  // eslint-disable-next-line no-empty-pattern -- Vitest reads fixture dependencies from this pattern.
-  env: async ({}, use) => {
-    const env = await TestEnv.start();
+  env: async ({ fakeGoogle }, use) => {
+    const env = await TestEnv.start({ googleUrl: fakeGoogle.url });
     await use(env);
     await env.stop();
   },

@@ -12,15 +12,17 @@ export type SetupHolder = "you" | "another_device" | "nobody";
 /** The browser session that holds self-hosted setup until an owner exists. */
 export interface SetupSessionService {
   /**
-   * Gives setup to the first browser, or extends the session of the browser holding it.
-   * Any other browser gets `SetupInProgressError`, also once the session has expired:
-   * only a new, empty database frees setup again.
+   * A browser without a token gets a new one and nothing is stored, so an answer it never
+   * receives claims nothing; its next start, carrying the token, gives it setup when nobody holds
+   * it, and later starts extend its session (`expiresAt` is null until the claim is stored). Any
+   * other browser gets `SetupInProgressError`, also once the session has expired: only a new,
+   * empty database frees setup again.
    */
   startSetup: (
     ctx: SecurityContext,
     tx: Tx,
     session: { token: string | null; now: Date },
-  ) => Promise<{ token: string; expiresAt: Date }>;
+  ) => Promise<{ token: string; expiresAt: Date | null }>;
   /** Who holds setup for the browser that sent `token`; nobody once an owner exists. Trusted read: no `ctx`. */
   readSetupHolder: (orm: Orm, session: { token: string | null; now: Date }) => Promise<SetupHolder>;
 }
@@ -36,7 +38,10 @@ export function createSetupSessionService(): SetupSessionService {
       if (setupSession && !holdsSetup(setupSession, token, now)) {
         throw new SetupInProgressError();
       }
-      return saveSetupSession(tx, setupSession && token ? token : newSetupToken(), now);
+      if (token === null) {
+        return { token: newSetupToken(), expiresAt: null };
+      }
+      return saveSetupSession(tx, token, now);
     },
     async readSetupHolder(orm, { token, now }) {
       const { ownerUserId, setupSession } = await instanceRepository(orm).readInstance();

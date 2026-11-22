@@ -63,11 +63,9 @@ test("returns no current user after logout", async ({ env }) => {
 });
 
 test("returns a signed-in employee without workspace operations", async ({ env }) => {
-  await env.seed.owner();
-  const credentials = { email: "employee@example.com", password: TEST_OWNER.password };
-  const user = await env.seed.user(credentials);
+  const { browser, user } = await env.signInAsOwner();
+  await env.seed.owner({ email: "another.owner@example.com" });
   await env.seed.employee({ userId: user.id });
-  const { browser } = await env.signIn(credentials);
 
   const response = await browser.graphql(query);
 

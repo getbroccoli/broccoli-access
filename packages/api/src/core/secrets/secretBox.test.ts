@@ -30,3 +30,20 @@ it("refuses ciphertext encrypted with another key", () => {
 
   expect(() => other.decrypt(secretBox.encrypt("test-token"))).toThrow();
 });
+
+it("decrypts a secret with its associated data", () => {
+  const secretBox = createSecretBox(key);
+  const encrypted = secretBox.encrypt("refresh-token", "connection-id");
+
+  expect(secretBox.decrypt(encrypted, "connection-id")).toBe("refresh-token");
+});
+
+it.each(["another-connection", undefined])(
+  "refuses ciphertext with associated data %s",
+  (associatedData) => {
+    const secretBox = createSecretBox(key);
+    const encrypted = secretBox.encrypt("refresh-token", "connection-id");
+
+    expect(() => secretBox.decrypt(encrypted, associatedData)).toThrow();
+  },
+);

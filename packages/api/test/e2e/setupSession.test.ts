@@ -1,15 +1,26 @@
+import { ACME } from "@broccoli-access/fake-apps";
 import { request } from "node:http";
 
-import { createBrowser, expect, TEST_OWNER, test } from "#test/support";
+import {
+  createBrowser,
+  expect,
+  test,
+  consentAtGoogle,
+  registerGoogleRedirect,
+} from "#test/support";
 
 test("the first browser starts setup with a private three-day cookie", async ({ env }) => {
   const browser = env.browser();
+  const offered = await browser.post("/api/auth/setup/start", undefined);
+  expect(offered.status).toBe(200);
+  expect(await offered.json()).toEqual({ holder: "nobody" });
 
   const response = await browser.post("/api/auth/setup/start", undefined);
 
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({ holder: "you" });
   const cookie = setupCookieOf(response);
+  expect(cookie!.split(";", 1)[0]).toBe(setupCookieOf(offered)!.split(";", 1)[0]);
   expect(cookie).toMatch(/^broccoli_access_setup=[^;]+;/);
   expect(cookie).toMatch(/;\s*Max-Age=259200(?:;|$)/i);
   expect(cookie).toMatch(/;\s*Path=\/(?:;|$)/i);
@@ -20,8 +31,21 @@ test("the first browser starts setup with a private three-day cookie", async ({ 
   expect(await setup.json()).toEqual({ data: { setup: { id: "instance", holder: "YOU" } } });
 });
 
+test("a lost first setup answer leaves setup free for a fresh browser", async ({ env }) => {
+  const lost = await fetch(`${env.url}/api/auth/setup/start`, {
+    method: "POST",
+    headers: { origin: env.url },
+  });
+  expect(lost.status).toBe(200);
+
+  const browser = await env.startSetup();
+
+  const setup = await browser.graphql("query { setup { holder } }");
+  expect(await setup.json()).toEqual({ data: { setup: { holder: "YOU" } } });
+});
+
 test("a second browser is refused setup and private access", async ({ env }) => {
-  await env.browser().post("/api/auth/setup/start", undefined);
+  await env.startSetup();
   const another = env.browser();
 
   const response = await another.post("/api/auth/setup/start", undefined);
@@ -39,20 +63,23 @@ test("a second browser is refused setup and private access", async ({ env }) => 
 });
 
 test("the setup cookie grants no access to employees", async ({ env }) => {
-  const browser = env.browser();
-  await browser.post("/api/auth/setup/start", undefined);
+  const browser = await env.startSetup();
 
   const response = await browser.graphql("query { employees { edges { node { id } } } }");
 
   expect(await response.json()).toMatchObject({ errors: [{ extensions: { code: "FORBIDDEN" } }] });
 });
 
-test("creating the owner ends the setup cookie's access", async ({ env }) => {
-  const browser = env.browser();
+test("connecting Google ends the setup cookie's access", async ({ env, fakeGoogle }) => {
+  await registerGoogleRedirect(fakeGoogle.url, env.url);
+  const browser = await env.startSetup();
   const started = await browser.post("/api/auth/setup/start", undefined);
   const oldCookie = setupCookieOf(started)!.split(";", 1)[0]!;
 
-  await browser.post("/api/auth/setup", TEST_OWNER);
+  const connection = await browser.post("/api/google/connect", ACME.oauthClient);
+  const { authorizationUrl } = (await connection.json()) as { authorizationUrl: string };
+  const callback = await consentAtGoogle(authorizationUrl);
+  await browser.getManual(callback.href);
 
   const stale = await fetch(`${env.url}/api/graphql`, {
     method: "POST",
@@ -64,15 +91,9 @@ test("creating the owner ends the setup cookie's access", async ({ env }) => {
   });
 });
 
-test("owner creation without the setup cookie is refused", async ({ env }) => {
-  const response = await env.browser().post("/api/auth/setup", TEST_OWNER);
-
-  expect(response.status).toBe(409);
-  expect(await response.json()).toMatchObject({ code: "SETUP_IN_PROGRESS" });
-});
-
 test("renews the setup cookie when the holder starts again", async ({ env }) => {
   const browser = env.browser();
+  await browser.post("/api/auth/setup/start", undefined);
   const first = await browser.post("/api/auth/setup/start", undefined);
 
   const renewed = await browser.post("/api/auth/setup/start", undefined);
@@ -82,19 +103,14 @@ test("renews the setup cookie when the holder starts again", async ({ env }) => 
   expect(setupCookieOf(renewed)).toMatch(/;\s*Max-Age=259200(?:;|$)/i);
 });
 
-test.for(["/api/auth/setup/start", "/api/auth/setup"])(
-  "refuses %s once an owner exists",
-  async (path, { env }) => {
-    await env.signInAsOwner();
+test("refuses setup start once an owner exists", async ({ env }) => {
+  await env.signInAsOwner();
 
-    const response = await env
-      .browser()
-      .post(path, path.endsWith("start") ? undefined : TEST_OWNER);
+  const response = await env.browser().post("/api/auth/setup/start", undefined);
 
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ code: "OWNER_EXISTS" });
-  },
-);
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({ code: "OWNER_EXISTS" });
+});
 
 test("sets a Secure setup cookie when the public URL uses HTTPS", async ({ env }) => {
   await env.restart({ publicUrl: "https://access.example.com" });
@@ -173,7 +189,7 @@ test("refuses the eleventh setup start even when each request changes X-Forwarde
       method: "POST",
       headers: { origin: env.url, "x-forwarded-for": `192.0.2.${request + 1}` },
     });
-    expect(response.status).toBe(request === 0 ? 200 : 409);
+    expect(response.status).toBe(200);
   }
 
   const response = await fetch(`${env.url}/api/auth/setup/start`, {

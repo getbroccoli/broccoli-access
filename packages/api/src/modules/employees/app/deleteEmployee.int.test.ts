@@ -128,7 +128,6 @@ test("deleting a joined employee deletes their user and keeps the owner", async 
   const owner = await seed.owner();
   const joined = await seed.user({
     email: "joined@example.com",
-    password: "correct horse battery staple",
   });
   const employee = await seed.employee({ userId: joined.id });
 

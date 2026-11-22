@@ -1,0 +1,19 @@
+# Adds Google Workspace to setup; the server merges the `Setup` types of the modules.
+type Setup {
+  "Where Google sends the admin back after consent; the admin registers it as their Google app's redirect address."
+  googleRedirectAddress: String!
+  "The connected Google organisation's name, which the sign-in page shows; null before Google Workspace is connected."
+  organizationName: String
+  "The Google Workspace connection; null before it exists. Owner only, though the rest of `Setup` is public."
+  googleWorkspace: GoogleWorkspaceConnection
+}
+
+"Google Workspace, connected with the instance's own Google app."
+type GoogleWorkspaceConnection {
+  id: ID!
+  "The workspace's primary domain, such as `acme.example`."
+  domain: String!
+  organizationName: String!
+  "The super admin who connected it."
+  adminEmail: String!
+}

@@ -2,36 +2,26 @@ import { Plant } from "@phosphor-icons/react";
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { t } from "@/i18n";
-import { cn } from "@/lib/class-names";
 
 import { type SetupStepId, stepViews } from "./setupSteps";
 import { StepBars } from "./StepBars";
 import { StepList } from "./StepList";
 
-/** How wide the card's content runs: a short centred column such as the owner step, or a form. */
-export type SetupWidth = "narrow" | "default";
-
-interface SetupLayoutProps {
+type Props = {
   step: SetupStepId;
   title: string;
   description?: string;
-  width?: SetupWidth;
   children?: ReactNode;
-}
+};
 
 /**
- * The frame of the setup pages: the setup steps beside a card with the step's heading.
- * The card fills the window and its body scrolls; the document does not.
+ * The frame of the setup pages: the setup steps beside a card with the step's heading. The card
+ * fills the window and scrolls; the document does not.
  */
-export function SetupLayout({
-  step,
-  title,
-  description,
-  width = "default",
-  children,
-}: SetupLayoutProps) {
+export function SetupLayout({ step, title, description, children }: Props) {
   const heading = useRef<HTMLHeadingElement>(null);
   const steps = stepViews(step);
+  const current = steps.find(({ state }) => state === "current");
 
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
@@ -48,32 +38,37 @@ export function SetupLayout({
           <span className="truncate text-[15px] font-semibold tracking-tight">{t("app.name")}</span>
         </div>
         <nav aria-label={t("setup.progress")} className="px-2 md:px-0">
+          <p className="hidden px-2 pb-2 text-xs font-medium text-muted-foreground md:block">
+            {t("setup.title")}
+          </p>
           <StepList steps={steps} />
           <StepBars steps={steps} />
         </nav>
       </aside>
-      <main className="m-2 mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300 md:my-3 md:mr-3 md:ml-0">
-        <header className="shrink-0 px-6 pt-8 sm:px-10 sm:pt-12">
-          <div className={cn("mx-auto", HEADER_WIDTHS[width])}>
+      <main className="m-2 mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto rounded-2xl border border-border bg-card shadow-sm motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300 md:my-3 md:mr-3 md:ml-0">
+        <div className="flex max-w-[870px] flex-col gap-8 px-6 py-8 sm:px-14 sm:py-12">
+          <header>
+            {current && (
+              <p className="text-sm text-muted-foreground">
+                {t("setup.stepOf", { number: String(current.number), total: String(steps.length) })}
+              </p>
+            )}
             <h1
               ref={heading}
               tabIndex={-1}
-              className="text-[34px] leading-[1.08] font-semibold tracking-[-0.025em] outline-none"
+              className="mt-1 text-[32px] leading-[1.15] font-semibold tracking-[-0.02em] outline-none"
             >
               {title}
             </h1>
             {description && (
-              <p className="mt-3 text-[17px] leading-[1.55] text-muted-foreground">{description}</p>
+              <p className="mt-2 max-w-[760px] text-base leading-relaxed text-muted-foreground">
+                {description}
+              </p>
             )}
-          </div>
-        </header>
-        {children}
+          </header>
+          {children}
+        </div>
       </main>
     </div>
   );
 }
-
-const HEADER_WIDTHS: Record<SetupWidth, string> = {
-  narrow: "max-w-[420px] text-center",
-  default: "max-w-[592px]",
-};

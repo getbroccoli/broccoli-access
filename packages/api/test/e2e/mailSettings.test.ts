@@ -8,7 +8,7 @@ import {
 } from "#test/support";
 
 test("the owner saves Resend, reads the choice without its key and receives a test email", async () => {
-  const { env, owner, resend } = await startMailTestEnv();
+  const { owner, resend } = await startMailTestEnv();
 
   const saved = await owner.graphql(SAVE_MAIL_SETTINGS, { input: RESEND_CHOICE });
 
@@ -24,7 +24,6 @@ test("the owner saves Resend, reads the choice without its key and receives a te
               from: "access@example.com",
               hasSecret: true,
             },
-            passwordResetByEmail: true,
           },
           error: null,
         },
@@ -40,11 +39,6 @@ test("the owner saves Resend, reads the choice without its key and receives a te
         mail: { id: "mail", source: "RESEND_API", from: "access@example.com", hasSecret: true },
       },
     },
-  });
-  expect(
-    await (await env.browser().graphql("query { setup { id passwordResetByEmail } }")).json(),
-  ).toEqual({
-    data: { setup: { id: "instance", passwordResetByEmail: true } },
   });
   const sent = await owner.graphql(`mutation {
     system { sendTestEmail { setup { id } error { __typename ... on Error { message } } } }

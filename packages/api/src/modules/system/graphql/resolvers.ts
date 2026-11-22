@@ -11,7 +11,12 @@ import { OPERATIONS, type SecurityContext } from "../../../core/security";
 const setupSessions = createSetupSessionService();
 const instances = createInstanceService();
 
-const STEPS = { owner: "OWNER", done: "DONE" } as const;
+const STEPS = {
+  connect_google: "CONNECT_GOOGLE",
+  scan: "SCAN",
+  select_apps: "SELECT_APPS",
+  done: "DONE",
+} as const;
 const HOLDERS = { you: "YOU", another_device: "ANOTHER_DEVICE", nobody: "NOBODY" } as const;
 const MAIL_SOURCES = {
   smtp_server: "SMTP_SERVER",
@@ -78,7 +83,7 @@ export function createResolvers({
 
 /** The `Setup` object for `security`, as `Query.setup` and every setup payload return it. */
 async function readSetupView(orm: Orm, security: SecurityContext | null) {
-  const { step, mailSource } = await instances.readInstance(orm);
+  const { step } = await instances.readInstance(orm);
   return {
     id: "instance",
     step: STEPS[step],
@@ -86,7 +91,6 @@ async function readSetupView(orm: Orm, security: SecurityContext | null) {
     holder: security?.isSetupHolder
       ? ("YOU" as const)
       : HOLDERS[await setupSessions.readSetupHolder(orm, { token: null, now: new Date() })],
-    passwordResetByEmail: mailSource !== null && mailSource !== "no_email",
   };
 }
 

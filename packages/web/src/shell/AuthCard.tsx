@@ -6,7 +6,7 @@ import { t } from "@/i18n";
 interface AuthCardProps {
   title: string;
   description?: string;
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 /**
@@ -26,7 +26,7 @@ export function AuthCard({ title, description, children }: AuthCardProps) {
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {description && <p className="mt-2 text-sm text-foreground/70">{description}</p>}
-        <div className="mt-6">{children}</div>
+        {children && <div className="mt-6">{children}</div>}
       </div>
     </main>
   );

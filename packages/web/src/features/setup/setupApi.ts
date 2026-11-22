@@ -1,36 +1,45 @@
 import { postJson } from "@/lib/postJson";
 
-/** How an attempt to create the owner ended, as the setup form reports it. */
-export type SetupResult = "ok" | "invalidInput" | "conflict" | "tooManyAttempts" | "failed";
-
-const SETUP_RESULT_BY_STATUS: Partial<Record<number, SetupResult>> = {
-  200: "ok",
-  400: "invalidInput",
-  // Another account already has the email.
-  422: "invalidInput",
-  // The owner exists, or another browser holds setup.
-  409: "conflict",
-  429: "tooManyAttempts",
-};
-
 /**
  * Starts setup in this browser, or renews it for the browser holding it; the API sets
  * the setup cookie. Returns whether this browser holds setup.
  */
 export async function startSetup(): Promise<boolean> {
   try {
-    return (await postJson("/api/auth/setup/start", {})).ok;
+    // A browser without a token first only gets one, so an answer it never receives claims nothing.
+    const holder = await postSetupStart();
+    return (holder === "nobody" ? await postSetupStart() : holder) === "you";
   } catch {
     return false;
   }
 }
 
-/** Creates the instance's owner and signs them in; the API sets the session cookie. */
-export async function setUpOwner(email: string, password: string): Promise<SetupResult> {
+/**
+ * Starts connecting Google Workspace with the admin's own Google app: the address of Google's
+ * consent page, or null when the API refused or could not be reached.
+ */
+export async function startGoogleConnection(
+  clientId: string,
+  clientSecret: string,
+): Promise<string | null> {
   try {
-    const response = await postJson("/api/auth/setup", { email, password });
-    return SETUP_RESULT_BY_STATUS[response.status] ?? "failed";
+    const response = await postJson("/api/google/connect", { clientId, clientSecret });
+    if (!response.ok) {
+      return null;
+    }
+    const { authorizationUrl } = (await response.json()) as { authorizationUrl: string };
+    return authorizationUrl;
   } catch {
-    return "failed";
+    return null;
   }
+}
+
+/** Who holds setup after one start: this browser, or nobody yet; null when the API refused. */
+async function postSetupStart(): Promise<"you" | "nobody" | null> {
+  const response = await postJson("/api/auth/setup/start", {});
+  if (!response.ok) {
+    return null;
+  }
+  const { holder } = (await response.json()) as { holder: "you" | "nobody" };
+  return holder;
 }

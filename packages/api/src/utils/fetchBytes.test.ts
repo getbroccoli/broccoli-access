@@ -2,7 +2,7 @@ import { expect, it, onTestFinished } from "vitest";
 
 import { PNG, startFakeHttpServer, startSimpleHttpServer } from "#test/support";
 
-import { fetchBytes } from ".";
+import { fetchBytes, UnsuccessfulAnswerError } from ".";
 
 it("returns the body bytes", async () => {
   const server = await startSimpleHttpServer((_request, response) => {
@@ -23,11 +23,14 @@ it("returns null for a 404 response", async () => {
   await expect(fetchBytes(new URL(server.url), options)).resolves.toBeNull();
 });
 
-it("rejects a 500 response", async () => {
-  const server = await startFakeHttpServer(() => ({ status: 500 }));
+it.each([403, 500])("rejects an unsuccessful answer with status %s", async (status) => {
+  const server = await startFakeHttpServer(() => ({ status }));
   onTestFinished(() => server.stop());
 
-  await expect(fetchBytes(new URL(server.url), options)).rejects.toThrow();
+  await expect(fetchBytes(new URL(server.url), options)).rejects.toMatchObject({
+    constructor: UnsuccessfulAnswerError,
+    status,
+  });
 });
 
 it("rejects a body over the byte limit", async () => {

@@ -1,19 +1,18 @@
-import assert from "node:assert/strict";
-
 import type { Orm, Transact } from "../../src/core/db";
-import {
-  createMailSettingsService,
-  createPasswordResetEmailService,
-  type MailSettingsService,
-} from "../../src/core/instance";
-import type { Jobs } from "../../src/core/jobs";
+import { createMailSettingsService, type MailSettingsService } from "../../src/core/instance";
 import { createLogger } from "../../src/core/logger";
 import {
   createEmployeeReadService,
   createEmployeeService,
+  employeeDirectory,
   type EmployeeReadService,
   type EmployeeService,
 } from "../../src/modules/employees";
+import { createAppConnectionService } from "../../src/modules/apps";
+import {
+  createGoogleConnectionService,
+  type GoogleConnectionService,
+} from "../../src/modules/google";
 import { fakeMail } from "./fakeMail";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { testTransactor } from "./testTransactor";
@@ -54,28 +53,18 @@ export function mailSettings(
   });
 }
 
-export function passwordResetEmail(
+export function googleConnection(
   orm: Orm,
-  options: NonNullable<Parameters<typeof mailSettings>[1]>,
-) {
-  const sentJobs: {
-    name: "instance.sendPasswordResetEmail";
-    payload: Jobs["instance.sendPasswordResetEmail"];
-  }[] = [];
-  const service = createPasswordResetEmailService({
+  { googleUrl }: { googleUrl: string },
+): GoogleConnectionService {
+  return createGoogleConnectionService({
     orm,
     transact: testTransactor(orm),
     secretBox: TEST_SECRET_BOX,
-    mailSettings: mailSettings(orm, options),
     logger: createLogger("silent"),
-    jobs: {
-      send: (_tx, name, payload) => {
-        assert.equal(name, "instance.sendPasswordResetEmail");
-        assert("userId" in payload && "encryptedToken" in payload);
-        sentJobs.push({ name: "instance.sendPasswordResetEmail", payload });
-        return Promise.resolve();
-      },
-    },
+    openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
+    adminApiUrl: googleUrl,
+    connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
+    employeeDirectory: employeeDirectory(orm),
   });
-  return { ...service, sentJobs };
 }

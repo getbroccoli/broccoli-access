@@ -23,6 +23,8 @@ export interface TestServerOptions {
   dataDir?: string;
   publicUrl?: string;
   resendApiUrl?: string;
+  googleOpenIdConfigurationUrl?: string;
+  googleAdminApiUrl?: string;
 }
 
 /**
@@ -37,6 +39,8 @@ export async function startTestServer(
     dataDir,
     publicUrl,
     resendApiUrl = "http://127.0.0.1:9",
+    googleOpenIdConfigurationUrl = "http://127.0.0.1:9/.well-known/openid-configuration",
+    googleAdminApiUrl = "http://127.0.0.1:9",
   }: TestServerOptions = {},
 ): Promise<RunningServer> {
   const ownsDataDir = dataDir === undefined;
@@ -44,7 +48,13 @@ export async function startTestServer(
   const server = await startServer(
     { databaseUrl, port: 0, webDir, publicUrl, dataDir: folder },
     logger,
-    (core) => createModules(core, { publicUrl, resendApiUrl }),
+    (core) =>
+      createModules(core, {
+        publicUrl,
+        resendApiUrl,
+        googleOpenIdConfigurationUrl,
+        googleAdminApiUrl,
+      }),
   );
   return {
     url: server.url,

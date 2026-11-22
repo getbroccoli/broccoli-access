@@ -1,5 +1,8 @@
-/** Where a new instance is in its first-run flow: the owner is created at `owner`, then setup is `done`. */
-export const SETUP_STEPS = ["owner", "done"] as const;
+/**
+ * Where a new instance is in its first-run flow: the Google admin's consent at `connect_google`
+ * makes them the owner, then their workspace is scanned and they select its apps.
+ */
+export const SETUP_STEPS = ["connect_google", "scan", "select_apps", "done"] as const;
 
 export type SetupStep = (typeof SETUP_STEPS)[number];
 

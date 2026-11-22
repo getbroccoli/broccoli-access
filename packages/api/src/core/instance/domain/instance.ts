@@ -41,10 +41,16 @@ export class Instance {
     }
   }
 
+  /** Whether the browser holding `token` holds live setup, before an owner exists. */
+  isSetupHeldBy(token: string | null, now: Date): boolean {
+    const session = this.#state.setupSession;
+    return !this.ownerUserId && session !== null && holdsSetup(session, token, now);
+  }
+
   /** Refuses a browser that does not hold live setup, including after an owner was claimed. */
   requireHeldSetup(token: string | null, now: Date): void {
     this.requireUnclaimedOwner();
-    if (!this.#state.setupSession || !holdsSetup(this.#state.setupSession, token, now)) {
+    if (!this.isSetupHeldBy(token, now)) {
       throw new SetupInProgressError();
     }
   }
@@ -54,7 +60,8 @@ export class Instance {
     return new Instance({ ...this.#state, ownerUserId: userId });
   }
 
-  completeOwnerStep(): Instance | null {
-    return this.step === "owner" ? new Instance({ ...this.#state, step: "done" }) : null;
+  /** Moves setup from connecting Google to the scan; null at any other step. */
+  finishConnectStep(): Instance | null {
+    return this.step === "connect_google" ? new Instance({ ...this.#state, step: "scan" }) : null;
   }
 }

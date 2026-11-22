@@ -4,7 +4,7 @@ import { expect, EMPLOYEE, SYSTEM, test, instances, setupSessions } from "#test/
 
 import { hashSetupToken } from "../helpers";
 
-test("starts a setup session on a fresh instance and stores only its hash", async ({
+test("a start without a token gives a token and leaves setup unclaimed", async ({
   orm,
   transact,
 }) => {
@@ -16,10 +16,39 @@ test("starts a setup session on a fresh instance and stores only its hash", asyn
 
   expect(session.token).toEqual(expect.any(String));
   expect(session.token.length).toBeGreaterThan(0);
-  expect(session.expiresAt).toEqual(new Date("2026-01-04T12:00:00Z"));
+  expect(session.expiresAt).toBeNull();
+  expect((await instances.readInstance(orm)).setupSession).toBeNull();
+});
+
+test("a start with a token claims setup and stores only its hash", async ({ orm, transact }) => {
+  const now = new Date("2026-01-01T12:00:00Z");
+
+  const session = await transact((tx) =>
+    setupSessions.startSetup(SYSTEM, tx, { token: "setup-token", now }),
+  );
+
+  expect(session).toEqual({ token: "setup-token", expiresAt: new Date("2026-01-04T12:00:00Z") });
   expect((await instances.readInstance(orm)).setupSession).toEqual({
     tokenHash: createHash("sha256").update(session.token).digest("hex"),
     expiresAt: session.expiresAt,
+  });
+});
+
+test("the first browser to return its token holds setup", async ({ orm, transact }) => {
+  const now = new Date("2026-01-01T12:00:00Z");
+  const first = await transact((tx) => setupSessions.startSetup(SYSTEM, tx, { token: null, now }));
+  const second = await transact((tx) => setupSessions.startSetup(SYSTEM, tx, { token: null, now }));
+  expect(second.token).not.toBe(first.token);
+  expect((await instances.readInstance(orm)).setupSession).toBeNull();
+
+  await transact((tx) => setupSessions.startSetup(SYSTEM, tx, { token: first.token, now }));
+
+  await expect(
+    transact((tx) => setupSessions.startSetup(SYSTEM, tx, { token: second.token, now })),
+  ).rejects.toMatchObject({ name: "SetupInProgressError" });
+  expect((await instances.readInstance(orm)).setupSession).toEqual({
+    tokenHash: createHash("sha256").update(first.token).digest("hex"),
+    expiresAt: new Date("2026-01-04T12:00:00Z"),
   });
 });
 
@@ -81,8 +110,8 @@ test("two simultaneous starts leave one holder", async ({ orm, transact }) => {
   const now = new Date("2026-01-01T12:00:00Z");
 
   const results = await Promise.allSettled([
-    transact((tx) => setupSessions.startSetup(SYSTEM, tx, { token: null, now })),
-    transact((tx) => setupSessions.startSetup(SYSTEM, tx, { token: null, now })),
+    transact((tx) => setupSessions.startSetup(SYSTEM, tx, { token: "first", now })),
+    transact((tx) => setupSessions.startSetup(SYSTEM, tx, { token: "second", now })),
   ]);
 
   expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(1);

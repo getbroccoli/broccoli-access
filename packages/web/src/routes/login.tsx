@@ -1,9 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { loginSearch, SignIn } from "@/features/auth";
+import { loginSearch } from "@/features/auth";
 import { t } from "@/i18n";
 import { AuthCard } from "@/shell";
 
+/** The sign-in page; until Sign in with Google arrives it names only the product and the organisation. */
 export const Route = createFileRoute("/login")({
   validateSearch: loginSearch,
   beforeLoad: ({ context: { me }, search }) => {
@@ -13,9 +14,8 @@ export const Route = createFileRoute("/login")({
       throw redirect({ href: search.redirect, replace: true, reloadDocument });
     }
   },
-  component: () => (
-    <AuthCard title={t("auth.login.title")} description={t("auth.login.description")}>
-      <SignIn />
-    </AuthCard>
-  ),
+  component: function Login() {
+    const { organizationName } = Route.useRouteContext();
+    return <AuthCard title={organizationName ?? t("app.name")} />;
+  },
 });

@@ -21,16 +21,7 @@
       "src/lib/class-names",
       "src/lib/useSessionChange"
     ],
-    "src/features/auth": [
-      "src/__generated__",
-      "src/components/form",
-      "src/components/ui",
-      "src/features/setup",
-      "src/i18n",
-      "src/lib/postJson",
-      "src/lib/useFragmentToken",
-      "src/lib/useSessionChange"
-    ],
+    "src/features/auth": ["src/lib/postJson"],
     "src/features/employees": [
       "src/__generated__",
       "src/apollo",
@@ -90,8 +81,7 @@
     "src/lib/useRouteAction": [],
     "src/lib/useSessionChange": ["src/lib/useRouteAction"],
     "src/lib/calendarDay": [],
-    "src/lib/sentenceCase": [],
-    "src/lib/useFragmentToken": []
+    "src/lib/sentenceCase": []
   },
   "deepImports": ["src/components/ui", "src/__generated__"]
 }

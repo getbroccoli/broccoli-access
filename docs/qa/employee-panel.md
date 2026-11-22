@@ -4,8 +4,8 @@ A manual check of opening a person from People, their tabs, editing them in plac
 
 ## Setup
 
-1. Start the stack, create the owner and add a few employees as in [QA setup](setup.md).
-2. Sign in as `owner@example.com` and open `/people`.
+1. Start the stack, connect Google Workspace, move setup on and add a few employees as in [QA setup](setup.md).
+2. Open `/people` in the browser that connected Google Workspace.
 
 ## Open and close
 

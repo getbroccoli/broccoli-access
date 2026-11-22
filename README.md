@@ -2,7 +2,7 @@
 
 The open-source SaaS access management app. Request, approve and remove access to every tool your team uses. Self-host it.
 
-**Status:** early. Broccoli Access starts as a copy of [Broccoli](https://github.com/getbroccoli/broccoli), the open-source Employee Operations System, cut down to its base: setup with an owner account, sign-in, people, record history and email settings. Access management comes next; see the [product requirements](docs/prd.md) and [circle 1](docs/circle1.md).
+**Status:** early. Broccoli Access starts as a copy of [Broccoli](https://github.com/getbroccoli/broccoli), the open-source Employee Operations System, cut down to its base: setup by connecting Google Workspace, people, record history and email settings. Access management comes next; see the [product requirements](docs/prd.md) and [circle 1](docs/circle1.md).
 
 ## Quick install
 
@@ -10,7 +10,7 @@ The open-source SaaS access management app. Request, approve and remove access t
 docker compose up
 ```
 
-Open http://localhost:8080 and create the owner account. More in the [setup guide](docs/guides/setup-guide.md).
+Open http://localhost:8080 and connect Google Workspace. More in the [setup guide](docs/guides/setup-guide.md).
 
 ## Develop
 

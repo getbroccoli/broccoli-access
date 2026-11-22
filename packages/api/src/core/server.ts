@@ -62,7 +62,7 @@ export async function startServer(
   let resolveSecurity: SecurityResolver;
   let graphql: GraphqlApi;
   try {
-    const { manifests, employeeDirectory, passwordResetEmail } = createModules({
+    const { manifests, employeeDirectory } = createModules({
       dataDir: env.dataDir,
       orm: database.orm,
       transact,
@@ -78,7 +78,6 @@ export async function startServer(
       logger,
       plugins: modules.flatMap((module) => (module.authPlugin ? [module.authPlugin] : [])),
       publicUrl: env.publicUrl,
-      passwordResetEmail,
     });
     const auth = deployment.auth;
     resolveSecurity = (headers) =>
@@ -107,7 +106,8 @@ export async function startServer(
         beforeCommit.subscribe(module.eventsBeforeCommit);
       }
       if (module.router) {
-        app.use("/api", module.router(resolveSecurity, deployment.publicOrigin));
+        const { publicOrigin, startSession } = deployment;
+        app.use("/api", module.router({ resolveSecurity, publicOrigin, startSession }));
       }
     }
     app.all("/api/auth/{*path}", authHandler(deployment.auth));

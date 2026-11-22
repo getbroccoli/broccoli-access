@@ -13,7 +13,12 @@ if (offGoogle.length > 0) {
   );
 }
 const server = await startServer(env, logger, (core) =>
-  createModules(core, { publicUrl: env.publicUrl, resendApiUrl: "https://api.resend.com" }),
+  createModules(core, {
+    publicUrl: env.publicUrl,
+    resendApiUrl: "https://api.resend.com",
+    googleOpenIdConfigurationUrl: env.googleOpenIdConfigurationUrl,
+    googleAdminApiUrl: env.googleAdminApiUrl,
+  }),
 );
 logger.info({ url: server.url }, "Broccoli Access API listening");
 

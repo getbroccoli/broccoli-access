@@ -26,10 +26,5 @@ export function useCopyToClipboard() {
     }
   }
 
-  function resetCopy() {
-    setCopied(false);
-    setCopyFailed(false);
-  }
-
-  return { copied, copyFailed, copy, resetCopy };
+  return { copied, copyFailed, copy };
 }

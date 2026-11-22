@@ -1,5 +1,6 @@
-export { NewPasswordField } from "./NewPasswordField";
-export { OwnerSetupForm } from "./OwnerSetupForm";
+export { ConnectGoogleStep } from "./ConnectGoogleStep";
+export { connectSearch } from "./connectSearch";
 export { readSession } from "./readSession";
+export { ScanStep } from "./ScanStep";
 export { SetupInProgress } from "./SetupInProgress";
 export { requireFinishedSetup, requireSetupPage, SetupLayout, setupStepPage } from "./SetupLayout";

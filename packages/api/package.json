@@ -49,6 +49,7 @@
     "express": "5.2.1",
     "express-rate-limit": "8.7.0",
     "graphql": "16.14.2",
+    "jose": "6.2.12",
     "nodemailer": "10.1.0",
     "pg": "8.23.1",
     "pg-boss": "12.35.1",
