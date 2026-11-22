@@ -9,14 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { t, type MessageKey } from "@/i18n";
 
+import { type GoogleConsentPath, startGoogleConsent } from "../setupApi";
 import { GoogleCloudSteps } from "./GoogleCloudSteps";
 import { RedirectAddress } from "./RedirectAddress";
 
 type Props = {
   /** Above the Google app's fields, such as setup's choice of how to connect. */
   children?: ReactNode;
-  /** Starts Google's consent with the client: its address, or null when the API refused. */
-  startConsent: (clientId: string, clientSecret: string) => Promise<string | null>;
+  /** Where the API starts Google's consent with the client. */
+  consentPath: GoogleConsentPath;
   /** Why the last consent failed, from Google's redirect back. */
   failure: MessageKey | undefined;
 };
@@ -25,7 +26,7 @@ type Props = {
  * The admin's own Google app: the redirect address, how to make the app in Google Cloud, and its
  * client ID and secret, which leave for Google's consent page; Google's answer comes back to the API.
  */
-export function GoogleAppForm({ children, startConsent, failure }: Props) {
+export function GoogleAppForm({ children, consentPath, failure }: Props) {
   const { data, error, refetch } = useQuery(ConnectGoogleDocument);
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
@@ -37,7 +38,7 @@ export function GoogleAppForm({ children, startConsent, failure }: Props) {
   const connect = async () => {
     setStarting(true);
     setStartFailed(false);
-    const authorizationUrl = await startConsent(clientId, clientSecret);
+    const authorizationUrl = await startGoogleConsent(consentPath, clientId, clientSecret);
     if (authorizationUrl) {
       window.location.assign(authorizationUrl);
       return;

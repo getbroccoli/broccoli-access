@@ -3,7 +3,6 @@ import { t, type MessageKey } from "@/i18n";
 import { PageHeader } from "@/shell";
 
 import type { ChangeError } from "./changeSearch";
-import { startGoogleAppChange } from "./startGoogleAppChange";
 
 const CHANGE_ERROR_MESSAGES: Record<ChangeError, MessageKey> = {
   cancelled: "settings.googleApp.cancelled",
@@ -29,7 +28,7 @@ export function ChangeGoogleApp({ changeError }: Props) {
         description={t("settings.googleApp.description")}
       />
       <GoogleAppForm
-        startConsent={startGoogleAppChange}
+        consentPath="/api/google/change-app"
         failure={changeError && CHANGE_ERROR_MESSAGES[changeError]}
       />
     </div>

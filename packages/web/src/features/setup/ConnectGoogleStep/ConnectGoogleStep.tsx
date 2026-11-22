@@ -1,7 +1,6 @@
 import type { MessageKey } from "@/i18n";
 
 import type { ConnectError } from "../connectSearch";
-import { startGoogleConnection } from "../setupApi";
 import { GoogleAppForm } from "./GoogleAppForm";
 import { HowToConnect } from "./HowToConnect";
 
@@ -23,7 +22,7 @@ type Props = {
 export function ConnectGoogleStep({ connectError }: Props) {
   return (
     <GoogleAppForm
-      startConsent={startGoogleConnection}
+      consentPath="/api/google/connect"
       failure={connectError && CONNECT_ERROR_MESSAGES[connectError]}
     >
       <HowToConnect />

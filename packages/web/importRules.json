@@ -61,7 +61,6 @@
       "src/lib/calendarDay",
       "src/lib/class-names",
       "src/lib/lastScan",
-      "src/lib/postJson",
       "src/shell"
     ],
     "src/features/setup": [
