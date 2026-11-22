@@ -25,7 +25,7 @@ it("discovers Acme's Slack settings from Mia's session", async ({ connectors: { 
   const result = await testSession(url, { appSession });
 
   expect(result.body).toEqual({
-    details: { organizationName: "Acme", domain: null },
+    details: { organizationName: "Acme", domain: "acme.slack.com" },
     connection: { settings: { teamId: "T04ACME", teamDomain: "acme", teamName: "Acme" } },
   });
 });
@@ -106,7 +106,9 @@ it("accepts a new Slack sign-in after sessions expire", async ({ connectors: { u
 
   const result = await testSession(url, { appSession });
 
-  expect(result.body).toMatchObject({ details: { organizationName: "Acme", domain: null } });
+  expect(result.body).toMatchObject({
+    details: { organizationName: "Acme", domain: "acme.slack.com" },
+  });
 });
 
 function testSession(url: string, secrets: Record<string, unknown>) {

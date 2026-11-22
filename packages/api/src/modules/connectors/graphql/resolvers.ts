@@ -33,6 +33,8 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
       containerConnectors: (_parent, _args, context) =>
         connections.listConnectors(context.getActor()),
       appsToConnect: (_parent, _args, context) => connections.listAppsToConnect(context.getActor()),
+      appSessionHandOver: (_parent, { id }, context) =>
+        connections.readAppSessionHandOver(context.getActor(), id),
     },
     Mutation: {
       connectors: () => ({}),
@@ -51,12 +53,16 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
       name: ({ connector }) => connector.name,
       appDomain: ({ connector }) => connector.appDomain,
       findingKind: ({ connector }) => connector.findingKinds.ownAppAccounts,
+      notice: ({ connector }) => connector.notice,
       connectionFields: ({ connector }) =>
         connector.connectionFields.map((field) => ({ ...field, kind: toEnum(field.kind) })),
       connection: ({ connection }) => connection,
     },
     ContainerConnection: {
       connector: (connection) => ({ connector: connection.connector, connection }),
+    },
+    AppSessionHandOver: {
+      id: ({ requestId }) => requestId,
     },
     App: {
       containerConnection: (app, _args, context) => connectionsOfApps(context).load(app.id),

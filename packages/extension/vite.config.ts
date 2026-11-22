@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 import { defineConfig } from "vite";
 
-// Chrome loads `dist/` unpacked: the manifest names `background.js` and the two pages by path.
+// Chrome loads `dist/` unpacked: the manifest names `background.js` and the pages by path.
 export default defineConfig({
   root: "src",
   publicDir: "../public",
@@ -13,6 +13,7 @@ export default defineConfig({
       input: {
         popup: resolve(import.meta.dirname, "src/popup.html"),
         pair: resolve(import.meta.dirname, "src/pair.html"),
+        handOver: resolve(import.meta.dirname, "src/handOver.html"),
         background: resolve(import.meta.dirname, "src/background.ts"),
       },
       output: {

@@ -1,12 +1,10 @@
-import { EXTENSION_ID } from "@broccoli-access/extension";
-
 import { UnpairExtensionDocument } from "@/__generated__/graphql";
 import { usePayloadMutation } from "@/apollo";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { formatSince } from "@/lib/since";
-import { useChromeExtension } from "@/lib/useChromeExtension";
+import { CHROME_WEB_STORE_URL, useChromeExtension } from "@/lib/useChromeExtension";
 
 /** The Chrome extension: install it, pair this Chrome with the instance, or unpair it. */
 export function ChromeExtensionCard() {
@@ -92,7 +90,7 @@ export function ChromeExtensionCard() {
         <div className="flex shrink-0 flex-wrap gap-2">
           {status === "not_installed" && (
             <a
-              href={`https://chromewebstore.google.com/detail/${EXTENSION_ID}`}
+              href={CHROME_WEB_STORE_URL}
               target="_blank"
               rel="noreferrer"
               className={cn(buttonVariants({ variant: "outline", size: "lg" }), "px-4")}

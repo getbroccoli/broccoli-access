@@ -1,12 +1,21 @@
 {
   "elements": {
-    "src/background": ["src/instanceOrigin", "src/workerRequests"],
+    "src/background": [
+      "src/appSessionHandOver",
+      "src/instanceCall",
+      "src/instanceOrigin",
+      "src/workerRequests"
+    ],
     "src/popup": ["src/instanceOrigin", "src/page", "src/workerRequests"],
     "src/pair": ["src/instanceOrigin", "src/page", "src/workerRequests"],
     "src/page": [],
     "src/instanceOrigin": [],
     "src/workerRequests": [],
     "src/extensionId": [],
-    "src/index": ["src/extensionId", "src/instanceOrigin"]
+    "src/index": ["src/extensionId", "src/instanceOrigin"],
+    "src/handOver": ["src/appSession", "src/instanceOrigin", "src/page", "src/workerRequests"],
+    "src/appSessionHandOver": ["src/appSession", "src/instanceCall", "src/workerRequests"],
+    "src/appSession": [],
+    "src/instanceCall": []
   }
 }

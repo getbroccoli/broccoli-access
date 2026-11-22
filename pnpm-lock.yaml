@@ -186,6 +186,9 @@ importers:
       '@broccoli-access/config':
         specifier: workspace:*
         version: link:../config
+      '@broccoli-access/connector-contract':
+        specifier: workspace:*
+        version: link:../connector-contract
       '@types/chrome':
         specifier: 0.3.6
         version: 0.3.6

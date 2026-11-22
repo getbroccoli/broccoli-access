@@ -9,6 +9,7 @@ import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { ScanNowButton } from "@/shell";
 
+import { ConnectAppSessionDialog } from "./ConnectAppSessionDialog";
 import { ConnectionSummary } from "./ConnectionSummary";
 
 export type ContainerConnector = ContainerConnectorsSettingsQuery["containerConnectors"][number];
@@ -60,11 +61,13 @@ export function ContainerConnectorCard({ connector }: Props) {
           className="shrink-0 items-start pb-0"
         />
       ) : (
-        connectsWithText(connector) && (
-          <div className="shrink-0">
+        <div className="shrink-0">
+          {connectsWithText(connector) ? (
             <ConnectContainerConnectorDialog connector={connector} />
-          </div>
-        )
+          ) : (
+            <ConnectAppSessionDialog connector={connector} />
+          )}
+        </div>
       )}
     </article>
   );

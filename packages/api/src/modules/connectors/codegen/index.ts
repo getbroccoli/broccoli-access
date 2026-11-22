@@ -7,4 +7,5 @@ export const codegenMappers = {
   AppToConnect: "../../modules/connectors/app#AppToConnect as AppToConnectModel",
   ContainerConnection:
     "../../modules/connectors/app#ContainerConnection as ContainerConnectionModel",
+  AppSessionHandOver: "../../modules/connectors/app#AppSessionHandOver as AppSessionHandOverModel",
 };

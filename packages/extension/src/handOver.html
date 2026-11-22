@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hand over to Broccoli Access</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./handOver.ts"></script>
+  </head>
+  <body>
+    <main class="card" hidden>
+      <header class="card-header">
+        <span class="mark" aria-hidden="true">B</span>
+        <span class="name">Broccoli Access</span>
+        <span class="version" data-version></span>
+      </header>
+      <section class="card-body" data-state="ask" hidden>
+        <h1 class="question">
+          Hand over your <span data-app></span> session to <span data-origin></span>?
+        </h1>
+        <p class="text strong-text">
+          Broccoli Access at this address receives your cookies of these addresses<span data-storage
+            >, and the token <span data-app></span>'s signed-in page keeps</span
+          >:
+        </p>
+        <ul class="text strong-text domains" data-domains></ul>
+        <p class="note">
+          Chrome asks you next to allow access to these addresses. It never reads other sites,
+          passwords or two-step codes.
+        </p>
+        <p class="alert" role="alert" data-failure hidden></p>
+        <div class="actions">
+          <button type="button" class="button" data-cancel>Cancel</button>
+          <button type="button" class="button primary" data-hand-over>Hand over</button>
+        </div>
+      </section>
+      <section class="card-body" data-state="not-paired" hidden>
+        <p class="text">
+          This Chrome isn't paired with this Broccoli Access. Pair it from Settings, then connect
+          again.
+        </p>
+      </section>
+      <section class="card-body" data-state="broken" hidden>
+        <p class="text">
+          This hand-over link is broken, or Broccoli Access didn't answer. Start again from Settings
+          in Broccoli Access.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

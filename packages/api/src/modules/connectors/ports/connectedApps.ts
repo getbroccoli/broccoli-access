@@ -4,8 +4,9 @@ import type { SecurityContext } from "../../../core/security";
 /** What the connectors module needs from the apps module: connected apps and their connections. */
 export interface ConnectedApps {
   /**
-   * Approves the connector's app and saves its connection with the secrets encrypted, joining
-   * `tx`; refuses a connector already connected with CONFLICT.
+   * Approves the connector's app and saves its connection with the secrets encrypted, and the
+   * caller as who accepted its notice at `noticeAcceptedAt`, joining `tx`; refuses a connector
+   * already connected with CONFLICT.
    */
   connectApp(
     ctx: SecurityContext,
@@ -15,6 +16,7 @@ export interface ConnectedApps {
       app: { name: string; domain: string | null };
       settings: Record<string, unknown>;
       secrets: Record<string, unknown>;
+      noticeAcceptedAt?: Date;
     },
   ): Promise<{ appId: string; connectionId: string }>;
   /** The catalog apps among `catalogKeys` that have no app yet, whatever its status. */
@@ -29,6 +31,7 @@ export interface ConnectedApps {
       connector: string;
       appId: string;
       settings: Record<string, unknown>;
+      noticeAcceptedAt: Date | null;
     }[]
   >;
 }

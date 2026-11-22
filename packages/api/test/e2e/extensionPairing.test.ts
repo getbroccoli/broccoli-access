@@ -1,4 +1,4 @@
-import { expect, test, type TestEnv } from "#test/support";
+import { expect, test, pairChrome, redeemCode, START_PAIRING, BROWSER } from "#test/support";
 
 test("the owner and the paired Chrome see the same pairing", async ({ env }) => {
   const { browser, token } = await pairChrome(env);
@@ -98,32 +98,4 @@ test("returns INVALID_INPUT when a pairing request contains malformed JSON", asy
   expect(await response.json()).toMatchObject({ code: "INVALID_INPUT" });
 });
 
-const START_PAIRING = "mutation { extension { startPairing { code } } }";
 const MY_PAIRING = "{ me { extensionPairing { browser pairedAt } } }";
-const BROWSER = "Chrome on macOS";
-
-async function pairChrome(env: TestEnv) {
-  const { browser } = await env.signInAsOwner();
-  const start = await browser.graphql(START_PAIRING);
-  const result = (await start.json()) as {
-    data: { extension: { startPairing: { code: string } } };
-  };
-  expect(result).toEqual({
-    data: { extension: { startPairing: { code: expect.stringMatching(/\S/) as unknown } } },
-  });
-
-  const response = await redeemCode(env, result.data.extension.startPairing.code);
-
-  expect(response.status).toBe(201);
-  const credentials = (await response.json()) as { token: string };
-  expect(credentials).toEqual({ token: expect.stringMatching(/\S/) as unknown });
-  return { browser, token: credentials.token };
-}
-
-function redeemCode(env: TestEnv, code: string) {
-  return fetch(new URL("/api/extension/pairings", env.url), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ code, browser: BROWSER }),
-  });
-}

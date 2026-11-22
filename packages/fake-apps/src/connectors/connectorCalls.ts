@@ -112,7 +112,7 @@ function checkedAnswer<R extends CallRequest>(
 
 function testConnection(connector: FakeConnector): ConnectionTestAnswer {
   return {
-    details: { organizationName: connector.workspace.name, domain: null },
+    details: { organizationName: connector.workspace.name, domain: connector.workspaceDomain },
     connection: { settings: connector.workspace.settings },
   };
 }

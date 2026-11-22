@@ -8,26 +8,68 @@ import {
 } from "../../../core/connectors";
 import type { Orm, Transact } from "../../../core/db";
 import type { Logger } from "../../../core/logger";
+import type { SecretBox } from "../../../core/secrets";
 import type { SecurityContext } from "../../../core/security";
-import { adminUrlOf } from "../domain";
+import { adminUrlOf, parseAppSession } from "../domain";
 import type { ConnectedApps, Scans } from "../ports";
-import type { ContainerConnector, ContainerConnectors } from "./containerConnectors";
+import { type AppSessionHandOver, createAppSessionHandOvers } from "./appSessionHandOvers";
+import { type Connection, connectionOf } from "./connectionOf";
+import {
+  type AppSessionField,
+  appSessionFieldOf,
+  type ContainerConnector,
+  type ContainerConnectors,
+} from "./containerConnectors";
 
-/** Apps connected through the connectors container: connecting one, and reading them for Settings. */
+/**
+ * Apps connected through the connectors container: handing over an app session, connecting one,
+ * and reading them for Settings.
+ */
 export interface ContainerConnectionService {
   /**
-   * Connects a container connector whose fields are all text with the owner's `values`: tests them
-   * with the app, trying a rate-limited or unavailable test again, then in one transaction saves
-   * the connection (secret fields encrypted, the rest with the test's settings), approves its app
-   * and queues its first scan into a source named after the workspace; returns the connector with
-   * its connection. Needs MANAGE_WORKSPACE. Refuses an unknown connector with NOT_FOUND, an app
-   * session field or a connected app with CONFLICT, a missing, repeated, unknown or refused value
-   * with INVALID_INPUT, and a failing test with UNAVAILABLE; a refusal stores nothing.
+   * Connects a container connector with the owner's typed `values`, or, for one with an app
+   * session field, the `appSession` sealed at its hand-over: tests them with the app, trying a
+   * rate-limited or unavailable test again, then in one transaction saves the connection (secrets
+   * encrypted, settings from the test, and the notice accepted now), approves its app and queues
+   * its first scan into a source named after the workspace; returns the connector with its
+   * connection. Needs MANAGE_WORKSPACE. Refuses an unknown connector with NOT_FOUND, a connected
+   * app with CONFLICT, a notice not accepted, a missing, repeated, unknown or refused value, or a
+   * missing, changed, expired or another's session with INVALID_INPUT, and a failing test with
+   * UNAVAILABLE; a refusal stores nothing.
    */
   connect: (
     ctx: SecurityContext,
-    input: { connector: string; values: readonly { key: string; value: string }[] },
+    input: {
+      connector: string;
+      values?: readonly { key: string; value: string }[];
+      appSession?: string | null;
+      noticeAccepted?: boolean;
+    },
   ) => Promise<ConnectorWithConnection>;
+  /**
+   * What the extension collects for the connector's app session field. Trusted: the extension's
+   * token was checked. Refuses an unknown connector with NOT_FOUND, and one without an app session
+   * field with CONFLICT.
+   */
+  describeAppSession: (connector: string) => Promise<AppSessionRequest>;
+  /**
+   * Tests the app session the extension collected for `userId`, then seals it for them and the
+   * connector, for five minutes, as their hand-over `requestId`. Trusted: the extension's token
+   * was checked and gave `userId`. Refuses like `describeAppSession`, a blank request id or a
+   * session holding anything its field does not name with INVALID_INPUT, a session the app
+   * refuses with INVALID_INPUT on `appSession`, and a failing test with UNAVAILABLE.
+   */
+  handOverAppSession: (handOver: {
+    userId: string;
+    connector: string;
+    requestId: string;
+    appSession: unknown;
+  }) => Promise<void>;
+  /** The caller's hand-over `requestId` while unexpired; null otherwise. Needs MANAGE_WORKSPACE. */
+  readAppSessionHandOver: (
+    ctx: SecurityContext,
+    requestId: string,
+  ) => Promise<AppSessionHandOver | null>;
   /** The container's connectors in its order, each with its connection. Needs MANAGE_WORKSPACE. */
   listConnectors: (ctx: SecurityContext) => Promise<ConnectorWithConnection[]>;
   /** The connections through the container of those of `appIds` that have one, by app id. Needs MANAGE_WORKSPACE. */
@@ -63,6 +105,8 @@ export interface ContainerConnection {
   id: string;
   /** Where the owner manages the app's members; null when the settings lack a value it names. */
   adminUrl: string | null;
+  /** When the owner accepted the connector's notice; null for a connector without one. */
+  noticeAcceptedAt: Date | null;
   /** The connector it connects through. */
   connector: ContainerConnector;
 }
@@ -76,6 +120,15 @@ export interface AppToConnect {
   connector: ContainerConnector;
 }
 
+/** What the extension collects for a connector's app session. */
+export interface AppSessionRequest {
+  connector: string;
+  /** The app's name, which the extension shows the owner. */
+  name: string;
+  domains: readonly string[];
+  storageKeys: readonly string[];
+}
+
 export interface ContainerConnectionDependencies {
   orm: Orm;
   transact: Transact;
@@ -83,25 +136,64 @@ export interface ContainerConnectionDependencies {
   containerConnectors: ContainerConnectors;
   connectedApps: ConnectedApps;
   scans: Scans;
+  secretBox: SecretBox;
   /** Waits between attempts of the connection test; tests pass one that does not wait. */
   wait?: (ms: number) => Promise<void>;
+  /** The clock; tests pass a fixed one. */
+  now?: () => Date;
 }
 
 export function createContainerConnectionService(
   dependencies: ContainerConnectionDependencies,
 ): ContainerConnectionService {
-  const { orm, containerConnectors, connectedApps } = dependencies;
+  const { orm, containerConnectors, connectedApps, logger } = dependencies;
+  const now = dependencies.now ?? (() => new Date());
+  const handOvers = createAppSessionHandOvers({ secretBox: dependencies.secretBox, now });
   return {
-    async connect(ctx, { connector: key, values }) {
+    async connect(ctx, input) {
       ctx.require("MANAGE_WORKSPACE");
-      const connector = await typedConnector(containerConnectors, key);
-      const connection = connectionOf(connector, values);
+      const connector = await containerConnectors.find(input.connector);
+      if (connector.notice !== null && input.noticeAccepted !== true) {
+        throw invalidInput([{ field: "noticeAccepted", code: "required" }]);
+      }
+      const connection = connectionOf(ctx, connector, input, { handOvers, logger });
       const connections = await connectedApps.readConnections(orm);
-      if (connections.some((candidate) => candidate.connector === key)) {
+      if (connections.some((candidate) => candidate.connector === connector.key)) {
         throw new ApplicationError("CONFLICT", "This app is already connected.");
       }
       const details = await testedConnection(dependencies, connector, connection);
-      return saveConnection(dependencies, ctx, { connector, connection, details });
+      const noticeAcceptedAt = connector.notice === null ? undefined : now();
+      return saveConnection(dependencies, ctx, {
+        connector,
+        connection,
+        details,
+        noticeAcceptedAt,
+      });
+    },
+    async describeAppSession(key) {
+      const { connector, field } = await appSessionConnector(containerConnectors, key);
+      const { domains, storageKeys } = field;
+      return { connector: connector.key, name: connector.name, domains, storageKeys };
+    },
+    async handOverAppSession({ userId, connector: key, requestId, appSession }) {
+      if (requestId.trim() === "") {
+        throw invalidInput([{ field: "requestId", code: "invalid" }]);
+      }
+      const { connector, field } = await appSessionConnector(containerConnectors, key);
+      const session = parseAppSession(appSession, field);
+      if (!session) {
+        logger.warn({ connector: key, userId }, "App session refused: not what its field names");
+        throw invalidInput([{ field: "appSession", code: "invalid" }]);
+      }
+      const connection = { settings: {}, secrets: { [field.key]: session } };
+      const details = await testedConnection(dependencies, connector, connection);
+      handOvers.keep({ userId, requestId, connector: key, appSession: session, details });
+      logger.info({ connector: key, userId }, "App session handed over; waiting for the owner");
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await -- A refusal rejects, as in every other operation.
+    async readAppSessionHandOver(ctx, requestId) {
+      ctx.require("MANAGE_WORKSPACE");
+      return ctx.user && handOvers.read(ctx.user.userId, requestId);
     },
     listConnectors(ctx) {
       ctx.require("MANAGE_WORKSPACE");
@@ -174,62 +266,30 @@ const REFUSED_VALUES: readonly ConnectorErrorCode[] = [
   "wrong_workspace",
 ];
 
-/** The listed connector with `key`, whose fields the owner can type. */
-async function typedConnector(
+/** The listed connector with `key` and its app session field. */
+async function appSessionConnector(
   containerConnectors: ContainerConnectors,
   key: string,
-): Promise<ContainerConnector> {
-  const connector = (await containerConnectors.list()).find((candidate) => candidate.key === key);
-  if (!connector) {
-    throw new ApplicationError(
-      "NOT_FOUND",
-      "The connectors container has no connector with this key.",
-    );
-  }
-  if (connector.connectionFields.some(({ kind }) => kind !== "text")) {
+): Promise<{ connector: ContainerConnector; field: AppSessionField & { key: string } }> {
+  const connector = await containerConnectors.find(key);
+  const field = appSessionFieldOf(connector);
+  if (!field) {
     throw new ApplicationError(
       "CONFLICT",
-      "This connector connects with an app session, not typed values.",
+      "This connector connects with typed values, not an app session.",
     );
   }
-  return connector;
+  return { connector, field };
 }
 
-/** The trimmed values as the connection's settings and secrets, refusing a missing or unknown one. */
-function connectionOf(
-  connector: ContainerConnector,
-  values: readonly { key: string; value: string }[],
-): { settings: Record<string, string>; secrets: Record<string, string> } {
-  const valueByKey = new Map(values.map(({ key, value }) => [key, value.trim()]));
-  const fieldKeys = new Set(connector.connectionFields.map(({ key }) => key));
-  const keys = values.map(({ key }) => key);
-  const repeatedKeys = new Set(keys.filter((key, index) => keys.indexOf(key) !== index));
-  const fieldErrors = [
-    ...[...repeatedKeys].map((key) => ({ field: `values.${key}`, code: "duplicate" })),
-    ...[...fieldKeys]
-      .filter((key) => !valueByKey.get(key))
-      .map((key) => ({ field: `values.${key}`, code: "required" })),
-    ...[...valueByKey.keys()]
-      .filter((key) => !fieldKeys.has(key))
-      .map((key) => ({ field: `values.${key}`, code: "unknown" })),
-  ];
-  if (fieldErrors.length > 0) {
-    throw invalidInput(fieldErrors);
-  }
-  const fieldsWhere = (secret: boolean) =>
-    Object.fromEntries(
-      connector.connectionFields
-        .filter((field) => field.secret === secret)
-        .map(({ key }) => [key, valueByKey.get(key)!]),
-    );
-  return { settings: fieldsWhere(false), secrets: fieldsWhere(true) };
-}
-
-/** The app's answer to the values; a refusal is invalid input, any other failure unavailable. */
+/**
+ * The app's answer to the connection; a refusal is invalid input on what the owner gave (the
+ * values or the app session), any other failure unavailable.
+ */
 async function testedConnection(
   { logger, wait }: ContainerConnectionDependencies,
   connector: ContainerConnector,
-  connection: { settings: Record<string, string>; secrets: Record<string, string> },
+  connection: Connection,
 ): Promise<ConnectionDetails> {
   try {
     const session = await connector.openSession(connection);
@@ -247,7 +307,8 @@ async function testedConnection(
     }
     logger.warn({ connector: connector.key, failure: error.code }, "Connection test failed");
     if (REFUSED_VALUES.includes(error.code)) {
-      throw invalidInput([{ field: "values", code: error.code }]);
+      const field = appSessionFieldOf(connector) ? "appSession" : "values";
+      throw invalidInput([{ field, code: error.code }]);
     }
     throw new ApplicationError("UNAVAILABLE", "The app did not answer the connection test.");
   }
@@ -261,10 +322,12 @@ async function saveConnection(
     connector,
     connection,
     details,
+    noticeAcceptedAt,
   }: {
     connector: ContainerConnector;
-    connection: { settings: Record<string, string>; secrets: Record<string, string> };
+    connection: Connection;
     details: ConnectionDetails;
+    noticeAcceptedAt: Date | undefined;
   },
 ): Promise<ConnectorWithConnection> {
   const settings = { ...connection.settings, ...details.connection?.settings };
@@ -274,6 +337,7 @@ async function saveConnection(
       app: { name: connector.name, domain: connector.appDomain },
       settings,
       secrets: details.connection?.secrets ?? connection.secrets,
+      noticeAcceptedAt,
     });
     const scan = { connectionId, sourceName: details.organizationName };
     const { sourceId } = await scans.scanConnection(ctx, tx, scan);
@@ -283,16 +347,22 @@ async function saveConnection(
     { connector: connector.key, ...saved },
     "App connected through the connectors container; its scan is queued",
   );
-  return { connector, connection: summaryOf(connector, { id: saved.connectionId, settings }) };
+  const summary = summaryOf(connector, {
+    id: saved.connectionId,
+    settings,
+    noticeAcceptedAt: noticeAcceptedAt ?? null,
+  });
+  return { connector, connection: summary };
 }
 
 function summaryOf(
   connector: ContainerConnector,
-  connection: { id: string; settings: Record<string, unknown> },
+  connection: { id: string; settings: Record<string, unknown>; noticeAcceptedAt: Date | null },
 ): ContainerConnection {
   return {
     id: connection.id,
     adminUrl: adminUrlOf(connector.adminUrl, connection.settings),
+    noticeAcceptedAt: connection.noticeAcceptedAt,
     connector,
   };
 }

@@ -9,6 +9,7 @@ import {
   type ConnectorSession,
   type ImportedAccount,
 } from "../../../core/connectors";
+import { ApplicationError } from "../../../core/applicationError";
 import type { Logger } from "../../../core/logger";
 import {
   type ConnectorsContainerClient,
@@ -23,6 +24,8 @@ export interface ContainerConnectors {
    * the container does not answer, logs it, lists none and reads again on the next call.
    */
   list(): Promise<readonly ContainerConnector[]>;
+  /** The listed connector with `key`; refuses one the container does not list with NOT_FOUND. */
+  find(key: string): Promise<ContainerConnector>;
 }
 
 /** A connector of the connectors container: the core shows and runs it with no code for its app. */
@@ -37,10 +40,18 @@ export interface ContainerConnector extends Connector {
 }
 
 /** A value connecting asks for: text the owner types or pastes, or their app session. */
-interface ContainerConnectionField extends ConnectionField {
-  kind: "text" | "app_session";
+type ContainerConnectionField = ConnectionField & {
   label: string;
   help: string;
+} & ({ kind: "text" } | AppSessionField);
+
+/** The owner's app session, which the extension collects from their Chrome. */
+export interface AppSessionField {
+  kind: "app_session";
+  /** Whose cookies the extension hands over: these domains and their subdomains. */
+  domains: readonly string[];
+  /** The local storage keys of the app's signed-in page whose values it hands over. */
+  storageKeys: readonly string[];
 }
 
 export function createContainerConnectors({
@@ -52,13 +63,13 @@ export function createContainerConnectors({
   logger: Logger;
 }): ContainerConnectors {
   if (!url) {
-    return { list: () => Promise.resolve([]) };
+    return withFind({ list: () => Promise.resolve([]) });
   }
   const client = createConnectorsContainerClient(url);
   // shortcut: while the container is down, each read asks it again; throttle these reads if a
   // container that stays down ever slows the pages that list connectors.
   let connectors: Promise<readonly ContainerConnector[]> | undefined;
-  return {
+  return withFind({
     list() {
       connectors ??= client.readConnectors().then(
         (descriptions) => {
@@ -84,6 +95,33 @@ export function createContainerConnectors({
         },
       );
       return connectors;
+    },
+  });
+}
+
+/**
+ * The connection field of the owner's app session; undefined for a connector of typed values.
+ * shortcut: a connector connects with one app session or with typed values, as both of v1's do;
+ * mixing them needs the typed values beside the session.
+ */
+export function appSessionFieldOf(
+  connector: ContainerConnector,
+): (AppSessionField & { key: string }) | undefined {
+  return connector.connectionFields.find((field) => field.kind === "app_session");
+}
+
+function withFind(connectors: Pick<ContainerConnectors, "list">): ContainerConnectors {
+  return {
+    ...connectors,
+    async find(key) {
+      const connector = (await connectors.list()).find((candidate) => candidate.key === key);
+      if (!connector) {
+        throw new ApplicationError(
+          "NOT_FOUND",
+          "The connectors container has no connector with this key.",
+        );
+      }
+      return connector;
     },
   };
 }
@@ -118,13 +156,7 @@ function containerConnector(
     adminUrl,
     findingKinds: { ownAppAccounts: description.findingKind },
     isDirectory: false,
-    connectionFields: description.connectionFields.map((field) => ({
-      key: field.key,
-      kind: field.kind,
-      label: field.label,
-      help: field.help,
-      secret: field.kind === "app_session" || field.secret,
-    })),
+    connectionFields: description.connectionFields.map(containerConnectionField),
     settings: OPAQUE,
     secrets: OPAQUE,
     openSession: (connection) =>
@@ -135,6 +167,23 @@ function containerConnector(
         }),
       ),
   };
+}
+
+function containerConnectionField(
+  field: ConnectorDescription["connectionFields"][number],
+): ContainerConnectionField {
+  const { key, label, help } = field;
+  return field.kind === "app_session"
+    ? {
+        key,
+        label,
+        help,
+        kind: "app_session",
+        secret: true,
+        domains: field.domains,
+        storageKeys: field.storageKeys ?? [],
+      }
+    : { key, label, help, kind: "text", secret: field.secret };
 }
 
 /** Calls the container with the connection, which each answer's `connection` replaces for later calls. */

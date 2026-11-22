@@ -87,6 +87,7 @@ export { readGoogleConnection, finishSetupWithPreselectedApps, scannedApps } fro
 export {
   connectLinear,
   containerConnections,
+  ownerHandOver,
   containerConnectors,
   failLinearCall,
   serveAccountList,
@@ -100,3 +101,5 @@ export {
   linearMemberStatus,
   listedLinearChloe,
 } from "./accountChanges";
+export { signInToFakeSlack } from "./signInToFakeSlack";
+export { pairChrome, redeemCode, START_PAIRING, BROWSER } from "./pairChrome";

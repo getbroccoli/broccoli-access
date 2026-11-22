@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@broccoli-access/config": "workspace:*",
+    "@broccoli-access/connector-contract": "workspace:*",
     "@types/chrome": "0.3.6",
     "eslint": "10.12.0",
     "typescript": "6.0.3",
