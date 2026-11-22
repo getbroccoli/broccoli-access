@@ -1,0 +1,61 @@
+# Adds the scans to the Google Workspace connection; the server merges the types of the modules.
+type GoogleWorkspaceConnection {
+  "The connection's scans: the one running, or the last one's outcome; null before the first."
+  scan: Scan
+}
+
+"The scans of one connected app: the one running, or the last one's outcome."
+type Scan {
+  "The import source the scans read into."
+  id: ID!
+  status: ScanStatus!
+  "Why the last scan failed; null unless `status` is `SCAN_FAILED`."
+  failure: ScanFailure
+  "When the last successful scan finished; null before one."
+  readAt: DateTime
+  "Reading the directory's people."
+  people: ScanPeopleStep!
+}
+
+"Where a connection's scan is."
+enum ScanStatus {
+  "A scan is queued or running; the last successful scan's results stay until it finishes."
+  SCANNING
+  "The last scan finished and its results are saved."
+  SCANNED
+  "The last scan failed; the results of the one before stay."
+  SCAN_FAILED
+}
+
+"Why a scan failed, as the connected app answered."
+enum ScanFailure {
+  "The app refused the stored token: it was revoked or expired."
+  AUTHENTICATION_FAILED
+  "A permission or an admin right is missing."
+  PERMISSION_MISSING
+  "The app kept limiting requests after the scan tried again."
+  RATE_LIMITED
+  "The app timed out or failed after the scan tried again."
+  APP_UNAVAILABLE
+  "The app answered something the connector does not understand."
+  UNEXPECTED_RESPONSE
+}
+
+"Reading the directory's people during a scan."
+type ScanPeopleStep {
+  state: ScanStepState!
+  "How many people the directory holds; null until the step is done."
+  count: Int
+  "How many of them are suspended; null until the step is done."
+  suspended: Int
+}
+
+"Where one step of a scan is."
+enum ScanStepState {
+  "The step is running."
+  RUNNING
+  "The step finished."
+  DONE
+  "The scan failed."
+  FAILED
+}

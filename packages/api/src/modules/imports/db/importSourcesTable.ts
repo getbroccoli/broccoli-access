@@ -14,7 +14,8 @@ export const importSources = pgTable(
       .primaryKey()
       .default(sql`uuidv7()`),
     kind: text("kind", { enum: IMPORT_SOURCE_KINDS }).notNull(),
-    connectionId: uuid("connection_id").unique("import_sources_connection_unique"),
+    /** Set exactly when `kind` is `app_connection`, the only kind so far. */
+    connectionId: uuid("connection_id").notNull().unique("import_sources_connection_unique"),
     /** What the UI calls the source, such as the Google domain. */
     name: text("name").notNull(),
     status: text("status", { enum: SCAN_STATUSES }).notNull(),
@@ -25,10 +26,6 @@ export const importSources = pgTable(
   },
   (table) => [
     check("import_sources_kind", sql`${table.kind} in ('app_connection')`),
-    check(
-      "import_sources_connection",
-      sql`(${table.kind} = 'app_connection') = (${table.connectionId} is not null)`,
-    ),
     check("import_sources_status", sql`${table.status} in ('scanning', 'scanned', 'scan_failed')`),
     check(
       "import_sources_failure",

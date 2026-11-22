@@ -5,3 +5,10 @@ export {
   SCAN_STATUSES,
   type ScanStatus,
 } from "./importSource";
+export {
+  type PeopleCount,
+  type Scan,
+  type ScanPeopleStep,
+  type ScanProgress,
+  scanOf,
+} from "./scan";
