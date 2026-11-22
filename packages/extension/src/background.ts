@@ -1,4 +1,4 @@
-import { hostPermissionOf } from "./instanceOrigin";
+import { hostPermissionOf, isPairableOrigin } from "./instanceOrigin";
 import type { PairingView, WorkerAnswers, WorkerRequest } from "./workerRequests";
 
 /**
@@ -18,6 +18,13 @@ chrome.runtime.onMessage.addListener((request: WorkerRequest, sender, sendRespon
 /** Where `chrome.storage.local` keeps the pairing. */
 const PAIRING_KEY = "pairing";
 
+/** How long a call to the instance may take before the extension stops waiting for it. */
+const INSTANCE_TIMEOUT_MS = 10_000;
+
+const CREATED = 201;
+
+const UNAUTHORIZED = 401;
+
 /** The paired instance and the token it gave, shown to the extension once. */
 interface StoredPairing {
   origin: string;
@@ -35,8 +42,12 @@ function answer(request: WorkerRequest): Promise<WorkerAnswers[WorkerRequest["ty
   }
 }
 
-/** Redeems the instance's one-time code; a pairing with another instance is unpaired first. */
+/** Redeems the instance's one-time code; a pairing with another instance is dropped first. */
 async function pair(origin: string, code: string): Promise<WorkerAnswers["pair"]> {
+  // The pair page checks it too; the token must never travel to another origin.
+  if (!isPairableOrigin(origin)) {
+    return { paired: false };
+  }
   const previous = await storedPairing();
   const token = await redeem(origin, code);
   if (token === null) {
@@ -46,7 +57,9 @@ async function pair(origin: string, code: string): Promise<WorkerAnswers["pair"]
     return { paired: false };
   }
   if (previous && previous.origin !== origin) {
-    await unpairAt(previous);
+    // The owner chose another instance: its pairing goes here even when the old one does not answer.
+    await callInstance(previous, "DELETE");
+    await forgetIfCurrent(previous);
   }
   await chrome.storage.local.set({ [PAIRING_KEY]: { origin, token } satisfies StoredPairing });
   return { paired: true };
@@ -58,31 +71,32 @@ async function readPairing(): Promise<PairingView | null> {
   if (!pairing) {
     return null;
   }
-  try {
-    const response = await fetch(`${pairing.origin}/api/extension/pairing`, {
-      headers: authorizationOf(pairing),
-    });
-    if (response.status === UNAUTHORIZED) {
-      await forget(pairing);
-      return null;
-    }
-    const { pairedAt } = response.ok ? ((await response.json()) as { pairedAt: string }) : {};
-    return { origin: pairing.origin, pairedAt: pairedAt ?? null };
-  } catch {
-    // Unreachable for now, such as offline: still paired, without the date the instance keeps.
-    return { origin: pairing.origin, pairedAt: null };
+  const response = await callInstance(pairing, "GET");
+  if (response?.status === UNAUTHORIZED) {
+    await forgetIfCurrent(pairing);
+    return null;
   }
+  // Unreachable for now, such as offline: still paired, without the date the instance keeps.
+  const pairedAt = response?.ok
+    ? ((await response.json()) as { pairedAt?: unknown }).pairedAt
+    : null;
+  return { origin: pairing.origin, pairedAt: typeof pairedAt === "string" ? pairedAt : null };
 }
 
-async function unpair(): Promise<null> {
+/** Unpairs at the instance, and here once the instance confirms, so a failed unpair can be retried. */
+async function unpair(): Promise<WorkerAnswers["unpair"]> {
   const pairing = await storedPairing();
-  if (pairing) {
-    await unpairAt(pairing);
+  if (!pairing) {
+    return { unpaired: true };
   }
-  return null;
+  const response = await callInstance(pairing, "DELETE");
+  // 401: the instance had already dropped this pairing.
+  const isGone = response !== null && (response.ok || response.status === UNAUTHORIZED);
+  if (isGone) {
+    await forgetIfCurrent(pairing);
+  }
+  return { unpaired: isGone };
 }
-
-const UNAUTHORIZED = 401;
 
 async function redeem(origin: string, code: string): Promise<string | null> {
   try {
@@ -90,28 +104,41 @@ async function redeem(origin: string, code: string): Promise<string | null> {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ code, browser: browserLabel() }),
+      signal: AbortSignal.timeout(INSTANCE_TIMEOUT_MS),
     });
-    return response.ok ? ((await response.json()) as { token: string }).token : null;
+    if (response.status !== CREATED) {
+      return null;
+    }
+    const { token } = (await response.json()) as { token?: unknown };
+    return typeof token === "string" && token !== "" ? token : null;
   } catch {
     // The pair page says pairing failed; the owner starts again from Settings.
     return null;
   }
 }
 
-/** Unpairs at the instance when it answers, and forgets the pairing here either way. */
-async function unpairAt(pairing: StoredPairing): Promise<void> {
+/** The instance's answer to a call with the pairing's token; null when it did not answer in time. */
+async function callInstance(
+  pairing: StoredPairing,
+  method: "GET" | "DELETE",
+): Promise<Response | null> {
   try {
-    await fetch(`${pairing.origin}/api/extension/pairing`, {
-      method: "DELETE",
-      headers: authorizationOf(pairing),
+    return await fetch(`${pairing.origin}/api/extension/pairing`, {
+      method,
+      headers: { authorization: `Bearer ${pairing.token}` },
+      signal: AbortSignal.timeout(INSTANCE_TIMEOUT_MS),
     });
   } catch {
-    // The instance drops the pairing when the owner unpairs in Settings or pairs again.
+    return null;
   }
-  await forget(pairing);
 }
 
-async function forget(pairing: StoredPairing): Promise<void> {
+/** Forgets `pairing` unless pairing again replaced it meanwhile, such as while a call was on its way. */
+async function forgetIfCurrent(pairing: StoredPairing): Promise<void> {
+  const current = await storedPairing();
+  if (current?.token !== pairing.token) {
+    return;
+  }
   await chrome.storage.local.remove(PAIRING_KEY);
   await chrome.permissions.remove(hostPermissionOf(pairing.origin));
 }
@@ -119,10 +146,6 @@ async function forget(pairing: StoredPairing): Promise<void> {
 async function storedPairing(): Promise<StoredPairing | null> {
   const stored = await chrome.storage.local.get<Record<string, StoredPairing>>(PAIRING_KEY);
   return stored[PAIRING_KEY] ?? null;
-}
-
-function authorizationOf({ token }: StoredPairing): HeadersInit {
-  return { authorization: `Bearer ${token}` };
 }
 
 /** What Settings shows for this Chrome, such as "Chrome on macOS". */

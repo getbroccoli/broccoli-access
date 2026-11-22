@@ -6,6 +6,7 @@
     "src/page": [],
     "src/instanceOrigin": [],
     "src/workerRequests": [],
-    "src/extensionId": []
+    "src/extensionId": [],
+    "src/index": ["src/extensionId", "src/instanceOrigin"]
   }
 }

@@ -13,6 +13,8 @@ if (window.top === window) {
 
 function start(): void {
   const parameters = new URLSearchParams(location.hash.slice(1));
+  // The code stays in this page's memory only, out of the address bar and the history.
+  history.replaceState(null, "", location.pathname);
   const origin = parseInstanceOrigin(parameters.get("origin"));
   const code = parameters.get("code");
   showVersion();
@@ -29,7 +31,10 @@ function start(): void {
 
 async function pair(origin: string, code: string): Promise<void> {
   const pairButton = element<HTMLButtonElement>("[data-pair]");
+  const cancelButton = element<HTMLButtonElement>("[data-cancel]");
+  // Once the owner allows access, pairing runs to its end, so Cancel could not keep its promise.
   pairButton.disabled = true;
+  cancelButton.disabled = true;
   // Chrome asks the owner in its own prompt, which needs this click; nothing may await before it.
   const granted = await chrome.permissions.request(hostPermissionOf(origin));
   if (!granted) {
@@ -37,11 +42,13 @@ async function pair(origin: string, code: string): Promise<void> {
       "Chrome has no access to this address, so nothing changed. Pair again to allow it.",
     );
     pairButton.disabled = false;
+    cancelButton.disabled = false;
     return;
   }
   const { paired } = await askWorker({ type: "pair", origin, code });
   if (!paired) {
     showFailure("Pairing failed. Start again from Settings in Broccoli Access.");
+    cancelButton.disabled = false;
     return;
   }
   window.close();

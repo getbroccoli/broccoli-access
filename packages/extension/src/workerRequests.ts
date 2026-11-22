@@ -12,7 +12,8 @@ export interface PairingView {
 export interface WorkerAnswers {
   pair: { paired: boolean };
   readPairing: PairingView | null;
-  unpair: null;
+  /** False when the instance did not confirm, so the pairing stays to try again. */
+  unpair: { unpaired: boolean };
 }
 
 /** Sends `request` to the service worker and waits for its answer. */

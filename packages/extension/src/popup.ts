@@ -30,8 +30,12 @@ function showPairing(pairing: PairingView | null): void {
 }
 
 async function unpair(): Promise<void> {
-  element<HTMLButtonElement>("[data-unpair]").disabled = true;
-  await askWorker({ type: "unpair" });
-  element<HTMLButtonElement>("[data-unpair]").disabled = false;
-  showState("not-paired");
+  const unpairButton = element<HTMLButtonElement>("[data-unpair]");
+  unpairButton.disabled = true;
+  const { unpaired } = await askWorker({ type: "unpair" });
+  unpairButton.disabled = false;
+  element("[data-unpair-failed]").hidden = unpaired;
+  if (unpaired) {
+    showState("not-paired");
+  }
 }
