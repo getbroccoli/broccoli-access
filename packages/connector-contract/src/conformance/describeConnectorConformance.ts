@@ -183,7 +183,10 @@ async function expectMayNotCause(
   fixture: ConnectorFixture,
   code: ConnectorErrorCode,
 ): Promise<void> {
-  expect(OPTIONAL_ERROR_CODES, `cannotCause lists ${code}`).toContain(code);
+  expect(
+    OPTIONAL_ERROR_CODES,
+    `cannotCause may list only ${OPTIONAL_ERROR_CODES.join(" and ")}`,
+  ).toContain(code);
   if (code !== "owner_browser_lost") return;
   const runtimes = await runtimesOf(url, fixture.connector);
   expect(runtimes, `runtimes of a connector that cannot cause ${code}`).not.toContain(
