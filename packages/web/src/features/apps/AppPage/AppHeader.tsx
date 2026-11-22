@@ -15,6 +15,7 @@ import { isConnected } from "../AppTable";
 import { useAppStatusChange } from "../useAppStatusChange";
 import { AppStatusBadge } from "./AppStatusBadge";
 import { AppSubtitle } from "./AppSubtitle";
+import { CanDisableBadge } from "./CanDisableBadge";
 import { IgnoreAppButton } from "./IgnoreAppButton";
 
 type Props = {
@@ -34,9 +35,9 @@ type Props = {
 };
 
 /**
- * The way back to Applications, the app with its status, domain and connection, and Approve or
- * Ignore; Connect while a connector that can manage it has no connection; a connected app's admin
- * page and Scan now.
+ * The way back to Applications, the app with its status, whether a connector can manage it, its
+ * domain and connection, and Approve or Ignore; Connect while that connector has no connection; a
+ * connected app's admin page and Scan now.
  */
 export function AppHeader({ app, onConnected }: Props) {
   const { approve, ignore, pending } = useAppStatusChange(app);
@@ -62,6 +63,7 @@ export function AppHeader({ app, onConnected }: Props) {
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <h1 className="truncate text-2xl font-semibold tracking-tight">{app.name}</h1>
               <AppStatusBadge status={app.status} />
+              {app.managingConnector && <CanDisableBadge />}
               {app.connected && <ConnectedBadge />}
             </div>
             <AppSubtitle app={app} />

@@ -50,6 +50,8 @@ export const appsEn = {
   "apps.page.lastScanFailed": "The last scan failed.",
   "apps.page.connectedSubtitle": "{domain} · the {workspace} workspace. {lastScan}",
   "apps.page.connectedSubtitleWithoutDomain": "The {workspace} workspace. {lastScan}",
+  "apps.page.canDisable": "Can disable",
+  "apps.page.canDisableTitle": "Broccoli Access can disable and enable accounts in this app",
   "apps.page.connectHint":
     "Connect {app} to see every member and disable or enable their accounts from here. Until then, Broccoli Access sees only who signs in to {app} with Google.",
   "apps.page.openAdmin": "Open {app} admin",

@@ -29,15 +29,16 @@ A manual check of an app's page, `/apps/<id>`, against a development stack.
 
 Open Slack from Applications.
 
+- [ ] After "Approved", an outlined "Can disable" pill with a person-minus icon reads "Broccoli Access can disable and enable accounts in this app" on hover.
 - [ ] Next to "Ignore", "Connect Slack" opens Settings → Connections.
 - [ ] Under the header, a grey note reads "Connect Slack to see every member and disable or enable their accounts from here. Until then, Broccoli Access sees only who signs in to Slack with Google."
-- [ ] Figma's and Google Workspace's pages have neither.
+- [ ] Figma's and Google Workspace's pages have none of the three.
 
 ## A connected app
 
 Connect Linear in Settings → Connections as in [Connections settings](connections-settings.md#apps), then open Linear from Applications.
 
-- [ ] The header reads "Linear" with "Approved" and "Connected", "linear.app · the Acme workspace. Scanned today at HH:MM." below, and "Open Linear admin ↗" and "Scan now" on the right; "Open Linear admin" opens `https://linear.app/acme/settings/members` in a new tab.
+- [ ] The header reads "Linear" with "Approved", "Can disable" and "Connected", "linear.app · the Acme workspace. Scanned today at HH:MM." below, and "Open Linear admin ↗" and "Scan now" on the right; "Open Linear admin" opens `https://linear.app/acme/settings/members` in a new tab.
 - [ ] The cards read "Users 7" and "Suspended in Google, still has access 1".
 - [ ] The table adds "In Linear" after Status: Hannah Weber reads "Disabled", the others "Active"; Found via reads "Linear members"; the pending invitation is not listed.
 - [ ] Suspend Chloé in the fake (`POST <fake connectors>/_fake/linear/members/chloe@acme.example/suspend`) and choose "Scan now": the header shows "Scanning…", then Chloé reads "Disabled" without a reload.
