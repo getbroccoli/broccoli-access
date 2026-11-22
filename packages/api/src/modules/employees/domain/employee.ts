@@ -20,6 +20,8 @@ export interface Employee {
   createdAt: Date;
   /** The user who signs in as this employee, or null. */
   userId: string | null;
+  /** The employee the directory names as manager, or null. */
+  managerId: string | null;
 }
 
 /** What a list of employees can be sorted by. */
@@ -34,7 +36,10 @@ export interface NewEmployeeInput {
   email: string;
 }
 
-export type NewEmployee = Omit<Employee, "id" | "avatarFileId" | "createdAt" | "userId">;
+export type NewEmployee = Omit<
+  Employee,
+  "id" | "avatarFileId" | "createdAt" | "userId" | "managerId"
+>;
 
 /** The fields an update sends; an absent field stays as it is, and null clears a nullable one. */
 export interface EmployeeUpdateInput {

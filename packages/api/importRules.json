@@ -82,6 +82,7 @@
     "src/core/env": ["src/utils"],
     "src/core/readiness": [],
     "src/core/secrets": [],
+    "src/core/connectors": [],
     "test/support": [
       "src/core/*",
       "src/core/instance/app",
@@ -93,6 +94,7 @@
       "src/modules/*",
       "src/modules/employees/db",
       "src/modules/apps/db",
+      "src/modules/imports/db",
       "src/utils"
     ],
     "test/e2e": ["src/core/db", "src/core/logger", "src/core/server", "test/support"]

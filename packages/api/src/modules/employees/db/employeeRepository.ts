@@ -171,7 +171,7 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
 }
 
 /** A new employee as stored, with the columns only the module itself sets. */
-type EmployeeRow = NewEmployee & Partial<Pick<Employee, "avatarFileId" | "userId">>;
+type EmployeeRow = NewEmployee & Partial<Pick<Employee, "avatarFileId" | "userId" | "managerId">>;
 
 function keysetColumns({ field, direction }: EmployeeOrder): KeysetOrder {
   const descending = direction === "DESC";
