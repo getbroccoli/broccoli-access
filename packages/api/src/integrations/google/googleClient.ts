@@ -1,6 +1,7 @@
 import { createLocalJWKSet, type JWTVerifyGetKey } from "jose";
 import { z } from "zod";
 
+import { imageTypeOf, type ImageType } from "../../utils";
 import { bearer, fetchGoogleJson, fetchRequired } from "./fetchGoogleJson";
 import { type GoogleGrantEventPage, readGrantEventPage } from "./grantEventPage";
 
@@ -20,7 +21,10 @@ export interface GoogleClient {
   findUser(accessToken: string, userId: string): Promise<GoogleUser | null>;
   /** One page of the customer's users, from a null page token; `nextPageToken` is null on the last. */
   listUsers(accessToken: string, pageToken: string | null): Promise<GoogleUserPage>;
-  /** The user's photo, which Google downsizes to 96×96; null when the user has none. */
+  /**
+   * The user's photo, which Google downsizes to 96×96; null when the user has none. Refuses a
+   * photo whose bytes are not the image type Google declares, or over `MAX_PHOTO_BYTES`.
+   */
   readPhoto(accessToken: string, userId: string): Promise<GooglePhoto | null>;
   /** The apps the user with Google's user id `userId` granted access; empty once the user is gone. */
   listTokens(accessToken: string, userId: string): Promise<GoogleToken[]>;
@@ -87,7 +91,7 @@ export interface GoogleUserPage {
 
 export interface GooglePhoto {
   content: Buffer;
-  mimeType: (typeof PHOTO_MIME_TYPES)[number];
+  mimeType: ImageType;
 }
 
 /** An app's grant to a user, from the user's tokens list. */
@@ -180,10 +184,7 @@ export function createGoogleClient({
     readPhoto: async (accessToken, userId) => {
       const url = directoryUrl(`users/${encodeURIComponent(userId)}/photos/thumbnail`);
       const photo = await fetchGoogleJson(url, USER_PHOTO, bearer(accessToken));
-      // Node's base64url decoder also reads the `*` and `.` padding Google's web-safe base64 allows.
-      return (
-        photo && { content: Buffer.from(photo.photoData, "base64url"), mimeType: photo.mimeType }
-      );
+      return photo && parsePhoto(photo);
     },
     listTokens: async (accessToken, userId) => {
       const url = directoryUrl(`users/${encodeURIComponent(userId)}/tokens`);
@@ -241,10 +242,10 @@ const USERS_PAGE = z.object({
   nextPageToken: z.string().optional(),
 });
 
-/** Image types browsers show and never run as a page, so an avatar served from them is safe. */
-const PHOTO_MIME_TYPES = ["image/jpeg", "image/png", "image/gif"] as const;
+const USER_PHOTO = z.object({ mimeType: z.string(), photoData: z.string() });
 
-const USER_PHOTO = z.object({ mimeType: z.enum(PHOTO_MIME_TYPES), photoData: z.string() });
+/** Far above a 96×96 thumbnail, so only an answer that is no thumbnail goes over it. */
+const MAX_PHOTO_BYTES = 256 * 1024;
 
 // Tokens stay as Google sent them, so each keeps every field for its import record.
 const TOKEN_LIST = z.object({ items: z.array(z.record(z.string(), z.unknown())).optional() });
@@ -273,6 +274,23 @@ async function readUserPage(
     users: (page.users ?? []).map((user) => toGoogleUser(DIRECTORY_USER.parse(user), user)),
     nextPageToken: page.nextPageToken ?? null,
   };
+}
+
+/**
+ * The photo's bytes, when they are the JPEG, PNG or GIF Google declares, which browsers show and
+ * never run as a page, and stay within `MAX_PHOTO_BYTES`.
+ */
+function parsePhoto({ mimeType, photoData }: z.infer<typeof USER_PHOTO>): GooglePhoto {
+  // Node's base64url decoder also reads the `*` and `.` padding Google's web-safe base64 allows.
+  const content = Buffer.from(photoData, "base64url");
+  if (content.length > MAX_PHOTO_BYTES) {
+    throw new Error(`The photo is larger than ${MAX_PHOTO_BYTES} bytes`);
+  }
+  const type = imageTypeOf(content);
+  if (type !== mimeType) {
+    throw new Error("The photo's bytes are not the image type Google declares");
+  }
+  return { content, mimeType: type };
 }
 
 function shortScopeName(scope: string): string {

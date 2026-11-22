@@ -7,6 +7,7 @@ import {
   OWNER,
   SYSTEM,
   PNG,
+  JPEG,
   googleScanSetup,
   scans as scanServices,
   createGoogleWorkspaceConnector,
@@ -161,34 +162,43 @@ test("clears a removed photo, deletes its file and records the change", async ({
   ]);
 });
 
-test("keeps the previous photo when its read fails and still finishes the scan", async ({
-  orm,
-  fakeGoogle,
-  transact,
-}) => {
-  const { scans, sourceId, connectionId } = await googleScanSetup(orm, fakeGoogle.url);
-  await scans.runScan(SYSTEM, sourceId);
-  const chloe = (await storedEmployees(orm)).find(({ email }) => email === "chloe@acme.example")!;
-  expect(chloe.avatarFileId).toEqual(expect.any(String));
-  const photo = await employeeServices(orm).readAvatar(OWNER, chloe.avatarFileId!);
-  fakeGoogle.setPhoto(chloe.email, PNG);
-  await failFakeGoogle(fakeGoogle.url, {
-    endpoint: "directory.users.photos.get",
-    error: "unexpected_response",
-    count: 1,
-  });
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+test.for([
+  { name: "an unexpected response", content: null },
+  { name: "JPEG bytes declared as PNG", content: JPEG },
+  { name: "SVG bytes", content: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>') },
+  {
+    name: "a PNG larger than 256 KB",
+    content: Buffer.concat([PNG, Buffer.alloc(262145 - PNG.length)]),
+  },
+])(
+  "keeps the previous photo and finishes the scan after $name",
+  async ({ content }, { orm, fakeGoogle, transact }) => {
+    const { scans, sourceId, connectionId } = await googleScanSetup(orm, fakeGoogle.url);
+    await scans.runScan(SYSTEM, sourceId);
+    const chloe = (await storedEmployees(orm)).find(({ email }) => email === "chloe@acme.example")!;
+    expect(chloe.avatarFileId).toEqual(expect.any(String));
+    const photo = await employeeServices(orm).readAvatar(OWNER, chloe.avatarFileId!);
+    fakeGoogle.setPhoto(chloe.email, content ?? PNG);
+    if (content === null) {
+      await failFakeGoogle(fakeGoogle.url, {
+        endpoint: "directory.users.photos.get",
+        error: "unexpected_response",
+        count: 1,
+      });
+    }
+    await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
 
-  await scans.runScan(SYSTEM, sourceId);
+    await scans.runScan(SYSTEM, sourceId);
 
-  expect(await storedImportSources(orm)).toMatchObject([
-    { id: sourceId, status: "scanned", failure: null },
-  ]);
-  expect((await storedEmployees(orm)).find(({ id }) => id === chloe.id)?.avatarFileId).toBe(
-    chloe.avatarFileId,
-  );
-  expect(await employeeServices(orm).readAvatar(OWNER, chloe.avatarFileId!)).toEqual(photo);
-});
+    expect(await storedImportSources(orm)).toMatchObject([
+      { id: sourceId, status: "scanned", failure: null },
+    ]);
+    expect((await storedEmployees(orm)).find(({ id }) => id === chloe.id)?.avatarFileId).toBe(
+      chloe.avatarFileId,
+    );
+    expect(await employeeServices(orm).readAvatar(OWNER, chloe.avatarFileId!)).toEqual(photo);
+  },
+);
 
 test("reads on the next scan a photo whose first read failed", async ({
   orm,
