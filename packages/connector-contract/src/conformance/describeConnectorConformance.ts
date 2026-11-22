@@ -16,7 +16,7 @@ import {
   type ConnectorErrorCode,
   type ListedAccount,
 } from "../connectorCalls.js";
-import { CONNECTOR_MANIFEST, RUNTIME_KINDS } from "../connectorManifest.js";
+import { CONNECTOR_MANIFEST, RUNTIME_KINDS, type RuntimeKind } from "../connectorManifest.js";
 
 export interface ConformanceOptions {
   /**
@@ -42,6 +42,11 @@ export interface ConnectorFixture {
    * member active, the connection's credentials working, and no error waiting.
    */
   reset: (url: string) => Promise<void>;
+  /**
+   * The errors the connector can never give, each with a one-line reason; their checks show as
+   * skipped. `owner_browser_lost` only for a connector without the `owner_browser` runtime.
+   */
+  cannotCause?: Partial<Record<(typeof OPTIONAL_ERROR_CODES)[number], string>>;
 }
 
 /**
@@ -73,7 +78,14 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
           checkRepeatedActions(url, fixture));
         it.for(CONNECTOR_ERROR_CODES)(
           "answers %s, when the fixture causes it, as that error",
-          (code) => checkError(url, fixture, code),
+          async (code, { skip }) => {
+            const reason = cannotCauseReason(fixture, code);
+            if (reason !== undefined) {
+              await expectMayNotCause(url, fixture, code);
+              skip(`${fixture.connector} cannot cause ${code}: ${reason}`);
+            }
+            await checkError(url, fixture, code);
+          },
         );
         it("answers a runtime the connector does not list with HTTP 400", () =>
           checkUnlistedRuntimes(url, fixture));
@@ -98,6 +110,12 @@ const FIXTURE_TIMEOUT_MS = CALL_TIMEOUT_MS;
 const MAX_PAGES = 1_000;
 
 const SERVER = { kind: "server" } as const;
+
+/** The errors only some connectors meet: a check that only a robot's page shows, and a lost owner's browser. */
+const OPTIONAL_ERROR_CODES = [
+  "blocked_by_check",
+  "owner_browser_lost",
+] as const satisfies readonly ConnectorErrorCode[];
 
 /** An address that answers nothing: the suite never drives an owner's browser. */
 const UNUSED_BROWSER_URL = "ws://127.0.0.1:9/conformance";
@@ -151,13 +169,34 @@ async function checkError(
   expect(CONNECTOR_ERROR_ANSWER.parse(answer).error.code).toBe(code);
 }
 
+/** Why the fixture says its connector cannot cause `code`, if it says so. */
+function cannotCauseReason(
+  fixture: ConnectorFixture,
+  code: ConnectorErrorCode,
+): string | undefined {
+  return Object.entries(fixture.cannotCause ?? {}).find(([listed]) => listed === code)?.[1];
+}
+
+/** Fails a code the fixture may not skip, whatever its type let through. */
+async function expectMayNotCause(
+  url: string,
+  fixture: ConnectorFixture,
+  code: ConnectorErrorCode,
+): Promise<void> {
+  expect(OPTIONAL_ERROR_CODES, `cannotCause lists ${code}`).toContain(code);
+  if (code !== "owner_browser_lost") return;
+  const runtimes = await runtimesOf(url, fixture.connector);
+  expect(runtimes, `runtimes of a connector that cannot cause ${code}`).not.toContain(
+    "owner_browser",
+  );
+}
+
 /** Each call as it would succeed, with only its runtime changed. */
 async function checkUnlistedRuntimes(url: string, fixture: ConnectorFixture): Promise<void> {
-  const manifest = CONNECTOR_MANIFEST.parse(await getManifest(url));
-  const listed = manifest.connectors.find(({ key }) => key === fixture.connector)?.runtimes;
+  const listed = await runtimesOf(url, fixture.connector);
   const [flow] = await startFlow(url, fixture);
 
-  for (const runtime of unlistedRuntimes(listed ?? [])) {
+  for (const runtime of unlistedRuntimes(listed)) {
     for (const path of CONNECTOR_CALLS) {
       const body = { ...requestOf(flow, path), runtime };
       expect((await post(url, path, body)).status, `${path} on ${runtime.kind}`).toBe(400);
@@ -290,6 +329,11 @@ async function withinDeadline<T>(step: Promise<T>, name: string): Promise<T> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function runtimesOf(url: string, connector: string): Promise<RuntimeKind[]> {
+  const manifest = CONNECTOR_MANIFEST.parse(await getManifest(url));
+  return manifest.connectors.find(({ key }) => key === connector)?.runtimes ?? [];
 }
 
 async function getManifest(url: string): Promise<unknown> {

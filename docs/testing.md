@@ -145,7 +145,7 @@ pnpm --filter @broccoli-access/fake-apps test:e2e
 It builds the fake's image (`packages/fake-apps/Dockerfile`, never part of the production image) and runs the suite against two containers of it, each with a read-only root file system. `pnpm test:e2e` includes it, so it needs Docker; CI runs it in the "Connector conformance" job. Another repository installs the package from a release tag and runs the same suite with its own fixtures:
 
 ```sh
-pnpm add 'github:getbroccoli/broccoli-access#connector-contract-v1.0.0&path:packages/connector-contract'
+pnpm add 'github:getbroccoli/broccoli-access#connector-contract-v1.1.0&path:packages/connector-contract'
 ```
 
 pnpm sees this repository's `postinstall` in the downloaded archive and asks whether the package may run build scripts. It has none, so the consumer's `pnpm-workspace.yaml` answers no:
@@ -161,3 +161,5 @@ const { urls, stop } = await startContainers("<image>");
 afterAll(stop);
 describeConnectorConformance({ urls, fixtures: [/* one ConnectorFixture per connector */] });
 ```
+
+A fixture lists in `cannotCause` the errors its connector can never give, each with a one-line reason, such as `{ owner_browser_lost: "no owner_browser runtime" }`: only `blocked_by_check`, and `owner_browser_lost` for a connector without the `owner_browser` runtime. Their checks show as skipped with the reason (`--reporter=verbose` prints it). The fake causes every error, so its fixtures list none.
