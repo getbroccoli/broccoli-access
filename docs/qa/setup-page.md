@@ -28,7 +28,8 @@ A manual check of setup held by one browser, which connects Google Workspace wit
 
 ## After consent
 
-- [ ] Consenting as Mia Novak (`admin@acme.example`) lands on `/setup/scan`: "Step 2 of 3", "Scanning acme.example", "Connected as admin@acme.example…", and the three scan steps waiting; the sidebar shows Connect done and Scan current. The `broccoli_access_setup` cookie is gone.
+- [ ] Consenting as Mia Novak (`admin@acme.example`) lands on `/setup/scan`: "Step 2 of 3", "Scanning acme.example", "Connected as admin@acme.example…"; the sidebar shows Connect done and Scan current. The `broccoli_access_setup` cookie is gone.
+- [ ] "Reading people" spins, then within a minute shows a check and "42 people, 2 suspended" without a reload; "Finding apps people signed in to with Google" and "Reading sign-in logs" stay "Waiting". Setup stays on `/setup/scan`.
 - [ ] Reloading keeps the owner signed in on `/setup/scan`; `/setup`, `/people` and `/` lead back to it.
 - [ ] In B, any path now lands on `/login`, which shows "Broccoli Access" and "Acme" and no form.
 - [ ] The dev API log holds neither the client secret nor any Google token.
