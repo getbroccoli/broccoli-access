@@ -44,7 +44,11 @@ function listUsers(context: FakeGoogleContext): RequestHandler {
   return (request, response) => {
     const customerKey = typeof request.query.customer === "string" ? request.query.customer : "";
     if (!isAcme(context.state, customerKey)) return sendGoogleError(response, "badRequest");
-    const pageRequest = parsePageRequest(request.query, "directory.users.list");
+    const pageRequest = parsePageRequest(
+      request.query,
+      "directory.users.list",
+      context.maxPageSize,
+    );
     if (pageRequest === undefined) return sendGoogleError(response, "invalid");
     const people = context.state.people.toSorted((a, b) => (a.email < b.email ? -1 : 1));
     const { items, nextPageToken } = pageOf(people, pageRequest);

@@ -8,8 +8,15 @@ export interface PageRequest {
   offset: number;
 }
 
-/** The page a list call asks for, within the method's bounds; undefined when Google refuses it. */
-export function parsePageRequest(query: unknown, method: AdminMethod): PageRequest | undefined {
+/**
+ * The page a list call asks for, within the method's bounds and at most `maxPageSize` items, as
+ * Google may return fewer than asked; undefined when Google refuses it.
+ */
+export function parsePageRequest(
+  query: unknown,
+  method: AdminMethod,
+  maxPageSize = Infinity,
+): PageRequest | undefined {
   const bounds = adminMethodRules(method).maxResults;
   if (bounds === undefined) throw new Error(`${method} is not a list method`);
   const parsed = z
@@ -21,7 +28,7 @@ export function parsePageRequest(query: unknown, method: AdminMethod): PageReque
   if (!parsed.success) return undefined;
   const offset = parsed.data.pageToken === undefined ? 0 : pageTokenOffset(parsed.data.pageToken);
   if (offset === undefined) return undefined;
-  return { maxResults: parsed.data.maxResults ?? bounds.default, offset };
+  return { maxResults: Math.min(parsed.data.maxResults ?? bounds.default, maxPageSize), offset };
 }
 
 /** One page of `items`, with an opaque token to the next while more remain. */

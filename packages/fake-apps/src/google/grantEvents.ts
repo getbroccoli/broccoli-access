@@ -33,7 +33,11 @@ function listGrantEvents(context: FakeGoogleContext): RequestHandler {
   return (request, response) => {
     const now = context.now();
     const filter = EVENT_FILTER.safeParse(request.query);
-    const pageRequest = parsePageRequest(request.query, "reports.activities.list");
+    const pageRequest = parsePageRequest(
+      request.query,
+      "reports.activities.list",
+      context.maxPageSize,
+    );
     if (!filter.success || pageRequest === undefined || !startsInTime(filter.data, now)) {
       return sendGoogleError(response, "invalid");
     }

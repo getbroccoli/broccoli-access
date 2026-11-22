@@ -23,6 +23,8 @@ export interface FakeGoogleOptions {
   browserUrl?: string;
   /** Address servers use for the token endpoint, user info and keys; defaults to `url`. */
   serverUrl?: string;
+  /** The largest page a list returns, so tests page through a small seed; unset for Google's own bounds. */
+  maxPageSize?: number;
   /** The clock; its value at start is the fake's start, which the seed's grant dates count back from. */
   now?: () => Date;
 }
@@ -52,6 +54,7 @@ export async function startFakeGoogle(options: FakeGoogleOptions = {}): Promise<
     browserUrl: options.browserUrl ?? url,
     serverUrl: options.serverUrl ?? url,
     signingKey,
+    maxPageSize: options.maxPageSize,
     reset: () => {
       context.state = seededState(ACME, start, redirectUris);
     },

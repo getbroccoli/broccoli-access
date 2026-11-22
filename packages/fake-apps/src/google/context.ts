@@ -12,6 +12,8 @@ export interface FakeGoogleContext {
   /** Address servers reach, for tokens and the Admin APIs. */
   serverUrl: string;
   signingKey: SigningKey;
+  /** The largest page a list returns, whatever the caller asks; unset for Google's own bounds. */
+  maxPageSize?: number;
   reset: () => void;
 }
 
