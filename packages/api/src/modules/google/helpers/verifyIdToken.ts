@@ -1,12 +1,10 @@
 import { jwtVerify, type JWTVerifyGetKey } from "jose";
 import { z } from "zod";
 
-/** Who Google says signed in. */
+/** Who Google says signed in; the Directory gives their email. */
 export interface GoogleIdentity {
   /** Google's user id. */
   sub: string;
-  /** Lowercased. */
-  email: string;
 }
 
 /**
@@ -35,7 +33,7 @@ export async function verifyIdToken(
   if (claims.nonce !== nonce) {
     throw new Error("The ID token answers another sign-in");
   }
-  return { sub: claims.sub, email: claims.email.toLowerCase() };
+  return { sub: claims.sub };
 }
 
-const ID_TOKEN_CLAIMS = z.object({ sub: z.string(), email: z.string(), nonce: z.string() });
+const ID_TOKEN_CLAIMS = z.object({ sub: z.string(), nonce: z.string() });

@@ -20,15 +20,16 @@ curl -c cookies -b cookies -X POST -H "origin: $URL" "$URL/api/auth/setup/start"
 
 Setup's first step, `/setup`, connects the fake Google, which already knows this stack's redirect address. Enter the seed's client ID `123456789012-acme.apps.googleusercontent.com` and secret `acme-broccoli-access-fake-secret` (`packages/fake-apps/src/seed/acme.ts`), choose "Connect as Google admin", pick Mia Novak (`admin@acme.example`) on the fake's consent page and choose Allow. This signs Mia in as the owner and lands on the scan step (`/setup/scan`).
 
-From a terminal, with the setup cookie from above:
+From a terminal, with the setup cookie from above, start the consent, answer the fake's consent form as Mia, and follow its redirect back with the same cookie jar:
 
 ```sh
-curl -c cookies -b cookies -H 'content-type: application/json' -H "origin: $URL" \
+AUTH=$(curl -s -c cookies -b cookies -H 'content-type: application/json' -H "origin: $URL" \
   -d '{"clientId":"123456789012-acme.apps.googleusercontent.com","clientSecret":"acme-broccoli-access-fake-secret"}' \
-  "$URL/api/google/connect"
+  "$URL/api/google/connect" | node -pe 'JSON.parse(require("fs").readFileSync(0)).authorizationUrl')
+CALLBACK=$(curl -s -o /dev/null -w '%{redirect_url}' "${AUTH%%\?*}" \
+  --data "${AUTH#*\?}&account=admin%40acme.example&decision=allow")
+curl -c cookies -b cookies "$CALLBACK"
 ```
-
-Open the `authorizationUrl` it answers in the browser, or post the consent form to it with `-d account=admin@acme.example -d decision=allow` plus its query parameters, then `curl -c cookies -b cookies` the callback address the fake redirects to.
 
 There is no sign-in yet: a browser without the owner's session cannot sign in again. Until the scan and the app selection are built, setup stays at the scan step and the app's pages lead back to it. To check them, move setup on in the dev database:
 

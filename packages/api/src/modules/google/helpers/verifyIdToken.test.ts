@@ -8,7 +8,6 @@ it("accepts a signed token for this client and nonce", async () => {
 
   await expect(verifyIdToken(token, options)).resolves.toEqual({
     sub: "google-admin",
-    email: "admin@acme.example",
   });
 });
 
