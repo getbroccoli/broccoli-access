@@ -1,0 +1,10 @@
+{
+  // NodeNext, as in the connectors repository that installs this package from git and
+  // type-checks its source. @broccoli-access/config resolves from the workspace root, so the
+  // package needs no workspace: dependency.
+  "extends": "@broccoli-access/config/tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src", "*.ts"]
+}
