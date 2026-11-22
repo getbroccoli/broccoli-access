@@ -1,0 +1,10 @@
+{
+  "extends": "@broccoli-access/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["chrome", "vite/client"]
+  },
+  "include": ["src", "*.ts"]
+}

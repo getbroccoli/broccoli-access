@@ -1,0 +1,11 @@
+{
+  "elements": {
+    "src/background": ["src/instanceOrigin", "src/workerRequests"],
+    "src/popup": ["src/instanceOrigin", "src/page", "src/workerRequests"],
+    "src/pair": ["src/instanceOrigin", "src/page", "src/workerRequests"],
+    "src/page": [],
+    "src/instanceOrigin": [],
+    "src/workerRequests": [],
+    "src/extensionId": []
+  }
+}

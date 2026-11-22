@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Broccoli Access</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./popup.ts"></script>
+  </head>
+  <body>
+    <main class="card">
+      <header class="card-header">
+        <span class="mark" aria-hidden="true">B</span>
+        <span class="name">Broccoli Access</span>
+        <span class="version" data-version></span>
+      </header>
+      <section class="card-body" data-state="not-paired" hidden>
+        <h1 class="state">Not paired</h1>
+        <p class="text">
+          Open your Broccoli Access in this Chrome, go to Settings › Connections, choose Connect
+          Slack, then Pair this Chrome.
+        </p>
+        <p class="note">Until it's paired, the extension does nothing.</p>
+      </section>
+      <section class="card-body" data-state="paired" hidden>
+        <span class="badge">Paired</span>
+        <dl class="facts">
+          <dt>With</dt>
+          <dd class="strong" data-origin></dd>
+          <dt data-since>Since</dt>
+          <dd data-since data-paired-at></dd>
+        </dl>
+        <p class="note">
+          It hands over your Slack session only when you connect or reconnect Slack in Broccoli
+          Access.
+        </p>
+        <div class="actions spread">
+          <a class="button" target="_blank" rel="noreferrer" data-open>Open Broccoli Access ↗</a>
+          <button type="button" class="button" data-unpair>Unpair</button>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
