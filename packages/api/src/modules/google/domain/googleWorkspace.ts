@@ -5,20 +5,24 @@ import { z } from "zod";
  * their Google app, so every Google consent and sign-in comes back through it.
  */
 export function googleRedirectAddress(publicOrigin: string): string {
-  return `${publicOrigin}/api/google/callback`;
+  return `${publicOrigin}${GOOGLE_CALLBACK_PATH}`;
 }
+
+/** The path of the redirect address. */
+export const GOOGLE_CALLBACK_PATH = "/api/google/callback";
 
 /** The connector key and catalog key of Google Workspace. */
 export const GOOGLE_WORKSPACE = "google_workspace";
+
+/** What signing in asks Google: who the person is, and nothing else. */
+export const GOOGLE_SIGN_IN_SCOPES = ["openid", "email", "profile"] as const;
 
 /**
  * What setup asks the admin to allow: who they are, and read access to users, their app access,
  * the organisation and audit logs, which the scans read.
  */
 export const GOOGLE_WORKSPACE_SCOPES = [
-  "openid",
-  "email",
-  "profile",
+  ...GOOGLE_SIGN_IN_SCOPES,
   "https://www.googleapis.com/auth/admin.directory.user.readonly",
   "https://www.googleapis.com/auth/admin.directory.user.security",
   "https://www.googleapis.com/auth/admin.directory.customer.readonly",
@@ -62,5 +66,13 @@ export class NotSuperAdminError extends Error {
   constructor() {
     super("The consenting Google account is not a super admin");
     this.name = "NotSuperAdminError";
+  }
+}
+
+/** Only a user with the Google account that signed in may sign in; for now only the owner has one. */
+export class UnknownGoogleAccountError extends Error {
+  constructor() {
+    super("The Google account that signed in belongs to no user");
+    this.name = "UnknownGoogleAccountError";
   }
 }

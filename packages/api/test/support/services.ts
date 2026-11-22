@@ -15,6 +15,7 @@ import { createAppConnectionService, createAppAccountService } from "../../src/m
 import { createScanService, type ScanService } from "../../src/modules/imports";
 import {
   createGoogleConnectionService,
+  createGoogleSignInService,
   createGoogleWorkspaceConnector,
   type GoogleConnectionService,
 } from "../../src/modules/google";
@@ -73,6 +74,16 @@ export function googleConnection(
     connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
     employeeDirectory: employeeDirectory(orm),
     scans: scans(orm, { googleUrl, jobs }),
+  });
+}
+
+export function googleSignIn(orm: Orm, { googleUrl }: { googleUrl: string }) {
+  return createGoogleSignInService({
+    orm,
+    secretBox: TEST_SECRET_BOX,
+    openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
+    adminApiUrl: googleUrl,
+    connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
   });
 }
 
