@@ -1,6 +1,6 @@
 import { type MessageKey, t } from "@/i18n";
 
-/** How accounts were found, as people read it, such as "Google sign-in". */
+/** How an app's accounts were found, as people read it, such as "Google sign-in". */
 export function describeFoundVia(findingKinds: readonly string[]): string {
   return findingKinds.map(foundViaLabel).join(", ");
 }

@@ -109,7 +109,7 @@ export function appUsers(orm: Orm): AppUserService {
   return createAppUserService({
     orm,
     connectors: GOOGLE_DIRECTORY,
-    employees: createEmployeeReadService({ orm }),
+    employees: createEmployeeReadService({ orm, accounts: apps(orm) }),
   });
 }
 

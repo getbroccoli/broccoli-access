@@ -2,10 +2,10 @@ import { Link } from "@tanstack/react-router";
 
 import type { DataTableColumn } from "@/components/dataTable";
 import { t } from "@/i18n";
+import { describeFoundVia } from "@/lib/foundVia";
 import { formatSince } from "@/lib/since";
 
 import { AppStatusActions } from "./AppStatusActions";
-import { describeFoundVia } from "./foundVia";
 import { AppNameCell, type AppRow } from "./AppTable";
 
 const APP_COLUMN: DataTableColumn<AppRow> = {

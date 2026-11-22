@@ -2,9 +2,9 @@ import { CaretLeft } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 
 import type { AppPageQuery } from "@/__generated__/graphql";
+import { AppInitial } from "@/components/AppInitial";
 import { t } from "@/i18n";
 
-import { AppInitial } from "../AppTable";
 import { AppStatusActions } from "../AppStatusActions";
 import { AppStatusBadge } from "./AppStatusBadge";
 

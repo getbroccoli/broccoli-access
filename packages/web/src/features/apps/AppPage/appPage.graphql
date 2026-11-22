@@ -9,7 +9,6 @@ query AppPage($id: ID!) {
     suspendedWithAccessCount
     users {
       id
-      suspendedInDirectory
       foundVia
       since {
         at
@@ -21,6 +20,7 @@ query AppPage($id: ID!) {
         lastName
         email
         avatarUrl
+        status
       }
     }
   }

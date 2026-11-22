@@ -64,7 +64,11 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     importsModule(scans),
     appsModule({
       ...apps,
-      ...createAppUserService({ ...core, connectors, employees: createEmployeeReadService(core) }),
+      ...createAppUserService({
+        ...core,
+        connectors,
+        employees: createEmployeeReadService({ ...core, accounts: apps }),
+      }),
     }),
   ];
   return {

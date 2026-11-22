@@ -1,4 +1,4 @@
-import { AppInitial } from "./AppInitial";
+import { AppInitial } from "@/components/AppInitial";
 
 type Props = { name: string; domain: string | null | undefined };
 

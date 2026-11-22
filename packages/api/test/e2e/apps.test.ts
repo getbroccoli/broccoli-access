@@ -107,8 +107,8 @@ test("reads Figma and its users with their directory status after setup", async 
       app(id: $id) {
         id name peopleCount suspendedWithAccessCount
         users {
-          id suspendedInDirectory foundVia since { before }
-          employee { firstName lastName email }
+          id foundVia since { before }
+          employee { firstName lastName email status }
         }
       }
     }`,
@@ -125,10 +125,14 @@ test("reads Figma and its users with their directory status after setup", async 
   expect(body.data.app.users).toHaveLength(16);
   expect(body.data.app.users[0]).toEqual({
     id: expect.any(String) as unknown,
-    suspendedInDirectory: true,
     foundVia: ["google_sign_in"],
     since: { before: true },
-    employee: { firstName: "Ana", lastName: "Ruiz", email: "ana@acme.example" },
+    employee: {
+      firstName: "Ana",
+      lastName: "Ruiz",
+      email: "ana@acme.example",
+      status: "SUSPENDED",
+    },
   });
 }, 90_000);
 

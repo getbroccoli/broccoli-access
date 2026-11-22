@@ -19,6 +19,7 @@ A manual check of an app's page, `/apps/<id>`, against a development stack.
 
 - [ ] "Ignore" changes the badge to "Ignored" and the button to "Approve" without a reload; Applications then reads "Approved 6" and "Ignored 32".
 - [ ] "Approve" brings Figma back: the badge reads "Approved" and the tabs "Approved 7" and "Ignored 31".
+- [ ] "Ignore" on Slack's page lowers the left menu's People badge from 2 to 1 without a reload, since Ben's only approved app was Slack; "Approve" puts it back to 2.
 - [ ] A Discovered app's page has both "Approve" and "Ignore"; approving it removes the left menu's Discovered badge when it was the last one.
 - [ ] Google Workspace's page has no action button, and its amber card reads 0 without the tint.
 

@@ -17,15 +17,13 @@ type App {
   suspendedWithAccessCount: Int!
   "Whether a connection reads it; a connected app stays approved, so it cannot be ignored."
   connected: Boolean!
-  "Its users: the accounts in it that belong to an employee, those suspended in the directory first, then by name."
+  "Its users: the accounts in it that belong to an employee, those whose employee the directory suspended first, then by name."
   users: [AppUser!]!
 }
 
 "An account in an app that belongs to an employee."
 type AppUser {
   id: ID!
-  "Whether the directory, such as Google Workspace, suspended the employee's account there."
-  suspendedInDirectory: Boolean!
   "The finding kinds that saw the account, sorted, such as `google_sign_in`; connector modules register them."
   foundVia: [String!]!
   since: Since!
