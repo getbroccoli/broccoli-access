@@ -66,6 +66,7 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
     });
   });
   for (const fixture of fixtures) {
+    const cannotCause = parseCannotCause(fixture);
     describe(
       `${fixture.connector} conformance`,
       { timeout: NO_CHECK_TIMEOUT, concurrent: false },
@@ -79,7 +80,7 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
         it.for(CONNECTOR_ERROR_CODES)(
           "answers %s, when the fixture causes it, as that error",
           async (code, { skip }) => {
-            const reason = cannotCauseReason(fixture, code);
+            const reason = cannotCause.get(code);
             if (reason !== undefined) {
               await expectMayNotCause(url, fixture, code);
               skip(`${fixture.connector} cannot cause ${code}: ${reason}`);
@@ -169,29 +170,39 @@ async function checkError(
   expect(CONNECTOR_ERROR_ANSWER.parse(answer).error.code).toBe(code);
 }
 
-/** Why the fixture says its connector cannot cause `code`, if it says so. */
-function cannotCauseReason(
-  fixture: ConnectorFixture,
-  code: ConnectorErrorCode,
-): string | undefined {
-  return Object.entries(fixture.cannotCause ?? {}).find(([listed]) => listed === code)?.[1];
-}
-
-/** Fails a code the fixture may not skip, whatever its type let through. */
+/** A connector that runs in the owner's browser can lose it, so it must cause `owner_browser_lost`. */
 async function expectMayNotCause(
   url: string,
   fixture: ConnectorFixture,
   code: ConnectorErrorCode,
 ): Promise<void> {
-  expect(
-    OPTIONAL_ERROR_CODES,
-    `cannotCause may list only ${OPTIONAL_ERROR_CODES.join(" and ")}`,
-  ).toContain(code);
   if (code !== "owner_browser_lost") return;
   const runtimes = await runtimesOf(url, fixture.connector);
   expect(runtimes, `runtimes of a connector that cannot cause ${code}`).not.toContain(
     "owner_browser",
   );
+}
+
+/**
+ * Each code the fixture's `cannotCause` lists, with its reason. Checked before any test runs,
+ * since its type lets through the extra keys of an object built elsewhere.
+ */
+function parseCannotCause(fixture: ConnectorFixture): Map<string, string> {
+  const reasons = new Map<string, string>();
+  for (const [code, reason] of Object.entries(fixture.cannotCause ?? {})) {
+    if (!(OPTIONAL_ERROR_CODES as readonly string[]).includes(code)) {
+      const allowed = OPTIONAL_ERROR_CODES.join(" and ");
+      throw new Error(`${fixture.connector}'s cannotCause may list only ${allowed}, not ${code}`);
+    }
+    if (!isOneLineText(reason))
+      throw new Error(`${fixture.connector}'s cannotCause needs a one-line reason for ${code}`);
+    reasons.set(code, reason);
+  }
+  return reasons;
+}
+
+function isOneLineText(text: string | undefined): text is string {
+  return text !== undefined && text.trim() !== "" && !text.includes("\n");
 }
 
 /** Each call as it would succeed, with only its runtime changed. */
