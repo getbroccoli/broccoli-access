@@ -59,21 +59,21 @@ export function LeftNav() {
   );
 }
 
-/** The app's pages; Applications shows how many apps await the owner's decision. */
+/** The app's pages; Applications, for admins, shows how many apps await their decision. */
 function useAppItems(): NavItem[] {
   const { me } = useRouteContext({ from: "/_authenticated" });
-  const { data } = useQuery(NavCountsDocument, {
-    skip: !me.operations.includes("MANAGE_WORKSPACE"),
-  });
+  const canManage = me.operations.includes("MANAGE_WORKSPACE");
+  const { data } = useQuery(NavCountsDocument, { skip: !canManage });
   const discovered = data?.appCounts.discovered ?? 0;
+  const applications: NavItem = {
+    to: "/apps",
+    label: t("nav.applications"),
+    icon: SquaresFour,
+    badge: discovered > 0 ? discovered : undefined,
+  };
   return [
     { to: "/", label: t("nav.today"), icon: House },
-    {
-      to: "/apps",
-      label: t("nav.applications"),
-      icon: SquaresFour,
-      badge: discovered > 0 ? discovered : undefined,
-    },
+    ...(canManage ? [applications] : []),
     { to: "/people", label: t("nav.people"), icon: Users },
   ];
 }

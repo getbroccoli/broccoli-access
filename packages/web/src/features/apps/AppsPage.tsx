@@ -12,8 +12,9 @@ import { AppTable } from "./AppTable";
 import { AppTabs } from "./AppTabs";
 import { FirstRunBanner } from "./FirstRunBanner";
 
-/** Every app of a tab in one page; shortcut: page with `after` if a tab ever holds thousands. */
-const ALL_APPS = 1_000;
+// shortcut: a tab shows at most the API's largest page of apps, so selection misses any beyond
+// it; page with `after` if a directory ever has that many apps.
+const ALL_APPS = 10_000;
 
 const STATUSES = {
   approved: "APPROVED",
@@ -40,17 +41,16 @@ export function AppsPage() {
   });
   // Null until the owner changes the selection, which starts with the preselected apps.
   const [selection, setSelection] = useState<Set<string> | null>(null);
+  const discoveredApps = discovered.data?.apps.edges.map(({ node }) => node);
   const selected =
-    selection ??
-    new Set(
-      discovered.data?.apps.edges.filter(({ node }) => node.preselected).map(({ node }) => node.id),
-    );
+    selection ?? new Set(discoveredApps?.filter((app) => app.preselected).map(({ id }) => id));
   const apps = data?.apps.edges.map(({ node }) => node);
 
   return (
     <div className="flex flex-col">
-      {firstRun && data && (
-        <FirstRunBanner discoveredCount={data.appCounts.discovered} selectedIds={selected} />
+      {/* Finishing ignores every app left unselected, so it waits for the selection to load. */}
+      {firstRun && discoveredApps && (
+        <FirstRunBanner discoveredCount={discoveredApps.length} selectedIds={selected} />
       )}
       <div className="mb-6">
         <AppTabs

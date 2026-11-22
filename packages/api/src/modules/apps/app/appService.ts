@@ -189,8 +189,9 @@ async function summarize(db: Orm, apps: readonly App[]): Promise<AppSummary[]> {
     // Every employee holds a directory account, so they are the directory's people.
     accounts.countEmployeesWithAccounts(),
   ]);
+  const usersByApp = Map.groupBy(users, ({ appId }) => appId);
   return apps.map((app) => {
-    const appUsers = users.filter(({ appId }) => appId === app.id);
+    const appUsers = usersByApp.get(app.id) ?? [];
     return {
       ...app,
       peopleCount: appUsers.length,

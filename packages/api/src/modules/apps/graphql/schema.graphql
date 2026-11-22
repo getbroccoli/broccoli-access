@@ -9,16 +9,16 @@ type App {
   peopleCount: Int!
   "The finding kinds that saw its people's accounts, sorted, such as `google_sign_in`; connector modules register them."
   foundVia: [String!]!
-  "Since when its people have had accounts: the earliest of theirs; null without people."
+  "The earliest Since of its people's accounts; null without people."
   since: Since
   "Whether setup's selection of the company's apps starts with it: at least a fifth of the directory's people have an account in it."
   preselected: Boolean!
 }
 
-"Since when someone has had an account: a moment, or before it when the grant is older than the log."
+"Since when someone has had an account, as far as the sources know: when they granted access; before the log began, for a grant older than the log; otherwise when a scan first saw the account."
 type Since {
   at: DateTime!
-  "The grant is older than the log, which began at `at`."
+  "The grant is older than the log, which began at `at`; false says nothing more about how exact `at` is."
   before: Boolean!
 }
 
