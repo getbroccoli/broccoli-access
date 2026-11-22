@@ -257,12 +257,6 @@ These numbers are the circle 1 design canvas's; screens and checks rely on them.
 - **Scanning apps:** grants and grant events.
 - **People and Settings checks:** the control endpoints, to suspend someone or add a grant, then scan.
 
-## In development and tests
-
-- `pnpm dev` runs the fake Google beside the app on a free port and points the app's two Google settings at it. Restarting `pnpm dev` resets it.
-- The seed's OAuth client secret is in `packages/fake-apps/src/seed/acme.ts`. Its redirect address is `http://localhost:<app port>/api/google/callback`.
-- API tests use the `fakeGoogle` fixture: a fresh fake on a free local port for each test. A test registers its server's redirect address with `POST /_fake/clients`.
-
 ## Left to the builder
 
 - The file layout, the generated names and the page token format, which only has to be opaque.
