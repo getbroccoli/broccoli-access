@@ -1,5 +1,6 @@
 import { test as base } from "vitest";
 
+import { startFakeConnectors } from "../../src/connectors";
 import { startFakeGoogle } from "../../src/google";
 
 export const REDIRECT_URI = "http://localhost:3000/oauth/google/callback";
@@ -23,7 +24,16 @@ export interface TestFakeGoogle {
   setPhoto: (email: string, photo: Buffer | null) => void;
 }
 
-export const test = base.extend<{ fake: TestFakeGoogle }>({
+export const test = base.extend<{ fake: TestFakeGoogle; connectors: { url: string } }>({
+  // eslint-disable-next-line no-empty-pattern -- Vitest requires destructured fixture dependencies.
+  connectors: async ({}, use) => {
+    const server = await startFakeConnectors({ delayMs: 0 });
+    try {
+      await use({ url: server.url });
+    } finally {
+      await server.stop();
+    }
+  },
   // eslint-disable-next-line no-empty-pattern -- Vitest requires destructured fixture dependencies.
   fake: async ({}, use) => {
     const startedAt = new Date("2026-11-21T08:00:00.000Z");

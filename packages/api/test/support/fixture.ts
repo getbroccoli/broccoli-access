@@ -1,4 +1,9 @@
-import { startFakeGoogle, type RunningFakeGoogle } from "@broccoli-access/fake-apps";
+import {
+  startFakeConnectors,
+  startFakeGoogle,
+  type RunningFakeConnectors,
+  type RunningFakeGoogle,
+} from "@broccoli-access/fake-apps";
 import { inject, test as baseTest } from "vitest";
 
 import { connectDatabase, type Orm, type Transact } from "../../src/core/db";
@@ -16,7 +21,8 @@ import { testTransactor } from "./testTransactor";
  * receives, and `fakeGoogle`, Google with the demo company Acme on a free local port, fresh for
  * each test. Pages hold at most three people, so scanning all 42 crosses pages and Ana's
  * manager David arrives on a later page. A test registers its redirect address,
- * with the fake's `POST /_fake/clients`.
+ * with the fake's `POST /_fake/clients`. `fakeConnectors` is the fake connectors container with
+ * Acme's Slack and Linear, fresh for each test and answering without delay.
  */
 export const test = baseTest.extend<{
   env: TestEnv;
@@ -25,6 +31,7 @@ export const test = baseTest.extend<{
   seed: TestSeed;
   transact: Transact;
   fakeGoogle: RunningFakeGoogle;
+  fakeConnectors: RunningFakeConnectors;
 }>({
   env: async ({ fakeGoogle }, use) => {
     const env = await TestEnv.start({ googleUrl: fakeGoogle.url });
@@ -53,6 +60,15 @@ export const test = baseTest.extend<{
   },
   transact: async ({ orm }, use) => {
     await use(testTransactor(orm));
+  },
+  // eslint-disable-next-line no-empty-pattern -- Vitest reads fixture dependencies from this pattern.
+  fakeConnectors: async ({}, use) => {
+    const fake = await startFakeConnectors({ delayMs: 0 });
+    try {
+      await use(fake);
+    } finally {
+      await fake.stop();
+    }
   },
   // eslint-disable-next-line no-empty-pattern -- Vitest reads fixture dependencies from this pattern.
   fakeGoogle: async ({}, use) => {
