@@ -15,8 +15,8 @@ import { connectsWithText } from "./connectsWithText";
 
 type Props = {
   connector: FragmentType<ConnectAppButton_ConnectorFragment>;
-  /** `sm` in a table row, reading "Connect"; `lg` reads "Connect <app>". */
-  size: "sm" | "lg";
+  /** `default` in a table row, reading "Connect"; `lg` reads "Connect <app>". */
+  size: "default" | "lg";
   /** Runs once the app is connected. */
   onConnected?: () => void;
 };
@@ -25,14 +25,16 @@ type Props = {
 export function ConnectAppButton({ connector, size, onConnected }: Props) {
   const { data, complete } = useFragment({
     fragment: ConnectAppButton_ConnectorFragmentDoc,
+    // Its document holds the dialog's fragment too.
+    fragmentName: "ConnectAppButton_connector",
     from: connector,
   });
   if (!complete) {
     return null;
   }
   const name = t("settings.apps.connect", { app: data.name });
-  const label = size === "sm" ? t("apps.connect") : name;
-  const className = cn(size === "lg" && "px-4");
+  const label = size === "lg" ? name : t("apps.connect");
+  const className = size === "lg" ? "px-4" : "px-3 text-[13px] font-semibold";
   if (!connectsWithText(data)) {
     // shortcut: an app session connects in Settings > Connections; open its own dialog here once
     // the extension hands the session over from this page.

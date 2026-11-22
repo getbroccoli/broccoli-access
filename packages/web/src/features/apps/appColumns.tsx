@@ -79,7 +79,7 @@ export const APPROVED_APP_COLUMNS: DataTableColumn<ApprovedAppRow>[] = [
       return connector.connection ? (
         <ConnectedBadge />
       ) : (
-        <ConnectAppButton connector={connector} size="sm" />
+        <ConnectAppButton connector={connector} size="default" />
       );
     },
   },
