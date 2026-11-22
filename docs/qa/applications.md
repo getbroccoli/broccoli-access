@@ -15,14 +15,16 @@ A manual check of the Applications page, the home page, against a development st
 
 ## Approved
 
-- [ ] The table lists App (initial, name, domain), Users, Found via and Suspended in Google: Google Workspace 42 "Google directory", Slack 41, Notion 31, Figma 16, Miro 12, Loom 11 and Claude 9, each "Google sign-in".
+- [ ] The table lists App (logo or initial, name, domain), Users, Found via and Suspended in Google: Google Workspace "Google directory", then Slack, Notion, Figma, Miro, Loom and Claude, each "Google sign-in". Notion, Figma, Miro, Loom and Claude show their logo; Google Workspace and Slack their initial.
+- [ ] Users shows four avatars, then the rest of the 42, 41, 31, 16, 12, 11 and 9 people: "+38", "+37", "+27", "+12", "+8", "+7" and "+5".
+- [ ] Hovering an avatar, or reaching it with Tab, shows the person's name and email; Slack's first four are Ana Ruiz and Ben Ito, suspended in Google, then Aisha Khan and Bruno Costa. A screen reader reads each avatar as "<name>, <email>", then "41 in total"; an avatar opens the person's page.
 - [ ] Slack shows "2 still have access", Notion and Figma "1 still has access"; the others show nothing there.
-- [ ] Every row but Google Workspace has an outlined "Ignore"; no row has "Approve".
+- [ ] No row has "Ignore" or "Approve".
 - [ ] Clicking an app's name opens its page (see [App page](app-page.md)).
 
 ## Moving apps
 
-- [ ] "Ignore" on Claude removes it from Approved without a reload; the tabs read "Approved 6" and "Ignored 32".
+- [ ] Ignoring Claude on its page (see [App page](app-page.md#actions)) removes it from Approved; the tabs read "Approved 6" and "Ignored 32".
 - [ ] Ignored lists App, People, Found via and Since; each row has "Approve" and no "Ignore".
 - [ ] "Approve" on ChatGPT in Ignored removes it there; the tabs read "Approved 7" and "Ignored 31", and Approved lists it.
 - [ ] Claude's and ChatGPT's history (`record_history`) holds one line each for the change.
@@ -30,7 +32,7 @@ A manual check of the Applications page, the home page, against a development st
 ## Scan now
 
 - [ ] Add a grant for a new app in the fake Google (`POST /_fake/grants` with an `email`, a new `clientId` and an `appName`, see [the fake apps](../fake-apps.md#control-endpoints)), then "Scan now": the button turns inactive and the header reads "Scanning…"; within a minute, without a reload, the header shows the new time and the counts and the left menu's badge show the new app in Discovered.
-- [ ] A Discovered row has "Approve" and "Ignore"; "Approve" moves it to Approved and the left menu's badge goes.
+- [ ] A Discovered row has "Approve" and no "Ignore"; "Approve" moves it to Approved and the left menu's badge goes.
 
 ## Phone width
 
