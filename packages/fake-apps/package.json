@@ -1,0 +1,32 @@
+{
+  "name": "@broccoli-access/fake-apps",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fakes of the apps broccoli-access connects to, for development and tests.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#test/support": "./test/support/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --maxWorkers=2"
+  },
+  "devDependencies": {
+    "@broccoli-access/config": "workspace:*",
+    "@types/express": "5.0.6",
+    "@types/node": "24.19.1",
+    "eslint": "10.12.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3"
+  },
+  "dependencies": {
+    "express": "5.2.1",
+    "jose": "6.2.12",
+    "zod": "4.6.5"
+  }
+}

@@ -52,3 +52,11 @@ pnpm --filter @broccoli-access/api test:load
 ```
 
 Each checkout gets its own container on a free port, so worktrees can run the tests at the same time. The data lives in memory; removing the container discards it, including databases left by an interrupted run. To use another Postgres server, set `TEST_DATABASE_URL` to an admin connection URL; the tests create and drop only databases named `broccoli_access_test_*`.
+
+## The fake Google
+
+Sign-in and the Google connector are tested against the fake Google in `packages/fake-apps`, seeded with the demo company Acme ([design](fake-apps.md)).
+
+- API tests use the `fakeGoogle` fixture: a fresh fake on a free local port for each test. A test registers its server's redirect address, `<its origin>/api/google/callback`, with `POST /_fake/clients`.
+- `pnpm dev` runs the fake beside the app on a free port and points the app's two Google settings at it. Restarting `pnpm dev` resets it.
+- The seed's OAuth client secret is in `packages/fake-apps/src/seed/acme.ts`. Its redirect address under `pnpm dev` is `http://localhost:<app port>/api/google/callback`.

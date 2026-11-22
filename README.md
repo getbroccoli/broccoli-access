@@ -19,7 +19,7 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` starts this checkout's stack on a free port and prints its address and the address of Mailpit, which catches the email it sends. `pnpm dev --drop-db` starts over with an empty database, and `pnpm dev:prune` removes the stacks of checkouts that no longer exist. Tests are in [testing](docs/testing.md).
+`pnpm dev` starts this checkout's stack on free ports and prints its address, the address of Mailpit, which catches the email it sends, and the address of the [fake Google](docs/fake-apps.md) with the demo company Acme. `pnpm dev --drop-db` starts over with an empty database, and `pnpm dev:prune` removes the stacks of checkouts that no longer exist. Tests are in [testing](docs/testing.md).
 
 ## Licence
 
