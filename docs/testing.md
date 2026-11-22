@@ -61,3 +61,90 @@ Sign-in and the Google connector are tested against the fake Google in `packages
 - End-to-end tests run against the `env` fixture's fake Google; `env.signInAsOwner()` connects Google Workspace as the seed's super admin, `admin@acme.example`, through the real consent, and leaves setup at the scan step.
 - `pnpm dev` runs the fake beside the app on a free port and points the app's two Google settings at it. Restarting `pnpm dev` resets it.
 - The seed's OAuth client secret is in `packages/fake-apps/src/seed/acme.ts`. Its redirect address under `pnpm dev` is `http://localhost:<app port>/api/google/callback`.
+
+## The fake connectors container
+
+The connectors container is faked in `packages/fake-apps` for `slack` and `linear`, with Acme's members ([design](fake-apps.md#fake-connectors-container)). It speaks the [connector contract](connector-contract.md), whose schemas and conformance suite are in `packages/connector-contract`.
+
+- `pnpm dev` runs it as the Compose service `fake-connectors`. The API reaches it at `CONNECTORS_URL`, `http://fake-connectors:4000`; this machine reaches it on a free port of `127.0.0.1`, which `pnpm dev` prints as "Fake connectors (Acme)" with the Slack sign-in address. `HOST_FAKE_CONNECTORS_PORT` pins the port. Restarting `pnpm dev` resets it.
+- API tests use the `fakeConnectors` fixture, and tests in `packages/fake-apps` the `connectors` fixture: a fresh fake on a free local port for each test, answering without delay.
+- Each answer takes 250 ms by default, so a change's progress shows; `POST /_fake/delay` changes it.
+
+Set `FAKE` to its address, such as `http://127.0.0.1:<printed port>`. The examples use `jq`.
+
+### Linear
+
+The key `lin_api_acme_fake` reaches Acme's Linear; any other key fails with `authentication_failed`.
+
+```sh
+LINEAR='{"connector":"linear","runtime":{"kind":"server"},"connection":{"settings":{},"secrets":{"apiKey":"lin_api_acme_fake"}}}'
+curl -s "$FAKE/v1/connectors"
+curl -s -H 'content-type: application/json' -d "$LINEAR" "$FAKE/v1/connections/test"
+curl -s -H 'content-type: application/json' -d "$(jq -c '.cursor = null' <<<"$LINEAR")" "$FAKE/v1/accounts/list"
+CHLOE=$(curl -s "$FAKE/_fake/state" | jq -c '.linear[] | select(.email == "chloe@acme.example") | {sourceKey, email}')
+curl -s -H 'content-type: application/json' \
+  -d "$(jq -c --argjson account "$CHLOE" '. + {action: "suspend", account: $account}' <<<"$LINEAR")" \
+  "$FAKE/v1/actions/run"
+```
+
+### Slack
+
+- In Chrome, open `http://slack.localhost:<printed port>/slack/signin`. The page shows "Sign in as Mia Novak" and signs Mia in at once: cookie `d` on `slack.localhost`, and Slack's token in local storage under `localConfig_v2`. `*.localhost` reaches this machine, so the cookie never mixes with the app's on `localhost`.
+- Read the session from the browser's developer tools (Application: cookie `d`, local storage `localConfig_v2`), or with `agent-browser cookies get --json` and `agent-browser eval 'localStorage.getItem("localConfig_v2")'`. Without a browser, take both from one sign-in:
+
+  ```sh
+  PAGE=$(curl -si "$FAKE/slack/signin")
+  D=$(printf '%s' "$PAGE" | sed -n 's/^set-cookie: d=\([^;]*\).*/\1/ip')
+  CONFIG=$(printf '%s' "$PAGE" | sed -n 's/.*id="localConfig_v2">\(.*\)<\/script>.*/\1/p')
+  ```
+
+- The call carries them as the `appSession` secret, then works like Linear's above with `$SLACK`:
+
+  ```sh
+  SLACK=$(jq -nc --arg d "$D" --arg config "$CONFIG" '{connector: "slack", runtime: {kind: "server"},
+    connection: {settings: {}, secrets: {appSession: {storage: {localConfig_v2: $config}, cookies: [{name: "d",
+    value: $d, domain: "slack.localhost", path: "/", httpOnly: true, secure: false, sameSite: "Lax"}]}}}}')
+  curl -s -H 'content-type: application/json' -d "$SLACK" "$FAKE/v1/connections/test"
+  ```
+
+- The fake accepts only sessions it issued since its last start, reset or session expiry. Its list has three pages: pass each `nextCursor` as the next `cursor`.
+
+### Controls
+
+They refuse requests with an `Origin` header, so a web page cannot call them.
+
+```sh
+curl -s -X POST "$FAKE/_fake/reset"
+curl -s "$FAKE/_fake/state"
+curl -s -X POST "$FAKE/_fake/linear/members/ana@acme.example/suspend"
+curl -s -X POST "$FAKE/_fake/slack/members/elif@acme.example/reactivate"
+curl -s -H 'content-type: application/json' "$FAKE/_fake/failures" \
+  -d '{"connector": "slack", "call": "actions/run", "code": "not_allowed", "count": 1}'
+curl -s -X POST "$FAKE/_fake/slack/sessions/expire"
+curl -s -X POST "$FAKE/_fake/linear/keys/revoke"
+curl -s -H 'content-type: application/json' -d '{"milliseconds": 5000}' "$FAKE/_fake/delay"
+```
+
+- `reset` puts back the seed: members, failures, the delay, the Linear key, and no Slack session.
+- `state` lists each workspace's members with their status; pending invitations are not members.
+- A member control changes the member as an admin would in the app.
+- `failures` makes the next `count` calls of that connector and `call` (`connections/test`, `accounts/list` or `actions/run`) answer the contract error `code`.
+- After `sessions/expire`, every Slack session fails with `authentication_failed` until a new sign-in; after `keys/revoke`, the Linear key fails until `reset`.
+
+### The conformance suite
+
+```sh
+pnpm --filter @broccoli-access/fake-apps test:e2e
+```
+
+It builds the fake's image (`packages/fake-apps/Dockerfile`, never part of the production image) and runs the suite against two containers of it, each with a read-only root file system. `pnpm test:e2e` includes it, so it needs Docker; CI runs it in the "Connector conformance" job. Another repository installs the package from a release tag and runs the same suite with its own fixtures:
+
+```sh
+pnpm add 'github:getbroccoli/broccoli-access#connector-contract-v1.0.0&path:packages/connector-contract'
+```
+
+```ts
+const { urls, stop } = await startContainers("<image>");
+afterAll(stop);
+describeConnectorConformance({ urls, fixtures: [/* one ConnectorFixture per connector */] });
+```
