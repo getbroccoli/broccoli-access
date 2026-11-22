@@ -131,14 +131,14 @@ export function createMailSettingsService({
         throw new ApplicationError("CONFLICT", "Choose how Broccoli Access sends email first.");
       }
       try {
-        const { messageId } = await saved.mailer.send({
+        await saved.mailer.send({
           template: TEST_EMAIL_TEMPLATE,
           values: { recipient: caller.email },
           to: caller.email,
           fromName: "Broccoli Access",
           idempotencyKey: randomUUID(),
         });
-        logger.info({ messageId }, "Test email sent");
+        logger.info({ userId: caller.userId }, "Test email sent");
       } catch (error) {
         throw testEmailRefusal(error, logger);
       }
