@@ -3,6 +3,7 @@ export interface DirectoryUser {
   primaryEmail: string;
   suspended: boolean;
   isAdmin: boolean;
+  thumbnailPhotoEtag?: string;
   relations?: { type: string; value: string }[];
 }
 

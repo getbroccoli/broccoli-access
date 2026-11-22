@@ -10,7 +10,7 @@ import { controlRoutes } from "./controls";
 import { directoryRoutes } from "./directory";
 import { grantEventRoutes } from "./grantEvents";
 import { signInRoutes } from "./signIn";
-import { seededState } from "./state";
+import { findPerson, seededState } from "./state";
 
 export interface FakeGoogleOptions {
   /** Redirect addresses registered for the seed's OAuth client. */
@@ -33,6 +33,8 @@ export interface RunningFakeGoogle {
   /** The address it listens on, such as `http://127.0.0.1:<free port>`. */
   url: string;
   stop: () => Promise<void>;
+  /** Gives the person a new photo, or removes theirs with null; tests only, with no control endpoint. */
+  setPhoto: (email: string, photo: Buffer | null) => void;
 }
 
 /** Starts a fake Google serving the seeded Acme, by default on a free local port. */
@@ -62,6 +64,11 @@ export async function startFakeGoogle(options: FakeGoogleOptions = {}): Promise<
   server.on("request", fakeGoogleApp(context));
   return {
     url,
+    setPhoto: (email, photo) => {
+      const person = findPerson(context.state, email);
+      if (person === undefined) throw new Error("No person has this email");
+      person.photo = photo;
+    },
     stop: () =>
       new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));

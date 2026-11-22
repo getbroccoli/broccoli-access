@@ -3,6 +3,32 @@ import { describe, expect, it } from "vitest";
 import { ACME } from ".";
 
 describe("Acme people", () => {
+  it("gives the 11 named people distinct placeholder portraits and nobody else one", () => {
+    const peopleWithPhotos = ACME.people.filter(({ photo }) => photo !== null);
+
+    expect(peopleWithPhotos.map(({ email }) => email).sort()).toEqual([
+      "ana@acme.example",
+      "ben@acme.example",
+      "chloe@acme.example",
+      "david@acme.example",
+      "elif@acme.example",
+      "farah@acme.example",
+      "gabriel@acme.example",
+      "hannah@acme.example",
+      "ivan@acme.example",
+      "jun@acme.example",
+      "lena@acme.example",
+    ]);
+    for (const { photo } of peopleWithPhotos) {
+      expect(Buffer.isBuffer(photo)).toBe(true);
+      expect(photo!.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      expect(photo!.toString("ascii", 12, 16)).toBe("IHDR");
+      expect(photo!.readUInt32BE(16)).toBe(96);
+      expect(photo!.readUInt32BE(20)).toBe(96);
+    }
+    expect(new Set(peopleWithPhotos.map(({ photo }) => photo!.toString("base64"))).size).toBe(11);
+  });
+
   it("has 42 people with unique Google IDs and emails", () => {
     expect(ACME.people).toHaveLength(42);
     expect(new Set(ACME.people.map((person) => person.id)).size).toBe(42);

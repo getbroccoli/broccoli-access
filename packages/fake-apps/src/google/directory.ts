@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { Router, type RequestHandler } from "express";
 
 import type { SeedPerson } from "../seed";
@@ -7,7 +9,7 @@ import { sendGoogleError } from "./googleErrors";
 import { pageOf, parsePageRequest } from "./pageRequest";
 import { findPerson, fullName, type GoogleState } from "./state";
 
-/** Google's Directory API v1: the customer, its users and each user's app grants. */
+/** Google's Directory API v1: the customer, its users, their photos and each user's app grants. */
 export function directoryRoutes(context: FakeGoogleContext): Router {
   const base = "/admin/directory/v1";
   return Router()
@@ -17,6 +19,11 @@ export function directoryRoutes(context: FakeGoogleContext): Router {
       showCustomer(context),
     )
     .get(`${base}/users`, adminAccess(context, "directory.users.list"), listUsers(context))
+    .get(
+      `${base}/users/:userKey/photos/thumbnail`,
+      adminAccess(context, "directory.users.photos.get"),
+      showPhoto(context),
+    )
     .get(
       `${base}/users/:userKey/tokens`,
       adminAccess(context, "directory.tokens.list"),
@@ -61,6 +68,26 @@ function listUsers(context: FakeGoogleContext): RequestHandler {
     });
   };
 }
+
+function showPhoto(context: FakeGoogleContext): RequestHandler<{ userKey: string }> {
+  return (request, response) => {
+    const person = findPerson(context.state, request.params.userKey);
+    if (!person?.photo) return sendGoogleError(response, "notFound");
+    response.json({
+      kind: "admin#directory#user#photo",
+      id: person.id,
+      etag: photoEtag(person.photo),
+      primaryEmail: person.email,
+      mimeType: "image/png",
+      width: THUMBNAIL_SIZE,
+      height: THUMBNAIL_SIZE,
+      photoData: person.photo.toString("base64url"),
+    });
+  };
+}
+
+/** Google downsizes every photo to 96×96 pixels. */
+const THUMBNAIL_SIZE = 96;
 
 function listTokens(context: FakeGoogleContext): RequestHandler<{ userKey: string }> {
   return (request, response) => {
@@ -107,5 +134,14 @@ function directoryUser(state: GoogleState, person: SeedPerson) {
     }),
     customerId: state.customer.id,
     creationTime: person.creationTime,
+    ...(person.photo && { thumbnailPhotoEtag: photoEtag(person.photo) }),
   };
 }
+
+/** Changes with the photo's bytes, as Google's etag changes with the photo. */
+function photoEtag(photo: Buffer): string {
+  return `"${createHash("sha256").update(photo).digest("base64url").slice(0, ETAG_LENGTH)}"`;
+}
+
+/** Long enough that two photos never share an etag. */
+const ETAG_LENGTH = 16;

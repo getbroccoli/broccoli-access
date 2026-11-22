@@ -20,13 +20,19 @@ export interface TestFakeGoogle {
   url: string;
   startedAt: Date;
   now: Date;
+  setPhoto: (email: string, photo: Buffer | null) => void;
 }
 
 export const test = base.extend<{ fake: TestFakeGoogle }>({
   // eslint-disable-next-line no-empty-pattern -- Vitest requires destructured fixture dependencies.
   fake: async ({}, use) => {
     const startedAt = new Date("2026-11-21T08:00:00.000Z");
-    const fake: TestFakeGoogle = { url: "", startedAt, now: new Date(startedAt) };
+    const fake: TestFakeGoogle = {
+      url: "",
+      startedAt,
+      now: new Date(startedAt),
+      setPhoto: (email, photo) => server.setPhoto(email, photo),
+    };
     const server = await startFakeGoogle({
       redirectUris: [REDIRECT_URI],
       now: () => new Date(fake.now),

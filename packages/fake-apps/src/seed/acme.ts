@@ -1,59 +1,12 @@
-/**
- * Acme, the demo company the fake Google serves. Its numbers are the circle 1 design canvas's,
- * and tests import it for their expected values, so it is fixed data with no randomness.
- */
-export interface AcmeSeed {
-  customer: SeedCustomer;
-  /** The instance's own Google app, used in development and tests; not one of the apps. */
-  oauthClient: SeedOAuthClient;
-  people: SeedPerson[];
-  apps: SeedApp[];
-  grants: SeedGrant[];
-}
-
-export interface SeedCustomer {
-  id: string;
-  domain: string;
-  organizationName: string;
-  creationTime: string;
-}
-
-export interface SeedOAuthClient {
-  clientId: string;
-  clientSecret: string;
-  name: string;
-}
-
-export interface SeedPerson {
-  /** The Google user id. */
-  id: string;
-  email: string;
-  givenName: string;
-  familyName: string;
-  managerEmail: string | null;
-  isSuperAdmin: boolean;
-  suspended: boolean;
-  creationTime: string;
-}
-
-export interface SeedApp {
-  clientId: string;
-  name: string;
-}
-
-export interface SeedGrant {
-  email: string;
-  clientId: string;
-  scopes: string[];
-  /** Whole days between the grant and the fake's start, so the grant log always splits the seed alike. */
-  daysBeforeStart: number;
-}
+import type { AcmeSeed, SeedGrant, SeedPerson } from "./acmeSeed";
+import { placeholderPortrait } from "./placeholderPortrait";
 
 const DOMAIN = "acme.example";
 const SIGN_IN_SCOPES = ["openid", "email", "profile"];
 
 const NAMED_PEOPLE: NamedPerson[] = [
-  { name: "Mia Novak", email: "admin", manager: null, apps: ["Slack"] },
+  // The canvas lists Mia apart from the 11 named people, who alone have a portrait.
+  { name: "Mia Novak", email: "admin", manager: null, apps: ["Slack"], portrait: false },
   { name: "David Okafor", manager: "admin", apps: ["Figma", "Miro", "Notion", "Slack"] },
   { name: "Elif Demir", manager: "admin", apps: ["Figma", "Notion", "Slack"] },
   { name: "Hannah Weber", manager: "admin", apps: ["Figma", "Loom", "Notion", "Slack"] },
@@ -221,6 +174,8 @@ interface NamedPerson {
   manager: string | null;
   suspended?: boolean;
   apps: string[];
+  /** Defaults to true. */
+  portrait?: boolean;
 }
 
 interface CountedApp {
@@ -237,6 +192,7 @@ interface DraftPerson {
   manager: string | null;
   suspended: boolean;
   apps: string[];
+  photo: Buffer | null;
 }
 
 interface DraftGrant {
@@ -245,7 +201,10 @@ interface DraftGrant {
   clientId: string;
 }
 
-function namedPerson({ name, email, manager, suspended, apps }: NamedPerson): DraftPerson {
+function namedPerson(
+  { name, email, manager, suspended, apps, portrait = true }: NamedPerson,
+  index: number,
+): DraftPerson {
   const [givenName = "", familyName = ""] = name.split(" ");
   return {
     givenName,
@@ -254,6 +213,7 @@ function namedPerson({ name, email, manager, suspended, apps }: NamedPerson): Dr
     manager,
     suspended: suspended ?? false,
     apps,
+    photo: portrait ? placeholderPortrait(index) : null,
   };
 }
 
@@ -266,6 +226,7 @@ function generatedPerson(name: string, index: number): DraftPerson {
     manager: TEAM_LEADS[index % TEAM_LEADS.length] ?? null,
     suspended: false,
     apps: [],
+    photo: null,
   };
 }
 
@@ -281,6 +242,7 @@ function toSeedPerson(person: DraftPerson, index: number): SeedPerson {
     creationTime: new Date(
       FIRST_ACCOUNT_CREATED + index * DAYS_BETWEEN_ACCOUNTS * DAY_MS,
     ).toISOString(),
+    photo: person.photo,
   };
 }
 

@@ -1,9 +1,9 @@
-export {
-  ACME,
-  type AcmeSeed,
-  type SeedApp,
-  type SeedCustomer,
-  type SeedGrant,
-  type SeedOAuthClient,
-  type SeedPerson,
-} from "./acme";
+export { ACME } from "./acme";
+export type {
+  AcmeSeed,
+  SeedApp,
+  SeedCustomer,
+  SeedGrant,
+  SeedOAuthClient,
+  SeedPerson,
+} from "./acmeSeed";
