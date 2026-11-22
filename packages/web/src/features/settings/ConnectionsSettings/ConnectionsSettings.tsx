@@ -11,6 +11,7 @@ import { usePayloadMutation } from "@/apollo";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
+import { cn } from "@/lib/class-names";
 import { formatLastScan } from "@/lib/lastScan";
 import { PageHeader } from "@/shell";
 
@@ -115,7 +116,7 @@ function GoogleWorkspaceCard({ connection }: { connection: Connection }) {
         </Button>
         <Link
           to="/settings/connections/google-app"
-          className={buttonVariants({ variant: "outline", size: "lg", className: "px-4" })}
+          className={cn(buttonVariants({ variant: "outline", size: "lg" }), "px-4")}
         >
           {t("settings.connections.changeApp")}
         </Link>
