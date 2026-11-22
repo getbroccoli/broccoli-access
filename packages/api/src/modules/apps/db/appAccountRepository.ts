@@ -1,4 +1,4 @@
-import { and, arrayContains, eq, isNotNull, or } from "drizzle-orm";
+import { and, arrayContains, countDistinct, eq, isNotNull, or } from "drizzle-orm";
 
 import { anyOf, insertBatches, type Orm, ormOf, type Tx } from "../../../core/db";
 import type { AppAccount } from "../domain";
@@ -13,6 +13,8 @@ export interface AppAccountRepository {
   deleteMany(ids: readonly string[]): Promise<void>;
   /** How many of the app's accounts belong to an employee, and how many of those are suspended. */
   countPeople(appId: string): Promise<{ people: number; suspended: number }>;
+  /** How many apps hold an account `findingKind` saw. */
+  countAppsFoundVia(findingKind: string): Promise<number>;
 }
 
 export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
@@ -48,6 +50,13 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
       ]);
       return { people: total, suspended };
     },
+    countAppsFoundVia: async (findingKind) => {
+      const [row] = await orm()
+        .select({ apps: countDistinct(appAccounts.appId) })
+        .from(appAccounts)
+        .where(arrayContains(appAccounts.foundVia, [findingKind]));
+      return row!.apps;
+    },
   };
 }
 
@@ -58,5 +67,7 @@ const columns = {
   employeeId: appAccounts.employeeId,
   status: appAccounts.status,
   foundVia: appAccounts.foundVia,
+  grantedAt: appAccounts.grantedAt,
+  grantedBefore: appAccounts.grantedBefore,
   firstSeenAt: appAccounts.firstSeenAt,
 };

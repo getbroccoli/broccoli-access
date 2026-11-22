@@ -11,6 +11,10 @@ export interface AppAccount {
   status: AccountStatus;
   /** The finding kinds whose last scan saw the account, such as `google_directory`. */
   foundVia: string[];
+  /** When the person granted access, from the source's log; null when the log lacked it. */
+  grantedAt: Date | null;
+  /** Set only when the grant was older than the log: the log's start when a scan first saw it. */
+  grantedBefore: Date | null;
   firstSeenAt: Date;
 }
 
@@ -20,6 +24,8 @@ export interface FoundAccount {
   email: string;
   status: AccountStatus;
   employeeId: string | null;
+  grantedAt: Date | null;
+  grantedBefore: Date | null;
 }
 
 /** What one finding kind's scan changes in the accounts: new ones, changed ones and gone ones. */
@@ -33,7 +39,9 @@ export interface AccountSyncPlan {
 /**
  * Brings `known` accounts in line with what `findingKind` saw: a found account is created or takes
  * the found status and employee, and an account the kind no longer sees loses the kind, going
- * when no kind is left.
+ * when no kind is left. Two found grants of one person to one app are one account, since the
+ * earlier. Grant dates are fixed when a scan first sees the account: a later scan only moves
+ * `grantedAt` earlier, since a later event is a renewed consent, not the first grant.
  */
 export function planAccountSync(
   known: readonly AppAccount[],
@@ -42,7 +50,7 @@ export function planAccountSync(
   const knownByKey = new Map(known.map((account) => [accountKey(account), account]));
   const foundKeys = new Set(found.map(accountKey));
   const plan: AccountSyncPlan = { created: [], updated: [], deleted: [] };
-  for (const account of found) {
+  for (const account of foundOnce(found)) {
     const before = knownByKey.get(accountKey(account));
     if (!before) {
       plan.created.push({ ...account, foundVia: [findingKind], firstSeenAt: now });
@@ -51,7 +59,16 @@ export function planAccountSync(
     const foundVia = before.foundVia.includes(findingKind)
       ? before.foundVia
       : [...before.foundVia, findingKind];
-    plan.updated.push({ before, after: { ...before, ...account, foundVia } });
+    plan.updated.push({
+      before,
+      after: {
+        ...before,
+        status: account.status,
+        employeeId: account.employeeId,
+        foundVia,
+        grantedAt: earlierGrant(before.grantedAt, account.grantedAt),
+      },
+    });
   }
   for (const before of known) {
     if (foundKeys.has(accountKey(before)) || !before.foundVia.includes(findingKind)) {
@@ -80,6 +97,8 @@ export function accountChanges(
     employee: account?.employeeId ?? null,
     status: account?.status ?? null,
     foundVia: account ? account.foundVia.join(", ") : null,
+    grantedAt: account?.grantedAt?.toISOString() ?? null,
+    grantedBefore: account?.grantedBefore?.toISOString() ?? null,
   });
   const old = fields(before);
   const current = fields(after);
@@ -91,7 +110,44 @@ export function accountChanges(
 }
 
 /** The fields whose changes history keeps, in the order a history line lists them. */
-const HISTORY_FIELDS = ["email", "employee", "status", "foundVia"] as const;
+const HISTORY_FIELDS = [
+  "email",
+  "employee",
+  "status",
+  "foundVia",
+  "grantedAt",
+  "grantedBefore",
+] as const;
+
+/** The found accounts, once each. */
+function foundOnce(found: readonly FoundAccount[]): FoundAccount[] {
+  const byKey = new Map<string, FoundAccount>();
+  for (const account of found) {
+    const seen = byKey.get(accountKey(account));
+    byKey.set(accountKey(account), seen ? mergedAccount(seen, account) : account);
+  }
+  return [...byKey.values()];
+}
+
+/** One account from two grants: active when either is, and undated when either is older than the log. */
+function mergedAccount(one: FoundAccount, other: FoundAccount): FoundAccount {
+  const grantedBefore = earliest(one.grantedBefore, other.grantedBefore);
+  return {
+    ...one,
+    status: one.status === "active" ? one.status : other.status,
+    grantedAt: grantedBefore ? null : earliest(one.grantedAt, other.grantedAt),
+    grantedBefore,
+  };
+}
+
+function earliest(one: Date | null, other: Date | null): Date | null {
+  return one && other ? (one < other ? one : other) : (one ?? other);
+}
+
+/** The known grant date, or the found one when earlier; an undated account stays undated. */
+function earlierGrant(known: Date | null, found: Date | null): Date | null {
+  return known && earliest(known, found);
+}
 
 function accountKey({ appId, email }: { appId: string; email: string }): string {
   return `${appId} ${email}`;

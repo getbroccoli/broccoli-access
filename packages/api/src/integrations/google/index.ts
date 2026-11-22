@@ -5,6 +5,7 @@ export { createGoogleClient } from "./googleClient";
 export type {
   GoogleClient,
   GoogleCustomer,
+  GoogleToken,
   GoogleTokens,
   GoogleUser,
   OpenIdConfiguration,

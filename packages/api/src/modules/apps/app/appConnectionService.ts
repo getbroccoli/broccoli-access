@@ -4,7 +4,7 @@ import { createRecordHistoryService } from "../../../core/records";
 import type { SecretBox } from "../../../core/secrets";
 import type { SecurityContext } from "../../../core/security";
 import { type App, type AppConnection, appConnectionRepository, appRepository } from "../db";
-import { catalogApp } from "../domain";
+import { appChanges, catalogApp } from "../domain";
 
 const recordHistory = createRecordHistoryService();
 
@@ -74,17 +74,7 @@ async function createApprovedApp(ctx: SecurityContext, tx: Tx, catalogKey: strin
     recordType: "app",
     operation: "CREATED",
     cause: { kind: "EDITED_DIRECTLY" },
-    records: [
-      {
-        recordId: app.id,
-        changes: [
-          { field: "name", oldValue: null, newValue: app.name },
-          { field: "domain", oldValue: null, newValue: app.domain },
-          { field: "catalogKey", oldValue: null, newValue: app.catalogKey },
-          { field: "status", oldValue: null, newValue: app.status },
-        ],
-      },
-    ],
+    records: [{ recordId: app.id, changes: appChanges(null, app) }],
   });
   return app;
 }

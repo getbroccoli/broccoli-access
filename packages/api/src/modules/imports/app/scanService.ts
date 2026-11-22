@@ -13,7 +13,7 @@ import type { JobQueue } from "../../../core/jobs";
 import type { Logger } from "../../../core/logger";
 import type { SecurityContext } from "../../../core/security";
 import { importSourceRepository } from "../db";
-import { type PeopleCount, type Scan, type ScanProgress, scanOf } from "../domain";
+import { type Scan, type ScanCounts, type ScanProgress, scanOf } from "../domain";
 import type { DirectoryPeople, ScannedApps } from "../ports";
 import { syncAccounts } from "./syncAccounts";
 
@@ -90,7 +90,7 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
         logger.info({ sourceId, status: source?.status ?? null }, "Scan skipped: not queued");
         return;
       }
-      progressBySource.set(sourceId, { people: null });
+      progressBySource.set(sourceId, { found: null });
       try {
         await scanSource(
           ctx,
@@ -119,7 +119,8 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
       if (!source) {
         return null;
       }
-      const saved = source.status === "scanned" ? await savedPeople(apps, orm, connectionId) : null;
+      const saved =
+        source.status === "scanned" ? await savedCounts(dependencies, connectionId) : null;
       return scanOf(source, { progress: progressBySource.get(source.id) ?? null, saved });
     },
   };
@@ -149,7 +150,8 @@ async function scanSource(
     connector.openSession({ settings: connection.settings, secrets }),
   );
   const accounts = await readAllAccounts((cursor) => retrying(() => session.listAccounts(cursor)));
-  progressBySource.set(sourceId, { people: peopleCount(accounts) });
+  const found = foundCounts(accounts);
+  progressBySource.set(sourceId, { found });
   const saved = await transact(async (tx) => {
     const sources = importSourceRepository(tx);
     if ((await sources.lockById(sourceId))?.status !== "scanning") {
@@ -160,7 +162,10 @@ async function scanSource(
     await sources.markScanned(sourceId, new Date());
     return true;
   });
-  logger.info({ sourceId, accounts: accounts.length, saved }, "Scan finished");
+  logger.info(
+    { sourceId, accounts: accounts.length, people: found.people, apps: found.apps, saved },
+    "Scan finished",
+  );
 }
 
 async function readAllAccounts(
@@ -199,12 +204,15 @@ async function withRetries<T>(
   }
 }
 
-/** The directory's people among the accounts read: its own accounts, and the suspended ones. */
-function peopleCount(accounts: readonly ImportedAccount[]): PeopleCount {
+/** The directory's people among the accounts read (its own accounts), and the other apps they name. */
+function foundCounts(accounts: readonly ImportedAccount[]): ScanCounts {
   const people = accounts.filter(({ values }) => values.appExternalId === null);
+  const otherApps = new Set(accounts.map(({ values }) => values.appExternalId));
+  otherApps.delete(null);
   return {
-    count: people.length,
+    people: people.length,
     suspended: people.filter(({ values }) => values.status === "suspended").length,
+    apps: otherApps.size,
   };
 }
 
@@ -222,14 +230,19 @@ async function markFailed(
   });
 }
 
-async function savedPeople(
-  apps: ScannedApps,
-  orm: Orm,
+/** What the last scan's sync saved: the connection's app's people, and the other apps they use. */
+async function savedCounts(
+  dependencies: ScanDependencies,
   connectionId: string,
-): Promise<PeopleCount> {
+): Promise<ScanCounts> {
+  const { apps, orm } = dependencies;
   const connection = (await apps.readConnectionById(orm, connectionId))!;
-  const { people, suspended } = await apps.countAccounts(orm, connection.appId);
-  return { count: people, suspended };
+  const { otherAppAccounts } = connectorOf(dependencies, connection.connector).findingKinds;
+  const [{ people, suspended }, otherApps] = await Promise.all([
+    apps.countAccounts(orm, connection.appId),
+    otherAppAccounts ? apps.countAppsFoundVia(orm, otherAppAccounts) : 0,
+  ]);
+  return { people, suspended, apps: otherApps };
 }
 
 function connectorOf({ connectors }: ScanDependencies, key: string): Connector {

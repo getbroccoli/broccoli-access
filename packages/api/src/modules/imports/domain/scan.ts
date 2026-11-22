@@ -9,47 +9,81 @@ export interface Scan {
   failure: ConnectorErrorCode | null;
   readAt: Date | null;
   people: ScanPeopleStep;
+  apps: ScanAppsStep;
+  signInLogs: ScanSignInLogsStep;
 }
 
 /** Reading the directory's people: running, then how many it read, or failed. */
 export interface ScanPeopleStep {
-  state: "running" | "done" | "failed";
+  state: ScanStepState;
   /** Null until the step is done. */
   count: number | null;
   suspended: number | null;
 }
 
-/** How far a running scan got; it lives in the process running the scan. */
-export interface ScanProgress {
-  /** Null while the people are being read. */
-  people: PeopleCount | null;
+/** Finding the apps people signed in to with the directory: waiting, then how many, or failed. */
+export interface ScanAppsStep {
+  state: ScanStepState;
+  /** Null until the step is done. */
+  count: number | null;
 }
 
-export interface PeopleCount {
-  count: number;
+/** Reading the sign-in logs that date the grants. */
+export interface ScanSignInLogsStep {
+  state: ScanStepState;
+}
+
+/** Where one step of a scan is; a step waits while the people are read. */
+export type ScanStepState = "waiting" | "running" | "done" | "failed";
+
+/** How far a running scan got; it lives in the process running the scan. */
+export interface ScanProgress {
+  /** Null while the accounts are being read. */
+  found: ScanCounts | null;
+}
+
+/** What a scan found: the directory's people, and the apps they signed in to. */
+export interface ScanCounts {
+  people: number;
   suspended: number;
+  apps: number;
 }
 
 /**
  * The scan of `source`: a running one by its progress, which a restart loses, and a finished one
- * by the people its sync saved.
+ * by what its sync saved.
  */
 export function scanOf(
   source: ImportSource,
-  { progress, saved }: { progress: ScanProgress | null; saved: PeopleCount | null },
+  { progress, saved }: { progress: ScanProgress | null; saved: ScanCounts | null },
 ): Scan {
   const { id, status, failure, readAt } = source;
-  return { id, status, failure, readAt, people: peopleStep(status, progress, saved) };
+  return { id, status, failure, readAt, ...steps(status, progress, saved) };
 }
 
-function peopleStep(
+function steps(
   status: ScanStatus,
   progress: ScanProgress | null,
-  saved: PeopleCount | null,
-): ScanPeopleStep {
+  saved: ScanCounts | null,
+): Pick<Scan, "people" | "apps" | "signInLogs"> {
   if (status === "scan_failed") {
-    return { state: "failed", count: null, suspended: null };
+    return {
+      people: { state: "failed", count: null, suspended: null },
+      apps: { state: "failed", count: null },
+      signInLogs: { state: "failed" },
+    };
   }
-  const read = status === "scanned" ? saved : (progress?.people ?? null);
-  return read ? { state: "done", ...read } : { state: "running", count: null, suspended: null };
+  const found = status === "scanned" ? saved : (progress?.found ?? null);
+  if (!found) {
+    return {
+      people: { state: "running", count: null, suspended: null },
+      apps: { state: "waiting", count: null },
+      signInLogs: { state: "waiting" },
+    };
+  }
+  return {
+    people: { state: "done", count: found.people, suspended: found.suspended },
+    apps: { state: "done", count: found.apps },
+    signInLogs: { state: "done" },
+  };
 }
