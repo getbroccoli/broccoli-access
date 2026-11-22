@@ -1,5 +1,3 @@
-import { isDeepStrictEqual } from "node:util";
-
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
 import {
   canChangeAccounts,
@@ -15,12 +13,12 @@ import type { SecurityContext } from "../../../core/security";
 import { adminUrlOf, parseAppSession } from "../domain";
 import type { ConnectedApps, Scans } from "../ports";
 import { type AppSessionHandOver, createAppSessionHandOvers } from "./appSessionHandOvers";
-import { type Connection, connectionOf } from "./connectionOf";
+import { type Connection, connectionOf, isOtherWorkspace } from "./connectionOf";
 import {
-  type AppSessionField,
   appSessionFieldOf,
   type ContainerConnector,
   type ContainerConnectors,
+  findAppSessionConnector,
 } from "./containerConnectors";
 
 /**
@@ -180,7 +178,7 @@ export function createContainerConnectionService(
       });
     },
     async describeAppSession(key) {
-      const { connector, field } = await appSessionConnector(containerConnectors, key);
+      const { connector, field } = await findAppSessionConnector(containerConnectors, key);
       const { domains, storageKeys } = field;
       return { connector: connector.key, name: connector.name, domains, storageKeys };
     },
@@ -188,7 +186,7 @@ export function createContainerConnectionService(
       if (requestId.trim() === "") {
         throw invalidInput([{ field: "requestId", code: "invalid" }]);
       }
-      const { connector, field } = await appSessionConnector(containerConnectors, key);
+      const { connector, field } = await findAppSessionConnector(containerConnectors, key);
       const session = parseAppSession(appSession, field);
       if (!session) {
         logger.warn({ connector: key, userId }, "App session refused: not what its field names");
@@ -280,35 +278,6 @@ const REFUSED_VALUES: readonly ConnectorErrorCode[] = [
   "permission_missing",
   "wrong_workspace",
 ];
-
-/** Whether the test found another workspace than the one the owner confirmed at the hand-over. */
-function isOtherWorkspace(
-  { workspace, settings }: Connection,
-  details: ConnectionDetails,
-): boolean {
-  const found = details.connection?.settings;
-  return (
-    details.organizationName !== workspace?.organizationName ||
-    details.domain !== workspace.domain ||
-    (found !== undefined && !isDeepStrictEqual(found, settings))
-  );
-}
-
-/** The listed connector with `key` and its app session field. */
-async function appSessionConnector(
-  containerConnectors: ContainerConnectors,
-  key: string,
-): Promise<{ connector: ContainerConnector; field: AppSessionField & { key: string } }> {
-  const connector = await containerConnectors.find(key);
-  const field = appSessionFieldOf(connector);
-  if (!field) {
-    throw new ApplicationError(
-      "CONFLICT",
-      "This connector connects with typed values, not an app session.",
-    );
-  }
-  return { connector, field };
-}
 
 /**
  * The app's answer to the connection; a refusal is invalid input on what the owner gave (the

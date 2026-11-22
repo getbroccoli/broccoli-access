@@ -110,6 +110,22 @@ export function appSessionFieldOf(
   return connector.connectionFields.find((field) => field.kind === "app_session");
 }
 
+/** The listed connector with `key` and its app session field; refuses one without with CONFLICT. */
+export async function findAppSessionConnector(
+  containerConnectors: ContainerConnectors,
+  key: string,
+): Promise<{ connector: ContainerConnector; field: AppSessionField & { key: string } }> {
+  const connector = await containerConnectors.find(key);
+  const field = appSessionFieldOf(connector);
+  if (!field) {
+    throw new ApplicationError(
+      "CONFLICT",
+      "This connector connects with typed values, not an app session.",
+    );
+  }
+  return { connector, field };
+}
+
 function withFind(connectors: Pick<ContainerConnectors, "list">): ContainerConnectors {
   return {
     ...connectors,
