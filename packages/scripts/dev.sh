@@ -1,6 +1,7 @@
 #!/bin/sh
-# Starts this checkout's development stack and its fake Google on free host ports unless
-# HOST_WEB_PORT or HOST_FAKE_GOOGLE_PORT is set, prints their URLs and follows new logs.
+# Starts this checkout's development stack, its fake Google and fake connectors on free host
+# ports unless HOST_WEB_PORT, HOST_FAKE_GOOGLE_PORT or HOST_FAKE_CONNECTORS_PORT is set, prints
+# their URLs and follows new logs.
 # Successful startup is quiet; failures print their output. Any exit removes the containers;
 # the database volume stays unless --drop-db removes it before the start.
 set -eu
@@ -76,10 +77,14 @@ if [ -t 1 ]; then
   reset='\033[0m'
 fi
 mailpit=$(compose port mailpit 8025)
+fake_connectors=$(compose port fake-connectors 4000)
 printf '\n%b🥦🥦🥦  Broccoli Access is ready!%b    ➜  %bhttp://localhost:%s%b\n' \
   "$green" "$reset" "$cyan" "$HOST_WEB_PORT" "$reset"
 printf '%b📬  Email it sends (Mailpit)%b  ➜  %bhttp://localhost:%s%b\n' \
   "$green" "$reset" "$cyan" "${mailpit##*:}" "$reset"
-printf '%b🔑  Fake Google (Acme)%b        ➜  %bhttp://localhost:%s%b\n\n' \
+printf '%b🔑  Fake Google (Acme)%b        ➜  %bhttp://localhost:%s%b\n' \
   "$green" "$reset" "$cyan" "$HOST_FAKE_GOOGLE_PORT" "$reset"
+# Chrome sends *.localhost to this machine; the Slack cookie stays off the app's own localhost.
+printf '%b🔌  Fake connectors (Acme)%b    ➜  %bhttp://slack.localhost:%s/slack/signin%b\n\n' \
+  "$green" "$reset" "$cyan" "${fake_connectors##*:}" "$reset"
 compose logs --follow --tail 0

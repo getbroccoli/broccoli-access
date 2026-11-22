@@ -34,6 +34,7 @@ services:
       SELF_HOSTED_PUBLIC_URL: ""
       GOOGLE_OPENID_CONFIGURATION_URL: http://fake-google:4000/.well-known/openid-configuration
       GOOGLE_ADMIN_API_URL: http://fake-google:4000
+      CONNECTORS_URL: http://fake-connectors:4000
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +54,22 @@ services:
       - 127.0.0.1:${HOST_FAKE_GOOGLE_PORT:?Start the development stack with pnpm dev}:4000
     healthcheck:
       test: [CMD, curl, --fail, --silent, http://localhost:4000/.well-known/openid-configuration]
+      interval: 2s
+      timeout: 3s
+      start_period: 60s
+
+  # The connectors container faked with Acme's Slack and Linear (docs/fake-apps.md): the API
+  # reaches it as fake-connectors, browsers the Slack sign-in page on the host port. A restart
+  # resets it to the seed.
+  fake-connectors:
+    <<: *dev-service
+    working_dir: /repo/packages/fake-apps
+    command: [node_modules/.bin/tsx, watch, src/connectorsMain.ts]
+    ports:
+      # Localhost only: the control endpoints have no authentication. HOST_FAKE_CONNECTORS_PORT pins it.
+      - 127.0.0.1:${HOST_FAKE_CONNECTORS_PORT:-0}:4000
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://localhost:4000/v1/connectors]
       interval: 2s
       timeout: 3s
       start_period: 60s
