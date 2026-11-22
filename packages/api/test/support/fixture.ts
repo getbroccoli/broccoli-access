@@ -14,7 +14,8 @@ import { testTransactor } from "./testTransactor";
  * `orm` and `seed`, a fresh migrated database for use-case integration tests (its
  * URL is `databaseUrl`), `transact`, transactions on `orm` whose events nobody
  * receives, and `fakeGoogle`, Google with the demo company Acme on a free local port, fresh for
- * each test. A test registers its server's redirect address, `<its origin>/api/google/callback`,
+ * each test. Pages hold at most three people, so scanning all 42 crosses pages and Ana's
+ * manager David arrives on a later page. A test registers its redirect address,
  * with the fake's `POST /_fake/clients`.
  */
 export const test = baseTest.extend<{
@@ -55,7 +56,7 @@ export const test = baseTest.extend<{
   },
   // eslint-disable-next-line no-empty-pattern -- Vitest reads fixture dependencies from this pattern.
   fakeGoogle: async ({}, use) => {
-    const fake = await startFakeGoogle();
+    const fake = await startFakeGoogle({ maxPageSize: 3 });
     try {
       await use(fake);
     } finally {

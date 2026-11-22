@@ -20,7 +20,7 @@ import {
   parseGoogleWorkspaceSettings,
 } from "../domain";
 import { type ConsentState, openConsentState, sealConsentState } from "../helpers";
-import type { ConnectedApps } from "../ports";
+import type { ConnectedApps, Scans } from "../ports";
 import { readSuperAdmin, type SuperAdmin, type VerifiedGrant, verifyGrant } from "./verifyGrant";
 
 const instances = createInstanceService();
@@ -39,7 +39,8 @@ export interface GoogleConnectionService {
   ) => Promise<{ authorizationUrl: string }>;
   /**
    * Google's answer to the consent: verifies it and, for a super admin, saves the connection, makes
-   * the admin the owner with their Google account and moves setup to the scan, in one transaction.
+   * the admin the owner with their Google account, moves setup to the scan and queues the first
+   * scan, in one transaction.
    * Refuses a consent by anyone else with `NotSuperAdminError`, and an answer it cannot trust with
    * INVALID_INPUT, FORBIDDEN or CONFLICT; nothing is written then.
    */
@@ -86,6 +87,7 @@ export interface GoogleConnectionDependencies {
   /** `GOOGLE_ADMIN_API_URL`. */
   adminApiUrl: string;
   connectedApps: ConnectedApps;
+  scans: Scans;
   /** Builds the new owner's security context, which authors the connection's history. */
   employeeDirectory: EmployeeDirectory;
 }
@@ -205,9 +207,9 @@ function consentUrl(
   return url.toString();
 }
 
-/** Writes the connection, the owner and the next step together, then logs the outcome. */
+/** Writes the connection, the owner, the next step and the first scan together, then logs the outcome. */
 async function saveConnection(
-  { transact, connectedApps, employeeDirectory, logger }: GoogleConnectionDependencies,
+  { transact, connectedApps, scans, employeeDirectory, logger }: GoogleConnectionDependencies,
   ctx: SecurityContext,
   { setupToken, now }: ConsentAnswer,
   { consent, grant, admin }: { consent: ConsentState; grant: VerifiedGrant; admin: SuperAdmin },
@@ -234,9 +236,10 @@ async function saveConnection(
       settings: { ...settings },
       secrets: { clientSecret: consent.clientSecret, refreshToken: grant.tokens.refreshToken },
     });
-    return { userId, connectionId };
+    const { sourceId } = await scans.scanConnection(owner, tx, connectionId);
+    return { userId, connectionId, sourceId };
   });
-  logger.info(saved, "Google Workspace connected; its admin is the owner");
+  logger.info(saved, "Google Workspace connected; its admin is the owner and its scan is queued");
   return { userId: saved.userId };
 }
 

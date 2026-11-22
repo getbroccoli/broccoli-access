@@ -6,6 +6,7 @@ import { readSetupToken } from "../../../core/instance";
 import type { Logger } from "../../../core/logger";
 import type { ModuleHttp } from "../../../core/moduleManifest";
 import type { SecurityContext } from "../../../core/security";
+import { UnsuccessfulAnswerError } from "../../../utils";
 import type { GoogleConnectionService } from "../app";
 import { NotSuperAdminError } from "../domain";
 
@@ -34,7 +35,7 @@ export function googleRouter(
           }),
         );
       } catch (error) {
-        sendApplicationError(error, response);
+        sendStartFailure(error, response, logger);
       }
     })
     .get("/google/callback", async (request, response) => {
@@ -63,6 +64,8 @@ export function googleRouter(
       }
     });
 }
+
+const INTERNAL_SERVER_ERROR = 500;
 
 /** Far above two Google client credentials. */
 const MAX_BODY_BYTES = "10kb";
@@ -95,10 +98,35 @@ async function requireSecurity(
   return security;
 }
 
+/** An expected refusal as its status; anything else as a 500, logged without its contents. */
+function sendStartFailure(error: unknown, response: Response, logger: Logger): void {
+  if (error instanceof ApplicationError) {
+    sendApplicationError(error, response);
+    return;
+  }
+  logger.error(failureFacts(error), "Google consent could not start");
+  response.sendStatus(INTERNAL_SERVER_ERROR);
+}
+
 /** A refusal the flow expects is a warning; anything else, such as Postgres failing, an error. */
 function logRefusal(logger: Logger, error: unknown, failure: ConnectFailure): void {
   const expected = error instanceof ApplicationError || error instanceof NotSuperAdminError;
-  logger[expected ? "warn" : "error"]({ err: error, failure }, "Google consent refused");
+  logger[expected ? "warn" : "error"](
+    { failure, ...failureFacts(error) },
+    "Google consent refused",
+  );
+}
+
+/**
+ * What a log may say about a failure: its class, an HTTP answer's status and an application error's
+ * code. Never its message or stack, which can carry Google's addresses (RULE31).
+ */
+function failureFacts(error: unknown): { kind: string; status?: number; code?: string } {
+  return {
+    kind: error instanceof Error ? error.name : typeof error,
+    ...(error instanceof UnsuccessfulAnswerError && { status: error.status }),
+    ...(error instanceof ApplicationError && { code: error.code }),
+  };
 }
 
 function sendBackToConnect(response: Response, failure: ConnectFailure): void {

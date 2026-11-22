@@ -32,7 +32,7 @@ CALLBACK=$(curl -s -o /dev/null -w '%{redirect_url}' "${AUTH%%\?*}" \
 curl -c cookies -b cookies "$CALLBACK"
 ```
 
-There is no sign-in yet: a browser without the owner's session cannot sign in again. Until the scan and the app selection are built, setup stays at the scan step and the app's pages lead back to it. To check them, move setup on in the dev database:
+There is no sign-in yet: a browser without the owner's session cannot sign in again. Until the app selection is built, setup stays at the scan step and the app's pages lead back to it. To check them, move setup on in the dev database:
 
 ```sh
 docker exec "$(docker ps -qf name=broccoli-access-dev-.*-postgres)" \

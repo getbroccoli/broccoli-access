@@ -26,6 +26,13 @@ export interface AppConnectionService {
   ) => Promise<{ appId: string; connectionId: string }>;
   /** The connection of `connector` without its secrets, or null. Trusted read: no `ctx`. */
   readConnection: (db: Orm | Tx, connector: string) => Promise<AppConnection | null>;
+  /** The connection with id `connectionId` without its secrets, or null. Trusted read: no `ctx`. */
+  readConnectionById: (db: Orm | Tx, connectionId: string) => Promise<AppConnection | null>;
+  /**
+   * The connection's secrets, decrypted, such as Google Workspace's `{ clientSecret, refreshToken }`;
+   * null for an unknown connection. Trusted read: no `ctx`, and never for a client.
+   */
+  readSecrets: (db: Orm | Tx, connectionId: string) => Promise<Record<string, string> | null>;
 }
 
 export function createAppConnectionService({
@@ -50,6 +57,13 @@ export function createAppConnectionService({
       return { appId: app.id, connectionId: id };
     },
     readConnection: (db, connector) => appConnectionRepository(db).findByConnector(connector),
+    readConnectionById: (db, connectionId) => appConnectionRepository(db).findById(connectionId),
+    async readSecrets(db, connectionId) {
+      const encrypted = await appConnectionRepository(db).findEncryptedSecrets(connectionId);
+      return encrypted === null
+        ? null
+        : (JSON.parse(secretBox.decrypt(encrypted, connectionId)) as Record<string, string>);
+    },
   };
 }
 

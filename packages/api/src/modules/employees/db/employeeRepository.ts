@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import {
   afterKeyset,
+  anyOf,
+  insertBatches,
   containsPattern,
   isUniqueViolation,
   type KeysetOrder,
@@ -31,6 +33,8 @@ const fileStorage = createFileStorageService();
 export interface EmployeeRepository {
   /** Throws `EmailTakenError` when another employee has the email. */
   insert(newEmployee: EmployeeRow): Promise<Employee>;
+  /** Inserts employees whose emails nobody has, as a sync found them. */
+  insertMany(newEmployees: readonly NewEmployee[]): Promise<Employee[]>;
   /**
    * Changes an employee's fields under the row's lock and returns the employee before and after;
    * null when no employee has the id. Throws `EmailTakenError` like `insert`.
@@ -39,6 +43,8 @@ export interface EmployeeRepository {
     id: string,
     changes: Partial<NewEmployee>,
   ): Promise<{ before: Employee; after: Employee } | null>;
+  /** Saves the fields an employee takes from the directory, without reading them first. */
+  saveDirectoryFields(id: string, fields: DirectoryFields): Promise<void>;
   /**
    * Deletes an employee, their avatar and the user who signs in as them, and returns what was
    * deleted; null when no employee has the id.
@@ -49,6 +55,8 @@ export interface EmployeeRepository {
   findByUserId(userId: string): Promise<Employee | null>;
   /** The employees among these ids that exist. */
   findByIds(ids: readonly string[]): Promise<Employee[]>;
+  /** The employees with these lowercased emails, locked until the transaction ends. */
+  lockByEmails(emails: readonly string[]): Promise<Employee[]>;
   /** The employees whose avatar is this file. */
   findIdsByAvatar(fileId: string): Promise<string[]>;
   /** Up to `limit` employees after `after`, with their sort values as Postgres computed them. */
@@ -86,6 +94,14 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
       }
     },
 
+    insertMany: async (newEmployees) => {
+      const inserted: Employee[] = [];
+      for (const batch of insertBatches(newEmployees)) {
+        inserted.push(...(await orm().insert(employees).values(batch).returning()));
+      }
+      return inserted;
+    },
+
     update: async (id, changes) => {
       // Locked before it is read, so the read sees a change committed while it waited.
       await orm()
@@ -104,6 +120,10 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
       }
       // The changes are normalised as stored, so the stored employee is the old one with them.
       return { before, after: { ...before, ...changes } };
+    },
+
+    saveDirectoryFields: async (id, fields) => {
+      await orm().update(employees).set(fields).where(eq(employees.id, id));
     },
 
     delete: async (id) => {
@@ -133,6 +153,9 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
         .select()
         .from(employees)
         .where(sql`${employees.id} = any(${sql.param([...ids])}::uuid[])`),
+
+    lockByEmails: (emails) =>
+      orm().select().from(employees).where(anyOf(employees.email, emails)).for("update"),
 
     findIdsByAvatar: async (fileId) => {
       const rows = await orm()
@@ -170,8 +193,11 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
   };
 }
 
+/** The fields an employee takes from the directory: names, manager and the owner's user. */
+type DirectoryFields = Pick<Employee, "firstName" | "lastName" | "managerId" | "userId">;
+
 /** A new employee as stored, with the columns only the module itself sets. */
-type EmployeeRow = NewEmployee & Partial<Pick<Employee, "avatarFileId" | "userId">>;
+type EmployeeRow = NewEmployee & Partial<Pick<Employee, "avatarFileId" | "userId" | "managerId">>;
 
 function keysetColumns({ field, direction }: EmployeeOrder): KeysetOrder {
   const descending = direction === "DESC";

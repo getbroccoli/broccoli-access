@@ -9,12 +9,16 @@ export interface GoogleClient {
   discover(): Promise<OpenIdConfiguration>;
   /** Trades an authorization code for tokens, server to server. */
   exchangeCode(openId: OpenIdConfiguration, exchange: CodeExchange): Promise<GoogleTokens>;
+  /** Trades a refresh token for a new access token, server to server. */
+  refreshAccessToken(openId: OpenIdConfiguration, refresh: TokenRefresh): Promise<string>;
   /** The keys that sign Google's ID tokens, from the discovery document's `jwks_uri`. */
   readSigningKeys(openId: OpenIdConfiguration): Promise<JWTVerifyGetKey>;
   /** The Workspace customer of the access token's admin. */
   readCustomer(accessToken: string): Promise<GoogleCustomer>;
   /** The customer's user with Google's user id `userId`, paging the Directory; null when absent. */
   findUser(accessToken: string, userId: string): Promise<GoogleUser | null>;
+  /** One page of the customer's users, from a null page token; `nextPageToken` is null on the last. */
+  listUsers(accessToken: string, pageToken: string | null): Promise<GoogleUserPage>;
 }
 
 export interface OpenIdConfiguration {
@@ -29,6 +33,12 @@ export interface CodeExchange {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
+}
+
+export interface TokenRefresh {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
 }
 
 export interface GoogleTokens {
@@ -49,8 +59,20 @@ export interface GoogleUser {
   id: string;
   /** Lowercased. */
   email: string;
+  givenName: string;
+  familyName: string;
   fullName: string;
   isAdmin: boolean;
+  suspended: boolean;
+  /** The manager the user's relations name, lowercased; null without one. */
+  managerEmail: string | null;
+  /** The user as Google sent it. */
+  raw: Record<string, unknown>;
+}
+
+export interface GoogleUserPage {
+  users: GoogleUser[];
+  nextPageToken: string | null;
 }
 
 export function createGoogleClient({
@@ -90,6 +112,19 @@ export function createGoogleClient({
         scopes: tokens.scope.split(" ").filter(Boolean).map(shortScopeName),
       };
     },
+    refreshAccessToken: async ({ tokenEndpoint }, { clientId, clientSecret, refreshToken }) => {
+      const body = new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+      });
+      const tokens = await fetchRequired(new URL(tokenEndpoint), REFRESHED_TOKEN, {
+        method: "POST",
+        body,
+      });
+      return tokens.access_token;
+    },
     readSigningKeys: async ({ jwksUri }) =>
       createLocalJWKSet(await fetchRequired(new URL(jwksUri), JSON_WEB_KEY_SET)),
     readCustomer: async (accessToken) => {
@@ -106,23 +141,18 @@ export function createGoogleClient({
     // shortcut: pages the user list because the fake Google has no `users.get`; read the one user
     // with `users.get` once the fake serves it, so a large directory takes one request.
     findUser: async (accessToken, userId) => {
-      let pageToken: string | undefined;
+      let pageToken: string | null = null;
       do {
-        const url = directoryUrl("users");
-        url.search = new URLSearchParams({
-          customer: "my_customer",
-          maxResults: String(USERS_PER_PAGE),
-          ...(pageToken !== undefined && { pageToken }),
-        }).toString();
-        const page = await fetchRequired(url, USERS_PAGE, bearer(accessToken));
-        const user = page.users?.find((candidate) => candidate.id === userId);
+        const page: GoogleUserPage = await readUserPage(directoryUrl, accessToken, pageToken);
+        const user = page.users.find((candidate) => candidate.id === userId);
         if (user) {
-          return toGoogleUser(user);
+          return user;
         }
         pageToken = page.nextPageToken;
-      } while (pageToken !== undefined);
+      } while (pageToken !== null);
       return null;
     },
+    listUsers: (accessToken, pageToken) => readUserPage(directoryUrl, accessToken, pageToken),
   };
 }
 
@@ -147,6 +177,8 @@ const TOKEN_RESPONSE = z.object({
   scope: z.string(),
 });
 
+const REFRESHED_TOKEN = z.object({ access_token: z.string() });
+
 const JSON_WEB_KEY_SET = z.object({
   keys: z.array(z.looseObject({ kty: z.string() })),
 });
@@ -159,12 +191,19 @@ const CUSTOMER = z.object({
 const DIRECTORY_USER = z.object({
   id: z.string(),
   primaryEmail: z.string(),
-  name: z.object({ fullName: z.string().optional() }).optional(),
+  name: z.object({
+    givenName: z.string(),
+    familyName: z.string(),
+    fullName: z.string().optional(),
+  }),
   isAdmin: z.boolean(),
+  suspended: z.boolean(),
+  relations: z.array(z.object({ type: z.string(), value: z.string() })).optional(),
 });
 
+// Users stay as Google sent them, so each keeps every field for its import record.
 const USERS_PAGE = z.object({
-  users: z.array(DIRECTORY_USER).optional(),
+  users: z.array(z.record(z.string(), z.unknown())).optional(),
   nextPageToken: z.string().optional(),
 });
 
@@ -183,6 +222,24 @@ async function fetchRequired<T>(url: URL, schema: z.ZodType<T>, init?: RequestIn
   return answer;
 }
 
+async function readUserPage(
+  directoryUrl: (path: string) => URL,
+  accessToken: string,
+  pageToken: string | null,
+): Promise<GoogleUserPage> {
+  const url = directoryUrl("users");
+  url.search = new URLSearchParams({
+    customer: "my_customer",
+    maxResults: String(USERS_PER_PAGE),
+    ...(pageToken !== null && { pageToken }),
+  }).toString();
+  const page = await fetchRequired(url, USERS_PAGE, bearer(accessToken));
+  return {
+    users: (page.users ?? []).map((user) => toGoogleUser(DIRECTORY_USER.parse(user), user)),
+    nextPageToken: page.nextPageToken ?? null,
+  };
+}
+
 function shortScopeName(scope: string): string {
   return SHORT_SCOPE_NAMES[scope] ?? scope;
 }
@@ -191,7 +248,21 @@ function bearer(accessToken: string): RequestInit {
   return { headers: { authorization: `Bearer ${accessToken}` } };
 }
 
-function toGoogleUser(user: z.infer<typeof DIRECTORY_USER>): GoogleUser {
-  const email = user.primaryEmail.toLowerCase();
-  return { id: user.id, email, fullName: user.name?.fullName ?? email, isAdmin: user.isAdmin };
+function toGoogleUser(
+  user: z.infer<typeof DIRECTORY_USER>,
+  raw: Record<string, unknown>,
+): GoogleUser {
+  const { givenName, familyName, fullName = `${givenName} ${familyName}` } = user.name;
+  const manager = user.relations?.find(({ type }) => type === "manager");
+  return {
+    id: user.id,
+    email: user.primaryEmail.toLowerCase(),
+    givenName,
+    familyName,
+    fullName,
+    isAdmin: user.isAdmin,
+    suspended: user.suspended,
+    managerEmail: manager ? manager.value.toLowerCase() : null,
+    raw,
+  };
 }

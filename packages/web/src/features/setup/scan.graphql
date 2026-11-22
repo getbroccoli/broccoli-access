@@ -5,6 +5,15 @@ query SetupScan {
       id
       domain
       adminEmail
+      scan {
+        id
+        status
+        people {
+          state
+          count
+          suspended
+        }
+      }
     }
   }
 }

@@ -10,3 +10,9 @@ export {
   type NewEmployee,
   type NewEmployeeInput,
 } from "./employee";
+export {
+  directoryChanges,
+  type DirectoryLinks,
+  type DirectoryPerson,
+  employeeFromDirectory,
+} from "./directoryPerson";

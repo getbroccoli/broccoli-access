@@ -1,21 +1,27 @@
 import type { Orm, Transact } from "../../src/core/db";
+import type { Connector } from "../../src/core/connectors";
+import type { JobQueue } from "../../src/core/jobs";
 import { createMailSettingsService, type MailSettingsService } from "../../src/core/instance";
 import { createLogger } from "../../src/core/logger";
 import {
   createEmployeeReadService,
   createEmployeeService,
+  createDirectorySyncService,
   employeeDirectory,
   type EmployeeReadService,
   type EmployeeService,
 } from "../../src/modules/employees";
-import { createAppConnectionService } from "../../src/modules/apps";
+import { createAppConnectionService, createAppAccountService } from "../../src/modules/apps";
+import { createScanService, type ScanService } from "../../src/modules/imports";
 import {
   createGoogleConnectionService,
+  createGoogleWorkspaceConnector,
   type GoogleConnectionService,
 } from "../../src/modules/google";
 import { fakeMail } from "./fakeMail";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { testTransactor } from "./testTransactor";
+import { recordingJobQueue } from "./recordingJobQueue";
 
 /** Every employee service a person's actions reach, together. */
 export type EmployeeServices = EmployeeService & EmployeeReadService;
@@ -55,7 +61,7 @@ export function mailSettings(
 
 export function googleConnection(
   orm: Orm,
-  { googleUrl }: { googleUrl: string },
+  { googleUrl, jobs = recordingJobQueue().jobs }: { googleUrl: string; jobs?: JobQueue },
 ): GoogleConnectionService {
   return createGoogleConnectionService({
     orm,
@@ -66,5 +72,39 @@ export function googleConnection(
     adminApiUrl: googleUrl,
     connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
     employeeDirectory: employeeDirectory(orm),
+    scans: scans(orm, { googleUrl, jobs }),
+  });
+}
+
+/** Real scan dependencies with an instant retry wait and the local fake Google. */
+export function scans(
+  orm: Orm,
+  {
+    googleUrl,
+    jobs = recordingJobQueue().jobs,
+    connectors,
+  }: {
+    googleUrl: string;
+    jobs?: JobQueue;
+    connectors?: readonly Connector[];
+  },
+): ScanService {
+  return createScanService({
+    orm,
+    transact: testTransactor(orm),
+    logger: createLogger("silent"),
+    jobs,
+    connectors: connectors ?? [
+      createGoogleWorkspaceConnector({
+        openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
+        adminApiUrl: googleUrl,
+      }),
+    ],
+    apps: {
+      ...createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
+      ...createAppAccountService(),
+    },
+    directory: createDirectorySyncService(),
+    wait: () => Promise.resolve(),
   });
 }

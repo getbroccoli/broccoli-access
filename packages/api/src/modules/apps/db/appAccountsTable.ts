@@ -1,0 +1,40 @@
+import { sql } from "drizzle-orm";
+import { check, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+
+import { ACCOUNT_STATUSES } from "../../../core/connectors";
+import { apps } from "./appsTable";
+
+/**
+ * One person's account in one app. `employee_id` references `employees`; the migration adds that
+ * foreign key, since a module's tables never import another module's.
+ */
+// shortcut: deleting an employee clears `employee_id` without a history line; fine until the
+// copied delete-employee action goes with the old People panel.
+export const appAccounts = pgTable(
+  "app_accounts",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`uuidv7()`),
+    appId: uuid("app_id")
+      .notNull()
+      .references(() => apps.id),
+    /** Lowercased. */
+    email: text("email").notNull(),
+    /** The employee with this email; null when it matches nobody. */
+    employeeId: uuid("employee_id"),
+    status: text("status", { enum: ACCOUNT_STATUSES }).notNull(),
+    /** The finding kinds whose last scan saw the account, such as `google_directory`. */
+    foundVia: text("found_via").array().notNull(),
+    /** When the person granted access, from the source's log; null when the log lacks it. */
+    grantedAt: timestamp("granted_at", { withTimezone: true }),
+    /** Set only when the grant is older than the log: the earliest moment the log covered. */
+    grantedBefore: timestamp("granted_before", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("app_accounts_app_email").on(table.appId, table.email),
+    check("app_accounts_status", sql`${table.status} in ('active', 'suspended')`),
+  ],
+);

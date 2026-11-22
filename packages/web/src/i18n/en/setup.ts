@@ -55,6 +55,8 @@ export const setupEn = {
     "Connected as {email}. This takes about a minute; you can leave this page and come back.",
   "setup.scan.readingPeople": "Reading people",
   "setup.scan.readingPeopleHint": "From the Google directory",
+  "setup.scan.peopleRead": "{count} people, {suspended} suspended",
+  "setup.scan.readingPeopleFailed": "Couldn’t read the Google directory",
   "setup.scan.findingApps": "Finding apps people signed in to with Google",
   "setup.scan.readingLogs": "Reading sign-in logs",
   "setup.scan.waiting": "Waiting",

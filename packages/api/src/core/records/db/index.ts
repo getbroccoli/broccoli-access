@@ -1,3 +1,4 @@
+export { recordHistory } from "./recordHistoryTable";
 export {
   HISTORY_SORT_VALUES,
   type HistoryFieldFilter,

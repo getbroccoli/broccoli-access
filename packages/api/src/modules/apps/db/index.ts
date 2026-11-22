@@ -6,3 +6,5 @@ export {
   type AppConnection,
   type AppConnectionRepository,
 } from "./appConnectionRepository";
+export { appAccounts } from "./appAccountsTable";
+export { appAccountRepository, type AppAccountRepository } from "./appAccountRepository";

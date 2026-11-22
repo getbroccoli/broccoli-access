@@ -15,6 +15,13 @@
       "when": 1795309096957,
       "tag": "0001_connect_google_workspace",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795315227693,
+      "tag": "0002_scan_google_people",
+      "breakpoints": true
     }
   ]
 }

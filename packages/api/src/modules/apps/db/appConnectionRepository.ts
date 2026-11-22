@@ -24,6 +24,9 @@ export interface AppConnectionRepository {
     encryptedSecrets: string;
   }): Promise<AppConnection>;
   findByConnector(connector: string): Promise<AppConnection | null>;
+  findById(id: string): Promise<AppConnection | null>;
+  /** The connection's `encrypted_secrets`, or null for an unknown id. */
+  findEncryptedSecrets(id: string): Promise<string | null>;
 }
 
 export function appConnectionRepository(db: Orm | Tx): AppConnectionRepository {
@@ -44,6 +47,20 @@ export function appConnectionRepository(db: Orm | Tx): AppConnectionRepository {
         .from(appConnections)
         .where(eq(appConnections.connector, connector));
       return connection ?? null;
+    },
+    findById: async (id) => {
+      const [connection] = await orm()
+        .select(columns)
+        .from(appConnections)
+        .where(eq(appConnections.id, id));
+      return connection ?? null;
+    },
+    findEncryptedSecrets: async (id) => {
+      const [row] = await orm()
+        .select({ encryptedSecrets: appConnections.encryptedSecrets })
+        .from(appConnections)
+        .where(eq(appConnections.id, id));
+      return row?.encryptedSecrets ?? null;
     },
   };
 }

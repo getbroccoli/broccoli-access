@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { user } from "../../../core/auth";
 import { files } from "../../../core/files";
@@ -20,6 +20,12 @@ export const employees = pgTable(
     userId: text("user_id")
       .unique("employees_user_id_unique")
       .references(() => user.id, { onDelete: "set null" }),
+    /** The employee the directory names as manager, or null. */
+    // shortcut: deleting the manager clears this without a history line; fine until the copied
+    // delete-employee action goes with the old People panel.
+    managerId: uuid("manager_id").references((): AnyPgColumn => employees.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     // Serves the list order, which is also the keyset of its cursor.

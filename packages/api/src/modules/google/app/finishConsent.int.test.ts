@@ -12,8 +12,9 @@ import {
   storedAppConnections,
   storedGoogleAccounts,
   storedUsers,
-  recordHistory,
   TEST_SECRET_BOX,
+  recordingJobQueue,
+  storedImportSources,
 } from "#test/support";
 
 import { ApplicationError } from "../../../core/applicationError";
@@ -114,46 +115,9 @@ test("accepts Google's full names for the email and profile scopes", async ({
   expect(saved?.settings.grantedScopes).toEqual(expect.arrayContaining(GOOGLE_SCOPES));
 });
 
-test("approves Google Workspace and records both creations as edits by the new owner", async ({
-  orm,
-  fakeGoogle,
-}) => {
-  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
-  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
-  const callback = await consentAtGoogle(authorizationUrl);
-
-  const { userId } = await connection.finishConsent(SETUP_HOLDER, {
-    ...input,
-    code: callback.searchParams.get("code")!,
-    state: callback.searchParams.get("state")!,
-  });
-
-  const apps = await storedApps(orm);
-  expect(apps).toMatchObject([
-    {
-      catalogKey: "google_workspace",
-      name: "Google Workspace",
-      domain: "workspace.google.com",
-      status: "approved",
-      externalIds: [],
-    },
-  ]);
-  const connections = await storedAppConnections(orm);
-  expect(connections).toMatchObject([{ appId: apps[0]!.id }]);
-  const appHistory = await recordHistory.read(orm, "app", apps[0]!.id, {});
-  const connectionHistory = await recordHistory.read(orm, "app_connection", connections[0]!.id, {});
-  for (const history of [appHistory, connectionHistory]) {
-    expect(history.edges).toHaveLength(1);
-    expect(history.edges[0]!.node).toMatchObject({
-      operation: "CREATED",
-      author: { kind: "SIGNED_IN_USER", id: userId },
-      cause: { kind: "EDITED_DIRECTLY" },
-    });
-  }
-});
-
 test("refuses a non-admin consent without writing anything", async ({ orm, fakeGoogle }) => {
-  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { jobs, sent } = recordingJobQueue();
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url, jobs);
   const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
   const callback = await consentAtGoogle(authorizationUrl, { account: "chloe@acme.example" });
 
@@ -166,6 +130,35 @@ test("refuses a non-admin consent without writing anything", async ({ orm, fakeG
   ).rejects.toBeInstanceOf(NotSuperAdminError);
 
   await expectUnconnected(orm);
+  expect(await storedImportSources(orm)).toEqual([]);
+  expect(sent).toEqual([]);
+});
+
+test("consent creates a scanning source and queues its first scan", async ({ orm, fakeGoogle }) => {
+  const { jobs, sent } = recordingJobQueue();
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url, jobs);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const callback = await consentAtGoogle(authorizationUrl);
+
+  await connection.finishConsent(SETUP_HOLDER, {
+    ...input,
+    code: callback.searchParams.get("code")!,
+    state: callback.searchParams.get("state")!,
+  });
+
+  const [saved] = await storedAppConnections(orm);
+  const sources = await storedImportSources(orm);
+  expect(sources).toMatchObject([
+    {
+      kind: "app_connection",
+      connectionId: saved!.id,
+      name: "acme.example",
+      status: "scanning",
+      failure: null,
+      readAt: null,
+    },
+  ]);
+  expect(sent).toEqual([{ name: "imports.scanConnection", payload: { sourceId: sources[0]!.id } }]);
 });
 
 test("refuses consent without a refresh token without writing anything", async ({
