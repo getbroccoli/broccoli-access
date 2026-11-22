@@ -58,6 +58,9 @@ export function ChromeExtensionCard() {
           ) : (
             <p className="text-sm text-foreground/80">{t("settings.extension.description")}</p>
           )}
+          {status === "not_paired" && !extension.canPair && (
+            <p className="text-sm text-muted-foreground">{t("settings.extension.needsHttps")}</p>
+          )}
           {extension.isAwaitingPair && (
             <p className="text-sm text-muted-foreground" aria-live="polite">
               {t("settings.extension.confirmInPopup")}
@@ -89,7 +92,7 @@ export function ChromeExtensionCard() {
               type="button"
               size="lg"
               className="px-4"
-              disabled={extension.isStarting}
+              disabled={extension.isStarting || !extension.canPair}
               // A failure shows from the hook's state, so the rejection needs no handling here.
               onClick={() => void extension.startPairing().catch(() => undefined)}
             >

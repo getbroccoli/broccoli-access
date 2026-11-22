@@ -1,12 +1,9 @@
 import { useQuery } from "@apollo/client/react";
-import { EXTENSION_ID } from "@broccoli-access/extension";
+import { EXTENSION_ID, isPairableOrigin } from "@broccoli-access/extension";
 import { useEffect, useState } from "react";
 
 import { ChromeExtensionDocument, StartExtensionPairingDocument } from "@/__generated__/graphql";
 import { usePayloadMutation } from "@/apollo";
-
-/** Where the signed-in user's Chrome extension stands; `checking` until this Chrome answers. */
-export type ChromeExtensionStatus = "checking" | "not_installed" | "not_paired" | "paired";
 
 /**
  * Whether this Chrome has the extension and whether the signed-in user is paired, the server's
@@ -14,32 +11,46 @@ export type ChromeExtensionStatus = "checking" | "not_installed" | "not_paired" 
  * extension's pair window; the status moves on by itself once the owner pairs there.
  */
 export function useChromeExtension() {
-  const query = useQuery(ChromeExtensionDocument);
+  // Pairing and unpairing happen in the extension, outside this cache.
+  const query = useQuery(ChromeExtensionDocument, { fetchPolicy: "cache-and-network" });
   const pairing = query.data?.me?.extensionPairing ?? null;
   const isInstalled = useExtensionDetection();
-  const [isAwaitingPair, setAwaitingPair] = useState(false);
+  useRefetchOnFocus(query.refetch);
+  // Each "Pair this Chrome" is a new attempt with its own deadline; 0 while none is waiting.
+  const [attempt, setAttempt] = useState(0);
   const [start, { loading: isStarting, error: startError }] = usePayloadMutation(
     StartExtensionPairingDocument,
   );
-  if (isAwaitingPair && pairing) {
+  if (attempt !== 0 && pairing) {
     // Paired: waiting ends here, so unpairing later does not bring it back.
-    setAwaitingPair(false);
+    setAttempt(0);
   }
-  usePollWhileAwaitingPair(isAwaitingPair, query, setAwaitingPair);
+  usePollWhileAwaitingPair(attempt, query, setAttempt);
 
   const startPairing = async () => {
-    const { code } = await start();
-    openPairWindow(code);
-    setAwaitingPair(true);
+    // Opened in the click itself: Chrome blocks a window opened after the click's activation ends.
+    const pairWindow = openBlankPairWindow();
+    if (!pairWindow) {
+      return;
+    }
+    try {
+      const { code } = await start();
+      pairWindow.location.replace(pairPageUrl(code));
+      setAttempt((current) => current + 1);
+    } catch (error) {
+      pairWindow.close();
+      throw error;
+    }
   };
 
   return {
-    status: statusOf(pairing !== null, isInstalled),
+    status: query.data ? statusOf(pairing !== null, isInstalled) : "checking",
     pairing,
+    canPair: isPairableOrigin(window.location.origin),
     startPairing,
     isStarting,
     startFailed: startError !== undefined,
-    isAwaitingPair,
+    isAwaitingPair: attempt !== 0,
   };
 }
 
@@ -52,6 +63,8 @@ const PAIRING_CODE_LIFETIME_MS = 5 * 60_000;
 /** A file the extension lets every site load, holding nothing, only to tell it is installed. */
 // shortcut: any site can load it and so tell the extension is installed; narrow its matches if instances ever share known origins.
 const DETECTION_URL = `chrome-extension://${EXTENSION_ID}/installed.txt`;
+
+type ChromeExtensionStatus = "checking" | "not_installed" | "not_paired" | "paired";
 
 function statusOf(isPaired: boolean, isInstalled: boolean | null): ChromeExtensionStatus {
   if (isPaired) {
@@ -92,36 +105,49 @@ async function isExtensionInstalled(): Promise<boolean> {
   }
 }
 
+/** Reads the pairing again when the page is shown again, such as after the extension's popup. */
+function useRefetchOnFocus(refetch: () => Promise<unknown>): void {
+  useEffect(() => {
+    // A failed read shows as the query's own error.
+    const refresh = () => void refetch().catch(() => undefined);
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [refetch]);
+}
+
+/** Polls while pairing `attempt` waits, until its code expires; 0 waits for nothing. */
 function usePollWhileAwaitingPair(
-  isAwaiting: boolean,
+  attempt: number,
   {
     startPolling,
     stopPolling,
   }: { startPolling: (interval: number) => void; stopPolling: () => void },
-  setAwaiting: (isAwaiting: boolean) => void,
+  setAttempt: (attempt: number) => void,
 ): void {
   useEffect(() => {
-    if (!isAwaiting) {
+    if (attempt === 0) {
       return;
     }
     startPolling(PAIR_POLL_INTERVAL_MS);
-    const giveUp = setTimeout(() => setAwaiting(false), PAIRING_CODE_LIFETIME_MS);
+    const giveUp = setTimeout(() => setAttempt(0), PAIRING_CODE_LIFETIME_MS);
     return () => {
       stopPolling();
       clearTimeout(giveUp);
     };
-  }, [isAwaiting, startPolling, stopPolling, setAwaiting]);
+  }, [attempt, startPolling, stopPolling, setAttempt]);
 }
 
-/**
- * Opens the extension's pair page in a small window for this instance's origin and `code`. Without
- * an opener, the page gives this one nothing back; the pairing reaches it through the server.
- */
-function openPairWindow(code: string): void {
+/** A small empty window for the pair page, cut off from this page, which it gives nothing back. */
+function openBlankPairWindow(): Window | null {
+  const pairWindow = window.open("about:blank", "_blank", "popup,width=480,height=460");
+  if (pairWindow) {
+    pairWindow.opener = null;
+  }
+  return pairWindow;
+}
+
+/** The extension's pair page for this instance's origin and `code`; the pairing reaches Settings through the server. */
+function pairPageUrl(code: string): string {
   const parameters = new URLSearchParams({ origin: window.location.origin, code });
-  window.open(
-    `chrome-extension://${EXTENSION_ID}/pair.html#${parameters.toString()}`,
-    "_blank",
-    "popup,noopener,width=480,height=460",
-  );
+  return `chrome-extension://${EXTENSION_ID}/pair.html#${parameters.toString()}`;
 }

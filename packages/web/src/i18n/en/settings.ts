@@ -22,6 +22,8 @@ export const settingsEn = {
     "Hands over your Slack session when you connect or reconnect Slack.",
   "settings.extension.webStore": "Chrome Web Store ↗",
   "settings.extension.pair": "Pair this Chrome",
+  "settings.extension.needsHttps":
+    "Pairing needs HTTPS: open Broccoli Access at its https address to pair this Chrome.",
   "settings.extension.confirmInPopup": "Chrome shows the extension’s popup for you to confirm.",
   "settings.extension.pairFailed": "Couldn’t start pairing. Try again.",
   "settings.extension.unpairFailed": "Couldn’t unpair. Try again.",
