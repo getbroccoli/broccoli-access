@@ -25,6 +25,15 @@ A manual check of an app's page, `/apps/<id>`, against a development stack.
 - [ ] A Discovered app's page has both "Approve" and "Ignore"; approving it removes the left menu's Discovered badge when it was the last one.
 - [ ] Google Workspace's page has no action button, and its amber card reads 0 without the tint.
 
+## An app to connect
+
+Open Slack from Applications.
+
+- [ ] Next to "Ignore", "Connect Slack" opens Settings → Connections.
+- [ ] Under the header, a grey note reads "Connect Slack to see every member and disable or enable their accounts from here. Until then, Broccoli Access sees only who signs in to Slack with Google."
+- [ ] Figma's and Google Workspace's pages have neither.
+- [ ] With Linear found by Google sign-in and not connected (add its grants with `POST /_fake/grants` before setup, see [the fake apps](../fake-apps.md#control-endpoints)), Linear's page shows "Connect Linear" and the note. Connecting it there with `lin_api_acme_fake` turns the page, without a reload, to "Approved" and "Connected" with "Open Linear admin" and "Scan now", and the users with "In Linear" once the scan ends.
+
 ## A connected app
 
 Connect Linear in Settings → Connections as in [Connections settings](connections-settings.md#apps), then open Linear from Applications.

@@ -15,12 +15,18 @@ A manual check of the Applications page, the home page, against a development st
 
 ## Approved
 
-- [ ] The table lists App (logo or initial, name, domain), Users, Found via and Suspended in Google: Google Workspace "Google directory", then Slack, Notion, Figma, Miro, Loom and Claude, each "Google sign-in". Notion, Figma, Miro, Loom and Claude show their logo; Google Workspace and Slack their initial.
+- [ ] The table lists App (logo or initial, name, domain), Users, Found via, Suspended in Google and Connection: Google Workspace "Google directory", then Slack, Notion, Figma, Miro, Loom and Claude, each "Google sign-in", then Linear with only its name, "linear.app" and "Connect". Notion, Figma, Miro, Loom and Claude show their logo; Google Workspace, Slack and Linear their initial.
 - [ ] Users shows four avatars, then the rest of the 42, 41, 31, 16, 12, 11 and 9 people: "+38", "+37", "+27", "+12", "+8", "+7" and "+5".
 - [ ] Hovering an avatar, or reaching it with Tab, shows the person's name and email; Slack's first four are Ana Ruiz and Ben Ito, suspended in Google, then Aisha Khan and Bruno Costa. A screen reader reads each avatar as "<name>, <email>", then "41 in total"; an avatar opens the person's page.
 - [ ] Slack shows "2 still have access", Notion and Figma "1 still has access"; the others show nothing there.
 - [ ] No row has "Ignore" or "Approve".
-- [ ] Clicking an app's name opens its page (see [App page](app-page.md)).
+- [ ] Clicking an app's name opens its page (see [App page](app-page.md)); Linear's name opens nothing until it is connected.
+
+## Connection
+
+- [ ] Only Slack and Linear show "Connect"; the other rows leave Connection empty. A screen reader reads them "Connect Slack" and "Connect Linear".
+- [ ] Slack's "Connect" opens Settings → Connections.
+- [ ] Linear's "Connect" opens the "Connect Linear" dialog of [Connections settings](connections-settings.md#apps). A wrong key reads "Linear refused it. Check it and try again." and keeps the dialog open; `lin_api_acme_fake` closes it, and without a reload Linear's row reads "Connected", links to its page and the tabs read "Approved 8".
 
 ## Moving apps
 
