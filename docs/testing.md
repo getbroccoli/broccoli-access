@@ -90,7 +90,7 @@ curl -s -H 'content-type: application/json' \
 ### Slack
 
 - In Chrome, open `http://slack.localhost:<printed port>/slack/signin`. The page shows "Sign in as Mia Novak" and signs Mia in at once: cookie `d` on `slack.localhost`, and Slack's token in local storage under `localConfig_v2`. `*.localhost` reaches this machine, so the cookie never mixes with the app's on `localhost`.
-- Read the session from the browser's developer tools (Application: cookie `d`, local storage `localConfig_v2`), or with `agent-browser cookies get --json` and `agent-browser eval 'localStorage.getItem("localConfig_v2")'`. Without a browser, take both from one sign-in:
+- Read the app session from the browser's developer tools (Application: cookie `d`, local storage `localConfig_v2`), or with `agent-browser cookies get --json` and `agent-browser eval 'localStorage.getItem("localConfig_v2")'`. Without a browser, take both from one sign-in:
 
   ```sh
   PAGE=$(curl -si "$FAKE/slack/signin")
@@ -107,7 +107,7 @@ curl -s -H 'content-type: application/json' \
   curl -s -H 'content-type: application/json' -d "$SLACK" "$FAKE/v1/connections/test"
   ```
 
-- The fake accepts only sessions it issued since its last start, reset or session expiry. Its list has three pages: pass each `nextCursor` as the next `cursor`.
+- The fake accepts only app sessions it issued since its last start, reset or session expiry. Its list has three pages: pass each `nextCursor` as the next `cursor`.
 
 ### Controls
 
@@ -129,7 +129,7 @@ curl -s -H 'content-type: application/json' -d '{"milliseconds": 5000}' "$FAKE/_
 - `state` lists each workspace's members with their status; pending invitations are not members.
 - A member control changes the member as an admin would in the app.
 - `failures` makes the next `count` calls of that connector and `call` (`connections/test`, `accounts/list` or `actions/run`) answer the contract error `code`.
-- After `sessions/expire`, every Slack session fails with `authentication_failed` until a new sign-in; after `keys/revoke`, the Linear key fails until `reset`.
+- After `sessions/expire`, every Slack app session fails with `authentication_failed` until a new sign-in; after `keys/revoke`, the Linear key fails until `reset`.
 
 ### The conformance suite
 

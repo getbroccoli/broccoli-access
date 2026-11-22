@@ -12,8 +12,8 @@ import type { FakeConnector } from "./fakeConnector";
 const STORAGE_KEY = "localConfig_v2";
 
 /**
- * Slack through the web methods its own pages call, with the owner's session: the `d` cookie
- * and the token Slack's page keeps in local storage. Only sessions the fake issued count.
+ * Slack through the web methods its own pages call, with the owner's app session: the `d` cookie
+ * and the token Slack's page keeps in local storage. Only app sessions the fake issued count.
  */
 export const SLACK: FakeConnector = {
   key: "slack",
