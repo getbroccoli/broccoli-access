@@ -48,10 +48,11 @@ Load the built extension in its own profile as "The Chrome extension" in `docs/t
 - [ ] With the extension not paired, it opens on step 2 "Pair the extension with Broccoli Access", Extension ticked, naming this address and "Installed in Chrome on <platform>. Not paired yet."; "Pair this Chrome" pairs as the Chrome extension card does, and the dialog moves on by itself.
 - [ ] Paired, it opens on step 3 "Before you connect Slack" with Slack's notice; "Accept and continue" stays disabled until "I’ve read this and choose to connect Slack." is ticked.
 - [ ] Step 4 "Sign in to Slack in Chrome, then Connect" lists what the extension sends, with "Open Slack in a new tab ↗" to `https://slack.com`.
-- [ ] Without a fake Slack tab open, "Connect Slack" opens the extension's window "Hand over your Slack session to <address>?" listing `slack.localhost`; "Hand over" there says "Open Slack in a tab of this Chrome and sign in, then hand over again."
-- [ ] After `POST <fake connectors>/_fake/slack/sessions/expire`, with the old tab still open, "Hand over" says "Slack didn't accept this session. Sign in to Slack again, then hand over again."
-- [ ] Cancel in the extension's window leaves the dialog with "Nothing was handed over. Sign in to Slack in this Chrome, then Connect Slack again."
-- [ ] Signed in at the fake Slack, "Hand over" asks Chrome for access to "all slack.localhost sites" the first time, closes, and the dialog shows "Connect the Acme workspace?" with Acme and `acme.slack.com`; Back returns to step 4.
+- [ ] Without a fake Slack tab open, "Connect Slack" opens the extension's window "Hand over your Slack session to <address>?" listing `slack.localhost`. The first "Hand over" in the profile asks Chrome for access to "all slack.localhost sites"; once allowed, it says "Open Slack in a tab of this Chrome and sign in, then hand over again.", and later attempts ask Chrome nothing.
+- [ ] After `POST <fake connectors>/_fake/slack/sessions/expire`, with the old tab still open, "Hand over" says "Slack didn't accept this session. Check that you're signed in to Slack as an admin, then hand over again."
+- [ ] Cancel in the extension's window leaves the dialog with "Nothing was handed over. Connect Slack again when you’re ready."
+- [ ] Signed in at the fake Slack, "Hand over" closes the window, and the dialog shows "Connect the Acme workspace?" with Acme and `acme.slack.com`; Back returns to step 4.
+- [ ] In a profile without the extension, while this owner is paired in another Chrome, "Connect Slack" still opens on step 1.
 - [ ] "Connect Acme" closes the dialog; the card reads "Connected", "The Acme workspace, connected with the Slack session of admin@acme.example." and, once scanned, "41 members. Scanned today at HH:MM. You accepted Slack’s notice on <today>."
 - [ ] Slack's app page lists 41 users with their "In Slack" status, Elif's not active.
 - [ ] At 390 px wide, every step fits without horizontal scrolling.

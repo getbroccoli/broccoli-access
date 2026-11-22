@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
 import {
   canChangeAccounts,
@@ -162,6 +164,13 @@ export function createContainerConnectionService(
         throw new ApplicationError("CONFLICT", "This app is already connected.");
       }
       const details = await testedConnection(dependencies, connector, connection);
+      if (appSessionFieldOf(connector) && isOtherWorkspace(connection, details)) {
+        logger.warn(
+          { connector: connector.key },
+          "Connect refused: the session opens another workspace",
+        );
+        throw invalidInput([{ field: "appSession", code: "wrong_workspace" }]);
+      }
       const noticeAcceptedAt = connector.notice === null ? undefined : now();
       return saveConnection(dependencies, ctx, {
         connector,
@@ -265,6 +274,12 @@ const REFUSED_VALUES: readonly ConnectorErrorCode[] = [
   "permission_missing",
   "wrong_workspace",
 ];
+
+/** Whether the test found other workspace settings than those the owner confirmed at the hand-over. */
+function isOtherWorkspace(connection: Connection, details: ConnectionDetails): boolean {
+  const found = details.connection?.settings;
+  return found !== undefined && !isDeepStrictEqual(found, connection.settings);
+}
 
 /** The listed connector with `key` and its app session field. */
 async function appSessionConnector(

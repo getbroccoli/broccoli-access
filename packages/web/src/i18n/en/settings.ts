@@ -82,7 +82,9 @@ export const settingsEn = {
   "settings.appSession.windowBlocked":
     "Chrome blocked the extension’s window. Allow pop-ups for this site, then try again.",
   "settings.appSession.notHandedOver":
-    "Nothing was handed over. Sign in to {app} in this Chrome, then Connect {app} again.",
+    "Nothing was handed over. Connect {app} again when you’re ready.",
+  "settings.appSession.readFailed":
+    "Couldn’t check whether the extension handed over your session. Connect {app} again.",
   "settings.appSession.confirmTitle": "Connect the {workspace} workspace?",
   "settings.appSession.confirmBody": "Your {app} session in this Chrome opens this workspace.",
   "settings.appSession.approvesNow": "Broccoli Access approves {app} and reads its members now.",

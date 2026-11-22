@@ -5,7 +5,13 @@ export type WorkerRequest =
   | { type: "checkPairing" }
   | { type: "unpair" }
   | { type: "describeAppSession"; connector: string }
-  | { type: "handOverAppSession"; connector: string; requestId: string };
+  | {
+      type: "handOverAppSession";
+      /** The instance and the request the owner confirmed, which the hand-over must still match. */
+      origin: string;
+      confirmed: AppSessionRequest;
+      requestId: string;
+    };
 
 /** This Chrome's pairing as the popup shows it; `pairedAt` is null while the instance is unreachable. */
 export interface PairingView {

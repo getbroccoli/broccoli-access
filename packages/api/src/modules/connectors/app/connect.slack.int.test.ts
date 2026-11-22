@@ -1,11 +1,15 @@
 import { inspect } from "node:util";
 
+import express from "express";
+import { onTestFinished } from "vitest";
+
 import {
   expect,
   test,
   OWNER,
   SYSTEM,
   ownerHandOver,
+  startSimpleHttpServer,
   storedApps,
   storedAppConnections,
   storedAppAccounts,
@@ -92,4 +96,41 @@ test("connects Slack with the handed-over session, records the notice and queues
       }) as unknown,
     }),
   );
+});
+
+test("refuses to connect a workspace other than the one the owner confirmed and saves nothing", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const owner = OWNER.user!;
+  await seed.user({ id: owner.userId, email: owner.email });
+  const manifest = await (await fetch(new URL("/v1/connectors", fakeConnectors.url))).text();
+  let settings = { teamId: "T04ACME", teamDomain: "acme", teamName: "Acme" };
+  const container = express();
+  container.get("/v1/connectors", (_req, res) => res.type("json").send(manifest));
+  container.get("/slack/signin", (_req, res) => res.redirect(fakeConnectors.url + "/slack/signin"));
+  container.post("/v1/connections/test", (_req, res) =>
+    res.json({
+      details: { organizationName: "Acme", domain: "acme.slack.com" },
+      connection: { settings },
+    }),
+  );
+  const server = await startSimpleHttpServer(container);
+  onTestFinished(() => server.stop());
+  const { service, handOver, sent } = await ownerHandOver(orm, server);
+  settings = { teamId: "T09OTHER", teamDomain: "other", teamName: "Other" };
+
+  await expect(
+    service.connect(OWNER, {
+      connector: "slack",
+      appSession: handOver.appSession,
+      noticeAccepted: true,
+    }),
+  ).rejects.toMatchObject({
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "appSession", code: "wrong_workspace" }],
+  });
+  expect(await storedAppConnections(orm)).toEqual([]);
+  expect(sent).toEqual([]);
 });

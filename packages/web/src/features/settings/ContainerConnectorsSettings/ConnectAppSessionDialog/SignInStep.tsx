@@ -29,11 +29,11 @@ export function SignInStep({ connector, handOver }: Props) {
           {t("settings.appSession.confirmInWindow")}
         </p>
       )}
-      {(handOver.isWindowBlocked || handOver.wasAbandoned) && (
+      {(handOver.isWindowBlocked || handOver.wasAbandoned || handOver.readFailed) && (
         <p role="alert" className="text-sm text-destructive">
-          {handOver.isWindowBlocked
-            ? t("settings.appSession.windowBlocked")
-            : t("settings.appSession.notHandedOver", { app })}
+          {handOver.isWindowBlocked && t("settings.appSession.windowBlocked")}
+          {handOver.wasAbandoned && t("settings.appSession.notHandedOver", { app })}
+          {handOver.readFailed && t("settings.appSession.readFailed", { app })}
         </p>
       )}
       <DialogFooter className="m-0 flex-col-reverse gap-3 border-0 bg-transparent p-0 sm:flex-row sm:items-center sm:justify-between">

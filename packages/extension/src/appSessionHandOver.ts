@@ -12,7 +12,9 @@ export async function describeAppSession(
   pairing: StoredPairing,
   connector: string,
 ): Promise<AppSessionRequest | null> {
-  const response = await callInstance(pairing, appSessionPath(connector), { method: "GET" });
+  const response = await callInstance(pairing, appSessionPath(connector), {
+    method: "GET",
+  });
   if (!response?.ok) {
     return null;
   }
@@ -26,10 +28,16 @@ export async function describeAppSession(
  */
 export async function handOverAppSession(
   pairing: StoredPairing,
-  { connector, requestId }: { connector: string; requestId: string },
+  {
+    origin,
+    confirmed,
+    requestId,
+  }: { origin: string; confirmed: AppSessionRequest; requestId: string },
 ): Promise<HandOverOutcome> {
-  const request = await describeAppSession(pairing, connector);
-  if (!request || !(await hasAccessTo(request.domains))) {
+  // Pairing again, or a changed manifest, after the owner confirmed: they confirmed something else.
+  const request =
+    pairing.origin === origin ? await describeAppSession(pairing, confirmed.connector) : null;
+  if (!request || !isSameRequest(request, confirmed) || !(await hasAccessTo(request.domains))) {
     return "failed";
   }
   const storage = await storageOfOpenTab(request);
@@ -37,7 +45,7 @@ export async function handOverAppSession(
     return "signed_out";
   }
   const cookies = appSessionCookiesOf(await cookiesOf(request.domains), request.domains);
-  const response = await callInstance(pairing, appSessionPath(connector), {
+  const response = await callInstance(pairing, appSessionPath(request.connector), {
     method: "POST",
     body: { requestId, appSession: { cookies, storage } },
     timeoutMs: HAND_OVER_TIMEOUT_MS,
@@ -57,6 +65,10 @@ const BAD_REQUEST = 400;
 
 function appSessionPath(connector: string): string {
   return `/api/extension/app-sessions/${encodeURIComponent(connector)}`;
+}
+
+function isSameRequest(request: AppSessionRequest, confirmed: AppSessionRequest): boolean {
+  return JSON.stringify(request) === JSON.stringify(confirmed);
 }
 
 function parseAppSessionRequest(body: unknown): AppSessionRequest | null {
@@ -99,7 +111,7 @@ async function storageOfOpenTab(
   }
   const tabs = await chrome.tabs.query({ url: hostPatternsOf(request.domains) });
   for (const { id } of tabs) {
-    const storage = id === undefined ? null : await storageOfTab(id, request.storageKeys);
+    const storage = id === undefined ? null : await storageOfTab(id, request);
     if (storage) {
       return storage;
     }
@@ -109,13 +121,13 @@ async function storageOfOpenTab(
 
 async function storageOfTab(
   tabId: number,
-  storageKeys: readonly string[],
+  { storageKeys, domains }: AppSessionRequest,
 ): Promise<Record<string, string> | null> {
   try {
     const [injection] = await chrome.scripting.executeScript({
       target: { tabId },
       func: readLocalStorage,
-      args: [[...storageKeys]],
+      args: [[...storageKeys], [...domains]],
     });
     return appSessionStorageOf(injection?.result ?? {}, storageKeys);
   } catch {
@@ -124,7 +136,15 @@ async function storageOfTab(
   }
 }
 
-/** Runs in the app's tab, so it reads only the keys it is given, and nothing else of the page. */
-function readLocalStorage(keys: string[]): Record<string, string | null> {
+/**
+ * Runs in the app's tab, so it reads only the keys it is given, and nothing else of the page; it
+ * reads nothing once the tab has moved to a host outside the app's domains. Chrome runs it on its
+ * own, so it repeats the domain check instead of importing it.
+ */
+function readLocalStorage(keys: string[], domains: string[]): Record<string, string | null> {
+  const host = location.hostname;
+  if (!domains.some((domain) => host === domain || host.endsWith(`.${domain}`))) {
+    return {};
+  }
   return Object.fromEntries(keys.map((key) => [key, localStorage.getItem(key)]));
 }

@@ -9,8 +9,9 @@ export interface AppSessionScope {
 }
 
 /**
- * The handed-over session, when it is in the contract's shape and holds only what `scope` names;
- * null otherwise, so a session carrying anything else is refused whole rather than trimmed.
+ * The handed-over session, when it is in the contract's shape and holds only cookies and storage
+ * keys `scope` names; null for one holding any other, which is refused whole rather than trimmed.
+ * Properties the contract does not know are dropped, never stored or sent.
  */
 export function parseAppSession(raw: unknown, scope: AppSessionScope): AppSession | null {
   const parsed = APP_SESSION.safeParse(raw);

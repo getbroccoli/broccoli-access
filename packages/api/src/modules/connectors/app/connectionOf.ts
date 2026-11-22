@@ -10,7 +10,10 @@ export interface Connection {
   secrets: Record<string, unknown>;
 }
 
-/** The connection the owner gives: the app session sealed at its hand-over, or the typed values. */
+/**
+ * The connection the owner gives: the app session sealed at its hand-over, with the settings of the
+ * workspace they confirmed, or the typed values.
+ */
 export function connectionOf(
   ctx: SecurityContext,
   connector: ContainerConnector,
@@ -27,16 +30,17 @@ export function connectionOf(
   if (!appSession) {
     throw invalidInput([{ field: "appSession", code: "required" }]);
   }
-  const session =
+  const handedOver =
     ctx.user && handOvers.open(appSession, { userId: ctx.user.userId, connector: connector.key });
-  if (!session) {
+  if (!handedOver) {
     logger.warn(
       { connector: connector.key },
       "Connect refused: the hand-over is changed, expired or another's",
     );
     throw invalidInput([{ field: "appSession", code: "invalid" }]);
   }
-  return { settings: {}, secrets: { [field.key]: session } };
+  // The confirmed workspace's settings go with it, so the test before saving can tell a different one.
+  return { settings: handedOver.settings, secrets: { [field.key]: handedOver.appSession } };
 }
 
 /** The trimmed values as the connection's settings and secrets, refusing a missing or unknown one. */

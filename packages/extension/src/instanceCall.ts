@@ -21,6 +21,8 @@ export async function callInstance(
         ...(init.body === undefined ? {} : { "content-type": "application/json" }),
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      // A redirect could carry the body, such as an app session, to another origin.
+      redirect: "error",
       signal: AbortSignal.timeout(init.timeoutMs ?? INSTANCE_TIMEOUT_MS),
     });
   } catch {

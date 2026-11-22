@@ -20,8 +20,17 @@ export interface AppSessionHandOvers {
   }): void;
   /** The user's hand-over `requestId` while unexpired; null otherwise. */
   read(userId: string, requestId: string): AppSessionHandOver | null;
-  /** The session `sealed` holds for the user and connector while unexpired; null when changed, forged, expired or another's. */
-  open(sealed: string, owner: { userId: string; connector: string }): AppSession | null;
+  /**
+   * The session `sealed` holds for the user and connector while unexpired, with the settings of the
+   * workspace its test found; null when changed, forged, expired or another's.
+   */
+  open(sealed: string, owner: { userId: string; connector: string }): HandedOverSession | null;
+}
+
+/** A handed-over session, and the workspace the owner confirmed for it. */
+export interface HandedOverSession {
+  appSession: AppSession;
+  settings: Record<string, unknown>;
 }
 
 /** A handed-over app session as the owner's page receives it. */
@@ -48,7 +57,8 @@ export function createAppSessionHandOvers({
     keep({ userId, requestId, connector, appSession, details }) {
       forgetExpired(kept, now());
       const expiresAt = now().getTime() + HAND_OVER_LIFETIME_MS;
-      const sealed: SealedAppSession = { userId, connector, appSession, expiresAt };
+      const settings = details.connection?.settings ?? {};
+      const sealed: SealedAppSession = { userId, connector, appSession, settings, expiresAt };
       kept.set(keyOf(userId, requestId), {
         handOver: {
           requestId,
@@ -70,7 +80,7 @@ export function createAppSessionHandOvers({
         opened.userId === userId &&
         opened.connector === connector &&
         opened.expiresAt > now().getTime();
-      return isOwnAndFresh ? opened.appSession : null;
+      return isOwnAndFresh ? { appSession: opened.appSession, settings: opened.settings } : null;
     },
   };
 }
@@ -85,6 +95,7 @@ const SEALED_APP_SESSION = z.object({
   userId: z.string(),
   connector: z.string(),
   appSession: APP_SESSION,
+  settings: z.record(z.string(), z.unknown()),
   expiresAt: z.number(),
 });
 

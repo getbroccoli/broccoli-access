@@ -25,6 +25,7 @@ export function useAppSessionHandOver(connector: string) {
     setHandOverWindow(null);
   }
   usePollWhileWindowOpen(handOverWindow, query.refetch, setHandOverWindow);
+  const hasEnded = requestId !== null && handOverWindow === null && !handOver && !query.loading;
 
   const start = () => {
     // Opened in the click itself: Chrome blocks a window opened after the click's activation ends.
@@ -46,7 +47,9 @@ export function useAppSessionHandOver(connector: string) {
     isAwaiting: handOverWindow !== null,
     isWindowBlocked,
     // The window closed without a session, such as after Cancel.
-    wasAbandoned: requestId !== null && handOverWindow === null && !handOver && !query.loading,
+    wasAbandoned: hasEnded && query.error === undefined,
+    // The window closed, but the last read of the hand-over failed.
+    readFailed: hasEnded && query.error !== undefined,
     reset: () => {
       setRequestId(null);
       setHandOverWindow(null);
@@ -57,12 +60,9 @@ export function useAppSessionHandOver(connector: string) {
 /** How often the page asks whether the extension has handed the session over. */
 const POLL_INTERVAL_MS = 1_000;
 
-/** The hand-over's lifetime on the server: after it, waiting cannot end in a session. */
-const HAND_OVER_LIFETIME_MS = 5 * 60_000;
-
 /**
- * Asks for the hand-over every second while `handOverWindow` is open, and once more when it
- * closes, as it does after the hand-over or Cancel; gives up when the hand-over has expired.
+ * Asks for the hand-over every second while `handOverWindow` is open, however long the owner takes
+ * there, and once more when it closes, as it does after the hand-over or Cancel.
  */
 function usePollWhileWindowOpen(
   handOverWindow: Window | null,
@@ -84,11 +84,7 @@ function usePollWhileWindowOpen(
         .catch(() => undefined)
         .finally(() => setHandOverWindow(null));
     }, POLL_INTERVAL_MS);
-    const giveUp = setTimeout(() => setHandOverWindow(null), HAND_OVER_LIFETIME_MS);
-    return () => {
-      clearInterval(poll);
-      clearTimeout(giveUp);
-    };
+    return () => clearInterval(poll);
   }, [handOverWindow, refetch, setHandOverWindow]);
 }
 

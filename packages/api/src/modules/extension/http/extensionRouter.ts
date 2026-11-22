@@ -102,8 +102,12 @@ const INTERNAL_SERVER_ERROR = 500;
 /** Far above a pairing code and a browser label. */
 const MAX_BODY_BYTES = "10kb";
 
-/** Far above an app's cookies and the values its page keeps, such as Slack's local configuration. */
-const MAX_APP_SESSION_BYTES = "256kb";
+/**
+ * Room for an app's cookies and the values its page keeps, such as Slack's local configuration,
+ * small enough that the sealed session, a third larger in base64, still fits the 100 kB GraphQL
+ * body that Connect sends it back in.
+ */
+const MAX_APP_SESSION_BYTES = "64kb";
 
 /** A hand-over without a request id hands over nothing, which the use case refuses as invalid. */
 const HAND_OVER = z

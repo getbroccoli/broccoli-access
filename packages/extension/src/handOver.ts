@@ -37,7 +37,10 @@ async function start(): Promise<void> {
   }
   showRequest(origin, request);
   element("[data-cancel]").addEventListener("click", () => window.close());
-  element("[data-hand-over]").addEventListener("click", () => void handOver(request, requestId));
+  element("[data-hand-over]").addEventListener(
+    "click",
+    () => void handOver({ origin, confirmed: request, requestId }),
+  );
   showState("ask");
 }
 
@@ -56,29 +59,33 @@ function showRequest(origin: string, request: AppSessionRequest): void {
   );
 }
 
-async function handOver(request: AppSessionRequest, requestId: string): Promise<void> {
+async function handOver(handOverRequest: {
+  origin: string;
+  confirmed: AppSessionRequest;
+  requestId: string;
+}): Promise<void> {
+  const { confirmed } = handOverRequest;
   const buttons = document.querySelectorAll<HTMLButtonElement>("button");
   setDisabled(buttons, true);
   // Chrome asks the owner in its own prompt, which needs this click; nothing may await before it.
   const granted = await chrome.permissions
-    .request({ permissions: APP_SESSION_PERMISSIONS, origins: hostPatternsOf(request.domains) })
+    .request({ permissions: APP_SESSION_PERMISSIONS, origins: hostPatternsOf(confirmed.domains) })
     // Chrome refuses to ask for what the manifest does not allow, such as another scheme.
     .catch(() => false);
   if (!granted) {
-    showFailure(`Chrome has no access to ${request.name}, so nothing was handed over.`);
+    showFailure(`Chrome has no access to ${confirmed.name}, so nothing was handed over.`);
     setDisabled(buttons, false);
     return;
   }
-  const { outcome } = await askWorker({
-    type: "handOverAppSession",
-    connector: request.connector,
-    requestId,
-  });
+  const outcome = await askWorker({ type: "handOverAppSession", ...handOverRequest }).then(
+    (answer) => answer.outcome,
+    (): HandOverOutcome => "failed",
+  );
   if (outcome === "handed_over") {
     window.close();
     return;
   }
-  showFailure(failureMessage(outcome, request.name));
+  showFailure(failureMessage(outcome, confirmed.name));
   setDisabled(buttons, false);
 }
 
@@ -87,7 +94,7 @@ function failureMessage(outcome: Exclude<HandOverOutcome, "handed_over">, app: s
     case "signed_out":
       return `Open ${app} in a tab of this Chrome and sign in, then hand over again.`;
     case "refused":
-      return `${app} didn't accept this session. Sign in to ${app} again, then hand over again.`;
+      return `${app} didn't accept this session. Check that you're signed in to ${app} as an admin, then hand over again.`;
     case "failed":
       return "Handing over failed. Start again from Settings in Broccoli Access.";
   }

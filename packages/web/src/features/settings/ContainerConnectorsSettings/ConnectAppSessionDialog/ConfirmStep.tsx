@@ -1,38 +1,24 @@
-import {
-  type AppSessionHandOverQuery,
-  ConnectContainerConnectorDocument,
-} from "@/__generated__/graphql";
-import { useCache, usePayloadMutation } from "@/apollo";
-import { forgetAppLists } from "@/features/apps";
+import type { AppSessionHandOverQuery } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { t } from "@/i18n";
 
 import type { AppSessionConnector } from "./ConnectAppSessionSteps";
+import type { useConnectAppSession } from "./useConnectAppSession";
 
 type Props = {
   connector: Pick<AppSessionConnector, "id" | "name">;
   handOver: NonNullable<AppSessionHandOverQuery["appSessionHandOver"]>;
+  connection: ReturnType<typeof useConnectAppSession>;
   /** Back to signing in, such as to switch workspaces in the app. */
   onBack: () => void;
   onConnected: () => void;
 };
 
 /** Step 5: the workspace the handed-over session opens, which the owner confirms to connect. */
-export function ConfirmStep({ connector, handOver, onBack, onConnected }: Props) {
-  const cache = useCache();
-  const [connect, { loading, error, payloadError }] = usePayloadMutation(
-    ConnectContainerConnectorDocument,
-    // Connecting approves the app, which moves the app lists and their counts.
-    {
-      update: (_cache, { data }) => {
-        if (data?.connectors.connect.containerConnector) {
-          forgetAppLists(cache);
-        }
-      },
-    },
-  );
+export function ConfirmStep({ connector, handOver, connection, onBack, onConnected }: Props) {
+  const [connect, { loading, error, payloadError }] = connection;
   const app = connector.name;
   const workspace = handOver.organizationName;
   const confirm = () => {
