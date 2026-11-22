@@ -87,6 +87,21 @@ test("connecting Linear adds one approved app and removes it from the apps to co
   );
 });
 
+test("leaves out a connector already connected to an app it matched by name", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  await seed.app();
+  await seed.app({ name: "Linear", domain: null, catalogKey: null, status: "approved" });
+  const { service } = containerConnections(orm, fakeConnectors.url);
+  await service.connect(OWNER, LINEAR_INPUT);
+
+  const listed = await service.listAppsToConnect(OWNER);
+
+  expect(listed).toEqual([]);
+});
+
 test("lists no apps to connect without a connectors container", async ({ orm }) => {
   const { service } = containerConnections(orm, "");
 

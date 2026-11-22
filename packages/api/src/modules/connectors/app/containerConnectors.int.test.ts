@@ -1,9 +1,6 @@
-import type { ConnectorManifest } from "@broccoli-access/connector-contract";
 import { startFakeConnectors } from "@broccoli-access/fake-apps";
 
-import { onTestFinished } from "vitest";
-
-import { containerConnectors, expect, startSimpleHttpServer, test } from "#test/support";
+import { containerConnectors, expect, serveManifest, test } from "#test/support";
 
 test("lists the container's connectors with their manifest fields", async ({ fakeConnectors }) => {
   const listed = await containerConnectors(fakeConnectors.url).list();
@@ -61,20 +58,16 @@ test("retries an unavailable manifest and keeps the successful list", async () =
 test("omits only the connector that asks for the same field as both secret and public", async ({
   fakeConnectors,
 }) => {
-  const response = await fetch(`${fakeConnectors.url}/v1/connectors`);
-  const manifest = (await response.json()) as ConnectorManifest;
-  const linear = manifest.connectors.find((connector) => connector.key === "linear")!;
-  linear.connectionFields.push({
-    key: "apiKey",
-    kind: "text",
-    label: "Public key",
-    help: "",
-    secret: false,
+  const server = await serveManifest(fakeConnectors.url, ({ connectors }) => {
+    const linear = connectors.find((connector) => connector.key === "linear")!;
+    linear.connectionFields.push({
+      key: "apiKey",
+      kind: "text",
+      label: "Public key",
+      help: "",
+      secret: false,
+    });
   });
-  const server = await startSimpleHttpServer((_request, response) => {
-    response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(manifest));
-  });
-  onTestFinished(() => server.stop());
 
   const listed = await containerConnectors(server.url).list();
 
