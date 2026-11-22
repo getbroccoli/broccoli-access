@@ -48,8 +48,6 @@ export function PeoplePage() {
             query={q}
             onQueryChange={(next) =>
               void navigate({
-                // A pending search may finish after a person's panel opens: keep the panel open.
-                unsafeRelative: "path",
                 search: (previous) => ({ ...previous, q: next }),
                 replace: true,
               })

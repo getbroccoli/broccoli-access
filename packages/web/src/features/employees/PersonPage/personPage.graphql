@@ -1,0 +1,19 @@
+query PersonPage($id: ID!) {
+  employee(id: $id) {
+    id
+    firstName
+    lastName
+    email
+    avatarUrl
+    status
+    suspendedWithAccess
+    currentAccess {
+      appName
+      foundVia
+      since {
+        at
+        before
+      }
+    }
+  }
+}

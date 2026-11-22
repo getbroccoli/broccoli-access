@@ -16,6 +16,7 @@ A manual check of the People page against a development stack: everyone in Googl
 - [ ] Ten people show, then "Show 32 more"; it shows the rest.
 - [ ] Typing in "Search by name or email" filters by name or email, ignoring case, after a short pause; the URL holds `q`. A search without matches shows "No people match “…”".
 - [ ] No row has actions or checkboxes, and nothing on the page removes a person.
+- [ ] Clicking a name opens that person's page, `/people/<id>`; see [QA: A person's page](person-page.md).
 
 ## Suspended with access
 
