@@ -3,6 +3,7 @@ query AppPage($id: ID!) {
     id
     name
     domain
+    catalogKey
     status
     connected
     peopleCount

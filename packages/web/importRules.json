@@ -26,7 +26,7 @@
     "src/features/apps": [
       "src/__generated__",
       "src/apollo",
-      "src/components/AppInitial",
+      "src/components/AppMark",
       "src/components/Avatar",
       "src/components/dataTable",
       "src/components/ui",
@@ -48,7 +48,7 @@
     "src/features/employees": [
       "src/__generated__",
       "src/apollo",
-      "src/components/AppInitial",
+      "src/components/AppMark",
       "src/components/Avatar",
       "src/components/dataTable",
       "src/components/form",
@@ -90,7 +90,7 @@
       "src/lib/useSessionChange"
     ],
     "src/components/dataTable": ["src/components/ui"],
-    "src/components/AppInitial": ["src/lib/class-names"],
+    "src/components/AppMark": ["src/lib/class-names"],
     "src/components/Avatar": ["src/lib/class-names", "src/lib/initials"],
     "src/components/form": ["src/components/ui", "src/lib/class-names"],
     "src/components/ui": ["src/lib/class-names"],

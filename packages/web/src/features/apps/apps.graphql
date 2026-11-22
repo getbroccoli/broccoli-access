@@ -10,9 +10,20 @@ query AppsPage($status: AppStatus!, $first: Int!) {
         id
         name
         domain
+        catalogKey
         status
         connected
         peopleCount
+        users(first: 4) {
+          id
+          employee {
+            id
+            firstName
+            lastName
+            email
+            avatarUrl
+          }
+        }
         suspendedWithAccessCount
         foundVia
         since {

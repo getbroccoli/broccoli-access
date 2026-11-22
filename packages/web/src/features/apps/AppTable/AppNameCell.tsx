@@ -1,12 +1,14 @@
-import { AppInitial } from "@/components/AppInitial";
+import { AppMark } from "@/components/AppMark";
 
-type Props = { name: string; domain: string | null | undefined };
+import type { AppRow } from "./appRow";
 
-/** The app's initial in a tinted square, its name, and its domain below. */
-export function AppNameCell({ name, domain }: Props) {
+type Props = Pick<AppRow, "name" | "domain" | "catalogKey">;
+
+/** The app's mark, its name, and its domain below. */
+export function AppNameCell({ name, domain, catalogKey }: Props) {
   return (
     <div className="flex items-center gap-3">
-      <AppInitial name={name} />
+      <AppMark name={name} catalogKey={catalogKey} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{name}</span>
         {domain && <span className="truncate text-xs text-muted-foreground">{domain}</span>}

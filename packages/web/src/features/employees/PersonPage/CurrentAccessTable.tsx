@@ -1,5 +1,5 @@
 import type { PersonPageQuery } from "@/__generated__/graphql";
-import { AppInitial } from "@/components/AppInitial";
+import { AppMark } from "@/components/AppMark";
 import {
   Table,
   TableBody,
@@ -42,11 +42,11 @@ export function CurrentAccessTable({ currentAccess }: Props) {
               </TableCell>
             </TableRow>
           )}
-          {currentAccess.map(({ appName, foundVia, since }) => (
+          {currentAccess.map(({ appName, catalogKey, foundVia, since }) => (
             <TableRow key={appName}>
               <TableCell className="h-[54px] pl-5">
                 <span className="flex items-center gap-3 font-medium">
-                  <AppInitial name={appName} />
+                  <AppMark name={appName} catalogKey={catalogKey} />
                   {appName}
                 </span>
               </TableCell>

@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-import { ApproveAppDocument, IgnoreAppDocument } from "@/__generated__/graphql";
+import { ApproveAppDocument } from "@/__generated__/graphql";
 import { usePayloadMutation } from "@/apollo";
 import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
@@ -9,48 +9,35 @@ import type { AppRow } from "./AppTable";
 import { forgetAppLists } from "./cache";
 
 type Props = {
-  app: Pick<AppRow, "id" | "name" | "status" | "connected">;
+  app: Pick<AppRow, "id" | "name" | "status">;
   /** Small in a table row, the default in a page's header. */
   size?: "sm" | "lg";
 };
 
-/** Approve for an app not approved, and Ignore for one not ignored, except a connected app, which stays approved. */
-export function AppStatusActions({ app, size = "sm" }: Props) {
+/** Approve for an app not approved yet. */
+export function ApproveAppButton({ app, size = "sm" }: Props) {
   // The app moves to another tab and every count changes, so the lists and counts load afresh.
-  const [approve, approving] = usePayloadMutation(ApproveAppDocument, { update: forgetAppLists });
-  const [ignore, ignoring] = usePayloadMutation(IgnoreAppDocument, { update: forgetAppLists });
-  const pending = approving.loading || ignoring.loading;
-  const change = (mutate: typeof approve | typeof ignore) =>
-    void mutate({ variables: { input: { id: app.id } } }).catch(() =>
-      toast.error(t("apps.statusChangeFailed", { name: app.name })),
-    );
+  const [approve, { loading }] = usePayloadMutation(ApproveAppDocument, {
+    update: forgetAppLists,
+  });
+  if (app.status === "APPROVED") {
+    return null;
+  }
 
   return (
-    <div className="flex justify-end gap-2">
-      {app.status !== "APPROVED" && (
-        <Button
-          type="button"
-          variant="outline"
-          size={size}
-          disabled={pending}
-          aria-label={t("apps.approveApp", { name: app.name })}
-          onClick={() => change(approve)}
-        >
-          {t("apps.approve")}
-        </Button>
-      )}
-      {app.status !== "IGNORED" && !app.connected && (
-        <Button
-          type="button"
-          variant="outline"
-          size={size}
-          disabled={pending}
-          aria-label={t("apps.ignoreApp", { name: app.name })}
-          onClick={() => change(ignore)}
-        >
-          {t("apps.ignore")}
-        </Button>
-      )}
-    </div>
+    <Button
+      type="button"
+      variant="outline"
+      size={size}
+      disabled={loading}
+      aria-label={t("apps.approveApp", { name: app.name })}
+      onClick={() =>
+        void approve({ variables: { input: { id: app.id } } }).catch(() =>
+          toast.error(t("apps.statusChangeFailed", { name: app.name })),
+        )
+      }
+    >
+      {t("apps.approve")}
+    </Button>
   );
 }

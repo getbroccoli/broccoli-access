@@ -2,17 +2,21 @@ import { CaretLeft } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 
 import type { AppPageQuery } from "@/__generated__/graphql";
-import { AppInitial } from "@/components/AppInitial";
+import { AppMark } from "@/components/AppMark";
 import { t } from "@/i18n";
 
-import { AppStatusActions } from "../AppStatusActions";
+import { ApproveAppButton } from "../ApproveAppButton";
 import { AppStatusBadge } from "./AppStatusBadge";
+import { IgnoreAppButton } from "./IgnoreAppButton";
 
 type Props = {
-  app: Pick<NonNullable<AppPageQuery["app"]>, "id" | "name" | "domain" | "status" | "connected">;
+  app: Pick<
+    NonNullable<AppPageQuery["app"]>,
+    "id" | "name" | "domain" | "catalogKey" | "status" | "connected"
+  >;
 };
 
-/** The way back to Applications, the app with its status and domain, and Approve or Ignore. */
+/** The way back to Applications, the app with its status and domain, and Approve or Ignore as its status allows. */
 export function AppHeader({ app }: Props) {
   return (
     <div className="flex flex-col gap-5">
@@ -25,7 +29,11 @@ export function AppHeader({ app }: Props) {
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
-          <AppInitial name={app.name} className="size-14 rounded-xl text-xl" />
+          <AppMark
+            name={app.name}
+            catalogKey={app.catalogKey}
+            className="size-14 rounded-xl text-xl"
+          />
           <div className="flex min-w-0 flex-col gap-0.5">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <h1 className="truncate text-2xl font-semibold tracking-tight">{app.name}</h1>
@@ -34,7 +42,10 @@ export function AppHeader({ app }: Props) {
             {app.domain && <span className="text-sm text-muted-foreground">{app.domain}</span>}
           </div>
         </div>
-        <AppStatusActions app={app} size="lg" />
+        <div className="flex gap-2">
+          <ApproveAppButton app={app} size="lg" />
+          <IgnoreAppButton app={app} />
+        </div>
       </div>
     </div>
   );
