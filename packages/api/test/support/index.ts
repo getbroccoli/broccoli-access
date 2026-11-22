@@ -7,6 +7,7 @@ export { createBrowser, type Browser } from "./browser";
 export { startDisconnectingProxy, type DisconnectingProxy } from "./disconnectingProxy";
 export { test } from "./fixture";
 export { startSimpleHttpServer } from "./simpleHttpServer";
+export { startCountingGoogleProxy } from "./countingGoogleProxy";
 export { PNG, JPEG, WEBP } from "./images";
 export { holdMigrationLock, type MigrationLockHolder } from "./migrationLock";
 export {
