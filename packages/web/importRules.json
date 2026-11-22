@@ -13,6 +13,7 @@
     ],
     "src/shell": [
       "src/__generated__",
+      "src/apollo",
       "src/components/Avatar",
       "src/components/ui",
       "src/features/auth",

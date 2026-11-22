@@ -1,13 +1,12 @@
 import { useQuery } from "@apollo/client/react";
 import { useEffect, useRef } from "react";
 
-import { AppsScanDocument, type AppsScanQuery, ScanNowDocument } from "@/__generated__/graphql";
-import { useCache, usePayloadMutation } from "@/apollo";
-import { Button } from "@/components/ui/button";
+import { AppsScanDocument, type AppsScanQuery } from "@/__generated__/graphql";
+import { useCache } from "@/apollo";
 import { t } from "@/i18n";
 import { formatLastScan } from "@/lib/lastScan";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
-import { PageHeader } from "@/shell";
+import { PageHeader, ScanNowButton } from "@/shell";
 
 import { forgetAppLists } from "./cache";
 
@@ -24,7 +23,6 @@ export function AppsHeader({ canScan }: Props) {
   const isScanning = connection?.scan?.status === "SCANNING";
   usePollWhileScanning(isScanning, scanQuery);
   useReloadAppsAfterScan(isScanning);
-  const [scanNow, { loading, error }] = usePayloadMutation(ScanNowDocument);
 
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-4">
@@ -33,26 +31,7 @@ export function AppsHeader({ canScan }: Props) {
         description={connection && (isScanning ? t("scans.scanning") : lastScan(connection))}
       />
       {canScan && connection && (
-        <div className="flex flex-col items-end gap-2 pb-6">
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="px-4"
-            disabled={isScanning || loading}
-            // `usePayloadMutation` keeps a failure for display, so the rejection needs no handling here.
-            onClick={() =>
-              void scanNow({ variables: { connectionId: connection.id } }).catch(() => undefined)
-            }
-          >
-            {t("scans.scanNow")}
-          </Button>
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {t("scans.scanNowFailed")}
-            </p>
-          )}
-        </div>
+        <ScanNowButton connectionId={connection.id} isScanning={isScanning} />
       )}
     </div>
   );

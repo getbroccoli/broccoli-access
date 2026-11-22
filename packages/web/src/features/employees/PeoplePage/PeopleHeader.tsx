@@ -1,9 +1,7 @@
-import { ScanNowDocument, type PeoplePageQuery } from "@/__generated__/graphql";
-import { usePayloadMutation } from "@/apollo";
-import { Button } from "@/components/ui/button";
+import type { PeoplePageQuery } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 import { formatLastScan } from "@/lib/lastScan";
-import { PageHeader } from "@/shell";
+import { PageHeader, ScanNowButton } from "@/shell";
 
 type Props = {
   /** The Google Workspace connection; null without one, undefined while it loads. */
@@ -14,7 +12,6 @@ type Props = {
 
 /** The page's title with when Google Workspace was last scanned, and "Scan now". */
 export function PeopleHeader({ connection, loaded }: Props) {
-  const [scanNow, { loading, error }] = usePayloadMutation(ScanNowDocument);
   const scan = connection?.scan;
   const isScanning = scan?.status === "SCANNING";
   // The header shows the last scan without its full stop, as one line with the description.
@@ -28,28 +25,7 @@ export function PeopleHeader({ connection, loaded }: Props) {
         title={t("people.title")}
         description={loaded ? `${t("people.description")} ${lastScan}` : undefined}
       />
-      {connection && (
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="px-4"
-            disabled={isScanning || loading}
-            // `usePayloadMutation` keeps a failure for display, so the rejection needs no handling here.
-            onClick={() =>
-              void scanNow({ variables: { connectionId: connection.id } }).catch(() => undefined)
-            }
-          >
-            {t("scans.scanNow")}
-          </Button>
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {t("scans.scanNowFailed")}
-            </p>
-          )}
-        </div>
-      )}
+      {connection && <ScanNowButton connectionId={connection.id} isScanning={isScanning} />}
     </div>
   );
 }
