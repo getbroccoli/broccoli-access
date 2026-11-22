@@ -12,6 +12,7 @@ import {
   type AppRow,
   type ApprovedAppRow,
   isAppToConnect,
+  isConnected,
 } from "./AppTable";
 import { ConnectAppButton } from "./ConnectAppButton";
 import { ConnectedBadge } from "./ConnectedBadge";
@@ -72,14 +73,16 @@ export const APPROVED_APP_COLUMNS: DataTableColumn<ApprovedAppRow>[] = [
     header: t("apps.column.connection"),
     className: "w-28 text-right",
     cell: (row) => {
-      const connector = isAppToConnect(row) ? row.connector : row.managingConnector;
-      if (!connector) {
+      if (isAppToConnect(row)) {
+        return <ConnectAppButton connector={row.connector} size="default" />;
+      }
+      if (!row.managingConnector) {
         return null;
       }
-      return connector.connection ? (
+      return isConnected(row) ? (
         <ConnectedBadge />
       ) : (
-        <ConnectAppButton connector={connector} size="default" />
+        <ConnectAppButton connector={row.managingConnector} size="default" />
       );
     },
   },

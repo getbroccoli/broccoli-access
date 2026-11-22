@@ -45,12 +45,12 @@ export function AppsPage() {
   const navigate = useNavigate({ from: "/apps" });
   const tab = search.status ?? (firstRun ? "discovered" : "approved");
   const { data, error, refetch } = useQuery(AppsPageDocument, {
-    variables: { status: STATUSES[tab], first: ALL_APPS },
+    variables: { status: STATUSES[tab], first: ALL_APPS, approved: tab === "approved" },
     // A scan or a change elsewhere, such as in Settings, moves apps outside this cache.
     fetchPolicy: "cache-and-network",
   });
   const discovered = useQuery(AppsPageDocument, {
-    variables: { status: "DISCOVERED", first: ALL_APPS },
+    variables: { status: "DISCOVERED", first: ALL_APPS, approved: false },
     skip: !firstRun,
   });
   // Null until the owner changes the selection, which starts with the preselected apps.

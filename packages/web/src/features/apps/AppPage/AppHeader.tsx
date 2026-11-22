@@ -11,6 +11,7 @@ import { ScanNowButton } from "@/shell";
 import { ApproveAppButton } from "../ApproveAppButton";
 import { ConnectAppButton } from "../ConnectAppButton";
 import { ConnectedBadge } from "../ConnectedBadge";
+import { isConnected } from "../AppTable";
 import { useAppStatusChange } from "../useAppStatusChange";
 import { AppStatusBadge } from "./AppStatusBadge";
 import { AppSubtitle } from "./AppSubtitle";
@@ -40,7 +41,7 @@ type Props = {
 export function AppHeader({ app, onConnected }: Props) {
   const { approve, ignore, pending } = useAppStatusChange(app);
   const connection = app.containerConnection;
-  const connector = app.managingConnector?.connection ? null : app.managingConnector;
+  const connector = isConnected(app) ? null : app.managingConnector;
   return (
     <div className="flex flex-col gap-5">
       <Link

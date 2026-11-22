@@ -32,7 +32,6 @@ Open Slack from Applications.
 - [ ] Next to "Ignore", "Connect Slack" opens Settings → Connections.
 - [ ] Under the header, a grey note reads "Connect Slack to see every member and disable or enable their accounts from here. Until then, Broccoli Access sees only who signs in to Slack with Google."
 - [ ] Figma's and Google Workspace's pages have neither.
-- [ ] With Linear found by Google sign-in and not connected (add its grants with `POST /_fake/grants` before setup, see [the fake apps](../fake-apps.md#control-endpoints)), Linear's page shows "Connect Linear" and the note. Connecting it there with `lin_api_acme_fake` turns the page, without a reload, to "Approved" and "Connected" with "Open Linear admin" and "Scan now", and the users with "In Linear" once the scan ends.
 
 ## A connected app
 
@@ -43,6 +42,13 @@ Connect Linear in Settings → Connections as in [Connections settings](connecti
 - [ ] The table adds "In Linear" after Status: Hannah Weber reads "Disabled", the others "Active"; Found via reads "Linear members"; the pending invitation is not listed.
 - [ ] Suspend Chloé in the fake (`POST <fake connectors>/_fake/linear/members/chloe@acme.example/suspend`) and choose "Scan now": the header shows "Scanning…", then Chloé reads "Disabled" without a reload.
 - [ ] Google Workspace's page reads "Connected" too, and has no "In …" column.
+
+## Connecting from the page
+
+On a new stack (`pnpm dev --drop-db`), add Linear grants for a few Acme people with `POST /_fake/grants` (`appName` "Linear", see [the fake apps](../fake-apps.md#control-endpoints)) before setup, then finish setup with the preselected apps; Linear is ignored.
+
+- [ ] Linear's page shows "Approve", "Connect Linear" and the note.
+- [ ] Connecting it there with `lin_api_acme_fake` turns the page, without a reload, to "Approved" and "Connected" with "Open Linear admin" and "Scan now", and lists the users with "In Linear" once the scan ends.
 
 ## Not found
 

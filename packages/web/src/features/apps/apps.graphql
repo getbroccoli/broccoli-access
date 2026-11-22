@@ -1,4 +1,5 @@
-query AppsPage($status: AppStatus!, $first: Int!) {
+# `approved` reads what only the Approved tab shows, which waits for the connectors container.
+query AppsPage($status: AppStatus!, $first: Int!, $approved: Boolean!) {
   appCounts {
     approved
     discovered
@@ -34,7 +35,7 @@ query AppsPage($status: AppStatus!, $first: Int!) {
           before
         }
         preselected
-        managingConnector {
+        managingConnector @include(if: $approved) {
           id
           connection {
             id
@@ -45,7 +46,7 @@ query AppsPage($status: AppStatus!, $first: Int!) {
     }
   }
   # Computed rows the Approved tab lists after its apps.
-  appsToConnect {
+  appsToConnect @include(if: $approved) {
     __typename
     id
     name
