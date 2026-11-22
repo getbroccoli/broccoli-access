@@ -14,7 +14,11 @@ const POLL_INTERVAL_MS = 1_000;
 
 /** Settings' Connections page: where Broccoli Access finds people and their accounts. */
 export function ConnectionsSettings() {
-  const { data, error, refetch, startPolling, stopPolling } = useQuery(ConnectionsSettingsDocument);
+  // A scan started elsewhere, such as in another tab, changes the connection outside this cache.
+  const { data, error, refetch, startPolling, stopPolling } = useQuery(
+    ConnectionsSettingsDocument,
+    { fetchPolicy: "cache-and-network" },
+  );
   const connection = data?.setup.googleWorkspace;
   const isScanning = connection?.scan?.status === "SCANNING";
   useEffect(() => {
