@@ -14,8 +14,9 @@ let renewedSetup = false;
  */
 export async function readSession(apolloClient: ApolloClient): Promise<SessionQuery> {
   const session = await querySession(apolloClient);
-  const { me, setup } = session;
-  const beforeOwner = setup.step !== "DONE" && !me;
+  const { setup } = session;
+  // The owner exists from the scan step on, so only the connect step can be held.
+  const beforeOwner = setup.step === "CONNECT_GOOGLE";
   const shouldStart = setup.holder === "NOBODY" || (setup.holder === "YOU" && !renewedSetup);
   if (!beforeOwner || !shouldStart) {
     return session;
