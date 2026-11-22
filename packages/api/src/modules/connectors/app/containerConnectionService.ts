@@ -135,7 +135,10 @@ export function createContainerConnectionService(
     },
     async listAppsToConnect(ctx) {
       ctx.require("MANAGE_WORKSPACE");
-      const managing = (await containerConnectors.list()).filter(canChangeAccounts);
+      // A connected connector may read an app it matched by name, which has no catalog key.
+      const managing = (await connectorsWithConnections(dependencies))
+        .filter(({ connector, connection }) => !connection && canChangeAccounts(connector))
+        .map(({ connector }) => connector);
       const catalogApps = await connectedApps.readCatalogAppsWithoutApp(
         orm,
         managing.map(({ key }) => key),

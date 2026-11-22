@@ -73,16 +73,16 @@ export const APPROVED_APP_COLUMNS: DataTableColumn<ApprovedAppRow>[] = [
     header: t("apps.column.connection"),
     className: "w-28 text-right",
     cell: (row) => {
-      if (isAppToConnect(row)) {
-        return <ConnectAppButton connector={row.connector} size="default" />;
-      }
-      if (!row.managingConnector) {
+      const connector = isAppToConnect(row) ? row.connector : row.managingConnector;
+      if (!connector) {
         return null;
       }
-      return isConnected(row) ? (
+      // A cached app to connect may already be connected elsewhere until the list reloads.
+      const connected = isAppToConnect(row) ? Boolean(connector.connection) : isConnected(row);
+      return connected ? (
         <ConnectedBadge />
       ) : (
-        <ConnectAppButton connector={row.managingConnector} size="default" />
+        <ConnectAppButton connector={connector} size="default" />
       );
     },
   },

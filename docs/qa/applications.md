@@ -36,9 +36,9 @@ A manual check of the Applications page, the home page, against a development st
 
 ## Connection
 
-- [ ] Only Slack and Linear show "Connect"; the other rows leave Connection empty. A screen reader reads them "Connect Slack" and "Connect Linear".
+- [ ] Back on Approved, only Slack and Linear show "Connect"; the other rows leave Connection empty. A screen reader reads them "Connect Slack" and "Connect Linear".
 - [ ] Slack's "Connect" opens Settings → Connections.
-- [ ] Linear's "Connect" opens the "Connect Linear" dialog of [Connections settings](connections-settings.md#apps). A wrong key reads "Linear refused it. Check it and try again." and keeps the dialog open; `lin_api_acme_fake` closes it, and without a reload Linear's row reads "Connected" and links to its page, and the Approved count goes up by one.
+- [ ] Back on Approved, Linear's "Connect" opens the "Connect Linear" dialog of [Connections settings](connections-settings.md#apps). A wrong key reads "Linear refused it. Check it and try again." and keeps the dialog open; `lin_api_acme_fake` closes it, and without a reload Linear's row reads "Connected" and links to its page, and the Approved count goes up by one.
 
 ## Phone width
 

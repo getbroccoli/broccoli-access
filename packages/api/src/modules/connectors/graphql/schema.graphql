@@ -48,7 +48,7 @@ type App {
   managingConnector: ContainerConnector
 }
 
-"An app a container connector can manage that no scan has found and nothing has connected, as the catalog names it; computed when read, so nothing is stored until it connects."
+"An app a container connector can manage that no scan has found and nothing has connected, as the catalog names it; computed when read, never stored."
 type AppToConnect {
   "Its catalog key, such as `linear`."
   id: ID!
