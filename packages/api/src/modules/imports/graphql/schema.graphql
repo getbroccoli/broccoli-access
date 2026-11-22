@@ -77,3 +77,17 @@ enum ScanStepState {
   "The scan failed."
   FAILED
 }
+
+type ImportsMutations {
+  "Scan now: queues a scan of the connection, or nothing more while one is queued or running. Admins only."
+  scanConnection(connectionId: ID!): ScanMutationPayload!
+}
+
+"The scan after a change."
+type ScanMutationPayload {
+  scan: Scan
+}
+
+type Mutation {
+  imports: ImportsMutations!
+}

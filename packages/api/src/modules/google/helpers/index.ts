@@ -5,6 +5,7 @@ export {
   randomConsentToken,
   sealConsentState,
   type ConsentState,
+  type GoogleAppChangeState,
   type WorkspaceConsentState,
 } from "./consentState";
 export { verifyIdToken, type GoogleIdentity } from "./verifyIdToken";

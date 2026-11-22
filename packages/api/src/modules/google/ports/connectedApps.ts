@@ -14,6 +14,13 @@ export interface ConnectedApps {
       secrets: Record<string, string>;
     },
   ): Promise<{ appId: string; connectionId: string }>;
+  /** Replaces the connection's settings and secrets, joining `tx`, with its history line. */
+  changeConnection(
+    ctx: SecurityContext,
+    tx: Tx,
+    connectionId: string,
+    connection: { settings: Record<string, unknown>; secrets: Record<string, string> },
+  ): Promise<void>;
   /** The connection of `connector` without its secrets, or null. */
   readConnection(
     db: Orm | Tx,

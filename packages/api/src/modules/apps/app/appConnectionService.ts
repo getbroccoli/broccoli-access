@@ -1,3 +1,4 @@
+import { ApplicationError } from "../../../core/applicationError";
 import type { Orm, Tx } from "../../../core/db";
 import type { FieldChange } from "../../../core/records";
 import { createRecordHistoryService } from "../../../core/records";
@@ -24,6 +25,16 @@ export interface AppConnectionService {
       secrets: Record<string, string>;
     },
   ) => Promise<{ appId: string; connectionId: string }>;
+  /**
+   * Replaces the connection's settings and secrets, joining `tx`, and appends the settings' change
+   * to its history, never the secrets. Admins only; refuses an unknown connection with NOT_FOUND.
+   */
+  changeConnection: (
+    ctx: SecurityContext,
+    tx: Tx,
+    connectionId: string,
+    connection: { settings: Record<string, unknown>; secrets: Record<string, string> },
+  ) => Promise<void>;
   /** The connection of `connector` without its secrets, or null. Trusted read: no `ctx`. */
   readConnection: (db: Orm | Tx, connector: string) => Promise<AppConnection | null>;
   /** The connection with id `connectionId` without its secrets, or null. Trusted read: no `ctx`. */
@@ -55,6 +66,33 @@ export function createAppConnectionService({
         records: [{ recordId: id, changes: connectionChanges(connector, app, settings) }],
       });
       return { appId: app.id, connectionId: id };
+    },
+    async changeConnection(ctx, tx, connectionId, { settings, secrets }) {
+      ctx.require("MANAGE_WORKSPACE");
+      const connections = appConnectionRepository(tx);
+      const old = await connections.lockById(connectionId);
+      if (!old) {
+        throw new ApplicationError("NOT_FOUND", "No app connection has this id.");
+      }
+      const encryptedSecrets = secretBox.encrypt(JSON.stringify(secrets), connectionId);
+      await connections.update(connectionId, { settings, encryptedSecrets });
+      await recordHistory.append(ctx, tx, {
+        recordType: "app_connection",
+        operation: "UPDATED",
+        cause: { kind: "EDITED_DIRECTLY" },
+        records: [
+          {
+            recordId: connectionId,
+            changes: [
+              {
+                field: "settings",
+                oldValue: JSON.stringify(old.settings),
+                newValue: JSON.stringify(settings),
+              },
+            ],
+          },
+        ],
+      });
     },
     readConnection: (db, connector) => appConnectionRepository(db).findByConnector(connector),
     readConnectionById: (db, connectionId) => appConnectionRepository(db).findById(connectionId),

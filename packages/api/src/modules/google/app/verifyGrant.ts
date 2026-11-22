@@ -8,7 +8,7 @@ import type {
 } from "../../../integrations/google";
 import { UnsuccessfulAnswerError } from "../../../utils";
 import { GOOGLE_WORKSPACE_SCOPES, NotSuperAdminError } from "../domain";
-import { type GoogleIdentity, verifyIdToken, type WorkspaceConsentState } from "../helpers";
+import { type GoogleIdentity, verifyIdToken } from "../helpers";
 
 /** The consenting super admin and their Workspace customer. */
 export type SuperAdmin = GoogleUser & GoogleCustomer;
@@ -19,10 +19,13 @@ export interface VerifiedGrant {
   identity: GoogleIdentity;
 }
 
-/** Exchanges setup's code and checks the ID token, the refresh token and every scope asked for. */
+/**
+ * Exchanges the code of a Google Workspace consent, at setup or for a new Google app, and checks
+ * the ID token, the refresh token and every scope asked for.
+ */
 export async function verifyGrant(
   google: GoogleClient,
-  consent: WorkspaceConsentState,
+  consent: { clientId: string; clientSecret: string; nonce: string },
   answer: { code: string; redirectUri: string; now: Date },
 ): Promise<VerifiedGrant> {
   const { tokens, identity } = await verifyIdentity(google, consent, answer);

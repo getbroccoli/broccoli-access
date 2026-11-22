@@ -61,6 +61,19 @@ export const GOOGLE_WORKSPACE_SECRETS = z.object({
   refreshToken: z.string(),
 });
 
+/**
+ * Refuses with `OtherWorkspaceError` a new consent from outside the connected workspace, which
+ * Google names by its primary domain.
+ */
+export function requireSameWorkspace(
+  settings: GoogleWorkspaceSettings,
+  consentingDomain: string,
+): void {
+  if (consentingDomain.toLowerCase() !== settings.domain.toLowerCase()) {
+    throw new OtherWorkspaceError();
+  }
+}
+
 /** Only a Google super admin may connect the workspace and become the owner. */
 export class NotSuperAdminError extends Error {
   constructor() {
@@ -74,5 +87,13 @@ export class UnknownGoogleAccountError extends Error {
   constructor() {
     super("The Google account that signed in belongs to no user");
     this.name = "UnknownGoogleAccountError";
+  }
+}
+
+/** A new Google app must read the connected workspace, never another one. */
+export class OtherWorkspaceError extends Error {
+  constructor() {
+    super("The consenting Google account belongs to another workspace");
+    this.name = "OtherWorkspaceError";
   }
 }

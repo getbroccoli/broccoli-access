@@ -3,8 +3,16 @@ import { toEnum } from "../../../core/graphql";
 import type { ScanService } from "../app";
 import type { Scan } from "../domain";
 
-export function createResolvers(scans: Pick<ScanService, "readScan">): Resolvers {
+export function createResolvers(scans: Pick<ScanService, "readScan" | "scanNow">): Resolvers {
   return {
+    Mutation: {
+      imports: () => ({}),
+    },
+    ImportsMutations: {
+      scanConnection: async (_parent, { connectionId }, context) => ({
+        scan: toScanGraphql(await scans.scanNow(context.getActor(), connectionId)),
+      }),
+    },
     GoogleWorkspaceConnection: {
       scan: async (connection, _args, context) => {
         const scan = await scans.readScan(context.getActor(), connection.id);
