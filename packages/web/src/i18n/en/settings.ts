@@ -10,6 +10,22 @@ export const settingsEn = {
   "settings.connections.changeApp": "Change Google app",
   "settings.connections.loadFailed": "Couldn’t load the connections.",
   "settings.connections.retry": "Try again",
+  "settings.extension.section": "Chrome extension",
+  "settings.extension.name": "Broccoli Access for Chrome",
+  "settings.extension.notInstalled": "Not installed",
+  "settings.extension.notPaired": "Not paired",
+  "settings.extension.paired": "Paired",
+  "settings.extension.description":
+    "Hands over your Slack session when you connect or reconnect Slack. Nothing else.",
+  "settings.extension.pairedSummary": "{browser}, paired on {day}.",
+  "settings.extension.pairedNote":
+    "Hands over your Slack session when you connect or reconnect Slack.",
+  "settings.extension.webStore": "Chrome Web Store ↗",
+  "settings.extension.pair": "Pair this Chrome",
+  "settings.extension.confirmInPopup": "Chrome shows the extension’s popup for you to confirm.",
+  "settings.extension.pairFailed": "Couldn’t start pairing. Try again.",
+  "settings.extension.unpairFailed": "Couldn’t unpair. Try again.",
+  "settings.extension.unpair": "Unpair",
   "settings.googleApp.title": "Change Google app",
   "settings.googleApp.description":
     "Connect Google Workspace with another Google app of your own. Your people, apps and decisions stay as they are.",
