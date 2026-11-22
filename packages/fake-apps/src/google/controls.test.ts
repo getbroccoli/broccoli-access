@@ -32,6 +32,21 @@ it("returns 404 when suspending an unknown person", async ({ fake }) => {
   expect(response.status).toBe(404);
 });
 
+it("refuses a control request a browser sends from another site", async ({ fake }) => {
+  const response = await fetch(`${fake.url}/_fake/users/chloe@acme.example/suspend`, {
+    method: "POST",
+    headers: {
+      origin: "https://attacker.example",
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: "",
+  });
+
+  expect(response.status).toBe(403);
+  const state = await fetch(`${fake.url}/_fake/state`);
+  expect(await state.json()).toMatchObject({ suspendedPeople: 2 });
+});
+
 it("rejects an unknown connector error without changing state", async ({ fake }) => {
   const before = await fetch(`${fake.url}/_fake/state`).then((response) => response.json());
 
