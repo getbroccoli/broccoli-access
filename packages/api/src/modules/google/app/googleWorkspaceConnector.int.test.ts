@@ -81,8 +81,26 @@ test("maps all 42 Google directory users to their own app's accounts", async ({
 
   expect(accounts).toHaveLength(42);
   for (const person of ACME.people) {
-    expect(accounts.find(({ sourceKey }) => sourceKey === person.id)).toMatchObject({
-      raw: { id: person.id, primaryEmail: person.email, suspended: person.suspended },
+    const account = accounts.find(({ sourceKey }) => sourceKey === person.id);
+    expect(account?.raw).toEqual({
+      kind: "admin#directory#user",
+      id: person.id,
+      primaryEmail: person.email,
+      name: {
+        givenName: person.givenName,
+        familyName: person.familyName,
+        fullName: `${person.givenName} ${person.familyName}`,
+      },
+      isAdmin: person.isSuperAdmin,
+      suspended: person.suspended,
+      orgUnitPath: "/",
+      ...(person.managerEmail !== null && {
+        relations: [{ value: person.managerEmail, type: "manager" }],
+      }),
+      customerId: ACME.customer.id,
+      creationTime: person.creationTime,
+    });
+    expect(account).toMatchObject({
       values: {
         email: person.email,
         status: person.suspended ? "suspended" : "active",

@@ -49,12 +49,10 @@ it("preserves an existing user link even when the employee has the owner's email
 it("records a manager change with the old and new managers' names as labels", () => {
   const before = { ...EMPLOYEE, managerId: "employee-david" };
   const after = { ...EMPLOYEE, managerId: "employee-elif" };
-  const namesById = new Map([
-    ["employee-david", "David Okafor"],
-    ["employee-elif", "Elif Demir"],
-  ]);
+  const namesBefore = new Map([["employee-david", "David Okafor"]]);
+  const namesAfter = new Map([["employee-elif", "Elif Demir"]]);
 
-  const changes = directoryChanges(before, after, namesById);
+  const changes = directoryChanges(before, after, { before: namesBefore, after: namesAfter });
 
   expect(changes).toEqual([
     {
@@ -63,6 +61,23 @@ it("records a manager change with the old and new managers' names as labels", ()
       newValue: "employee-elif",
       oldLabel: "David Okafor",
       newLabel: "Elif Demir",
+    },
+  ]);
+});
+
+it("labels the owner's user link with the employee's email", () => {
+  const before = { ...EMPLOYEE, userId: null };
+  const after = { ...EMPLOYEE, userId: "user-owner" };
+
+  const changes = directoryChanges(before, after, { before: new Map(), after: new Map() });
+
+  expect(changes).toEqual([
+    {
+      field: "user",
+      oldValue: null,
+      newValue: "user-owner",
+      oldLabel: null,
+      newLabel: "ana@acme.example",
     },
   ]);
 });
