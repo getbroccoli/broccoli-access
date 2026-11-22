@@ -226,3 +226,30 @@ test("reads on the next scan a photo whose first read failed", async ({
     (await storedEmployees(orm)).filter(({ avatarFileId }) => avatarFileId !== null),
   ).toHaveLength(11);
 });
+
+test("reads again on the next scan a changed photo whose read failed", async ({
+  orm,
+  fakeGoogle,
+  transact,
+}) => {
+  const { scans, sourceId, connectionId } = await googleScanSetup(orm, fakeGoogle.url);
+  await scans.runScan(SYSTEM, sourceId);
+  const chloe = (await storedEmployees(orm)).find(({ email }) => email === "chloe@acme.example")!;
+  fakeGoogle.setPhoto(chloe.email, PNG);
+  await failFakeGoogle(fakeGoogle.url, {
+    endpoint: "directory.users.photos.get",
+    error: "unexpected_response",
+    count: 1,
+  });
+  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await scans.runScan(SYSTEM, sourceId);
+  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+
+  await scans.runScan(SYSTEM, sourceId);
+
+  const updated = (await storedEmployees(orm)).find(({ id }) => id === chloe.id)!;
+  expect(await employeeServices(orm).readAvatar(OWNER, updated.avatarFileId!)).toEqual({
+    content: PNG,
+    mimeType: "image/png",
+  });
+});

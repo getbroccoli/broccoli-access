@@ -29,6 +29,11 @@ export interface Connector {
    * photo; null without one. A directory whose sessions read photos has it.
    */
   photoVersion?(raw: Record<string, unknown>): string | null;
+  /**
+   * The account's `raw` without its photo version, saved when the photo's read failed so the next
+   * scan reads it again. A connector with `photoVersion` has it.
+   */
+  withoutPhotoVersion?(raw: Record<string, unknown>): Record<string, unknown>;
 }
 
 export interface ConnectionField {

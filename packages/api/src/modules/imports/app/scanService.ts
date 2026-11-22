@@ -43,7 +43,8 @@ export interface ScanService {
    * The scan's job: reads every page of the connection's accounts and a directory's changed
    * photos, trying a rate-limited or unavailable call again, then in one transaction replaces the
    * source's records, syncs them, marks it scanned and moves setup from the scan to selecting the
-   * apps. A connector error marks it failed and changes nothing else. System only.
+   * apps. A connector error reading the accounts marks it failed and changes nothing else; one
+   * reading a photo only keeps that person's photo as it is. System only.
    */
   runScan: (ctx: SecurityContext, sourceId: string) => Promise<void>;
   /** The job's attempts are used up: the scan failed with `app_unavailable`. System only. */
@@ -169,14 +170,14 @@ async function scanSource(
   const accounts = await readAllAccounts((cursor) => retrying(() => session.listAccounts(cursor)));
   const found = foundCounts(accounts);
   progressBySource.set(sourceId, { found });
-  const photos = await readChangedPhotos(ctx, dependencies, {
+  const { photos, accounts: savedAccounts } = await readChangedPhotos(ctx, dependencies, {
     sourceId,
     connector,
     session,
     accounts,
     retrying,
   });
-  const findings = { sourceId, connection, connector, accounts, photos };
+  const findings = { sourceId, connection, connector, accounts: savedAccounts, photos };
   const { saved, finishedSetupScan } = await saveScan(ctx, dependencies, findings);
   logger.info(
     {

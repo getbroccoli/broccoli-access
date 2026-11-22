@@ -22,34 +22,53 @@ export interface PhotoScan {
   retrying: <T>(call: () => Promise<T>) => Promise<T>;
 }
 
+/** What a directory scan's photo reads give the save. */
+export interface ChangedPhotos {
+  /** By source key: each photo read, and null for each the directory removed. */
+  photos: Map<string, AccountPhoto | null>;
+  /** The accounts to save, those whose photo read failed without their photo version. */
+  accounts: readonly ImportedAccount[];
+}
+
 /**
- * The photos a directory's scan changes, by source key: each one `photoUpdateOf` reads, and null
- * for each the directory removed. A failed read leaves its person out, so they keep their photo.
+ * Reads the photos `photoUpdateOf` asks for. A failed read leaves its person out of the photos,
+ * so they keep their photo, and drops its version from their record, so the next scan tries again.
  */
 export async function readChangedPhotos(
   ctx: SecurityContext,
   dependencies: { orm: Orm; logger: Logger; directory: DirectoryPeople },
   scan: PhotoScan,
-): Promise<Map<string, AccountPhoto | null>> {
+): Promise<ChangedPhotos> {
   const { connector, session } = scan;
-  if (!connector.isDirectory || !connector.photoVersion || !session.readPhoto) {
-    return new Map();
+  if (
+    !connector.isDirectory ||
+    !connector.photoVersion ||
+    !connector.withoutPhotoVersion ||
+    !session.readPhoto
+  ) {
+    return { photos: new Map(), accounts: scan.accounts };
   }
   const photoVersion = connector.photoVersion.bind(connector);
   const updates = await photoUpdates(ctx, dependencies, scan, photoVersion);
   const photos = new Map<string, AccountPhoto | null>(
     updates.cleared.map((sourceKey) => [sourceKey, null]),
   );
+  const failed = new Set<string>();
   for (let start = 0; start < updates.read.length; start += PHOTOS_AT_ONCE) {
     const batch = updates.read.slice(start, start + PHOTOS_AT_ONCE);
     await Promise.all(
       batch.map(async (sourceKey) => {
         const photo = await readKeepingOnFailure(dependencies.logger, scan, sourceKey);
-        if (photo !== undefined) photos.set(sourceKey, photo);
+        if (photo === undefined) failed.add(sourceKey);
+        else photos.set(sourceKey, photo);
       }),
     );
   }
-  return photos;
+  const withoutPhotoVersion = connector.withoutPhotoVersion.bind(connector);
+  const accounts = scan.accounts.map((account) =>
+    failed.has(account.sourceKey) ? { ...account, raw: withoutPhotoVersion(account.raw) } : account,
+  );
+  return { photos, accounts };
 }
 
 /** Photo reads at once, as many as the connector's tokens lists, well inside Google's quota. */

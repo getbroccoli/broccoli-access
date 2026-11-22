@@ -82,6 +82,11 @@ export function createGoogleWorkspaceConnector(addresses: {
     // Google gives a user's photo etag only to a user with a photo.
     photoVersion: ({ thumbnailPhotoEtag }) =>
       typeof thumbnailPhotoEtag === "string" ? thumbnailPhotoEtag : null,
+    withoutPhotoVersion: (raw) => {
+      const user = { ...raw };
+      delete user.thumbnailPhotoEtag;
+      return user;
+    },
   };
 }
 
