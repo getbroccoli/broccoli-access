@@ -56,7 +56,7 @@ export const setupEn = {
   "setup.scan.readingPeople": "Reading people",
   "setup.scan.readingPeopleHint": "From the Google directory",
   "setup.scan.peopleRead": "{count} people, {suspended} suspended",
-  "setup.scan.readingPeopleFailed": "Couldn’t read the Google directory",
+  "setup.scan.failed": "Couldn’t read Google Workspace",
   "setup.scan.findingApps": "Finding apps people signed in to with Google",
   "setup.scan.appsFound": "{count} apps found",
   "setup.scan.oneAppFound": "1 app found",

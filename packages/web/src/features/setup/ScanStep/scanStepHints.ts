@@ -18,7 +18,7 @@ export function scanStepHints({ people, apps, signInLogs }: ScanSteps) {
 
 function peopleHint({ state, count, suspended }: ScanSteps["people"]): string {
   if (state === "FAILED") {
-    return t("setup.scan.readingPeopleFailed");
+    return t("setup.scan.failed");
   }
   if (state === "DONE" && count !== null && suspended !== null) {
     return t("setup.scan.peopleRead", { count: String(count), suspended: String(suspended) });
