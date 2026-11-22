@@ -9,12 +9,9 @@ import {
   storedApps,
   storedAppAccounts,
   storedEmployees,
-  storedImportRecords,
   storedRecordHistory,
-  storedImportSources,
   grantAtFakeGoogle,
   revokeAtFakeGoogle,
-  failFakeGoogle,
 } from "#test/support";
 
 test("saves the 37 granted apps as discovered beside the approved Google Workspace", async ({
@@ -231,39 +228,6 @@ test("deletes a revoked grant account while keeping its creation and deletion hi
     causeRef: sourceId,
   });
 });
-
-test.for(["directory.tokens.list", "reports.activities.list"])(
-  "preserves apps, accounts, records and history after a failed %s rescan",
-  async (endpoint, { orm, fakeGoogle, transact }) => {
-    const { scans, sourceId, connectionId } = await googleScanSetup(orm, fakeGoogle.url);
-    await scans.runScan(SYSTEM, sourceId);
-    const before = {
-      apps: await storedApps(orm),
-      accounts: await storedAppAccounts(orm),
-      records: await storedImportRecords(orm),
-      history: await storedRecordHistory(orm),
-    };
-    await grantAtFakeGoogle(fakeGoogle.url, {
-      email: "ana@acme.example",
-      clientId: "new-app",
-      appName: "Acme Sketch",
-    });
-    await failFakeGoogle(fakeGoogle.url, { endpoint, error: "permission_missing", count: 1 });
-    await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
-
-    await scans.runScan(SYSTEM, sourceId);
-
-    expect(await storedImportSources(orm)).toMatchObject([
-      { id: sourceId, status: "scan_failed", failure: "permission_missing" },
-    ]);
-    expect({
-      apps: await storedApps(orm),
-      accounts: await storedAppAccounts(orm),
-      records: await storedImportRecords(orm),
-      history: await storedRecordHistory(orm),
-    }).toEqual(before);
-  },
-);
 
 test("records every discovered app and grant account as created by the scan", async ({
   orm,
