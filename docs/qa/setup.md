@@ -1,10 +1,10 @@
 # QA setup
 
-How to get a development stack with a signed-in owner before a manual check. Use generated demo data only, with `example.com` addresses.
+How to get a development stack with a signed-in owner before a manual check. Use generated demo data only: the fake Google's demo company Acme, or `example.com` addresses.
 
 ## Start the stack
 
-Run `pnpm dev` and set `URL` to the address it prints. Development data is kept between runs; an owner created once stays. `pnpm dev --drop-db` starts on a database without an owner.
+Run `pnpm dev` and set `URL` to the address it prints; it also prints the fake Google's address. Development data is kept between runs; an owner created once stays. `pnpm dev --drop-db` starts on a database without an owner.
 
 ## Hold setup
 
@@ -16,24 +16,30 @@ From a terminal, keep the setup cookie in a cookie jar instead:
 curl -c cookies -b cookies -X POST -H "origin: $URL" "$URL/api/auth/setup/start"
 ```
 
-## Create the owner
+## Connect Google Workspace
 
-Setup's only step, `/setup`, creates the owner. Enter `owner@example.com` and a password of at least 8 characters, then choose "Create account". This signs you in and ends on Today (`/`).
+Setup's first step, `/setup`, connects the fake Google, which already knows this stack's redirect address. Enter the seed's client ID `123456789012-acme.apps.googleusercontent.com` and secret `acme-broccoli-access-fake-secret` (`packages/fake-apps/src/seed/acme.ts`), choose "Connect as Google admin", pick Mia Novak (`admin@acme.example`) on the fake's consent page and choose Allow. This signs Mia in as the owner and lands on the scan step (`/setup/scan`).
 
-From a terminal:
+From a terminal, with the setup cookie from above:
 
 ```sh
 curl -c cookies -b cookies -H 'content-type: application/json' -H "origin: $URL" \
-  -d '{"email":"owner@example.com","password":"correct-horse-battery"}' "$URL/api/auth/setup"
+  -d '{"clientId":"123456789012-acme.apps.googleusercontent.com","clientSecret":"acme-broccoli-access-fake-secret"}' \
+  "$URL/api/google/connect"
 ```
 
-## Sign in again
+Open the `authorizationUrl` it answers in the browser, or post the consent form to it with `-d account=admin@acme.example -d decision=allow` plus its query parameters, then `curl -c cookies -b cookies` the callback address the fake redirects to.
 
-Once the owner exists, setup answers `OWNER_EXISTS`. Sign in with the same body at `/api/auth/sign-in/email`, from the console or with `curl -c cookies`.
+There is no sign-in yet: a browser without the owner's session cannot sign in again. Until the scan and the app selection are built, setup stays at the scan step and the app's pages lead back to it. To check them, move setup on in the dev database:
+
+```sh
+docker exec "$(docker ps -qf name=broccoli-access-dev-.*-postgres)" \
+  psql -U broccoli_access -c "update instance set setup_step = 'done'"
+```
 
 ## Send email
 
-`pnpm dev` runs Mailpit and configures a fresh instance to send through it from `access@example.com` before printing its address. Email works without visiting Settings. Saved email choices survive restarts; while Mailpit is chosen, links use the current development port. See [Email settings and password reset](email-settings.md).
+`pnpm dev` runs Mailpit and configures a fresh instance to send through it from `access@example.com` before printing its address. Email works without visiting Settings. Saved email choices survive restarts; while Mailpit is chosen, links use the current development port. See [Email settings](email-settings.md).
 
 ## Add employees
 

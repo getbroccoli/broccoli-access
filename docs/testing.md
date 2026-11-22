@@ -57,6 +57,7 @@ Each checkout gets its own container on a free port, so worktrees can run the te
 
 Sign-in and the Google connector are tested against the fake Google in `packages/fake-apps`, seeded with the demo company Acme ([design](fake-apps.md)).
 
-- API tests use the `fakeGoogle` fixture: a fresh fake on a free local port for each test. A test registers its server's redirect address, `<its origin>/api/google/callback`, with `POST /_fake/clients`.
+- API tests use the `fakeGoogle` fixture: a fresh fake on a free local port for each test. A test registers its server's redirect address, `<its origin>/api/google/callback`, with `POST /_fake/clients` (`registerGoogleRedirect`), and `consentAtGoogle` answers the consent page.
+- End-to-end tests run against the `env` fixture's fake Google; `env.signInAsOwner()` connects Google Workspace as the seed's super admin, `admin@acme.example`, through the real consent, and leaves setup at the scan step.
 - `pnpm dev` runs the fake beside the app on a free port and points the app's two Google settings at it. Restarting `pnpm dev` resets it.
 - The seed's OAuth client secret is in `packages/fake-apps/src/seed/acme.ts`. Its redirect address under `pnpm dev` is `http://localhost:<app port>/api/google/callback`.

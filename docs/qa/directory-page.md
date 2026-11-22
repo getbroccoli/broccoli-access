@@ -4,7 +4,7 @@ A manual check of the People page against a development stack.
 
 ## Setup
 
-1. Start the stack and create the owner as in [QA setup](setup.md).
+1. Start the stack, connect Google Workspace and move setup on as in [QA setup](setup.md).
 2. A fresh instance has no people: `/people` shows the empty state "No people yet".
 3. Add about 60 employees with the `employees { create }` mutation from [QA setup](setup.md).
 

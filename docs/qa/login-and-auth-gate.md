@@ -1,19 +1,17 @@
 # QA: Login, logout and the auth gate
 
-A manual check of signing in and out against a development stack.
+A manual check of the sign-in page and signing out against a development stack. Sign in with Google is not built yet.
 
 ## Setup
 
-1. Start the stack and create the owner as in [QA setup](setup.md).
+1. Start the stack, connect Google Workspace and move setup on as in [QA setup](setup.md).
 2. Use a fresh browser profile, so no session cookie is left over.
 
 ## Login
 
 - [ ] `/people?q=a` lands on `/login?redirect=%2Fpeople%3Fq%3Da`, shown without the navigation.
-- [ ] Submitting empty fields shows "Enter a valid email address." and "Enter your password."
-- [ ] A wrong password shows "The email or password is incorrect." and keeps the email.
-- [ ] The right password returns to `/people?q=a`.
-- [ ] `/login` while signed in goes to Today (`/`); `/login?redirect=https://example.com` goes to Today after signing in.
+- [ ] The page shows "Broccoli Access" and the organisation "Acme", and no form; `/forgot-password` and `/reset-password` show "Page not found".
+- [ ] `/login` while signed in as the owner goes to Today (`/`).
 
 ## Logout
 
@@ -22,7 +20,7 @@ A manual check of signing in and out against a development stack.
 
 ## Session ends elsewhere
 
-- [ ] Sign out in a second tab, then search in the first: it goes to login, and signing in returns to the same search.
+- [ ] Sign out in a second tab, then search in the first: it goes to login with that search as its `redirect`.
 
 ## Robustness
 

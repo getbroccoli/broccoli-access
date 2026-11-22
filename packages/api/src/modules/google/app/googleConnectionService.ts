@@ -11,31 +11,17 @@ import {
   profilesOf,
   type SecurityContext,
 } from "../../../core/security";
-import {
-  createGoogleClient,
-  type GoogleClient,
-  type GoogleCustomer,
-  type GoogleTokens,
-  type GoogleUser,
-  type OpenIdConfiguration,
-} from "../../../integrations/google";
-import { UnsuccessfulAnswerError } from "../../../utils";
+import { createGoogleClient } from "../../../integrations/google";
 import {
   GOOGLE_WORKSPACE,
   GOOGLE_WORKSPACE_SCOPES,
   googleRedirectAddress,
   type GoogleWorkspaceSettings,
-  NotSuperAdminError,
   parseGoogleWorkspaceSettings,
 } from "../domain";
-import {
-  type ConsentState,
-  type GoogleIdentity,
-  openConsentState,
-  sealConsentState,
-  verifyIdToken,
-} from "../helpers";
+import { type ConsentState, openConsentState, sealConsentState } from "../helpers";
 import type { ConnectedApps } from "../ports";
+import { readSuperAdmin, type SuperAdmin, type VerifiedGrant, verifyGrant } from "./verifyGrant";
 
 const instances = createInstanceService();
 const owners = createOwnerService();
@@ -145,7 +131,8 @@ export function createGoogleConnectionService(
           "The consent expired or was not this server's.",
         );
       }
-      const grant = await verifyGrant(google, consent, answer);
+      const redirectUri = googleRedirectAddress(answer.publicOrigin);
+      const grant = await verifyGrant(google, consent, { ...answer, redirectUri });
       const admin = await readSuperAdmin(google, grant.tokens.accessToken, grant.identity);
       return saveConnection(dependencies, ctx, answer, { consent, grant, admin });
     },
@@ -170,12 +157,6 @@ export function createGoogleConnectionService(
 /** How long the admin has between starting the consent and Google's answer. */
 const STATE_MINUTES = 10;
 const MINUTE_MS = 60_000;
-
-/** What Google's answer proved: the tokens it granted, with a refresh token, and who consented. */
-interface VerifiedGrant {
-  tokens: GoogleTokens & { refreshToken: string };
-  identity: GoogleIdentity;
-}
 
 function parseCredentials(clientId: string, clientSecret: string) {
   const credentials = { clientId: clientId.trim(), clientSecret: clientSecret.trim() };
@@ -223,70 +204,6 @@ function consentUrl(
   }).toString();
   return url.toString();
 }
-
-/** Exchanges the code and checks the ID token, the refresh token and every scope asked for. */
-async function verifyGrant(
-  google: GoogleClient,
-  { clientId, clientSecret, nonce }: ConsentState,
-  { code, publicOrigin, now }: ConsentAnswer,
-): Promise<VerifiedGrant> {
-  const openId = await google.discover();
-  const tokens = await google.exchangeCode(openId, {
-    code,
-    clientId,
-    clientSecret,
-    redirectUri: googleRedirectAddress(publicOrigin),
-  });
-  const identity = await verifiedIdentity(google, openId, tokens.idToken, { clientId, nonce, now });
-  const { refreshToken } = tokens;
-  if (refreshToken === null) {
-    throw new ApplicationError("INVALID_INPUT", "Google gave no refresh token.");
-  }
-  if (GOOGLE_WORKSPACE_SCOPES.some((scope) => !tokens.scopes.includes(scope))) {
-    throw new ApplicationError("INVALID_INPUT", "The admin did not allow every permission.");
-  }
-  return { tokens: { ...tokens, refreshToken }, identity };
-}
-
-async function verifiedIdentity(
-  google: GoogleClient,
-  openId: OpenIdConfiguration,
-  idToken: string,
-  { clientId, nonce, now }: { clientId: string; nonce: string; now: Date },
-): Promise<GoogleIdentity> {
-  const keys = await google.readSigningKeys(openId);
-  try {
-    return await verifyIdToken(idToken, { keys, issuer: openId.issuer, clientId, nonce, now });
-  } catch {
-    throw new ApplicationError("INVALID_INPUT", "Google's ID token did not verify.");
-  }
-}
-
-/** The consenting user and their customer, refused with `NotSuperAdminError` unless a super admin. */
-async function readSuperAdmin(
-  google: GoogleClient,
-  accessToken: string,
-  { sub }: GoogleIdentity,
-): Promise<SuperAdmin> {
-  try {
-    const customer = await google.readCustomer(accessToken);
-    const user = await google.findUser(accessToken, sub);
-    if (!user?.isAdmin) {
-      throw new NotSuperAdminError();
-    }
-    return { ...user, ...customer };
-  } catch (error) {
-    // The Directory refuses anyone but an admin.
-    throw error instanceof UnsuccessfulAnswerError && error.status === FORBIDDEN_STATUS
-      ? new NotSuperAdminError()
-      : error;
-  }
-}
-
-const FORBIDDEN_STATUS = 403;
-
-/** The consenting super admin and their Workspace customer. */
-type SuperAdmin = GoogleUser & GoogleCustomer;
 
 /** Writes the connection, the owner and the next step together, then logs the outcome. */
 async function saveConnection(
