@@ -8,20 +8,21 @@ import { extensionPairings } from "./extensionPairingsTable";
 export interface ExtensionPairingRepository {
   /**
    * Pairs the user's browser, replacing their pairing with a new id, so a call that checked the
-   * old token can no longer touch or delete the new pairing.
+   * old token can no longer touch or delete the new pairing. Returns that id.
    */
   save(pairing: {
     userId: string;
     tokenHash: string;
     browser: string;
     pairedAt: Date;
-  }): Promise<ExtensionPairing>;
+  }): Promise<string>;
   findByUser(userId: string): Promise<ExtensionPairing | null>;
   /** The pairing with its token hash, to check a token against. */
   findWithTokenHash(id: string): Promise<{ pairing: ExtensionPairing; tokenHash: string } | null>;
   /** Moves the pairing's `last_seen_at`; null when it is gone. */
   touch(id: string, lastSeenAt: Date): Promise<ExtensionPairing | null>;
-  delete(id: string): Promise<void>;
+  /** False when no pairing has `id`, such as when another call deleted it first. */
+  delete(id: string): Promise<boolean>;
   deleteByUser(userId: string): Promise<void>;
 }
 
@@ -37,8 +38,8 @@ export function extensionPairingRepository(db: Orm | Tx): ExtensionPairingReposi
           target: extensionPairings.userId,
           set: { ...values, id: sql`uuidv7()` },
         })
-        .returning(columns);
-      return saved!;
+        .returning({ id: extensionPairings.id });
+      return saved!.id;
     },
     findByUser: async (userId) => {
       const [pairing] = await orm()
@@ -67,7 +68,11 @@ export function extensionPairingRepository(db: Orm | Tx): ExtensionPairingReposi
       return pairing ?? null;
     },
     delete: async (id) => {
-      await orm().delete(extensionPairings).where(eq(extensionPairings.id, id));
+      const deleted = await orm()
+        .delete(extensionPairings)
+        .where(eq(extensionPairings.id, id))
+        .returning({ id: extensionPairings.id });
+      return deleted.length > 0;
     },
     deleteByUser: async (userId) => {
       await orm().delete(extensionPairings).where(eq(extensionPairings.userId, userId));

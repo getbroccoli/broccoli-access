@@ -1,7 +1,11 @@
-import express, { type Request, type Response, Router } from "express";
+import express, { type NextFunction, type Request, type Response, Router } from "express";
 import { z } from "zod";
 
-import { ApplicationError, sendApplicationError } from "../../../core/applicationError";
+import {
+  ApplicationError,
+  invalidInput,
+  sendApplicationError,
+} from "../../../core/applicationError";
 import type { Logger } from "../../../core/logger";
 import type { ExtensionPairingService } from "../app";
 
@@ -18,32 +22,33 @@ export function extensionRouter(
     .post(
       "/extension/pairings",
       express.json({ limit: MAX_BODY_BYTES }),
-      handled(logger, async (request, response) => {
+      async (request, response) => {
         const { code, browser } = REDEMPTION.parse(request.body);
         const { token } = await pairings.redeemCode({ code, browser, now: new Date() });
         response.status(CREATED).json({ token });
-      }),
+      },
     )
-    .get(
-      "/extension/pairing",
-      handled(logger, async (request, response) => {
-        const pairing = await pairings.readPairingOfToken({
-          token: bearerTokenOf(request),
-          now: new Date(),
-        });
-        if (!pairing) {
-          response.sendStatus(UNAUTHORIZED);
-          return;
-        }
-        response.json({ browser: pairing.browser, pairedAt: pairing.pairedAt.toISOString() });
-      }),
-    )
-    .delete(
-      "/extension/pairing",
-      handled(logger, async (request, response) => {
-        const unpaired = await pairings.unpairWithToken(bearerTokenOf(request));
-        response.sendStatus(unpaired ? NO_CONTENT : UNAUTHORIZED);
-      }),
+    .get("/extension/pairing", async (request, response) => {
+      const pairing = await pairings.readPairingOfToken({
+        token: bearerTokenOf(request),
+        now: new Date(),
+      });
+      if (!pairing) {
+        response.sendStatus(UNAUTHORIZED);
+        return;
+      }
+      response.json({ browser: pairing.browser, pairedAt: pairing.pairedAt.toISOString() });
+    })
+    .delete("/extension/pairing", async (request, response) => {
+      const unpaired = await pairings.unpairWithToken(bearerTokenOf(request));
+      response.sendStatus(unpaired ? NO_CONTENT : UNAUTHORIZED);
+    })
+    .use(
+      "/extension",
+      // Express tells an error handler by its four parameters, so `next` stays though unused.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      (error: unknown, _request: Request, response: Response, _next: NextFunction) =>
+        sendFailure(error, response, logger),
     );
 }
 
@@ -52,6 +57,8 @@ const CREATED = 201;
 const NO_CONTENT = 204;
 
 const UNAUTHORIZED = 401;
+
+const PAYLOAD_TOO_LARGE = 413;
 
 const INTERNAL_SERVER_ERROR = 500;
 
@@ -69,22 +76,23 @@ function bearerTokenOf(request: Request): string {
   return scheme?.toLowerCase() === "bearer" && token ? token : "";
 }
 
-/** Runs `handle`, answering any failure it throws with `sendFailure`. */
-function handled(
-  logger: Logger,
-  handle: (request: Request, response: Response) => Promise<void>,
-): (request: Request, response: Response) => Promise<void> {
-  return (request, response) =>
-    handle(request, response).catch((error: unknown) => sendFailure(error, response, logger));
-}
-
 /**
- * An expected refusal as its status; anything else as a bare 500, logged by its class only, since a
- * database error's message carries the query's values, such as the token's hash (RULE31).
+ * Answers any failure of these routes, the JSON parser's included: an expected refusal or an
+ * unreadable body as its status; anything else as a bare 500. Logs the class only, since a parser
+ * or database message can quote the body or the token's hash (RULE31).
  */
 function sendFailure(error: unknown, response: Response, logger: Logger): void {
   if (error instanceof ApplicationError) {
     sendApplicationError(error, response);
+    return;
+  }
+  const parserFailure = bodyParserFailureOf(error);
+  if (parserFailure === "entity.parse.failed") {
+    sendApplicationError(invalidInput([{ field: "body", code: "invalid" }]), response);
+    return;
+  }
+  if (parserFailure === "entity.too.large") {
+    response.sendStatus(PAYLOAD_TOO_LARGE);
     return;
   }
   logger.error(
@@ -92,4 +100,10 @@ function sendFailure(error: unknown, response: Response, logger: Logger): void {
     "Extension call failed",
   );
   response.sendStatus(INTERNAL_SERVER_ERROR);
+}
+
+/** The `type` Express's JSON parser gives its failures, such as `entity.parse.failed`. */
+function bodyParserFailureOf(error: unknown): string | undefined {
+  const { type } = (error ?? {}) as { type?: unknown };
+  return typeof type === "string" ? type : undefined;
 }

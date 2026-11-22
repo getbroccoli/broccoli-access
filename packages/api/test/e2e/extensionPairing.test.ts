@@ -87,6 +87,17 @@ test("refuses a JSON array as a pairing request", async ({ env }) => {
   expect(await response.json()).toMatchObject({ code: "INVALID_INPUT" });
 });
 
+test("returns INVALID_INPUT when a pairing request contains malformed JSON", async ({ env }) => {
+  const response = await fetch(new URL("/api/extension/pairings", env.url), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: '{"code": "abc',
+  });
+
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({ code: "INVALID_INPUT" });
+});
+
 const START_PAIRING = "mutation { extension { startPairing { code } } }";
 const MY_PAIRING = "{ me { extensionPairing { browser pairedAt } } }";
 const BROWSER = "Chrome on macOS";

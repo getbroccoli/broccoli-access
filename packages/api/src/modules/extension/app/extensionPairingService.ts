@@ -30,7 +30,7 @@ export interface ExtensionPairingService {
   redeemCode: (input: { code: string; browser: string; now: Date }) => Promise<{ token: string }>;
   /** The pairing `token` authenticates, seen at `now`; null for an unknown, replaced or malformed token. */
   readPairingOfToken: (input: { token: string; now: Date }) => Promise<ExtensionPairing | null>;
-  /** Deletes the pairing `token` authenticates; false when it authenticates none. */
+  /** Deletes the pairing `token` authenticates; false when it authenticates none or another call deleted it first. */
   unpairWithToken: (token: string) => Promise<boolean>;
   /** The caller's pairing; null when their Chrome is not paired. Needs MANAGE_WORKSPACE. */
   readPairing: (ctx: SecurityContext) => Promise<ExtensionPairing | null>;
@@ -65,20 +65,15 @@ export function createExtensionPairingService({
         throw invalidInput([{ field: "code", code: "invalid" }]);
       }
       const secret = newTokenSecret();
-      const pairing = await pairings
-        .save({
-          userId: opened.userId,
-          tokenHash: hashTokenSecret(secret),
-          browser: label,
-          pairedAt: now,
-        })
-        .catch((error: unknown) => {
-          // Nothing paired, so the owner may still use the code.
-          usedCodes.delete(opened.nonce);
-          throw error;
-        });
-      logger.info({ pairingId: pairing.id, userId: pairing.userId }, "Extension paired");
-      return { token: formatPairingToken({ pairingId: pairing.id, secret }) };
+      // A failed save keeps the code spent: the pairing may have been saved all the same.
+      const pairingId = await pairings.save({
+        userId: opened.userId,
+        tokenHash: hashTokenSecret(secret),
+        browser: label,
+        pairedAt: now,
+      });
+      logger.info({ pairingId, userId: opened.userId }, "Extension paired");
+      return { token: formatPairingToken({ pairingId, secret }) };
     },
     readPairingOfToken: async ({ token, now }) => {
       const pairing = await authenticate(pairings, token, logger);
@@ -89,12 +84,14 @@ export function createExtensionPairingService({
       if (!pairing) {
         return false;
       }
-      await pairings.delete(pairing.id);
-      logger.info(
-        { pairingId: pairing.id, userId: pairing.userId },
-        "Extension unpaired in Chrome",
-      );
-      return true;
+      const deleted = await pairings.delete(pairing.id);
+      if (deleted) {
+        logger.info(
+          { pairingId: pairing.id, userId: pairing.userId },
+          "Extension unpaired in Chrome",
+        );
+      }
+      return deleted;
     },
     readPairing: async (ctx) => pairings.findByUser(pairingUserOf(ctx)),
     unpair: async (ctx) => {
