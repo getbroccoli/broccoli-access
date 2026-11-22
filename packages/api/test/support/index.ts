@@ -22,7 +22,14 @@ export { TEST_OWNER, TestEnv, type SignedInOwner, type TestEnvOptions } from "./
 export { TestSeed } from "./testSeed";
 export { TEST_SECRET_BOX } from "./testSecretBox";
 export { storedFileIds } from "./storedFileIds";
-export { employeeServices, mailSettings, googleConnection, googleSignIn, scans } from "./services";
+export {
+  employeeServices,
+  mailSettings,
+  googleConnection,
+  googleSignIn,
+  scans,
+  apps,
+} from "./services";
 export type { EmployeeServices } from "./services";
 export { fileStorage, instances, owners, recordHistory, setupSessions } from "./statelessServices";
 export { EXAMPLE_PAYLOAD } from "./exampleEvent";

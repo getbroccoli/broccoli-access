@@ -4,13 +4,12 @@ import type { SetupStep } from "@/__generated__/graphql";
 import type { MessageKey } from "@/i18n";
 
 /** The path of a setup page, or of Today once setup is done. */
-export type SetupPath = "/setup" | "/setup/scan" | "/";
+export type SetupPath = "/setup" | "/setup/scan" | "/apps" | "/";
 
 interface StepDefinition {
   id: string;
   title: MessageKey;
-  /** Null for a step whose page is not built yet. */
-  path: SetupPath | null;
+  path: SetupPath;
   /** The server's setup step the page belongs to. */
   step: SetupStep;
 }
@@ -19,7 +18,8 @@ interface StepDefinition {
 const STEPS = [
   { id: "connect_google", title: "setup.connect.title", path: "/setup", step: "CONNECT_GOOGLE" },
   { id: "scan", title: "setup.scan.title", path: "/setup/scan", step: "SCAN" },
-  { id: "select_apps", title: "setup.selectApps.title", path: null, step: "SELECT_APPS" },
+  // The app's own Applications page, in its first-run mode.
+  { id: "select_apps", title: "setup.selectApps.title", path: "/apps", step: "SELECT_APPS" },
 ] as const satisfies readonly StepDefinition[];
 
 /** Where setup ends: Today. */
@@ -55,7 +55,7 @@ export function setupStepPage(step: SetupStep): SetupPath {
     return FINISHED;
   }
   const page = STEPS.find((candidate) => candidate.step === step);
-  if (!page?.path) {
+  if (!page) {
     throw new Error(`Setup has no page for the ${step} step`);
   }
   return page.path;
@@ -75,13 +75,17 @@ export function requireSetupPage<Me>(page: SetupStepId, { context, location }: G
   }
 }
 
-/** The gate of the app itself: a signed-in user once setup is done. Returns them. */
+/**
+ * The gate of the app itself: a signed-in user once setup is done, or on the app page of the
+ * current setup step, such as Applications while they select the apps. Returns them.
+ */
 export function requireFinishedSetup<Me>({ context, location }: Gate<Me>): Me {
   if (!context.me && !context.holdsSetup) {
     throw loginRedirect(location.href);
   }
-  if (context.setupStep !== "DONE") {
-    throw redirect({ to: setupStepPage(context.setupStep), replace: true });
+  const stepPage = setupStepPage(context.setupStep);
+  if (context.setupStep !== "DONE" && location.pathname !== stepPage) {
+    throw redirect({ to: stepPage, replace: true });
   }
   // Setup ends by signing the new owner in, so only a signed-in user gets here.
   if (!context.me) {
@@ -92,7 +96,7 @@ export function requireFinishedSetup<Me>({ context, location }: Gate<Me>): Me {
 
 interface Gate<Me> {
   context: { me: Me | null; holdsSetup: boolean; setupStep: SetupStep };
-  location: { href: string };
+  location: { href: string; pathname: string };
 }
 
 function loginRedirect(href: string) {

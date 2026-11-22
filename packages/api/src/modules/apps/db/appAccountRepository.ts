@@ -15,7 +15,17 @@ export interface AppAccountRepository {
   countPeople(appId: string): Promise<{ people: number; suspended: number }>;
   /** How many apps hold an account `findingKind` saw. */
   countAppsFoundVia(findingKind: string): Promise<number>;
+  /** The accounts with an employee in `appIds`: the apps' users. */
+  findUsersOfApps(appIds: readonly string[]): Promise<AppUserAccount[]>;
+  /** How many employees hold an account in any app. */
+  countEmployeesWithAccounts(): Promise<number>;
 }
+
+/** What the app list reads of a user's account. */
+export type AppUserAccount = Pick<
+  AppAccount,
+  "appId" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
+>;
 
 export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
   const orm = () => ormOf(db);
@@ -56,6 +66,23 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .from(appAccounts)
         .where(arrayContains(appAccounts.foundVia, [findingKind]));
       return row!.apps;
+    },
+    findUsersOfApps: (appIds) =>
+      orm()
+        .select({
+          appId: appAccounts.appId,
+          foundVia: appAccounts.foundVia,
+          grantedAt: appAccounts.grantedAt,
+          grantedBefore: appAccounts.grantedBefore,
+          firstSeenAt: appAccounts.firstSeenAt,
+        })
+        .from(appAccounts)
+        .where(and(anyOf(appAccounts.appId, appIds), isNotNull(appAccounts.employeeId))),
+    countEmployeesWithAccounts: async () => {
+      const [row] = await orm()
+        .select({ employees: countDistinct(appAccounts.employeeId) })
+        .from(appAccounts);
+      return row!.employees;
     },
   };
 }

@@ -15,6 +15,7 @@ import {
   createAppConnectionService,
   createAppAccountService,
   createAppService,
+  type AppService,
 } from "../../src/modules/apps";
 import { createScanService, type ScanService } from "../../src/modules/imports";
 import {
@@ -91,6 +92,11 @@ export function googleSignIn(orm: Orm, { googleUrl }: { googleUrl: string }) {
   });
 }
 
+/** App selection with real transactions and silent logs. */
+export function apps(orm: Orm): AppService {
+  return createAppService({ orm, transact: testTransactor(orm), logger: createLogger("silent") });
+}
+
 /** Real scan dependencies with an instant retry wait and the local fake Google. */
 export function scans(
   orm: Orm,
@@ -118,7 +124,7 @@ export function scans(
     apps: {
       ...createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
       ...createAppAccountService(),
-      ...createAppService(),
+      ...apps(orm),
     },
     directory: createDirectorySyncService(),
     wait: () => Promise.resolve(),

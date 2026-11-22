@@ -1,12 +1,35 @@
-import type { Tx } from "../../../core/db";
+import { ApplicationError, invalidInput } from "../../../core/applicationError";
+import type { Orm, Transact, Tx } from "../../../core/db";
+import { createSetupStepService } from "../../../core/instance";
+import type { Logger } from "../../../core/logger";
+import { type Connection, type PageArgs, paginate } from "../../../core/pagination";
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
-import { type App, appRepository } from "../db";
-import { appChanges, type FoundApp, planAppMatches } from "../domain";
+import { parseUuid } from "../../../utils";
+import {
+  type App,
+  APP_SORT_VALUES,
+  appAccountRepository,
+  appConnectionRepository,
+  appRepository,
+} from "../db";
+import {
+  appChanges,
+  appSince,
+  type AppStatus,
+  type FoundApp,
+  isPreselected,
+  planAppMatches,
+  type Since,
+} from "../domain";
 
 const recordHistory = createRecordHistoryService();
+const setupSteps = createSetupStepService();
 
-/** The apps the scans find. */
+/** An app approved or ignored by a signed-in user. */
+const EDITED_DIRECTLY: HistoryAppend["cause"] = { kind: "EDITED_DIRECTLY" };
+
+/** The apps the scans find, and the owner's choice of those the company uses. */
 export interface AppService {
   /**
    * Matches each found app to an app, joining `tx`: creates the missing ones as discovered and adds
@@ -18,9 +41,51 @@ export interface AppService {
     tx: Tx,
     match: { found: readonly FoundApp[]; cause: HistoryAppend["cause"] },
   ) => Promise<Map<string, string>>;
+  /** The apps with `status`, the most people first, then by name. Needs MANAGE_WORKSPACE. */
+  listApps: (
+    ctx: SecurityContext,
+    args: PageArgs & { status: AppStatus },
+  ) => Promise<Connection<AppSummary>>;
+  /** How many apps have each status. Needs MANAGE_WORKSPACE. */
+  countApps: (ctx: SecurityContext) => Promise<Record<AppStatus, number>>;
+  /** Approves the app, with its history line; refuses an unknown id with NOT_FOUND. Needs MANAGE_WORKSPACE. */
+  approveApp: (ctx: SecurityContext, appId: string) => Promise<AppSummary>;
+  /**
+   * Ignores the app, with its history line; refuses an unknown id with NOT_FOUND, and a connected
+   * app, which stays approved, with CONFLICT. Needs MANAGE_WORKSPACE.
+   */
+  ignoreApp: (ctx: SecurityContext, appId: string) => Promise<AppSummary>;
+  /**
+   * Setup's last step, in one transaction: approves the listed discovered apps, ignores every other
+   * discovered app and finishes setup, with a history line per app. Refuses with CONFLICT at
+   * another step, and an id that is no discovered app as invalid `approvedAppIds`. Needs
+   * MANAGE_WORKSPACE.
+   */
+  finishSetup: (
+    ctx: SecurityContext,
+    selection: { approvedAppIds: readonly string[] },
+  ) => Promise<void>;
 }
 
-export function createAppService(): AppService {
+/** An app with what the app list shows of it, computed from its users' accounts. */
+export interface AppSummary extends App {
+  /** How many people have an account in it. */
+  peopleCount: number;
+  /** The finding kinds that saw its users' accounts, sorted, such as `google_sign_in`. */
+  foundVia: string[];
+  /** Null without users. */
+  since: Since | null;
+  preselected: boolean;
+}
+
+interface AppDependencies {
+  orm: Orm;
+  transact: Transact;
+  logger: Logger;
+}
+
+export function createAppService(dependencies: AppDependencies): AppService {
+  const { orm, transact, logger } = dependencies;
   return {
     async matchFoundApps(ctx, tx, { found, cause }) {
       ctx.requireSystem();
@@ -33,7 +98,122 @@ export function createAppService(): AppService {
       await appendHistory(ctx, tx, { inserted, updated }, cause);
       return appIdsByExternalId(await repository.findAll());
     },
+    async listApps(ctx, { status, ...pageArgs }) {
+      ctx.require("MANAGE_WORKSPACE");
+      const page = await paginate(pageArgs, {
+        order: { field: "PEOPLE", direction: "DESC" },
+        keysetValues: APP_SORT_VALUES,
+        fetch: (query) => appRepository(orm).findPage({ ...query, status }),
+      });
+      const summaries = await summarize(
+        orm,
+        page.edges.map(({ node }) => node),
+      );
+      return {
+        ...page,
+        edges: page.edges.map((edge, index) => ({ ...edge, node: summaries[index]! })),
+      };
+    },
+    async countApps(ctx) {
+      ctx.require("MANAGE_WORKSPACE");
+      return appRepository(orm).countByStatus();
+    },
+    approveApp: (ctx, appId) => changeStatus(dependencies, ctx, { appId, status: "approved" }),
+    ignoreApp: (ctx, appId) => changeStatus(dependencies, ctx, { appId, status: "ignored" }),
+    async finishSetup(ctx, { approvedAppIds }) {
+      ctx.require("MANAGE_WORKSPACE");
+      const { approved, ignored } = await transact(async (tx) => {
+        await setupSteps.finishSelectAppsStep(ctx, tx);
+        return settleDiscoveredApps(ctx, tx, new Set(approvedAppIds));
+      });
+      logger.info({ approved, ignored }, "Setup finished: the selected apps are approved");
+    },
   };
+}
+
+/** Moves the app to `status` with its history line, and returns it as the app list shows it. */
+async function changeStatus(
+  { orm, transact, logger }: AppDependencies,
+  ctx: SecurityContext,
+  { appId, status }: { appId: string; status: AppStatus },
+): Promise<AppSummary> {
+  ctx.require("MANAGE_WORKSPACE");
+  const { app, changed } = await transact((tx) => changeStatusWithHistory(ctx, tx, appId, status));
+  if (changed) {
+    logger.info({ appId, status }, "App status changed");
+  }
+  const [summary] = await summarize(orm, [app]);
+  return summary!;
+}
+
+/** Moves the app to `status` and appends its history line, unless it is there already. */
+async function changeStatusWithHistory(
+  ctx: SecurityContext,
+  tx: Tx,
+  appId: string,
+  status: AppStatus,
+): Promise<{ app: App; changed: boolean }> {
+  const repository = appRepository(tx);
+  const id = parseUuid(appId);
+  const before = id && (await repository.lockById(id));
+  if (!before) {
+    throw new ApplicationError("NOT_FOUND", "No app has this id.");
+  }
+  if (status === "ignored" && (await appConnectionRepository(tx).findByApp(before.id))) {
+    throw new ApplicationError("CONFLICT", "A connected app stays approved.");
+  }
+  if (before.status === status) {
+    return { app: before, changed: false };
+  }
+  const after = { ...before, status };
+  await repository.updateStatus([before.id], status);
+  await appendUpdates(ctx, tx, [{ before, after }], EDITED_DIRECTLY);
+  return { app: after, changed: true };
+}
+
+/** Approves the selected discovered apps and ignores the others; refuses a selection of another app. */
+async function settleDiscoveredApps(
+  ctx: SecurityContext,
+  tx: Tx,
+  selected: ReadonlySet<string>,
+): Promise<{ approved: number; ignored: number }> {
+  const repository = appRepository(tx);
+  const discovered = await repository.lockByStatus("discovered");
+  const discoveredIds = new Set(discovered.map(({ id }) => id));
+  if ([...selected].some((id) => !discoveredIds.has(id))) {
+    throw invalidInput([{ field: "approvedAppIds", code: "invalid" }]);
+  }
+  const changes = discovered.map((before) => {
+    const status: AppStatus = selected.has(before.id) ? "approved" : "ignored";
+    return { before, after: { ...before, status } };
+  });
+  const idsWith = (status: AppStatus) =>
+    changes.filter(({ after }) => after.status === status).map(({ after }) => after.id);
+  await repository.updateStatus(idsWith("approved"), "approved");
+  await repository.updateStatus(idsWith("ignored"), "ignored");
+  await appendUpdates(ctx, tx, changes, EDITED_DIRECTLY);
+  return { approved: idsWith("approved").length, ignored: idsWith("ignored").length };
+}
+
+/** The apps with their people, how those were found, since when, and whether setup preselects them. */
+async function summarize(db: Orm, apps: readonly App[]): Promise<AppSummary[]> {
+  const accounts = appAccountRepository(db);
+  const [users, directoryPeople] = await Promise.all([
+    accounts.findUsersOfApps(apps.map(({ id }) => id)),
+    // Every employee holds a directory account, so they are the directory's people.
+    accounts.countEmployeesWithAccounts(),
+  ]);
+  const usersByApp = Map.groupBy(users, ({ appId }) => appId);
+  return apps.map((app) => {
+    const appUsers = usersByApp.get(app.id) ?? [];
+    return {
+      ...app,
+      peopleCount: appUsers.length,
+      foundVia: [...new Set(appUsers.flatMap(({ foundVia }) => foundVia))].sort(),
+      since: appSince(appUsers),
+      preselected: isPreselected(appUsers.length, directoryPeople),
+    };
+  });
 }
 
 /** One history line per created app and per app that gained external ids. */
@@ -54,6 +234,16 @@ async function appendHistory(
       records: inserted.map((app) => ({ recordId: app.id, changes: appChanges(null, app) })),
     });
   }
+  await appendUpdates(ctx, tx, updated, cause);
+}
+
+/** One history line per changed app. */
+async function appendUpdates(
+  ctx: SecurityContext,
+  tx: Tx,
+  updated: readonly { before: App; after: App }[],
+  cause: HistoryAppend["cause"],
+): Promise<void> {
   if (updated.length > 0) {
     await recordHistory.append(ctx, tx, {
       recordType: "app",

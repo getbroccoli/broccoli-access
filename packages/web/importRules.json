@@ -3,6 +3,7 @@
     "src/main": ["src/apollo", "src/routeTree.gen", "src/styles.css"],
     "src/routeTree.gen": ["src/routes"],
     "src/routes": [
+      "src/features/apps",
       "src/features/auth",
       "src/features/employees",
       "src/features/settings",
@@ -20,6 +21,16 @@
       "src/i18n",
       "src/lib/class-names",
       "src/lib/useSessionChange"
+    ],
+    "src/features/apps": [
+      "src/__generated__",
+      "src/apollo",
+      "src/components/dataTable",
+      "src/components/ui",
+      "src/i18n",
+      "src/lib/class-names",
+      "src/lib/since",
+      "src/lib/useRouteAction"
     ],
     "src/features/auth": [
       "src/components/ui",

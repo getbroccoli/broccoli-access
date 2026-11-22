@@ -4,6 +4,7 @@ export {
   type AppMatchPlan,
   type AppStatus,
   type FoundApp,
+  isPreselected,
   type KnownApp,
   type NewApp,
   planAppMatches,
@@ -16,3 +17,4 @@ export {
   type FoundAccount,
   planAccountSync,
 } from "./appAccount";
+export { type AccountDates, appSince, type Since } from "./since";

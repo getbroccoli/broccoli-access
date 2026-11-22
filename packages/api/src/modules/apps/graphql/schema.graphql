@@ -1,0 +1,107 @@
+"An application people use: found by a scan, or connected."
+type App {
+  id: ID!
+  name: String!
+  "Such as `slack.com`; null when unknown."
+  domain: String
+  status: AppStatus!
+  "How many people have an account in it."
+  peopleCount: Int!
+  "The finding kinds that saw its people's accounts, sorted, such as `google_sign_in`; connector modules register them."
+  foundVia: [String!]!
+  "The earliest Since of its people's accounts; null without people."
+  since: Since
+  "Whether setup's selection of the company's apps starts with it: at least a fifth of the directory's people have an account in it."
+  preselected: Boolean!
+}
+
+"Since when someone has had an account, as far as the sources know: when they granted access; before the log began, for a grant older than the log; otherwise when a scan first saw the account."
+type Since {
+  at: DateTime!
+  "The grant is older than the log, which began at `at`; false says nothing more about how exact `at` is."
+  before: Boolean!
+}
+
+"Whether the company uses an app."
+enum AppStatus {
+  "Found by a scan; the owner has not decided yet."
+  DISCOVERED
+  "The owner says the company uses it, or it is connected."
+  APPROVED
+  "The owner set it aside."
+  IGNORED
+}
+
+type AppEdge {
+  cursor: String!
+  node: App!
+}
+
+type AppConnection {
+  edges: [AppEdge!]!
+  pageInfo: PageInfo!
+}
+
+"How many apps have each status."
+type AppCounts {
+  approved: Int!
+  discovered: Int!
+  ignored: Int!
+}
+
+input AppApproveInput {
+  id: ID!
+}
+
+input AppIgnoreInput {
+  id: ID!
+}
+
+input SetupFinishInput {
+  "The discovered apps the company uses; every other discovered app is ignored."
+  approvedAppIds: [ID!]!
+}
+
+type AppsMutations {
+  "Approves an app and records it in the app's history. Admins only."
+  approve(input: AppApproveInput!): AppApprovePayload!
+  "Ignores an app and records it in the app's history; refused with a ConflictError for a connected app, which stays approved. Admins only."
+  ignore(input: AppIgnoreInput!): AppIgnorePayload!
+  "Setup's last step: approves the selected discovered apps, ignores the others and finishes setup. Refused with a ConflictError at another step, and as invalid `approvedAppIds` for an id that is no discovered app. Admins only."
+  finishSetup(input: SetupFinishInput!): SetupFinishPayload!
+}
+
+"The approved app, or why it was refused."
+type AppApprovePayload {
+  app: App
+  error: AppApproveError
+}
+
+union AppApproveError = NotFoundError
+
+"The ignored app, or why it was refused."
+type AppIgnorePayload {
+  app: App
+  error: AppIgnoreError
+}
+
+union AppIgnoreError = NotFoundError | ConflictError
+
+"Setup once finished, or why it was refused."
+type SetupFinishPayload {
+  setup: Setup
+  error: SetupFinishError
+}
+
+union SetupFinishError = InvalidInputError | ConflictError
+
+type Query {
+  "The apps with a status, the most people first, one page at a time. Admins only."
+  apps(status: AppStatus!, "Page size, 1 to 10000." first: Int = 100, after: String): AppConnection!
+  "How many apps have each status. Admins only."
+  appCounts: AppCounts!
+}
+
+type Mutation {
+  apps: AppsMutations!
+}

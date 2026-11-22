@@ -1,11 +1,13 @@
 import { Link } from "@tanstack/react-router";
 
+import { cn } from "@/lib/class-names";
+
 import type { NavItem } from "./NavList";
 
 type Props = { item: NavItem };
 
 /** A menu link, filled while its page is open. */
-export function NavLink({ item: { to, label, icon: Icon } }: Props) {
+export function NavLink({ item: { to, label, icon: Icon, badge } }: Props) {
   return (
     <Link
       to={to}
@@ -19,6 +21,16 @@ export function NavLink({ item: { to, label, icon: Icon } }: Props) {
         <>
           {Icon && <Icon size={16} weight={isActive ? "bold" : "regular"} />}
           <span className="flex-1 font-medium">{label}</span>
+          {badge !== undefined && (
+            <span
+              className={cn(
+                "rounded-full px-2 text-[11px] leading-[18px] font-medium tabular-nums",
+                isActive ? "bg-background/20" : "bg-foreground/10",
+              )}
+            >
+              {badge}
+            </span>
+          )}
         </>
       )}
     </Link>

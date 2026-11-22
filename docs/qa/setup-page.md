@@ -29,10 +29,18 @@ A manual check of setup held by one browser, which connects Google Workspace wit
 ## After consent
 
 - [ ] Consenting as Mia Novak (`admin@acme.example`) lands on `/setup/scan`: "Step 2 of 3", "Scanning acme.example", "Connected as admin@acme.example…"; the sidebar shows Connect done and Scan current. The `broccoli_access_setup` cookie is gone.
-- [ ] "Reading people" spins while "Finding apps people signed in to with Google" and "Reading sign-in logs" show "Waiting"; within a minute, without a reload, all three show a check with "42 people, 2 suspended", "37 apps found" and "Last 6 months read". Setup stays on `/setup/scan`.
-- [ ] Reloading keeps the owner signed in on `/setup/scan`; `/setup`, `/people` and `/` lead back to it.
+- [ ] "Reading people" spins while "Finding apps people signed in to with Google" and "Reading sign-in logs" show "Waiting"; within a minute, without a reload, all three show a check with "42 people, 2 suspended", "37 apps found" and "Last 6 months read", and the page moves on to Applications.
 - [ ] In B, any path now lands on `/login`, which shows "Broccoli Access" and "Acme" and no form.
 - [ ] The dev API log holds neither the client secret nor any Google token.
+
+## Select your apps
+
+- [ ] Applications opens on Discovered as on the design: the banner "Last step: select the apps your company uses" with "We found 37 apps…", tabs "Approved 1", "Discovered 37", "Ignored 0", and the left menu's Applications showing 37.
+- [ ] The table lists App (initial, name, domain), People, Found via and Since, the most people first; Slack, Notion, Figma, Miro, Loom and Claude are checked, and the button says "Approve 6 and finish".
+- [ ] Below the first twelve apps, "Show 25 more apps" shows the rest.
+- [ ] Unchecking Claude makes the button "Approve 5 and finish"; checking ChatGPT makes it "Approve 6 and finish". The header checkbox selects all apps, and again none.
+- [ ] Reloading keeps the owner on Applications; `/setup`, `/people` and `/` lead back to it.
+- [ ] "Approve 6 and finish" opens Approved: Google Workspace and the six selected apps, "Discovered 0", "Ignored 31", no banner and no count in the left menu. Reloading stays there, and `/setup` opens Today.
 
 ## Starting over
 
@@ -43,4 +51,5 @@ Start setup in A, then restart the dev stack with `pnpm dev --drop-db`.
 ## Layout
 
 - [ ] On a narrow window, one bar per step replaces the step list, the two ways to connect stack, and nothing scrolls sideways.
-- [ ] Screenshots of `/setup` (desktop and narrow; empty and with an error), `/setup/scan` and `/setup/in-progress` go in the pull request description.
+- [ ] On a narrow window, the banner's button goes below its text and the app table scrolls sideways inside its frame.
+- [ ] Screenshots of `/setup` (desktop and narrow; empty and with an error), `/setup/scan`, `/setup/in-progress` and the first-run Applications page go in the pull request description.

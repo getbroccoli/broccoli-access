@@ -1,10 +1,14 @@
 export { apps } from "./appsTable";
 export { appConnections } from "./appConnectionsTable";
-export { appRepository, type App, type AppRepository } from "./appRepository";
+export { APP_SORT_VALUES, appRepository, type App, type AppRepository } from "./appRepository";
 export {
   appConnectionRepository,
   type AppConnection,
   type AppConnectionRepository,
 } from "./appConnectionRepository";
 export { appAccounts } from "./appAccountsTable";
-export { appAccountRepository, type AppAccountRepository } from "./appAccountRepository";
+export {
+  appAccountRepository,
+  type AppAccountRepository,
+  type AppUserAccount,
+} from "./appAccountRepository";

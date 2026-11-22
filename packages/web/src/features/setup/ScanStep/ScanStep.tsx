@@ -1,4 +1,5 @@
 import { useQuery } from "@apollo/client/react";
+import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { SetupScanDocument } from "@/__generated__/graphql";
@@ -24,6 +25,8 @@ export function ScanStep() {
   const { data, error, refetch, startPolling, stopPolling } = useQuery(SetupScanDocument);
   const connection = data?.setup.googleWorkspace;
   const finished = connection?.scan != null && connection.scan.status !== "SCANNING";
+  const scanned = connection?.scan?.status === "SCANNED";
+  const router = useRouter();
   useEffect(() => {
     if (finished) {
       return;
@@ -31,6 +34,12 @@ export function ScanStep() {
     startPolling(POLL_INTERVAL_MS);
     return stopPolling;
   }, [finished, startPolling, stopPolling]);
+  useEffect(() => {
+    // The scan's save moved setup on; the gates read the new step and open its page.
+    if (scanned) {
+      void router.invalidate();
+    }
+  }, [scanned, router]);
   const steps = connection?.scan ?? STARTING_SCAN;
   const hints = scanStepHints(steps);
   return (

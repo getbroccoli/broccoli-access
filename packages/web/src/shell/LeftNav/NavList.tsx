@@ -7,6 +7,8 @@ export interface NavItem {
   to: LinkProps["to"];
   label: string;
   icon?: Icon;
+  /** A number beside the label, such as the apps awaiting a decision. */
+  badge?: number;
 }
 
 type Props = { label: string; items: NavItem[] };

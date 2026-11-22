@@ -1,0 +1,5 @@
+query NavCounts {
+  appCounts {
+    discovered
+  }
+}

@@ -32,12 +32,7 @@ CALLBACK=$(curl -s -o /dev/null -w '%{redirect_url}' "${AUTH%%\?*}" \
 curl -c cookies -b cookies "$CALLBACK"
 ```
 
-A browser without the owner's session signs in again with "Sign in with Google" on `/login`, choosing Mia on the fake's consent page. Until the app selection is built, setup stays at the scan step and the app's pages lead back to it. To check them, move setup on in the dev database:
-
-```sh
-docker exec "$(docker ps -qf name=broccoli-access-dev-.*-postgres)" \
-  psql -U broccoli_access -c "update instance set setup_step = 'done'"
-```
+A browser without the owner's session signs in again with "Sign in with Google" on `/login`, choosing Mia on the fake's consent page. After the scan, setup waits on Applications for the owner to select the company's apps; "Approve 6 and finish" finishes it and opens the app's other pages.
 
 ## Send email
 
