@@ -31,18 +31,32 @@ interface StoredPairing {
   token: string;
 }
 
+/** The last change to the stored pairing; each change waits for it, so none undoes another. */
+let pairingChanges: Promise<unknown> = Promise.resolve();
+
 function answer(request: WorkerRequest): Promise<WorkerAnswers[WorkerRequest["type"]]> {
   switch (request.type) {
     case "pair":
-      return pair(request.origin, request.code);
+      return changePairing(() => pair(request.origin, request.code));
     case "readPairing":
-      return readPairing();
+      return storedPairing().then(
+        (pairing) => pairing && { origin: pairing.origin, pairedAt: null },
+      );
+    case "checkPairing":
+      return checkPairing();
     case "unpair":
       return unpair();
   }
 }
 
-/** Redeems the instance's one-time code; a pairing with another instance is dropped first. */
+/** Runs `change` after every earlier change to the stored pairing has ended. */
+function changePairing<T>(change: () => Promise<T>): Promise<T> {
+  const result = pairingChanges.then(change);
+  pairingChanges = result.catch(() => undefined);
+  return result;
+}
+
+/** Redeems the instance's one-time code; a pairing with another instance is retired afterwards. */
 async function pair(origin: string, code: string): Promise<WorkerAnswers["pair"]> {
   // The pair page checks it too; the token must never travel to another origin.
   if (!isPairableOrigin(origin)) {
@@ -56,30 +70,28 @@ async function pair(origin: string, code: string): Promise<WorkerAnswers["pair"]
     }
     return { paired: false };
   }
-  if (previous && previous.origin !== origin) {
-    // The owner chose another instance: its pairing goes here even when the old one does not answer.
-    await callInstance(previous, "DELETE");
-    await forgetIfCurrent(previous);
-  }
   await chrome.storage.local.set({ [PAIRING_KEY]: { origin, token } satisfies StoredPairing });
+  if (previous && previous.origin !== origin) {
+    // Not awaited: the new pairing holds even when the old instance does not answer.
+    void retire(previous);
+  }
   return { paired: true };
 }
 
 /** The pairing as the instance knows it; one the instance refuses is forgotten here too. */
-async function readPairing(): Promise<PairingView | null> {
+async function checkPairing(): Promise<PairingView | null> {
   const pairing = await storedPairing();
   if (!pairing) {
     return null;
   }
   const response = await callInstance(pairing, "GET");
   if (response?.status === UNAUTHORIZED) {
-    await forgetIfCurrent(pairing);
+    await changePairing(() => forgetIfCurrent(pairing));
     return null;
   }
   // Unreachable for now, such as offline: still paired, without the date the instance keeps.
-  const pairedAt = response?.ok
-    ? ((await response.json()) as { pairedAt?: unknown }).pairedAt
-    : null;
+  const body: unknown = response?.ok ? await response.json().catch(() => null) : null;
+  const pairedAt = (body as { pairedAt?: unknown } | null)?.pairedAt;
   return { origin: pairing.origin, pairedAt: typeof pairedAt === "string" ? pairedAt : null };
 }
 
@@ -93,7 +105,7 @@ async function unpair(): Promise<WorkerAnswers["unpair"]> {
   // 401: the instance had already dropped this pairing.
   const isGone = response !== null && (response.ok || response.status === UNAUTHORIZED);
   if (isGone) {
-    await forgetIfCurrent(pairing);
+    await changePairing(() => forgetIfCurrent(pairing));
   }
   return { unpaired: isGone };
 }
@@ -115,6 +127,16 @@ async function redeem(origin: string, code: string): Promise<string | null> {
     // The pair page says pairing failed; the owner starts again from Settings.
     return null;
   }
+}
+
+/** Unpairs a replaced instance, then drops its host access unless the current pairing needs it. */
+async function retire(previous: StoredPairing): Promise<void> {
+  await callInstance(previous, "DELETE");
+  await changePairing(async () => {
+    if ((await storedPairing())?.origin !== previous.origin) {
+      await chrome.permissions.remove(hostPermissionOf(previous.origin));
+    }
+  });
 }
 
 /** The instance's answer to a call with the pairing's token; null when it did not answer in time. */

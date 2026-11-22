@@ -4,7 +4,7 @@ import { askWorker, type PairingView } from "./workerRequests";
 
 showVersion();
 element("[data-unpair]").addEventListener("click", () => void unpair());
-void askWorker({ type: "readPairing" }).then(showPairing);
+void showStoredThenChecked();
 
 /** Like the instance's own dates: "1 Dec 2026". */
 const PAIRED_AT_FORMAT = new Intl.DateTimeFormat("en-GB", {
@@ -12,6 +12,18 @@ const PAIRED_AT_FORMAT = new Intl.DateTimeFormat("en-GB", {
   month: "short",
   year: "numeric",
 });
+
+/** Once the owner presses Unpair, a check still on its way must not show the pairing again. */
+let hasUnpairStarted = false;
+
+/** Shows the stored pairing at once, then as the instance answers, which can take a while. */
+async function showStoredThenChecked(): Promise<void> {
+  showPairing(await askWorker({ type: "readPairing" }));
+  const checked = await askWorker({ type: "checkPairing" });
+  if (!hasUnpairStarted) {
+    showPairing(checked);
+  }
+}
 
 function showPairing(pairing: PairingView | null): void {
   if (!pairing) {
@@ -31,6 +43,7 @@ function showPairing(pairing: PairingView | null): void {
 
 async function unpair(): Promise<void> {
   const unpairButton = element<HTMLButtonElement>("[data-unpair]");
+  hasUnpairStarted = true;
   unpairButton.disabled = true;
   const { unpaired } = await askWorker({ type: "unpair" });
   unpairButton.disabled = false;

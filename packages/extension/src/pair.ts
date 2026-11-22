@@ -24,6 +24,7 @@ function start(): void {
     return;
   }
   element("[data-origin]").textContent = shownOrigin(origin);
+  void showReplacedPairing(origin);
   element("[data-cancel]").addEventListener("click", () => window.close());
   element("[data-pair]").addEventListener("click", () => void pair(origin, code));
   showState("ask");
@@ -52,6 +53,15 @@ async function pair(origin: string, code: string): Promise<void> {
     return;
   }
   window.close();
+}
+
+/** Says which instance pairing replaces, when this Chrome is paired with another one. */
+async function showReplacedPairing(origin: string): Promise<void> {
+  const current = await askWorker({ type: "readPairing" });
+  if (current && current.origin !== origin) {
+    element("[data-paired-origin]").textContent = shownOrigin(current.origin);
+    element("[data-replaces]").hidden = false;
+  }
 }
 
 function showFailure(message: string): void {
