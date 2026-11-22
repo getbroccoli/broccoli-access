@@ -53,13 +53,22 @@ export function createGoogleWorkspaceConnector(addresses: {
       const readGrantLog = onceUntilRead(() =>
         grantLogSince(google, accessToken, new Date(Date.now() - GRANT_LOG_MS)),
       );
+      // Kept for the session, so a page the scan tries again reads only the lists that failed.
+      const tokenListsByUser = new Map<string, GoogleToken[]>();
+      const readTokens = async (userId: string) => {
+        const tokens =
+          tokenListsByUser.get(userId) ?? (await google.listTokens(accessToken, userId));
+        tokenListsByUser.set(userId, tokens);
+        return tokens;
+      };
       return {
         testConnection: () =>
           asConnectorError(directoryError, async () => google.readCustomer(accessToken)),
         listAccounts: (cursor) =>
           asConnectorError(directoryError, async () => {
             const page = await google.listUsers(accessToken, cursor);
-            const grants = await grantAccounts(google, accessToken, page.users, {
+            const grants = await grantAccounts(page.users, {
+              readTokens,
               ownClientId: clientId,
               log: await readGrantLog(),
             });
@@ -121,17 +130,21 @@ async function grantLogSince(
 
 /** The users' grants, except to the instance's own Google app, which is not one of the company's apps. */
 async function grantAccounts(
-  google: GoogleClient,
-  accessToken: string,
   users: readonly GoogleUser[],
-  { ownClientId, log }: { ownClientId: string; log: GrantLog },
+  {
+    readTokens,
+    ownClientId,
+    log,
+  }: {
+    readTokens: (userId: string) => Promise<GoogleToken[]>;
+    ownClientId: string;
+    log: GrantLog;
+  },
 ): Promise<ImportedAccount[]> {
   const accounts: ImportedAccount[] = [];
   for (let start = 0; start < users.length; start += TOKEN_LISTS_AT_ONCE) {
     const batch = users.slice(start, start + TOKEN_LISTS_AT_ONCE);
-    const tokenLists = await Promise.all(
-      batch.map((user) => google.listTokens(accessToken, user.id)),
-    );
+    const tokenLists = await Promise.all(batch.map((user) => readTokens(user.id)));
     batch.forEach((user, index) => {
       const tokens = tokenLists[index]!.filter(({ clientId }) => clientId !== ownClientId);
       accounts.push(...tokens.map((token) => grantAccount(user, token, log)));
