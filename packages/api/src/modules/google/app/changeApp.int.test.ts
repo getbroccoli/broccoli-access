@@ -1,3 +1,5 @@
+import { ACME } from "@broccoli-access/fake-apps";
+
 import {
   expect,
   test,
@@ -71,6 +73,66 @@ test("changing the Google app replaces credentials and scopes while keeping the 
   expect(secrets.refreshToken).toBeTruthy();
   expect(secrets.refreshToken).not.toBe(oldSecrets.refreshToken);
   expect(await storedWorkspace(orm)).toEqual(before);
+});
+
+test("a scan after changing the Google app finds no app or account for the previous client", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, ctx, input, connectionId, scans, sourceId } = await connectedWorkspace(
+    orm,
+    fakeGoogle.url,
+  );
+  const appsBefore = await storedApps(orm);
+  const accountsBefore = await storedAppAccounts(orm);
+  expect(appsBefore).toHaveLength(38);
+  const { authorizationUrl, browserToken } = await connection.startAppChange(ctx, input);
+  const callback = await consentAtGoogle(authorizationUrl);
+
+  await connection.finishAppChange(ctx, {
+    ...input,
+    browserToken,
+    code: callback.searchParams.get("code")!,
+    state: callback.searchParams.get("state")!,
+  });
+  await scans.scanNow(ctx, connectionId);
+  await scans.runScan(SYSTEM, sourceId);
+
+  const appsAfter = await storedApps(orm);
+  expect(appsAfter).toEqual(appsBefore);
+  expect(await storedAppAccounts(orm)).toEqual(accountsBefore);
+  expect(appsAfter.flatMap(({ externalIds }) => externalIds)).not.toContain(
+    `google:${ACME.oauthClient.clientId}`,
+  );
+});
+
+test("changing the Google app twice keeps both previous client ids", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, ctx, input } = await connectedWorkspace(orm, fakeGoogle.url);
+  const [previous] = await storedAppConnections(orm);
+  const nextInput = {
+    ...input,
+    clientId: "third-google-client",
+    clientSecret: "third-google-secret",
+  };
+  await registerGoogleRedirect(fakeGoogle.url, nextInput.publicOrigin, nextInput);
+
+  for (const change of [input, nextInput]) {
+    const { authorizationUrl, browserToken } = await connection.startAppChange(ctx, change);
+    const callback = await consentAtGoogle(authorizationUrl);
+    await connection.finishAppChange(ctx, {
+      ...change,
+      browserToken,
+      code: callback.searchParams.get("code")!,
+      state: callback.searchParams.get("state")!,
+    });
+  }
+
+  const [saved] = await storedAppConnections(orm);
+  expect(saved!.settings.clientId).toBe(nextInput.clientId);
+  expect(saved!.settings.previousClientIds).toEqual([previous!.settings.clientId, input.clientId]);
 });
 
 test("records the Google app change as an update by the owner without secrets in history", async ({
@@ -213,6 +275,8 @@ async function connectedWorkspace(orm: Orm, googleUrl: string) {
     input,
     connectionId,
     ownerUserId,
+    scans,
+    sourceId,
   };
 }
 

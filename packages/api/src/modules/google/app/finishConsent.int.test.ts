@@ -75,6 +75,7 @@ test("stores connection settings separately from secrets encrypted for this conn
   expect(settings).toEqual({
     googleApp: "own_google_app",
     clientId: input.clientId,
+    previousClientIds: [],
     domain: "acme.example",
     organizationName: "Acme",
     adminEmail: "admin@acme.example",
