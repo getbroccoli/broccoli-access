@@ -97,6 +97,20 @@ test("cancelling Google consent returns to Connect without signing in", async ({
   });
 });
 
+test("an unknown Google consent flow named toString returns to setup with a failure", async ({
+  env,
+}) => {
+  const callback = new URL("/api/google/callback?code=any&state=toString.anything", env.url);
+
+  const response = await fetch(callback, {
+    redirect: "manual",
+    signal: AbortSignal.timeout(2_000),
+  });
+
+  expect(response.status).toBe(302);
+  expect(response.headers.get("location")).toBe("/setup?connectError=failed");
+});
+
 test("refuses connecting Google without the setup cookie", async ({ env }) => {
   const response = await env.browser().post("/api/google/connect", ACME.oauthClient);
 
