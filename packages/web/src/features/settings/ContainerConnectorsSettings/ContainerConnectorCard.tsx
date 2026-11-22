@@ -1,11 +1,10 @@
 import type { ContainerConnectorsSettingsQuery } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
+import { ConnectContainerConnectorDialog, connectingFieldName } from "@/features/apps";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { ScanNowButton } from "@/shell";
 
-import { ConnectContainerConnectorDialog } from "./ConnectContainerConnectorDialog";
-import { connectingFieldName } from "./connectingFieldName";
 import { ConnectionSummary } from "./ConnectionSummary";
 
 export type ContainerConnector = ContainerConnectorsSettingsQuery["containerConnectors"][number];

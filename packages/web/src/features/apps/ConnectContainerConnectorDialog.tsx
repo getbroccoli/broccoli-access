@@ -5,7 +5,6 @@ import {
   type ContainerConnectorsSettingsQuery,
 } from "@/__generated__/graphql";
 import { useCache, usePayloadMutation } from "@/apollo";
-import { forgetAppLists } from "@/features/apps";
 import { AppMark } from "@/components/AppMark";
 import { FieldError } from "@/components/form";
 import { Button } from "@/components/ui/button";
@@ -23,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { t } from "@/i18n";
 
+import { forgetAppLists } from "./cache";
 import { inSentence } from "./connectingFieldName";
 
 type Connector = ContainerConnectorsSettingsQuery["containerConnectors"][number];
