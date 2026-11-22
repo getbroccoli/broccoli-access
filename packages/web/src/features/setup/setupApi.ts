@@ -6,7 +6,9 @@ import { postJson } from "@/lib/postJson";
  */
 export async function startSetup(): Promise<boolean> {
   try {
-    return (await postJson("/api/auth/setup/start", {})).ok;
+    // A browser without a token first only gets one, so an answer it never receives claims nothing.
+    const holder = await postSetupStart();
+    return (holder === "nobody" ? await postSetupStart() : holder) === "you";
   } catch {
     return false;
   }
@@ -30,4 +32,14 @@ export async function startGoogleConnection(
   } catch {
     return null;
   }
+}
+
+/** Who holds setup after one start: this browser, or nobody yet; null when the API refused. */
+async function postSetupStart(): Promise<"you" | "nobody" | null> {
+  const response = await postJson("/api/auth/setup/start", {});
+  if (!response.ok) {
+    return null;
+  }
+  const { holder } = (await response.json()) as { holder: "you" | "nobody" };
+  return holder;
 }

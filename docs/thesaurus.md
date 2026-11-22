@@ -12,7 +12,7 @@ The words Broccoli Access's code and docs use, and what each one means. Only Bro
 - **Setup**: the first-run flow of a new instance: the setup holder connects Google Workspace with their own Google app, and the Google super admin who consents becomes the owner, signed in; then the workspace is scanned and the owner selects the company's apps.
 - **Setup step**: where a new instance is in setup: `connect_google`, `scan`, `select_apps`, then `done`.
 - **Redirect address**: `<public origin>/api/google/callback`, where Google sends the admin back after consent. The admin registers it for their Google app; every Google consent and sign-in comes back through it.
-- **Setup session**: before the owner exists, the server-side record that one browser holds setup: the hash of a token in the `broccoli_access_setup` cookie, valid three days after the holder last opened setup. Setup stays locked to it, even after it expires, until the database is dropped.
+- **Setup session**: before the owner exists, the server-side record that one browser holds setup: the hash of a token in the `broccoli_access_setup` cookie, stored by the first start that carries a token, and valid three days after the holder last opened setup. Setup stays locked to it, even after it expires, until the database is dropped.
 - **Setup holder**: the browser holding the setup session, and the security context it acts as. It may connect Google Workspace, which creates the owner, and nothing else.
 - **Data folder**: `DATA_DIR`, the folder for files that must survive restarts, such as `secrets/`.
 - **File**: bytes with a MIME type that a module stores in the `files` table, such as an employee's avatar. The module that references it decides who may see it.

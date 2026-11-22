@@ -10,9 +10,10 @@ Run `pnpm dev` and set `URL` to the address it prints; it also prints the fake G
 
 On a database without an owner, the first browser to open the app holds setup and lands on `/setup`; every other browser lands on `/setup/in-progress`. To free setup held by another browser, restart the dev stack with `pnpm dev --drop-db`.
 
-From a terminal, keep the setup cookie in a cookie jar instead:
+From a terminal, keep the setup cookie in a cookie jar instead. The first start only gives the jar a token (`{"holder":"nobody"}`); the second claims setup with it (`{"holder":"you"}`):
 
 ```sh
+curl -c cookies -b cookies -X POST -H "origin: $URL" "$URL/api/auth/setup/start"
 curl -c cookies -b cookies -X POST -H "origin: $URL" "$URL/api/auth/setup/start"
 ```
 

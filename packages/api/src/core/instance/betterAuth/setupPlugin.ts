@@ -22,8 +22,9 @@ const SETUP_IN_PROGRESS = {
 
 /**
  * Setup before the owner exists, and the sessions that sign people in. `POST /api/auth/setup/start`
- * gives setup to the first browser, or renews it for the browser holding it, through the
- * `broccoli_access_setup` cookie; `setupRouter` limits and origin-checks it before it runs.
+ * gives a browser its `broccoli_access_setup` token (`holder: "nobody"`), then, called again with
+ * it, gives that browser setup or renews it (`holder: "you"`); `setupRouter` limits and
+ * origin-checks it before it runs.
  * `startSession`, server-only, signs in a user whom a module has just verified, such as the owner
  * after Google's consent, and ends the setup cookie.
  */
@@ -37,7 +38,7 @@ export function setupPlugin(transact: Transact) {
           transact((tx) => setupSessions.startSetup(SYSTEM, tx, { token, now: new Date() })),
         );
         setSetupCookie(ctx, session.token, SETUP_SESSION_DAYS * DAY_SECONDS);
-        return ctx.json({ holder: "you" });
+        return ctx.json({ holder: session.expiresAt ? "you" : "nobody" });
       }),
       startSession: createAuthEndpoint.serverOnly(
         { method: "POST", body: z.object({ userId: z.string() }) },

@@ -87,6 +87,9 @@ test("masks a database failure while reading the session", async ({ fakeGoogle }
   expect(await waitForStartup(server)).toEqual({ httpStatus: 200, status: "ready" });
   const browser = createBrowser(server.url);
   expect((await browser.post("/api/auth/setup/start", undefined)).status).toBe(200);
+  const claimed = await browser.post("/api/auth/setup/start", undefined);
+  expect(claimed.status).toBe(200);
+  expect(await claimed.json()).toEqual({ holder: "you" });
   await registerGoogleRedirect(fakeGoogle.url, server.url);
   const started = await browser.post("/api/google/connect", ACME.oauthClient);
   expect(started.status).toBe(200);

@@ -86,6 +86,9 @@ export class TestEnv {
     if (started.status !== 200) {
       throw new Error(`Setup start failed with ${started.status}: ${await started.text()}`);
     }
+    const claimed = await browser.post("/api/auth/setup/start", undefined);
+    assert.equal(claimed.status, 200, await claimed.clone().text());
+    assert.deepEqual(await claimed.json(), { holder: "you" });
     return browser;
   }
 
