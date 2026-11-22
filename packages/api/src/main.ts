@@ -20,7 +20,7 @@ const server = await startServer(env, logger, (core) =>
     googleAdminApiUrl: env.googleAdminApiUrl,
   }),
 );
-logger.info({ port: Number(new URL(server.url).port) }, "Broccoli Access API listening");
+logger.info({ port: env.port }, "Broccoli Access API listening");
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
