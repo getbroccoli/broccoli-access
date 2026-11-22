@@ -6,7 +6,13 @@ import { type Connection, type PageArgs, paginate } from "../../../core/paginati
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
-import { type App, APP_SORT_VALUES, appAccountRepository, appRepository } from "../db";
+import {
+  type App,
+  APP_SORT_VALUES,
+  appAccountRepository,
+  appConnectionRepository,
+  appRepository,
+} from "../db";
 import {
   appChanges,
   appSince,
@@ -44,7 +50,10 @@ export interface AppService {
   countApps: (ctx: SecurityContext) => Promise<Record<AppStatus, number>>;
   /** Approves the app, with its history line; refuses an unknown id with NOT_FOUND. Needs MANAGE_WORKSPACE. */
   approveApp: (ctx: SecurityContext, appId: string) => Promise<AppSummary>;
-  /** Ignores the app, with its history line; refuses an unknown id with NOT_FOUND. Needs MANAGE_WORKSPACE. */
+  /**
+   * Ignores the app, with its history line; refuses an unknown id with NOT_FOUND, and a connected
+   * app, which stays approved, with CONFLICT. Needs MANAGE_WORKSPACE.
+   */
   ignoreApp: (ctx: SecurityContext, appId: string) => Promise<AppSummary>;
   /**
    * Setup's last step, in one transaction: approves the listed discovered apps, ignores every other
@@ -149,6 +158,9 @@ async function changeStatusWithHistory(
   const before = id && (await repository.lockById(id));
   if (!before) {
     throw new ApplicationError("NOT_FOUND", "No app has this id.");
+  }
+  if (status === "ignored" && (await appConnectionRepository(tx).findByApp(before.id))) {
+    throw new ApplicationError("CONFLICT", "A connected app stays approved.");
   }
   if (before.status === status) {
     return { app: before, changed: false };

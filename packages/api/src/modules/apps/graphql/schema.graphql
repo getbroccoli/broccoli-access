@@ -65,7 +65,7 @@ input SetupFinishInput {
 type AppsMutations {
   "Approves an app and records it in the app's history. Admins only."
   approve(input: AppApproveInput!): AppApprovePayload!
-  "Ignores an app and records it in the app's history. Admins only."
+  "Ignores an app and records it in the app's history; refused with a ConflictError for a connected app, which stays approved. Admins only."
   ignore(input: AppIgnoreInput!): AppIgnorePayload!
   "Setup's last step: approves the selected discovered apps, ignores the others and finishes setup. Refused with a ConflictError at another step, and as invalid `approvedAppIds` for an id that is no discovered app. Admins only."
   finishSetup(input: SetupFinishInput!): SetupFinishPayload!
@@ -85,7 +85,7 @@ type AppIgnorePayload {
   error: AppIgnoreError
 }
 
-union AppIgnoreError = NotFoundError
+union AppIgnoreError = NotFoundError | ConflictError
 
 "Setup once finished, or why it was refused."
 type SetupFinishPayload {

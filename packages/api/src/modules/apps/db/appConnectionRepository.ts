@@ -30,6 +30,8 @@ export interface AppConnectionRepository {
   ): Promise<AppConnection | null>;
   findByConnector(connector: string): Promise<AppConnection | null>;
   findById(id: string): Promise<AppConnection | null>;
+  /** The connection of the app `appId`, or null for an app nobody connected. */
+  findByApp(appId: string): Promise<AppConnection | null>;
   /** Like `findById`, locking the row until the transaction ends. */
   lockById(id: string): Promise<AppConnection | null>;
   /** The connection's `encrypted_secrets`, or null for an unknown id. */
@@ -68,6 +70,13 @@ export function appConnectionRepository(db: Orm | Tx): AppConnectionRepository {
         .select(columns)
         .from(appConnections)
         .where(eq(appConnections.id, id));
+      return connection ?? null;
+    },
+    findByApp: async (appId) => {
+      const [connection] = await orm()
+        .select(columns)
+        .from(appConnections)
+        .where(eq(appConnections.appId, appId));
       return connection ?? null;
     },
     lockById: async (id) => {

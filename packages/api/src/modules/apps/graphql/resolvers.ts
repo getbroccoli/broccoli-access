@@ -31,7 +31,7 @@ export function createResolvers(
       ignore: (_parent, { input }, context) =>
         mutationPayload<ResolversTypes["AppIgnorePayload"]>(
           async () => ({ app: await apps.ignoreApp(context.getActor(), input.id) }),
-          ["NOT_FOUND"],
+          ["NOT_FOUND", "CONFLICT"],
         ),
       finishSetup: (_parent, { input }, context) =>
         mutationPayload<ResolversTypes["SetupFinishPayload"]>(async () => {
