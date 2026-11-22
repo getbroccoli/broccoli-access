@@ -14,7 +14,16 @@ export interface Env {
   publicUrl?: string;
   /** Folder for files that must survive restarts, such as `secrets/`. */
   dataDir: string;
+  /** Where sign-in finds Google's OpenID Connect endpoints. */
+  googleOpenIdConfigurationUrl: string;
+  /** Where the connector calls Google's Admin APIs. */
+  googleAdminApiUrl: string;
 }
+
+/** Google's own addresses; only development and tests, with the fake Google, change them. */
+const GOOGLE_OPENID_CONFIGURATION_URL =
+  "https://accounts.google.com/.well-known/openid-configuration";
+const GOOGLE_ADMIN_API_URL = "https://admin.googleapis.com";
 
 /** Compose passes unset variables as empty strings, so blank means unset. */
 function blankAsUnset(value: unknown): unknown {
@@ -29,6 +38,14 @@ const envSchema = z
     WEB_DIR: z.preprocess(blankAsUnset, z.string().optional()),
     DATA_DIR: z.preprocess(blankAsUnset, z.string().default("/data")),
     SELF_HOSTED_PUBLIC_URL: z.preprocess(blankAsUnset, z.url({ protocol: /^https?$/ }).optional()),
+    GOOGLE_OPENID_CONFIGURATION_URL: z.preprocess(
+      blankAsUnset,
+      z.url({ protocol: /^https?$/ }).default(GOOGLE_OPENID_CONFIGURATION_URL),
+    ),
+    GOOGLE_ADMIN_API_URL: z.preprocess(
+      blankAsUnset,
+      z.url({ protocol: /^https?$/ }).default(GOOGLE_ADMIN_API_URL),
+    ),
   })
   .transform((variables): Env => ({
     databaseUrl: variables.DATABASE_URL,
@@ -37,6 +54,8 @@ const envSchema = z
     webDir: variables.WEB_DIR,
     publicUrl: variables.SELF_HOSTED_PUBLIC_URL,
     dataDir: variables.DATA_DIR,
+    googleOpenIdConfigurationUrl: variables.GOOGLE_OPENID_CONFIGURATION_URL,
+    googleAdminApiUrl: variables.GOOGLE_ADMIN_API_URL,
   }));
 
 /** Reads and validates the environment; throws one error listing every problem. */
@@ -46,4 +65,19 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(`Invalid environment:\n${z.prettifyError(result.error)}`);
   }
   return result.data;
+}
+
+/** The Google settings that point somewhere other than Google, which a real install never does. */
+export function googleSettingsOffGoogle(env: Env): string[] {
+  const settings = [
+    [
+      "GOOGLE_OPENID_CONFIGURATION_URL",
+      env.googleOpenIdConfigurationUrl,
+      GOOGLE_OPENID_CONFIGURATION_URL,
+    ],
+    ["GOOGLE_ADMIN_API_URL", env.googleAdminApiUrl, GOOGLE_ADMIN_API_URL],
+  ] as const;
+  return settings
+    .filter(([, url, google]) => new URL(url).origin !== new URL(google).origin)
+    .map(([name]) => name);
 }
