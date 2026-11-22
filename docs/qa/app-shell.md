@@ -9,9 +9,9 @@ A manual check of the left menu, the workspace menu, Settings and the profile me
 
 ## App menu
 
-- [ ] The left menu shows the workspace menu at the top, "Today" and "People", and the profile button at the bottom.
+- [ ] The left menu shows the workspace menu at the top, "Today", "Applications" and "People", and the profile button at the bottom; while apps are discovered, Applications shows their number.
 - [ ] "Today" is highlighted only on Today, not on other pages.
-- [ ] The workspace menu opens with "Broccoli Access", then "Settings".
+- [ ] The workspace menu shows the organisation's initial and name ("A", "Acme") and opens with them, then "Settings".
 
 ## Settings
 

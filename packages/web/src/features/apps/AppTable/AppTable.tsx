@@ -55,7 +55,6 @@ export function AppTable({ apps, columns, selection, emptyState }: Props) {
                 <SelectionCheckbox
                   label={t("apps.selectAll")}
                   checked={apps.length > 0 && allSelected}
-                  indeterminate={!allSelected && selection.selected.size > 0}
                   onChange={() =>
                     selection.onChange(new Set(allSelected ? [] : apps.map(({ id }) => id)))
                   }

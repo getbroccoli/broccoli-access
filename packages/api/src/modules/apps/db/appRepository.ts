@@ -123,7 +123,7 @@ const LOWERCASE_NAME = sql<string>`lower(${apps.name})`;
 
 const PAGE_ORDER = keysetOrder(
   [
-    { expression: sql`${PEOPLE}`, descending: true },
+    { expression: PEOPLE, descending: true },
     { expression: LOWERCASE_NAME, descending: false },
   ],
   sql`${apps.id}`,

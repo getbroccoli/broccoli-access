@@ -68,26 +68,14 @@ export interface AppSummary extends App {
   preselected: boolean;
 }
 
-export function createAppService({
-  orm,
-  transact,
-  logger,
-}: {
+interface AppDependencies {
   orm: Orm;
   transact: Transact;
   logger: Logger;
-}): AppService {
-  const changeStatus = async (ctx: SecurityContext, appId: string, status: AppStatus) => {
-    ctx.require("MANAGE_WORKSPACE");
-    const { app, changed } = await transact((tx) =>
-      changeStatusWithHistory(ctx, tx, appId, status),
-    );
-    if (changed) {
-      logger.info({ appId, status }, "App status changed");
-    }
-    const [summary] = await summarize(orm, [app]);
-    return summary!;
-  };
+}
+
+export function createAppService(dependencies: AppDependencies): AppService {
+  const { orm, transact, logger } = dependencies;
   return {
     async matchFoundApps(ctx, tx, { found, cause }) {
       ctx.requireSystem();
@@ -120,8 +108,8 @@ export function createAppService({
       ctx.require("MANAGE_WORKSPACE");
       return appRepository(orm).countByStatus();
     },
-    approveApp: (ctx, appId) => changeStatus(ctx, appId, "approved"),
-    ignoreApp: (ctx, appId) => changeStatus(ctx, appId, "ignored"),
+    approveApp: (ctx, appId) => changeStatus(dependencies, ctx, { appId, status: "approved" }),
+    ignoreApp: (ctx, appId) => changeStatus(dependencies, ctx, { appId, status: "ignored" }),
     async finishSetup(ctx, { approvedAppIds }) {
       ctx.require("MANAGE_WORKSPACE");
       const { approved, ignored } = await transact(async (tx) => {
@@ -131,6 +119,21 @@ export function createAppService({
       logger.info({ approved, ignored }, "Setup finished: the selected apps are approved");
     },
   };
+}
+
+/** Moves the app to `status` with its history line, and returns it as the app list shows it. */
+async function changeStatus(
+  { orm, transact, logger }: AppDependencies,
+  ctx: SecurityContext,
+  { appId, status }: { appId: string; status: AppStatus },
+): Promise<AppSummary> {
+  ctx.require("MANAGE_WORKSPACE");
+  const { app, changed } = await transact((tx) => changeStatusWithHistory(ctx, tx, appId, status));
+  if (changed) {
+    logger.info({ appId, status }, "App status changed");
+  }
+  const [summary] = await summarize(orm, [app]);
+  return summary!;
 }
 
 /** Moves the app to `status` and appends its history line, unless it is there already. */
