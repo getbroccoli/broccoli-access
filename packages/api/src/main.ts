@@ -25,8 +25,11 @@ logger.info({ port: env.port }, "Broccoli Access API listening");
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     logger.info({ signal }, "Shutting down");
-    server.stop().catch(() => {
-      logger.error({ signal }, "Shutdown failed");
+    server.stop().catch((error: unknown) => {
+      logger.error(
+        { signal, kind: error instanceof Error ? error.name : typeof error },
+        "Shutdown failed",
+      );
       process.exitCode = 1;
     });
   });
