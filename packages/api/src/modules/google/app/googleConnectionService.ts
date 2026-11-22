@@ -1,5 +1,3 @@
-import { randomBytes } from "node:crypto";
-
 import { ApplicationError, type FieldError, invalidInput } from "../../../core/applicationError";
 import type { Orm, Transact } from "../../../core/db";
 import { createInstanceService, createOwnerService } from "../../../core/instance";
@@ -19,8 +17,14 @@ import {
   type GoogleWorkspaceSettings,
   parseGoogleWorkspaceSettings,
 } from "../domain";
-import { type ConsentState, openConsentState, sealConsentState } from "../helpers";
+import {
+  openConsentState,
+  randomConsentToken,
+  sealConsentState,
+  type WorkspaceConsentState,
+} from "../helpers";
 import type { ConnectedApps, Scans } from "../ports";
+import { consentUrl } from "./consentUrl";
 import { readSuperAdmin, type SuperAdmin, type VerifiedGrant, verifyGrant } from "./verifyGrant";
 
 const instances = createInstanceService();
@@ -47,8 +51,8 @@ export interface GoogleConnectionService {
   finishConsent: (ctx: SecurityContext, answer: ConsentAnswer) => Promise<{ userId: string }>;
   /** The connection as Setup shows it, or null before it exists. Admins only. */
   readConnection: (ctx: SecurityContext) => Promise<GoogleWorkspaceConnection | null>;
-  /** The connected organisation's name, which the sign-in page shows; null before it. Public. */
-  readOrganizationName: () => Promise<string | null>;
+  /** The connected organisation's name and primary domain, which the sign-in page shows; null before it. Public. */
+  readOrganization: () => Promise<{ name: string; domain: string } | null>;
 }
 
 /** What the browser holding setup sends to start the consent. */
@@ -102,32 +106,35 @@ export function createGoogleConnectionService(
       ctx.requireSetupHolder();
       const credentials = parseCredentials(clientId, clientSecret);
       const heldToken = await requireConnectStep(orm, setupToken, now);
-      const nonce = randomToken();
+      const nonce = randomConsentToken();
       const state = sealConsentState(
         secretBox,
-        {
-          flow: "connect_google_workspace",
-          ...credentials,
-          nonce,
-          expiresAt: now.getTime() + STATE_MINUTES * MINUTE_MS,
-        },
-        heldToken,
+        { flow: "connect_google_workspace", ...credentials, nonce },
+        { browserToken: heldToken, now },
       );
       const { authorizationEndpoint } = await google.discover();
       return {
-        authorizationUrl: consentUrl(authorizationEndpoint, {
-          clientId: credentials.clientId,
-          redirectUri: googleRedirectAddress(publicOrigin),
-          state,
-          nonce,
-        }),
+        authorizationUrl: consentUrl(
+          authorizationEndpoint,
+          {
+            clientId: credentials.clientId,
+            redirectUri: googleRedirectAddress(publicOrigin),
+            scopes: GOOGLE_WORKSPACE_SCOPES,
+            state,
+            nonce,
+          },
+          OFFLINE_CONSENT,
+        ),
       };
     },
     async finishConsent(ctx, answer) {
       ctx.requireSetupHolder();
       const setupToken = await requireConnectStep(orm, answer.setupToken, answer.now);
-      const consent = openConsentState(secretBox, answer.state, { setupToken, now: answer.now });
-      if (!consent) {
+      const consent = openConsentState(secretBox, answer.state, {
+        browserToken: setupToken,
+        now: answer.now,
+      });
+      if (consent?.flow !== "connect_google_workspace") {
         throw new ApplicationError(
           "INVALID_INPUT",
           "The consent expired or was not this server's.",
@@ -149,16 +156,19 @@ export function createGoogleConnectionService(
       );
       return { id: connection.id, domain, organizationName, adminEmail };
     },
-    async readOrganizationName() {
+    async readOrganization() {
       const connection = await connectedApps.readConnection(orm, GOOGLE_WORKSPACE);
-      return connection && parseGoogleWorkspaceSettings(connection.settings).organizationName;
+      if (!connection) {
+        return null;
+      }
+      const { organizationName, domain } = parseGoogleWorkspaceSettings(connection.settings);
+      return { name: organizationName, domain };
     },
   };
 }
 
-/** How long the admin has between starting the consent and Google's answer. */
-const STATE_MINUTES = 10;
-const MINUTE_MS = 60_000;
+/** Google gives a refresh token, which the scans need, only for an offline consent asked now. */
+const OFFLINE_CONSENT = { access_type: "offline", prompt: "consent" };
 
 function parseCredentials(clientId: string, clientSecret: string) {
   const credentials = { clientId: clientId.trim(), clientSecret: clientSecret.trim() };
@@ -183,36 +193,16 @@ async function requireConnectStep(orm: Orm, setupToken: string | null, now: Date
   return setupToken;
 }
 
-function consentUrl(
-  authorizationEndpoint: string,
-  {
-    clientId,
-    redirectUri,
-    state,
-    nonce,
-  }: Record<"clientId" | "redirectUri" | "state" | "nonce", string>,
-): string {
-  const url = new URL(authorizationEndpoint);
-  url.search = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    response_type: "code",
-    scope: GOOGLE_WORKSPACE_SCOPES.join(" "),
-    state,
-    nonce,
-    // Google gives a refresh token, which the scans need, only for an offline consent asked now.
-    access_type: "offline",
-    prompt: "consent",
-  }).toString();
-  return url.toString();
-}
-
 /** Writes the connection, the owner, the next step and the first scan together, then logs the outcome. */
 async function saveConnection(
   { transact, connectedApps, scans, employeeDirectory, logger }: GoogleConnectionDependencies,
   ctx: SecurityContext,
   { setupToken, now }: ConsentAnswer,
-  { consent, grant, admin }: { consent: ConsentState; grant: VerifiedGrant; admin: SuperAdmin },
+  {
+    consent,
+    grant,
+    admin,
+  }: { consent: WorkspaceConsentState; grant: VerifiedGrant; admin: SuperAdmin },
 ): Promise<{ userId: string }> {
   const settings: GoogleWorkspaceSettings = {
     googleApp: "own_google_app",
@@ -257,8 +247,4 @@ function ownerContext(
     employeeId: null,
   };
   return PrincipalSecurityContext.user(user, directory);
-}
-
-function randomToken(): string {
-  return randomBytes(32).toString("base64url");
 }

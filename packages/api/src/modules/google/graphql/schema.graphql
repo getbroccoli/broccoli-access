@@ -4,6 +4,8 @@ type Setup {
   googleRedirectAddress: String!
   "The connected Google organisation's name, which the sign-in page shows; null before Google Workspace is connected."
   organizationName: String
+  "The connected Google organisation's primary domain, such as `acme.example`, which the sign-in page shows; null before Google Workspace is connected."
+  organizationDomain: String
   "The Google Workspace connection; null before it exists. Owner only, though the rest of `Setup` is public."
   googleWorkspace: GoogleWorkspaceConnection
 }

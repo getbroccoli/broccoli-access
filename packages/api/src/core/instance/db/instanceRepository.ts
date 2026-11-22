@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { account, user } from "../../auth";
 import { type Orm, ormOf, type Tx } from "../../db";
@@ -24,6 +24,8 @@ export interface InstanceRepository {
   saveSetupSession(session: SetupSession): Promise<void>;
   clearSetupSession(): Promise<void>;
   setOwner(userId: string, step: SetupStep): Promise<void>;
+  /** The id of the user whose Google account is `googleUserId`, or null. */
+  findUserIdByGoogleAccount(googleUserId: string): Promise<string | null>;
   /** Creates a user who signs in with their Google account, which keeps no tokens; returns their id. */
   createGoogleUser(googleUser: {
     googleUserId: string;
@@ -88,12 +90,20 @@ export function instanceRepository(db: Orm | Tx): InstanceRepository {
       await orm().update(instance).set({ ownerUserId: userId, setupStep: step });
     },
 
+    findUserIdByGoogleAccount: async (googleUserId) => {
+      const [row] = await orm()
+        .select({ userId: account.userId })
+        .from(account)
+        .where(and(eq(account.providerId, GOOGLE_PROVIDER), eq(account.accountId, googleUserId)));
+      return row?.userId ?? null;
+    },
+
     createGoogleUser: async ({ googleUserId, email, name }) => {
       const userId = randomUUID();
       await orm().insert(user).values({ id: userId, name, email, emailVerified: true });
       await orm()
         .insert(account)
-        .values({ id: randomUUID(), accountId: googleUserId, providerId: "google", userId });
+        .values({ id: randomUUID(), accountId: googleUserId, providerId: GOOGLE_PROVIDER, userId });
       return userId;
     },
 
@@ -149,6 +159,9 @@ export function instanceRepository(db: Orm | Tx): InstanceRepository {
     },
   };
 }
+
+/** Better Auth's provider id of a Google account. */
+const GOOGLE_PROVIDER = "google";
 
 const sessionColumns = {
   tokenHash: instance.setupTokenHash,

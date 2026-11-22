@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { toLocalPath } from "./loginSearch";
+import { loginSearch, toLocalPath } from "./loginSearch";
 
 const origin = "http://localhost:5173";
 
@@ -26,4 +26,9 @@ it.each([
 
 it("defaults a login redirect to Today to avoid a loop", () => {
   expect(toLocalPath("/login?redirect=/people", origin)).toBe("/");
+});
+
+it("keeps a known sign-in error and drops an unknown one", () => {
+  expect(loginSearch.parse({ signInError: "not_allowed" }).signInError).toBe("not_allowed");
+  expect(loginSearch.parse({ signInError: "unknown" }).signInError).toBeUndefined();
 });

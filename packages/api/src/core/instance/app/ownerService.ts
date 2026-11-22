@@ -12,10 +12,12 @@ export interface GoogleAdmin {
   name: string;
 }
 
-/** The instance's owner, created once by setup. */
+/** The instance's owner, created once by setup, and the Google account each user signs in with. */
 export interface OwnerService {
   /** The owner's id and sign-in email, or null before an owner exists. Trusted read: no `ctx`. */
   readOwner: (db: Orm | Tx) => Promise<{ userId: string; email: string } | null>;
+  /** The id of the user who signs in with Google account `googleUserId`, or null. Trusted read: no `ctx`. */
+  findUserIdByGoogleAccount: (db: Orm | Tx, googleUserId: string) => Promise<string | null>;
   /**
    * Setup's connect step, for the browser holding setup: creates the admin's user with their Google
    * account, makes them the owner, moves setup to the scan and ends the setup session, joining
@@ -32,6 +34,8 @@ export interface OwnerService {
 export function createOwnerService(): OwnerService {
   return {
     readOwner: (db) => instanceRepository(db).readOwner(),
+    findUserIdByGoogleAccount: (db, googleUserId) =>
+      instanceRepository(db).findUserIdByGoogleAccount(googleUserId),
     async createOwnerAtConnect(ctx, tx, { setupToken, now }, admin) {
       ctx.requireSetupHolder();
       const repository = instanceRepository(tx);

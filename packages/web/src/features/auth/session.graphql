@@ -15,5 +15,6 @@ query Session {
     step
     holder
     organizationName
+    organizationDomain
   }
 }

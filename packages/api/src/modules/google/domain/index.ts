@@ -1,4 +1,6 @@
 export {
+  GOOGLE_CALLBACK_PATH,
+  GOOGLE_SIGN_IN_SCOPES,
   GOOGLE_WORKSPACE,
   GOOGLE_WORKSPACE_SCOPES,
   GOOGLE_WORKSPACE_SECRETS,
@@ -7,4 +9,5 @@ export {
   type GoogleWorkspaceSettings,
   NotSuperAdminError,
   parseGoogleWorkspaceSettings,
+  UnknownGoogleAccountError,
 } from "./googleWorkspace";

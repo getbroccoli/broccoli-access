@@ -19,4 +19,6 @@ export interface ConnectedApps {
     db: Orm | Tx,
     connector: string,
   ): Promise<{ id: string; settings: Record<string, unknown> } | null>;
+  /** The secrets of connection `connectionId`, decrypted, or null for an unknown connection. */
+  readSecrets(db: Orm | Tx, connectionId: string): Promise<Record<string, string> | null>;
 }
