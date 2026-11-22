@@ -163,3 +163,26 @@ describeConnectorConformance({ urls, fixtures: [/* one ConnectorFixture per conn
 ```
 
 A fixture lists in `cannotCause` the errors its connector can never give, each with a one-line reason, such as `{ owner_browser_lost: "no owner_browser runtime" }`: only `blocked_by_check`, and `owner_browser_lost` for a connector without the `owner_browser` runtime. Their checks show as skipped with the reason (`--reporter=verbose` prints it). The fake causes every error, so its fixtures list none.
+
+## The Chrome extension
+
+`packages/extension` builds the extension to `packages/extension/dist`, which Chrome loads unpacked. Its ID is `pocgaplgfhgpfpgblaobjabmmgchhbld`, fixed by the manifest's `key`.
+
+```sh
+pnpm --filter @broccoli-access/extension build
+```
+
+Load it in its own Chromium profile, never in a profile in daily use. Chrome ignores `--load-extension` unless the `DisableLoadExtensionCommandLineSwitch` feature is turned off, and extensions need a headed browser, so give it a display (such as `Xvfb :121` and `DISPLAY=:121`). With agent-browser, set the whole launch in the environment and keep it the same for every call; a call without it starts the browser again without the extension:
+
+```sh
+export AGENT_BROWSER_HEADED=1
+export AGENT_BROWSER_PROFILE="$(mktemp -d)"
+export AGENT_BROWSER_EXTENSIONS="$PWD/packages/extension/dist"
+export AGENT_BROWSER_ARGS="--no-sandbox,--disable-features=Translate,DisableLoadExtensionCommandLineSwitch"
+agent-browser open "$URL/settings/connections"
+```
+
+- Settings → Connections finds the extension by loading `chrome-extension://<id>/installed.txt`. Without it the "Chrome extension" card shows Not installed.
+- "Pair this Chrome" opens the pair page in a small window, a tab for agent-browser (`agent-browser tab list`). Its Pair button asks Chrome for access to the instance's origin in Chrome's own prompt, which is browser UI outside the page: answer it on the display, such as `xdotool key Tab Return` for Allow. Chrome remembers the answer, so the prompt shows once per profile and origin.
+- The extension's popup is `chrome-extension://<id>/popup.html`; open it in a tab to read or drive it.
+- After code changes, build again; Chrome reads the pages from `dist` when they open, and the service worker when the browser starts.
