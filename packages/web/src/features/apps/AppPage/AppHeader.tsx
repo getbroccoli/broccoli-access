@@ -6,6 +6,7 @@ import { AppMark } from "@/components/AppMark";
 import { t } from "@/i18n";
 
 import { ApproveAppButton } from "../ApproveAppButton";
+import { useAppStatusChange } from "../useAppStatusChange";
 import { AppStatusBadge } from "./AppStatusBadge";
 import { IgnoreAppButton } from "./IgnoreAppButton";
 
@@ -18,6 +19,7 @@ type Props = {
 
 /** The way back to Applications, the app with its status and domain, and Approve or Ignore. */
 export function AppHeader({ app }: Props) {
+  const { approve, ignore, pending } = useAppStatusChange(app);
   return (
     <div className="flex flex-col gap-5">
       <Link
@@ -43,8 +45,8 @@ export function AppHeader({ app }: Props) {
           </div>
         </div>
         <div className="flex gap-2">
-          <ApproveAppButton app={app} size="lg" />
-          <IgnoreAppButton app={app} />
+          <ApproveAppButton app={app} size="lg" disabled={pending} onApprove={approve} />
+          <IgnoreAppButton app={app} disabled={pending} onIgnore={ignore} />
         </div>
       </div>
     </div>

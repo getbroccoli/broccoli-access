@@ -43,7 +43,8 @@ export function createAppUserService({
 }: AppUserDependencies): AppUserService {
   return {
     // shortcut: reads every user of the apps unpaged, since their order needs the employees'
-    // names; page them once a directory can be very large (left out of circle 1).
+    // names, even when the app list keeps only its first four avatars per app; page them, or read
+    // only the first few per app, once a directory can be very large (left out of circle 1).
     async readUsersOfApps(ctx, appIds) {
       ctx.require("MANAGE_WORKSPACE");
       const [accounts, suspended] = await Promise.all([

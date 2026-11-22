@@ -5,7 +5,7 @@ import { t } from "@/i18n";
 import { describeFoundVia } from "@/lib/foundVia";
 import { formatSince } from "@/lib/since";
 
-import { ApproveAppButton } from "./ApproveAppButton";
+import { AppRowActions } from "./AppRowActions";
 import { AppNameCell, AppPeopleCell, type AppRow } from "./AppTable";
 
 const APP_COLUMN: DataTableColumn<AppRow> = {
@@ -72,5 +72,5 @@ export const APP_ACTIONS_COLUMN: DataTableColumn<AppRow> = {
   id: "actions",
   header: "",
   className: "w-28 text-right",
-  cell: (app) => <ApproveAppButton app={app} />,
+  cell: (app) => <AppRowActions app={app} />,
 };
