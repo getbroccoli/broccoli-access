@@ -3,10 +3,11 @@ import { createHash } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 
 import type { SeedPerson } from "../seed";
+import { pageOf } from "../utils";
 import { adminAccess } from "./adminAccess";
 import type { FakeGoogleContext } from "./context";
 import { sendGoogleError } from "./googleErrors";
-import { pageOf, parsePageRequest } from "./pageRequest";
+import { parsePageRequest } from "./pageRequest";
 import { findPerson, fullName, type GoogleState } from "./state";
 
 /** Google's Directory API v1: the customer, its users, their photos and each user's app grants. */

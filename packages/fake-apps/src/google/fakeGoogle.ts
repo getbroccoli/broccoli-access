@@ -1,10 +1,8 @@
-import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
-
 import express from "express";
 import { exportJWK, generateKeyPair } from "jose";
 
 import { ACME } from "../seed";
+import { listen } from "../utils";
 import type { FakeGoogleContext, SigningKey } from "./context";
 import { controlRoutes } from "./controls";
 import { directoryRoutes } from "./directory";
@@ -44,12 +42,7 @@ export async function startFakeGoogle(options: FakeGoogleOptions = {}): Promise<
   const redirectUris = options.redirectUris ?? [];
   const host = options.host ?? "127.0.0.1";
   const signingKey = await createSigningKey();
-  const server = createServer();
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(options.port ?? 0, host, resolve);
-  });
-  const url = `http://${host}:${(server.address() as AddressInfo).port}`;
+  const { server, url, stop } = await listen(host, options.port);
   const context: FakeGoogleContext = {
     state: seededState(ACME, start, redirectUris),
     now,
@@ -69,11 +62,7 @@ export async function startFakeGoogle(options: FakeGoogleOptions = {}): Promise<
       if (person === undefined) throw new Error("No person has this email");
       person.photo = photo;
     },
-    stop: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-        server.closeAllConnections();
-      }),
+    stop,
   };
 }
 

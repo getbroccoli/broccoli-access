@@ -29,3 +29,5 @@ export {
   type GrantEvent,
 } from "./googleResponses";
 export { schemaViolations } from "./schemaViolations";
+export { callConnector, linearRequest, memberAccount } from "./callConnector";
+export { signInToFakeSlack } from "./signInToFakeSlack";

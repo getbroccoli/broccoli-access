@@ -1,6 +1,7 @@
-import express, { Router, type RequestHandler, type Response } from "express";
+import express, { Router, type RequestHandler } from "express";
 import { z } from "zod";
 
+import { invalidBody, notFound, refuseBrowsers } from "../utils";
 import { ADMIN_METHODS } from "./adminMethods";
 import type { FakeGoogleContext } from "./context";
 import { CONNECTOR_ERRORS } from "./googleErrors";
@@ -8,8 +9,7 @@ import { findPerson, grantAccess, revokeGrant } from "./state";
 
 /**
  * Endpoints only the fake has, so tests and agents can change its data mid-run and make calls
- * fail. They have no authentication, so the fake listens only where tests and the app reach it,
- * and refuses browsers, which any site can make post a form to it.
+ * fail. They have no authentication, so the fake listens only where tests and the app reach it.
  */
 export function controlRoutes(context: FakeGoogleContext): Router {
   return Router()
@@ -136,17 +136,3 @@ function registerClient(context: FakeGoogleContext): RequestHandler {
     response.sendStatus(204);
   };
 }
-
-function invalidBody(response: Response, error: z.ZodError): void {
-  response.status(400).json({ error: z.prettifyError(error) });
-}
-
-function notFound(response: Response, message: string): void {
-  response.status(404).json({ error: message });
-}
-
-/** Browsers send `Origin` with every cross-site POST; tests, curl and agents send none. */
-const refuseBrowsers: RequestHandler = (request, response, next) => {
-  if (request.get("origin") === undefined) return next();
-  response.status(403).json({ error: "The control endpoints refuse requests from browsers" });
-};

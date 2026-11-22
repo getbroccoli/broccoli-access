@@ -1,11 +1,15 @@
 {
   "elements": {
     "src/main": ["src/env", "src/google"],
+    "src/connectorsMain": ["src/connectors"],
     "src/env": [],
-    "src/index": ["src/google", "src/seed"],
-    "src/google": ["src/seed"],
+    "src/index": ["src/connectors", "src/google", "src/seed"],
+    "src/connectors": ["src/seed", "src/utils"],
+    "src/google": ["src/seed", "src/utils"],
     "src/seed": [],
-    "test/support": ["src/google", "src/seed"]
+    "src/utils": [],
+    "test/e2e": ["src/seed", "test/support"],
+    "test/support": ["src/connectors", "src/google", "src/seed"]
   },
   "testsMayImport": {
     "*": ["test/support"]

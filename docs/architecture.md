@@ -116,7 +116,8 @@ Test design and execution belong in [testing.md](testing.md). UI verification st
 
 - **pnpm workspaces and Turborepo** organize the monorepo. Packages live under `packages/`; shared packages are added when there is actual code to share. The repository root stays small ([RULE8](code-quality.md#modules-and-files)).
 - **Builds** use Vite for the web app and tsdown for the API, with bundler-style TypeScript module resolution.
-- **Automated quality checks** cover formatting, lint, types, module boundaries, duplicate code and tests. GitHub Actions also scans for secrets. Containerized CI jobs reach their isolated services over the container network.
+- **Automated quality checks** cover formatting, lint, types, module boundaries, duplicate code and tests. GitHub Actions also scans for secrets. Containerized CI jobs reach their isolated services over the container network. The connector conformance suite starts containers, so it runs on a GitHub-hosted runner, never with a Docker socket on the shared self-hosted one.
+- **`packages/connector-contract` installs on its own.** The connectors repository adds it from git at a release tag, so it ships its TypeScript source with Node's module resolution (`.js` import paths) and depends only on published packages: the consumer's Vitest and tsc read it with no build step to drift from the source.
 
 ## 10. Development environment
 

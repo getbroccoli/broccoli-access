@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+.git
+# Development data and environment files hold secrets, in any folder.
+**/.data
+**/.env
+**/.env.*
+!**/.env.example

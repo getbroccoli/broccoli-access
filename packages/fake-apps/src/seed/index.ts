@@ -7,3 +7,4 @@ export type {
   SeedOAuthClient,
   SeedPerson,
 } from "./acmeSeed";
+export { ACME_LINEAR, ACME_SLACK, type SeedMember, type SeedWorkspace } from "./acmeWorkspaces";

@@ -1,10 +1,11 @@
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 
+import { pageOf } from "../utils";
 import { adminAccess } from "./adminAccess";
 import type { FakeGoogleContext } from "./context";
 import { sendGoogleError } from "./googleErrors";
-import { pageOf, parsePageRequest } from "./pageRequest";
+import { parsePageRequest } from "./pageRequest";
 import { isInsideGrantLog, type GoogleState, type GrantEvent } from "./state";
 
 /** Google's Reports API v1, limited to the `token` application's grant log. */
