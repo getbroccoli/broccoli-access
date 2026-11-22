@@ -1,5 +1,7 @@
 export { expect } from "vitest";
 export { employeeDirectory } from "../../src/modules/employees";
+export { createAppConnectionService } from "../../src/modules/apps";
+export { createGoogleWorkspaceConnector } from "../../src/modules/google";
 export { ADMIN, EMPLOYEE, OWNER, SETUP_HOLDER, SYSTEM } from "./testSecurityContext";
 export { createBrowser, type Browser } from "./browser";
 export { startDisconnectingProxy, type DisconnectingProxy } from "./disconnectingProxy";
@@ -19,7 +21,7 @@ export { TEST_OWNER, TestEnv, type SignedInOwner, type TestEnvOptions } from "./
 export { TestSeed } from "./testSeed";
 export { TEST_SECRET_BOX } from "./testSecretBox";
 export { storedFileIds } from "./storedFileIds";
-export { employeeServices, mailSettings, googleConnection } from "./services";
+export { employeeServices, mailSettings, googleConnection, scans } from "./services";
 export type { EmployeeServices } from "./services";
 export { fileStorage, instances, owners, recordHistory, setupSessions } from "./statelessServices";
 export { EXAMPLE_PAYLOAD } from "./exampleEvent";
@@ -52,3 +54,14 @@ export {
   storedUsers,
 } from "./storedGoogleConnection";
 export { googleSetup, GOOGLE_SCOPES } from "./googleSetup";
+export { googleScanSetup } from "./googleScanSetup";
+export { connectorContract, type ConnectorContractCase } from "./connectorContract";
+export { recordingJobQueue } from "./recordingJobQueue";
+export { failFakeGoogle, suspendAtFakeGoogle } from "./fakeGoogleControls";
+export {
+  storedEmployees,
+  storedAppAccounts,
+  storedImportSources,
+  storedImportRecords,
+  storedRecordHistory,
+} from "./storedScan";
