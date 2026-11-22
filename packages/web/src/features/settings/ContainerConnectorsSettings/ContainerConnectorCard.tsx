@@ -5,6 +5,7 @@ import { cn } from "@/lib/class-names";
 import { ScanNowButton } from "@/shell";
 
 import { ConnectContainerConnectorDialog } from "./ConnectContainerConnectorDialog";
+import { connectingFieldName } from "./connectingFieldName";
 import { ConnectionSummary } from "./ConnectionSummary";
 
 export type ContainerConnector = ContainerConnectorsSettingsQuery["containerConnectors"][number];
@@ -75,6 +76,6 @@ function howItConnects(connector: ContainerConnector): string {
   if (!isTyped(connector)) {
     return t("settings.apps.throughAppSession", { app: connector.name });
   }
-  const help = connector.connectionFields.map((field) => field.help).join(" ");
-  return t("settings.apps.throughApi", { app: connector.name, help });
+  const field = connectingFieldName(connector.connectionFields);
+  return t("settings.apps.throughApi", { app: connector.name, field });
 }

@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { t } from "@/i18n";
 
+import { inSentence } from "./connectingFieldName";
+
 type Connector = ContainerConnectorsSettingsQuery["containerConnectors"][number];
 
 type Props = {
@@ -70,7 +72,7 @@ export function ConnectContainerConnectorDialog({ connector }: Props) {
   const fieldErrors = payloadError?.__typename === "InvalidInputError" ? payloadError.fields : [];
   const fieldError = (key: string, label: string) =>
     fieldErrors.some(({ field }) => field === `values.${key}`)
-      ? t("settings.apps.dialog.required", { field: label })
+      ? t("settings.apps.dialog.required", { field: inSentence(label) })
       : undefined;
   const formError = connectFailure(app, payloadError, error !== undefined);
 
@@ -122,12 +124,7 @@ export function ConnectContainerConnectorDialog({ connector }: Props) {
             <span className="font-semibold text-foreground">
               {t("settings.apps.dialog.nextTitle")}
             </span>
-            <span>
-              {t("settings.apps.dialog.next", {
-                app,
-                field: connector.connectionFields[0]?.label ?? "",
-              })}
-            </span>
+            <span>{t("settings.apps.dialog.next", { app })}</span>
           </div>
           {formError && (
             <p role="alert" className="text-sm text-destructive">

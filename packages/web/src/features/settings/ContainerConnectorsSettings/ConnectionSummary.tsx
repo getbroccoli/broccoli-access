@@ -2,6 +2,8 @@ import type { ContainerConnectorsSettingsQuery } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 import { formatLastScan } from "@/lib/lastScan";
 
+import { connectingFieldName } from "./connectingFieldName";
+
 type Connector = ContainerConnectorsSettingsQuery["containerConnectors"][number];
 
 type Props = {
@@ -12,10 +14,7 @@ type Props = {
 /** A connected app's workspace, whose key or session connects it, and its last scan. */
 export function ConnectionSummary({ connector, connection }: Props) {
   const { scan, connectionUserEmail } = connection;
-  // The secret field names what connects it, such as the API key.
-  const field =
-    (connector.connectionFields.find(({ secret }) => secret) ?? connector.connectionFields[0])
-      ?.label ?? "";
+  const field = connectingFieldName(connector.connectionFields);
   const workspace = scan?.sourceName ?? "";
 
   return (

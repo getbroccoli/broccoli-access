@@ -30,12 +30,12 @@ A manual check of Settings → Connections against a development stack: the Goog
 
 ## Apps
 
-- [ ] Slack reads "Not connected" and "Broccoli Access makes the calls Slack’s own admin pages make, with your Slack session. The Chrome extension hands it over.", with no button.
-- [ ] Linear reads "Not connected", "Through Linear’s API. Paste a personal API key made by a Linear admin." and "Connect Linear".
-- [ ] "Connect Linear" opens a dialog "Connect Linear" with a "Linear API key" field, its hint ending "Broccoli Access stores it encrypted on your server.", "What happens next", "Cancel" and "Connect Linear"; Escape and "Cancel" close it.
-- [ ] Connecting with an empty field shows "Enter the Linear API key." under it; any key other than `lin_api_acme_fake` shows "Linear refused it. Check it and try again." and Linear stays not connected.
+- [ ] Slack reads "Not connected" and "Slack has no API for this on your plan, so Broccoli Access makes the calls Slack’s own admin pages make, with your Slack session. The Chrome extension hands it over.", with no button.
+- [ ] Linear reads "Not connected", "Through Linear’s API, with a personal API key made by a Linear admin." and "Connect Linear".
+- [ ] "Connect Linear" opens a dialog "Connect Linear" reading "Broccoli Access reads your Linear members and disables or enables them when you ask, through Linear’s API.", a "Personal API key" field with "Make it in Linear’s settings while signed in as a Linear admin. Broccoli Access stores it encrypted on your server.", "What happens next" with "Broccoli Access checks the key, shows the workspace’s name, approves Linear and scans its members.", "Cancel" and "Connect Linear"; Escape and "Cancel" close it.
+- [ ] Connecting with an empty field shows "Enter the personal API key." under it; any key other than `lin_api_acme_fake` shows "Linear refused it. Check it and try again." and Linear stays not connected.
 - [ ] With the fake failing the test (`POST <fake connectors>/_fake/failures` for `linear`, `connections/test`, `app_unavailable`, count 3), connecting with `lin_api_acme_fake` shows "Couldn’t check the connection to Linear. Try again." and Linear stays not connected; with count 1, connecting succeeds on the next attempt.
-- [ ] `lin_api_acme_fake` closes the dialog; the card reads "Connected", "The Acme workspace, connected with the Linear API key of admin@acme.example." and, once its scan ends, "7 members. Scanned today at HH:MM.", with "Scan now".
+- [ ] `lin_api_acme_fake` closes the dialog; the card reads "Connected", "The Acme workspace, connected with a personal API key of admin@acme.example." and, once its scan ends, "7 members. Scanned today at HH:MM.", with "Scan now".
 - [ ] Linear shows in Applications under Approved with 7 users, found via "Linear members", "1 still has access".
 - [ ] With the fake failing the list (`accounts/list`, `app_unavailable`, count 3), Linear's "Scan now" ends with "The last scan failed. Try Scan now again."
 - [ ] Without `CONNECTORS_URL` (the self-hosted image as built), Connections shows no "Apps" section.
