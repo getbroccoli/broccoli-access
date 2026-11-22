@@ -5,7 +5,7 @@ import { createResolvers } from "./graphql";
 import { googleRouter } from "./http";
 
 // Public values.
-export { createGoogleConnectionService } from "./app";
+export { createGoogleConnectionService, createGoogleWorkspaceConnector } from "./app";
 
 // Public types.
 export type { GoogleConnectionService } from "./app";

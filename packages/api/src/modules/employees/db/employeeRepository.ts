@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import {
   afterKeyset,
+  anyOf,
+  insertBatches,
   containsPattern,
   isUniqueViolation,
   type KeysetOrder,
@@ -31,13 +33,15 @@ const fileStorage = createFileStorageService();
 export interface EmployeeRepository {
   /** Throws `EmailTakenError` when another employee has the email. */
   insert(newEmployee: EmployeeRow): Promise<Employee>;
+  /** Inserts employees whose emails nobody has, as a sync found them. */
+  insertMany(newEmployees: readonly NewEmployee[]): Promise<Employee[]>;
   /**
    * Changes an employee's fields under the row's lock and returns the employee before and after;
    * null when no employee has the id. Throws `EmailTakenError` like `insert`.
    */
   update(
     id: string,
-    changes: Partial<NewEmployee>,
+    changes: EmployeeChanges,
   ): Promise<{ before: Employee; after: Employee } | null>;
   /**
    * Deletes an employee, their avatar and the user who signs in as them, and returns what was
@@ -49,6 +53,8 @@ export interface EmployeeRepository {
   findByUserId(userId: string): Promise<Employee | null>;
   /** The employees among these ids that exist. */
   findByIds(ids: readonly string[]): Promise<Employee[]>;
+  /** The employees with these lowercased emails. */
+  findByEmails(emails: readonly string[]): Promise<Employee[]>;
   /** The employees whose avatar is this file. */
   findIdsByAvatar(fileId: string): Promise<string[]>;
   /** Up to `limit` employees after `after`, with their sort values as Postgres computed them. */
@@ -84,6 +90,14 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
       } catch (error) {
         throw isUniqueViolation(error, EMAIL_UNIQUE_CONSTRAINT) ? new EmailTakenError() : error;
       }
+    },
+
+    insertMany: async (newEmployees) => {
+      const inserted: Employee[] = [];
+      for (const batch of insertBatches(newEmployees)) {
+        inserted.push(...(await orm().insert(employees).values(batch).returning()));
+      }
+      return inserted;
     },
 
     update: async (id, changes) => {
@@ -134,6 +148,8 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
         .from(employees)
         .where(sql`${employees.id} = any(${sql.param([...ids])}::uuid[])`),
 
+    findByEmails: (emails) => orm().select().from(employees).where(anyOf(employees.email, emails)),
+
     findIdsByAvatar: async (fileId) => {
       const rows = await orm()
         .select({ id: employees.id })
@@ -169,6 +185,9 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
     },
   };
 }
+
+/** The fields an update changes, including the links only the module itself sets. */
+type EmployeeChanges = Partial<NewEmployee & Pick<Employee, "managerId" | "userId">>;
 
 /** A new employee as stored, with the columns only the module itself sets. */
 type EmployeeRow = NewEmployee & Partial<Pick<Employee, "avatarFileId" | "userId" | "managerId">>;

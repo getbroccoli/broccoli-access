@@ -41,15 +41,8 @@ export function parseGoogleWorkspaceSettings(settings: unknown): GoogleWorkspace
   return GOOGLE_WORKSPACE_SETTINGS.parse(settings);
 }
 
-/** Only a Google super admin may connect the workspace and become the owner. */
-export class NotSuperAdminError extends Error {
-  constructor() {
-    super("The consenting Google account is not a super admin");
-    this.name = "NotSuperAdminError";
-  }
-}
-
-const GOOGLE_WORKSPACE_SETTINGS = z.object({
+/** The settings as stored: what the connector needs and Settings shows, never a secret. */
+export const GOOGLE_WORKSPACE_SETTINGS = z.object({
   googleApp: z.literal("own_google_app"),
   clientId: z.string(),
   domain: z.string(),
@@ -57,3 +50,17 @@ const GOOGLE_WORKSPACE_SETTINGS = z.object({
   adminEmail: z.string(),
   grantedScopes: z.array(z.string()),
 });
+
+/** The connection's secrets, stored encrypted: the Google app's client secret and the admin's refresh token. */
+export const GOOGLE_WORKSPACE_SECRETS = z.object({
+  clientSecret: z.string(),
+  refreshToken: z.string(),
+});
+
+/** Only a Google super admin may connect the workspace and become the owner. */
+export class NotSuperAdminError extends Error {
+  constructor() {
+    super("The consenting Google account is not a super admin");
+    this.name = "NotSuperAdminError";
+  }
+}

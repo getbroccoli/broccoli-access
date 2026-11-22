@@ -3,6 +3,7 @@
 declare module "../../../core/records" {
   interface RecordTypes {
     app: true;
+    app_account: true;
     app_connection: true;
   }
 }

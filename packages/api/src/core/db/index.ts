@@ -3,6 +3,7 @@ export { connectDatabase } from "./database";
 export { containsPattern } from "./likePattern";
 export { MIGRATION_LOCK_KEY } from "./migrationRun";
 export { anyOf } from "./anyOf";
+export { insertBatches } from "./insertBatches";
 export { jsonb } from "./jsonb";
 export { afterKeyset, keysetOrder, nullsLast, orderByKeyset } from "./keyset";
 export { createBeforeCommitBus } from "./beforeCommitBus";

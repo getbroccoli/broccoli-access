@@ -7,10 +7,15 @@ import { createResolvers } from "./graphql";
 import { avatarRouter } from "./http";
 
 // Public values.
-export { createEmployeeReadService, createEmployeeService, employeeDirectory } from "./app";
+export {
+  createDirectorySyncService,
+  createEmployeeReadService,
+  createEmployeeService,
+  employeeDirectory,
+} from "./app";
 
 // Public types.
-export type { EmployeeReadService, EmployeeService } from "./app";
+export type { DirectorySyncService, EmployeeReadService, EmployeeService } from "./app";
 export type { Employee } from "./domain";
 
 /** The people who work for the company: create, change, remove and list them, keep their history and serve their avatars. */
