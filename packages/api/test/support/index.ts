@@ -7,6 +7,7 @@ export { createBrowser, type Browser } from "./browser";
 export { startDisconnectingProxy, type DisconnectingProxy } from "./disconnectingProxy";
 export { test } from "./fixture";
 export { startSimpleHttpServer } from "./simpleHttpServer";
+export { startCountingGoogleProxy } from "./countingGoogleProxy";
 export { PNG, JPEG, WEBP } from "./images";
 export { holdMigrationLock, type MigrationLockHolder } from "./migrationLock";
 export {
@@ -47,18 +48,19 @@ export { storedTextProbe } from "./storedTextProbe";
 export { startFakeHttpServer } from "./fakeHttpServer";
 export { expectHistoryReplaysTo } from "./employeeHistory";
 export { registerGoogleRedirect, consentAtGoogle } from "./googleConsent";
-export {
-  storedApps,
-  storedAppConnections,
-  storedGoogleAccounts,
-  storedUsers,
-} from "./storedGoogleConnection";
+export { storedAppConnections, storedGoogleAccounts, storedUsers } from "./storedGoogleConnection";
 export { googleSetup, GOOGLE_SCOPES } from "./googleSetup";
 export { googleScanSetup } from "./googleScanSetup";
 export { connectorContract, type ConnectorContractCase } from "./connectorContract";
 export { recordingJobQueue } from "./recordingJobQueue";
-export { failFakeGoogle, suspendAtFakeGoogle } from "./fakeGoogleControls";
 export {
+  failFakeGoogle,
+  suspendAtFakeGoogle,
+  grantAtFakeGoogle,
+  revokeAtFakeGoogle,
+} from "./fakeGoogleControls";
+export {
+  storedApps,
   storedEmployees,
   storedAppAccounts,
   storedImportSources,

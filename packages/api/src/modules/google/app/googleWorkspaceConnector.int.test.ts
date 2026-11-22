@@ -1,4 +1,5 @@
 import { ACME } from "@broccoli-access/fake-apps";
+import { onTestFinished } from "vitest";
 
 import {
   expect,
@@ -11,9 +12,10 @@ import {
   failFakeGoogle,
   createGoogleWorkspaceConnector,
   createAppConnectionService,
+  startCountingGoogleProxy,
 } from "#test/support";
 
-import type { ImportedAccount } from "../../../core/connectors";
+import { ConnectorError, type ImportedAccount } from "../../../core/connectors";
 
 const test = baseTest.extend<{ connectorCase: ConnectorContractCase }>({
   connectorCase: async ({ orm, fakeGoogle }, use) => {
@@ -75,7 +77,7 @@ test("maps all 42 Google directory users to their own app's accounts", async ({
   let cursor: string | null = null;
   do {
     const page = await session.listAccounts(cursor);
-    accounts.push(...page.accounts);
+    accounts.push(...page.accounts.filter(({ values }) => values.appExternalId === null));
     cursor = page.nextCursor;
   } while (cursor !== null);
 
@@ -114,4 +116,87 @@ test("maps all 42 Google directory users to their own app's accounts", async ({
       },
     });
   }
+});
+
+test("maps every grant except the instance's own client to an app account", async ({
+  connectorCase,
+}) => {
+  const openedAt = Date.now();
+  const session = await connectorCase.connector.openSession(connectorCase.connection);
+  const accounts: ImportedAccount[] = [];
+  let cursor: string | null = null;
+
+  do {
+    const page = await session.listAccounts(cursor);
+    accounts.push(...page.accounts.filter(({ values }) => values.appExternalId !== null));
+    cursor = page.nextCursor;
+  } while (cursor !== null);
+
+  expect(accounts).toHaveLength(ACME.grants.length);
+  expect(accounts.map(({ values }) => [values.email, values.appExternalId]).sort()).toEqual(
+    ACME.grants.map(({ email, clientId }) => [email, `google:${clientId}`]).sort(),
+  );
+  const figma = ACME.apps.find(({ name }) => name === "Figma")!;
+  const ana = accounts.find(
+    ({ sourceKey }) => sourceKey === `104857392018374650123:${figma.clientId}`,
+  )!;
+  expect(ana).toEqual({
+    sourceKey: `104857392018374650123:${figma.clientId}`,
+    raw: {
+      kind: "admin#directory#token",
+      clientId: figma.clientId,
+      displayText: "Figma",
+      scopes: ["openid", "email", "profile"],
+      userKey: "104857392018374650123",
+      anonymous: false,
+      nativeApp: false,
+    },
+    values: {
+      email: "ana@acme.example",
+      status: "active",
+      firstName: null,
+      lastName: null,
+      managerEmail: null,
+      appName: "Figma",
+      appExternalId: `google:${figma.clientId}`,
+      grantedAt: null,
+      grantedBefore: expect.any(String) as unknown,
+    },
+  });
+  const logStart = Date.parse(ana.values.grantedBefore!);
+  expect(logStart).toBeGreaterThanOrEqual(openedAt - 180 * 86_400_000);
+  expect(logStart).toBeLessThanOrEqual(Date.now() - 180 * 86_400_000);
+});
+
+test("a retried page reads only the tokens lists that failed", async ({
+  connectorCase,
+  fakeGoogle,
+}) => {
+  const proxy = await startCountingGoogleProxy(fakeGoogle.url);
+  onTestFinished(() => proxy.stop());
+  const connector = createGoogleWorkspaceConnector({
+    openIdConfigurationUrl: `${fakeGoogle.url}/.well-known/openid-configuration`,
+    adminApiUrl: proxy.url,
+  });
+  const session = await connector.openSession(connectorCase.connection);
+  await failFakeGoogle(fakeGoogle.url, {
+    endpoint: "directory.tokens.list",
+    error: "rate_limited",
+    count: 1,
+  });
+
+  const firstAttempt = session.listAccounts(null);
+  await expect(firstAttempt).rejects.toBeInstanceOf(ConnectorError);
+  await expect(firstAttempt).rejects.toMatchObject({ code: "rate_limited" });
+  const page = await session.listAccounts(null);
+
+  const users = page.accounts.filter(({ values }) => values.appExternalId === null);
+  expect(users).toHaveLength(3);
+  const tokenPaths = proxy.paths.filter((path) => path.endsWith("/tokens"));
+  expect(tokenPaths).toHaveLength(4);
+  const readsPerUser = users.map(
+    ({ sourceKey }) =>
+      tokenPaths.filter((path) => path === `/admin/directory/v1/users/${sourceKey}/tokens`).length,
+  );
+  expect(readsPerUser.sort()).toEqual([1, 1, 2]);
 });

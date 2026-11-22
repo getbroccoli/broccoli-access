@@ -26,6 +26,8 @@ export interface AppAccountService {
   ) => Promise<void>;
   /** How many people have an account in the app, and how many of those are suspended. Trusted read: no `ctx`. */
   countAccounts: (db: Orm | Tx, appId: string) => Promise<{ people: number; suspended: number }>;
+  /** How many apps hold an account `findingKind` saw in its last scan. Trusted read: no `ctx`. */
+  countAppsFoundVia: (db: Orm | Tx, findingKind: string) => Promise<number>;
 }
 
 export function createAppAccountService(): AppAccountService {
@@ -39,6 +41,7 @@ export function createAppAccountService(): AppAccountService {
       await applyPlan(ctx, tx, plan, cause);
     },
     countAccounts: (db, appId) => appAccountRepository(db).countPeople(appId),
+    countAppsFoundVia: (db, findingKind) => appAccountRepository(db).countAppsFoundVia(findingKind),
   };
 }
 

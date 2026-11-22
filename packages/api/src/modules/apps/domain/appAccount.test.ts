@@ -64,6 +64,145 @@ it("adds a second finding kind to a known account", () => {
   ]);
 });
 
+it.each([
+  { grantedAt: new Date("2026-08-12T10:00:00Z"), grantedBefore: null },
+  { grantedAt: null, grantedBefore: new Date("2026-05-25T08:00:00Z") },
+])("takes the found grant dates when creating an account (%j)", (dates) => {
+  const found = {
+    appId: ACCOUNT.appId,
+    email: ACCOUNT.email,
+    employeeId: ACCOUNT.employeeId,
+    status: ACCOUNT.status,
+    ...dates,
+  };
+
+  const plan = planAccountSync([], { findingKind: "google_sign_in", found: [found], now: NOW });
+
+  expect(plan).toEqual({
+    created: [{ ...found, foundVia: ["google_sign_in"], firstSeenAt: NOW }],
+    updated: [],
+    deleted: [],
+  });
+});
+
+it.each([null, new Date("2026-05-24T08:00:00Z"), new Date("2026-05-26T08:00:00Z")])(
+  "keeps granted_before from the scan that first saw the account (%s)",
+  (grantedBefore) => {
+    const before = { ...ACCOUNT, grantedBefore: new Date("2026-05-25T08:00:00Z") };
+    const found = { ...before, status: "suspended" as const, grantedBefore };
+
+    const plan = planAccountSync([before], {
+      findingKind: "google_directory",
+      found: [found],
+      now: NOW,
+    });
+
+    expect(plan.updated).toEqual([{ before, after: { ...before, status: "suspended" } }]);
+  },
+);
+
+it("does not add a grant date to an account first seen undated", () => {
+  const before = { ...ACCOUNT, grantedBefore: new Date("2026-05-25T08:00:00Z") };
+  const found = { ...before, grantedAt: new Date("2026-08-12T10:00:00Z"), grantedBefore: null };
+
+  const plan = planAccountSync([before], {
+    findingKind: "google_directory",
+    found: [found],
+    now: NOW,
+  });
+
+  expect(plan).toEqual({ created: [], updated: [], deleted: [] });
+});
+
+it("moves a known grant date earlier when the scan finds an older event", () => {
+  const before = { ...ACCOUNT, grantedAt: new Date("2026-08-12T10:00:00Z") };
+  const after = { ...before, grantedAt: new Date("2026-08-01T10:00:00Z") };
+
+  const plan = planAccountSync([before], {
+    findingKind: "google_directory",
+    found: [after],
+    now: NOW,
+  });
+
+  expect(plan).toEqual({ created: [], updated: [{ before, after }], deleted: [] });
+});
+
+it("does not move a known grant date later", () => {
+  const before = { ...ACCOUNT, grantedAt: new Date("2026-08-01T10:00:00Z") };
+  const found = { ...before, grantedAt: new Date("2026-08-12T10:00:00Z") };
+
+  const plan = planAccountSync([before], {
+    findingKind: "google_directory",
+    found: [found],
+    now: NOW,
+  });
+
+  expect(plan).toEqual({ created: [], updated: [], deleted: [] });
+});
+
+it("keeps a known grant date when its event falls out of the log", () => {
+  const before = { ...ACCOUNT, grantedAt: new Date("2026-08-01T10:00:00Z") };
+  const found = { ...before, grantedAt: null, grantedBefore: new Date("2026-08-02T10:00:00Z") };
+
+  const plan = planAccountSync([before], {
+    findingKind: "google_directory",
+    found: [found],
+    now: NOW,
+  });
+
+  expect(plan).toEqual({ created: [], updated: [], deleted: [] });
+});
+
+it("lists changed grant dates as ISO strings after the finding kinds", () => {
+  const before = { ...ACCOUNT, grantedAt: new Date("2026-08-12T10:00:00Z") };
+  const after = {
+    ...before,
+    foundVia: ["google_sign_in"],
+    grantedAt: null,
+    grantedBefore: new Date("2026-05-25T08:00:00Z"),
+  };
+
+  expect(accountChanges(before, after)).toEqual([
+    { field: "foundVia", oldValue: "google_directory", newValue: "google_sign_in" },
+    { field: "grantedAt", oldValue: "2026-08-12T10:00:00.000Z", newValue: null },
+    { field: "grantedBefore", oldValue: null, newValue: "2026-05-25T08:00:00.000Z" },
+  ]);
+});
+
+it("merges two found grants for the same person and app into one active account", () => {
+  const account = { appId: ACCOUNT.appId, email: ACCOUNT.email, employeeId: ACCOUNT.employeeId };
+  const grantedBefore = new Date("2026-05-25T08:00:00Z");
+
+  const plan = planAccountSync([], {
+    findingKind: "google_sign_in",
+    found: [
+      {
+        ...account,
+        status: "suspended",
+        grantedAt: new Date("2026-08-12T10:00:00Z"),
+        grantedBefore: null,
+      },
+      { ...account, status: "active", grantedAt: null, grantedBefore },
+    ],
+    now: NOW,
+  });
+
+  expect(plan).toEqual({
+    created: [
+      {
+        ...account,
+        status: "active",
+        grantedAt: null,
+        grantedBefore,
+        foundVia: ["google_sign_in"],
+        firstSeenAt: NOW,
+      },
+    ],
+    updated: [],
+    deleted: [],
+  });
+});
+
 const NOW = new Date("2026-11-22T12:00:00Z");
 const ACCOUNT: AppAccount = {
   id: "account-ana",
@@ -73,4 +212,6 @@ const ACCOUNT: AppAccount = {
   status: "active",
   foundVia: ["google_directory"],
   firstSeenAt: new Date("2026-11-21T12:00:00Z"),
+  grantedAt: null,
+  grantedBefore: null,
 };

@@ -30,7 +30,9 @@ test("saves all 42 directory people with lowercase emails and their names", asyn
 
   const people = await storedEmployees(orm);
   expect(people).toHaveLength(42);
-  const records = await storedImportRecords(orm);
+  const records = (await storedImportRecords(orm)).filter(({ sourceKey }) =>
+    ACME.people.some(({ id }) => id === sourceKey),
+  );
   expect(records).toHaveLength(42);
   for (const person of ACME.people) {
     expect(people.find(({ email }) => email === person.email.toLowerCase())).toMatchObject({
@@ -95,7 +97,9 @@ test("writes the 42 Google Workspace accounts with their status and employee", a
 
   const [connection] = await storedAppConnections(orm);
   const people = await storedEmployees(orm);
-  const accounts = await storedAppAccounts(orm);
+  const accounts = (await storedAppAccounts(orm)).filter(({ foundVia }) =>
+    foundVia.includes("google_directory"),
+  );
   expect(accounts).toHaveLength(42);
   for (const person of ACME.people) {
     expect(accounts.find(({ email }) => email === person.email)).toMatchObject({
@@ -131,6 +135,8 @@ test("finishes scanned with the read time and counts of people and suspended acc
     failure: null,
     readAt: source!.readAt,
     people: { state: "done", count: 42, suspended: 2 },
+    apps: { state: "done", count: 37 },
+    signInLogs: { state: "done" },
   });
 });
 
@@ -183,7 +189,9 @@ test("a rescan suspends Elif without duplicating people and appends just one his
   await scans.runScan(SYSTEM, sourceId);
   const people = await storedEmployees(orm);
   const accounts = await storedAppAccounts(orm);
-  const elif = accounts.find(({ email }) => email === "elif@acme.example")!;
+  const elif = accounts.find(
+    ({ email, foundVia }) => email === "elif@acme.example" && foundVia.includes("google_directory"),
+  )!;
   const history = await storedRecordHistory(orm);
   await suspendAtFakeGoogle(fakeGoogle.url, elif.email);
   await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
@@ -222,7 +230,7 @@ test("retries a rate-limited page and finishes the scan", async ({ orm, fakeGoog
   await scans.runScan(SYSTEM, sourceId);
 
   expect(await storedImportSources(orm)).toMatchObject([{ status: "scanned", failure: null }]);
-  expect(await storedImportRecords(orm)).toHaveLength(42);
+  expect(await storedImportRecords(orm)).toHaveLength(42 + ACME.grants.length);
 });
 
 test("three rate-limited attempts fail the scan without changing previous records", async ({
@@ -258,14 +266,20 @@ test("records employee and account creations as found by this scan by Broccoli i
 
   const history = await storedRecordHistory(orm);
   const people = await storedEmployees(orm);
-  const accounts = await storedAppAccounts(orm);
+  const accounts = (await storedAppAccounts(orm)).filter(({ foundVia }) =>
+    foundVia.includes("google_directory"),
+  );
   expect(people).toHaveLength(42);
   expect(accounts).toHaveLength(42);
   for (const [recordType, records] of [
     ["employee", people],
     ["app_account", accounts],
   ] as const) {
-    expect(history.filter((line) => line.recordType === recordType)).toHaveLength(42);
+    expect(
+      history.filter(
+        (line) => line.recordType === recordType && records.some(({ id }) => id === line.recordId),
+      ),
+    ).toHaveLength(42);
     for (const record of records) {
       expect(
         history.find((line) => line.recordType === recordType && line.recordId === record.id),

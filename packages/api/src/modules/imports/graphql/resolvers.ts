@@ -14,11 +14,13 @@ export function createResolvers(scans: Pick<ScanService, "readScan">): Resolvers
   };
 }
 
-function toScanGraphql({ failure, people, status, ...scan }: Scan) {
+function toScanGraphql({ failure, people, apps, signInLogs, status, ...scan }: Scan) {
   return {
     ...scan,
     status: toEnum(status),
     failure: failure && toEnum(failure),
     people: { ...people, state: toEnum(people.state) },
+    apps: { ...apps, state: toEnum(apps.state) },
+    signInLogs: { state: toEnum(signInLogs.state) },
   };
 }

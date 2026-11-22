@@ -83,6 +83,7 @@
     "src/__generated__": [],
     "src/styles.css": [],
     "src/lib/initials": [],
+    "src/lib/since": ["src/i18n"],
     "src/lib/useRouteAction": [],
     "src/lib/useSessionChange": ["src/lib/useRouteAction"],
     "src/lib/calendarDay": [],

@@ -1,7 +1,7 @@
 import { createMailSettingsService } from "../core/instance";
 import type { ModuleDependencies, Modules } from "../core/moduleManifest";
 import { recordsManifest } from "../core/records";
-import { createAppAccountService, createAppConnectionService } from "./apps";
+import { createAppAccountService, createAppConnectionService, createAppService } from "./apps";
 import { createDirectorySyncService, employeeDirectory, employeesModule } from "./employees";
 import { createGoogleWorkspaceConnector, googleModule } from "./google";
 import { createScanService, importsModule } from "./imports";
@@ -32,7 +32,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   const scans = createScanService({
     ...core,
     connectors: [createGoogleWorkspaceConnector(googleAddresses)],
-    apps: { ...connectedApps, ...createAppAccountService() },
+    apps: { ...connectedApps, ...createAppAccountService(), ...createAppService() },
     directory: createDirectorySyncService(),
   });
   const manifests = [

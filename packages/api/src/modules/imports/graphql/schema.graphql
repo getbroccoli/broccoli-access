@@ -15,6 +15,10 @@ type Scan {
   readAt: DateTime
   "Reading the directory's people."
   people: ScanPeopleStep!
+  "Finding the apps people signed in to with the directory's accounts."
+  apps: ScanAppsStep!
+  "Reading the sign-in logs that date when people granted the apps access."
+  signInLogs: ScanSignInLogsStep!
 }
 
 "Where a connection's scan is."
@@ -50,8 +54,22 @@ type ScanPeopleStep {
   suspended: Int
 }
 
+"Finding the apps people signed in to during a scan."
+type ScanAppsStep {
+  state: ScanStepState!
+  "How many apps people signed in to; null until the step is done."
+  count: Int
+}
+
+"Reading the sign-in logs during a scan."
+type ScanSignInLogsStep {
+  state: ScanStepState!
+}
+
 "Where one step of a scan is."
 enum ScanStepState {
+  "The step waits while the directory's people are read."
+  WAITING
   "The step is running."
   RUNNING
   "The step finished."

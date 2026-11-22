@@ -1,7 +1,8 @@
 import { createLocalJWKSet, type JWTVerifyGetKey } from "jose";
 import { z } from "zod";
 
-import { fetchJson } from "../../utils";
+import { bearer, fetchGoogleJson, fetchRequired } from "./fetchGoogleJson";
+import { type GoogleGrantEventPage, readGrantEventPage } from "./grantEventPage";
 
 /** Google's OAuth 2.0, OpenID Connect and Directory endpoints, at the addresses the settings give. */
 export interface GoogleClient {
@@ -19,6 +20,13 @@ export interface GoogleClient {
   findUser(accessToken: string, userId: string): Promise<GoogleUser | null>;
   /** One page of the customer's users, from a null page token; `nextPageToken` is null on the last. */
   listUsers(accessToken: string, pageToken: string | null): Promise<GoogleUserPage>;
+  /** The apps the user with Google's user id `userId` granted access; empty once the user is gone. */
+  listTokens(accessToken: string, userId: string): Promise<GoogleToken[]>;
+  /** One page of the `authorize` events logged since `startTime`, from a null page token. */
+  listGrantEvents(
+    accessToken: string,
+    page: { startTime: Date; pageToken: string | null },
+  ): Promise<GoogleGrantEventPage>;
 }
 
 export interface OpenIdConfiguration {
@@ -73,6 +81,15 @@ export interface GoogleUser {
 export interface GoogleUserPage {
   users: GoogleUser[];
   nextPageToken: string | null;
+}
+
+/** An app's grant to a user, from the user's tokens list. */
+export interface GoogleToken {
+  clientId: string;
+  /** The app's name as Google shows it; the client id when Google gives none. */
+  displayText: string;
+  /** The token as Google sent it. */
+  raw: Record<string, unknown>;
 }
 
 export function createGoogleClient({
@@ -153,13 +170,15 @@ export function createGoogleClient({
       return null;
     },
     listUsers: (accessToken, pageToken) => readUserPage(directoryUrl, accessToken, pageToken),
+    listTokens: async (accessToken, userId) => {
+      const url = directoryUrl(`users/${encodeURIComponent(userId)}/tokens`);
+      const list = await fetchGoogleJson(url, TOKEN_LIST, bearer(accessToken));
+      return (list?.items ?? []).map((token) => toGoogleToken(TOKEN.parse(token), token));
+    },
+    listGrantEvents: (accessToken, page) => readGrantEventPage(adminApiUrl, accessToken, page),
   };
 }
 
-/** Google answers within seconds; a slower answer fails the consent instead of holding it. */
-const TIMEOUT_MS = 10_000;
-/** Far above any answer these endpoints give, such as a page of 500 users. */
-const MAX_BYTES = 5_000_000;
 /** The Directory's largest page, so most companies take one request. */
 const USERS_PER_PAGE = 500;
 
@@ -207,20 +226,16 @@ const USERS_PAGE = z.object({
   nextPageToken: z.string().optional(),
 });
 
+// Tokens stay as Google sent them, so each keeps every field for its import record.
+const TOKEN_LIST = z.object({ items: z.array(z.record(z.string(), z.unknown())).optional() });
+
+const TOKEN = z.object({ clientId: z.string(), displayText: z.string().optional() });
+
 /** Google's token response names the `email` and `profile` scopes by their full names. */
 const SHORT_SCOPE_NAMES: Partial<Record<string, string>> = {
   "https://www.googleapis.com/auth/userinfo.email": "email",
   "https://www.googleapis.com/auth/userinfo.profile": "profile",
 };
-
-/** An answer every call needs; a 404 is as wrong as any other failure here. */
-async function fetchRequired<T>(url: URL, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
-  const answer = await fetchJson(url, schema, { timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES, init });
-  if (answer === null) {
-    throw new Error(`${url.origin} answered 404`);
-  }
-  return answer;
-}
 
 async function readUserPage(
   directoryUrl: (path: string) => URL,
@@ -244,8 +259,8 @@ function shortScopeName(scope: string): string {
   return SHORT_SCOPE_NAMES[scope] ?? scope;
 }
 
-function bearer(accessToken: string): RequestInit {
-  return { headers: { authorization: `Bearer ${accessToken}` } };
+function toGoogleToken(token: z.infer<typeof TOKEN>, raw: Record<string, unknown>): GoogleToken {
+  return { clientId: token.clientId, displayText: token.displayText ?? token.clientId, raw };
 }
 
 function toGoogleUser(
