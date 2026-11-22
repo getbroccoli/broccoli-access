@@ -24,6 +24,7 @@ ALTER TABLE "import_sources" ALTER COLUMN "status" DROP DEFAULT;--> statement-br
 ALTER TABLE "employees" ADD COLUMN "manager_id" uuid;--> statement-breakpoint
 ALTER TABLE "import_sources" ADD COLUMN "connection_id" uuid NOT NULL;--> statement-breakpoint
 ALTER TABLE "app_accounts" ADD CONSTRAINT "app_accounts_app_id_apps_id_fk" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+-- shortcut: deleting an employee clears these links without history; fine until the copied delete-employee action goes with the old People panel.
 ALTER TABLE "employees" ADD CONSTRAINT "employees_manager_id_employees_id_fk" FOREIGN KEY ("manager_id") REFERENCES "public"."employees"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "import_records" DROP COLUMN "external_record_id";--> statement-breakpoint
 ALTER TABLE "import_sources" ADD CONSTRAINT "import_sources_connection_unique" UNIQUE("connection_id");--> statement-breakpoint
@@ -34,4 +35,5 @@ ALTER TABLE "import_sources" ADD CONSTRAINT "import_sources_status" CHECK ("impo
 ALTER TABLE "import_sources" ADD CONSTRAINT "import_sources_failure" CHECK ("import_sources"."failure" in ('authentication_failed', 'permission_missing', 'rate_limited', 'app_unavailable', 'unexpected_response'));--> statement-breakpoint
 -- Foreign keys between modules' tables, which the TypeScript schemas cannot import from each other.
 ALTER TABLE "import_sources" ADD CONSTRAINT "import_sources_connection_id_app_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."app_connections"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+-- shortcut: deleting an employee clears these links without history; fine until the copied delete-employee action goes with the old People panel.
 ALTER TABLE "app_accounts" ADD CONSTRAINT "app_accounts_employee_id_employees_id_fk" FOREIGN KEY ("employee_id") REFERENCES "public"."employees"("id") ON DELETE set null ON UPDATE no action;

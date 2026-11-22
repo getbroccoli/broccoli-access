@@ -29,7 +29,7 @@ enum ScanStatus {
 
 "Why a scan failed, as the connected app answered."
 enum ScanFailure {
-  "The app refused the stored token: it was revoked or expired."
+  "The app refused the connection's credentials, such as a revoked or expired token."
   AUTHENTICATION_FAILED
   "A permission or an admin right is missing."
   PERMISSION_MISSING

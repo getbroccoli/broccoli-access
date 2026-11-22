@@ -188,8 +188,7 @@ const CUSTOMER = z.object({
   postalAddress: z.object({ organizationName: z.string().optional() }).optional(),
 });
 
-// Loose, so the user keeps every field Google sent.
-const DIRECTORY_USER = z.looseObject({
+const DIRECTORY_USER = z.object({
   id: z.string(),
   primaryEmail: z.string(),
   name: z.object({
@@ -202,8 +201,9 @@ const DIRECTORY_USER = z.looseObject({
   relations: z.array(z.object({ type: z.string(), value: z.string() })).optional(),
 });
 
+// Users stay as Google sent them, so each keeps every field for its import record.
 const USERS_PAGE = z.object({
-  users: z.array(DIRECTORY_USER).optional(),
+  users: z.array(z.record(z.string(), z.unknown())).optional(),
   nextPageToken: z.string().optional(),
 });
 
@@ -234,7 +234,10 @@ async function readUserPage(
     ...(pageToken !== null && { pageToken }),
   }).toString();
   const page = await fetchRequired(url, USERS_PAGE, bearer(accessToken));
-  return { users: (page.users ?? []).map(toGoogleUser), nextPageToken: page.nextPageToken ?? null };
+  return {
+    users: (page.users ?? []).map((user) => toGoogleUser(DIRECTORY_USER.parse(user), user)),
+    nextPageToken: page.nextPageToken ?? null,
+  };
 }
 
 function shortScopeName(scope: string): string {
@@ -245,7 +248,10 @@ function bearer(accessToken: string): RequestInit {
   return { headers: { authorization: `Bearer ${accessToken}` } };
 }
 
-function toGoogleUser(user: z.infer<typeof DIRECTORY_USER>): GoogleUser {
+function toGoogleUser(
+  user: z.infer<typeof DIRECTORY_USER>,
+  raw: Record<string, unknown>,
+): GoogleUser {
   const { givenName, familyName, fullName = `${givenName} ${familyName}` } = user.name;
   const manager = user.relations?.find(({ type }) => type === "manager");
   return {
@@ -257,6 +263,6 @@ function toGoogleUser(user: z.infer<typeof DIRECTORY_USER>): GoogleUser {
     isAdmin: user.isAdmin,
     suspended: user.suspended,
     managerEmail: manager ? manager.value.toLowerCase() : null,
-    raw: user,
+    raw,
   };
 }

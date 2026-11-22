@@ -35,7 +35,7 @@ export function createDirectorySyncService(): DirectorySyncService {
     async syncDirectoryPeople(ctx, tx, people, cause) {
       ctx.requireSystem();
       const repository = employeeRepository(tx);
-      const known = await repository.findByEmails(emailsNamedBy(people));
+      const known = await repository.lockByEmails(emailsNamedBy(people));
       const knownEmails = new Set(known.map(({ email }) => email));
       const created = await repository.insertMany(
         people
@@ -48,7 +48,8 @@ export function createDirectorySyncService(): DirectorySyncService {
         owner: await owners.readOwner(tx),
       };
       const saved = await saveDirectoryFields(repository, employees, people, links);
-      await recordChanges(ctx, tx, { created, saved, employees, cause });
+      const managerNames = await namesOfManagers(repository, employees, saved);
+      await recordChanges(ctx, tx, { created, saved, managerNames, cause });
       return new Map(people.map(({ email }) => [email, links.idsByEmail.get(email)!]));
     },
   };
@@ -60,40 +61,50 @@ function emailsNamedBy(people: readonly DirectoryPerson[]): string[] {
   return [...new Set([...people.map(({ email }) => email), ...managers])];
 }
 
-// shortcut: one update per changed employee, so a first scan of a large directory writes each
-// manager on its own; write them in one statement if directories of thousands come.
 /** Saves each listed employee's directory fields that changed; returns them before and after. */
 async function saveDirectoryFields(
   repository: EmployeeRepository,
   employees: readonly Employee[],
   people: readonly DirectoryPerson[],
   links: DirectoryLinks,
-): Promise<{ before: Employee; after: Employee }[]> {
+): Promise<EmployeeChange[]> {
   const byEmail = new Map(employees.map((employee) => [employee.email, employee]));
-  const saved: { before: Employee; after: Employee }[] = [];
+  const saved: EmployeeChange[] = [];
   for (const person of people) {
-    const employee = byEmail.get(person.email)!;
-    const { firstName, lastName, managerId, userId } = employeeFromDirectory(
-      employee,
-      person,
-      links,
-    );
+    const before = byEmail.get(person.email)!;
+    const after = employeeFromDirectory(before, person, links);
+    const { firstName, lastName, managerId, userId } = after;
     const changed =
-      firstName !== employee.firstName ||
-      lastName !== employee.lastName ||
-      managerId !== employee.managerId ||
-      userId !== employee.userId;
+      firstName !== before.firstName ||
+      lastName !== before.lastName ||
+      managerId !== before.managerId ||
+      userId !== before.userId;
     if (changed) {
-      const result = await repository.update(employee.id, {
-        firstName,
-        lastName,
-        managerId,
-        userId,
-      });
-      saved.push(result!);
+      await repository.saveDirectoryFields(before.id, { firstName, lastName, managerId, userId });
+      saved.push({ before, after });
     }
   }
   return saved;
+}
+
+/**
+ * Each manager's name before the sync, including a previous manager the directory no longer
+ * lists, and after it, for the labels of manager changes.
+ */
+async function namesOfManagers(
+  repository: EmployeeRepository,
+  employees: readonly Employee[],
+  saved: readonly EmployeeChange[],
+): Promise<{ before: Map<string, string>; after: Map<string, string> }> {
+  const loaded = new Set(employees.map(({ id }) => id));
+  const outside = new Set(
+    saved.flatMap(({ before }) =>
+      before.managerId && !loaded.has(before.managerId) ? [before.managerId] : [],
+    ),
+  );
+  const previousManagers = outside.size > 0 ? await repository.findByIds([...outside]) : [];
+  const before = namesById([...employees, ...previousManagers]);
+  return { before, after: new Map([...before, ...namesById(saved.map(({ after }) => after))]) };
 }
 
 /** One history line per created employee, holding its final fields, and per updated one. */
@@ -103,18 +114,15 @@ async function recordChanges(
   {
     created,
     saved,
-    employees,
+    managerNames,
     cause,
   }: {
     created: readonly Employee[];
-    saved: readonly { before: Employee; after: Employee }[];
-    employees: readonly Employee[];
+    saved: readonly EmployeeChange[];
+    managerNames: { before: Map<string, string>; after: Map<string, string> };
     cause: HistoryAppend["cause"];
   },
 ): Promise<void> {
-  const namesById = new Map(
-    employees.map(({ id, firstName, lastName }) => [id, `${firstName} ${lastName}`]),
-  );
   const savedById = new Map(saved.map((change) => [change.after.id, change]));
   const createdIds = new Set(created.map(({ id }) => id));
   const lines = [
@@ -122,7 +130,11 @@ async function recordChanges(
       operation: "CREATED" as const,
       records: created.map((employee) => ({
         recordId: employee.id,
-        changes: directoryChanges(null, savedById.get(employee.id)?.after ?? employee, namesById),
+        changes: directoryChanges(
+          null,
+          savedById.get(employee.id)?.after ?? employee,
+          managerNames,
+        ),
       })),
     },
     {
@@ -131,7 +143,7 @@ async function recordChanges(
         .filter(({ after }) => !createdIds.has(after.id))
         .map(({ before, after }) => ({
           recordId: after.id,
-          changes: directoryChanges(before, after, namesById),
+          changes: directoryChanges(before, after, managerNames),
         })),
     },
   ];
@@ -140,4 +152,13 @@ async function recordChanges(
       await recordHistory.append(ctx, tx, { recordType: "employee", operation, cause, records });
     }
   }
+}
+
+interface EmployeeChange {
+  before: Employee;
+  after: Employee;
+}
+
+function namesById(employees: readonly Employee[]): Map<string, string> {
+  return new Map(employees.map(({ id, firstName, lastName }) => [id, `${firstName} ${lastName}`]));
 }

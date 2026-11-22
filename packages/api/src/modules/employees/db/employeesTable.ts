@@ -21,6 +21,8 @@ export const employees = pgTable(
       .unique("employees_user_id_unique")
       .references(() => user.id, { onDelete: "set null" }),
     /** The employee the directory names as manager, or null. */
+    // shortcut: deleting the manager clears this without a history line; fine until the copied
+    // delete-employee action goes with the old People panel.
     managerId: uuid("manager_id").references((): AnyPgColumn => employees.id, {
       onDelete: "set null",
     }),

@@ -38,11 +38,14 @@ export function employeeFromDirectory(
   };
 }
 
-/** The changes history keeps from `before` to `after`, with each manager named by `namesById`. */
+/**
+ * The changes history keeps from `before` to `after`: each manager named as they were then, and
+ * the owner's user by the employee's email, which is theirs.
+ */
 export function directoryChanges(
   before: Employee | null,
   after: Employee,
-  namesById: ReadonlyMap<string, string>,
+  managerNames: { before: ReadonlyMap<string, string>; after: ReadonlyMap<string, string> },
 ): FieldChange[] {
   const changes = employeeChanges(before, after);
   const oldManager = before?.managerId ?? null;
@@ -51,13 +54,19 @@ export function directoryChanges(
       field: "manager",
       oldValue: oldManager,
       newValue: after.managerId,
-      oldLabel: oldManager && (namesById.get(oldManager) ?? null),
-      newLabel: after.managerId && (namesById.get(after.managerId) ?? null),
+      oldLabel: oldManager && (managerNames.before.get(oldManager) ?? null),
+      newLabel: after.managerId && (managerNames.after.get(after.managerId) ?? null),
     });
   }
   const oldUser = before?.userId ?? null;
   if (oldUser !== after.userId) {
-    changes.push({ field: "user", oldValue: oldUser, newValue: after.userId });
+    changes.push({
+      field: "user",
+      oldValue: oldUser,
+      newValue: after.userId,
+      oldLabel: oldUser && before!.email,
+      newLabel: after.userId && after.email,
+    });
   }
   return changes;
 }
