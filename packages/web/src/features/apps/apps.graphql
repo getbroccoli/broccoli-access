@@ -1,0 +1,40 @@
+query AppsPage($status: AppStatus!, $first: Int!) {
+  appCounts {
+    approved
+    discovered
+    ignored
+  }
+  apps(status: $status, first: $first) {
+    edges {
+      node {
+        id
+        name
+        domain
+        peopleCount
+        foundVia
+        since {
+          at
+          before
+        }
+        preselected
+      }
+    }
+  }
+}
+
+mutation FinishSetup($input: SetupFinishInput!) {
+  apps {
+    finishSetup(input: $input) {
+      setup {
+        id
+        step
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}

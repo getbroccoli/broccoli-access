@@ -14,14 +14,21 @@ import { t } from "@/i18n";
 
 import { useMenuFinalFocus } from "./useMenuFinalFocus";
 
-/** The workspace menu: the product's name, and the actions on the whole workspace. */
+/** The workspace menu: the company's name and initial, and the actions on the whole workspace. */
 export function WorkspaceMenu() {
-  const { me } = useRouteContext({ from: "/_authenticated" });
+  const { me, organizationName } = useRouteContext({ from: "/_authenticated" });
   const { onOpenChange, finalFocus } = useMenuFinalFocus();
-  const name = t("app.name");
+  const name = organizationName ?? t("app.name");
   const logo = (
-    <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-brand text-brand-foreground">
-      <Plant size={16} weight="fill" aria-hidden />
+    <span
+      aria-hidden
+      className="flex size-7 shrink-0 items-center justify-center rounded-md bg-brand text-sm font-semibold text-brand-foreground"
+    >
+      {organizationName ? (
+        ([...organizationName][0]?.toUpperCase() ?? "")
+      ) : (
+        <Plant size={16} weight="fill" />
+      )}
     </span>
   );
   const canManage = me.operations.includes("MANAGE_WORKSPACE");

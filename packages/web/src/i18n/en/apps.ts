@@ -1,4 +1,26 @@
 /** English copy under `apps.*`. */
 export const appsEn = {
+  "apps.title": "Applications",
   "apps.since.before": "Before {day}",
+  "apps.tabs": "App status",
+  "apps.tab.approved": "Approved",
+  "apps.tab.discovered": "Discovered",
+  "apps.tab.ignored": "Ignored",
+  "apps.column.app": "App",
+  "apps.column.people": "People",
+  "apps.column.foundVia": "Found via",
+  "apps.column.since": "Since",
+  "apps.foundVia.google_directory": "Google directory",
+  "apps.foundVia.google_sign_in": "Google sign-in",
+  "apps.select": "Select {name}",
+  "apps.selectAll": "Select all apps",
+  "apps.showMore": "Show {count} more apps",
+  "apps.empty": "No apps here.",
+  "apps.loadFailed": "Couldn’t load the apps.",
+  "apps.retry": "Retry",
+  "apps.firstRun.title": "Last step: select the apps your company uses",
+  "apps.firstRun.description":
+    "We found {count} apps people signed in to with Google. Apps you don’t select are ignored; you can bring them back any time.",
+  "apps.firstRun.finish": "Approve {count} and finish",
+  "apps.firstRun.finishFailed": "Couldn’t finish setup. Try again.",
 } as const;

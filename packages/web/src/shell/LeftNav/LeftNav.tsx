@@ -1,5 +1,8 @@
-import { CaretLeft, House, Users } from "@phosphor-icons/react";
-import { Link } from "@tanstack/react-router";
+import { useQuery } from "@apollo/client/react";
+import { CaretLeft, House, SquaresFour, Users } from "@phosphor-icons/react";
+import { Link, useRouteContext } from "@tanstack/react-router";
+
+import { NavCountsDocument } from "@/__generated__/graphql";
 
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
@@ -9,10 +12,6 @@ import { useInSettings } from "../useInSettings";
 import { WorkspaceMenu } from "../WorkspaceMenu";
 import { NavList, type NavItem } from "./NavList";
 
-const APP_ITEMS: NavItem[] = [
-  { to: "/", label: t("nav.today"), icon: House },
-  { to: "/people", label: t("nav.people"), icon: Users },
-];
 const SETTINGS_ITEMS: NavItem[] = [
   { to: "/settings/connections", label: t("settings.connections.title") },
   { to: "/settings/email", label: t("settings.email.title") },
@@ -24,6 +23,7 @@ const SETTINGS_ITEMS: NavItem[] = [
  */
 export function LeftNav() {
   const inSettings = useInSettings();
+  const appItems = useAppItems();
   return (
     <aside className="shrink-0 md:h-full md:w-56 md:overflow-hidden">
       <div
@@ -37,7 +37,7 @@ export function LeftNav() {
           <div className="min-w-0 flex-1 md:flex-none md:pt-1 md:pb-4">
             <WorkspaceMenu />
           </div>
-          <NavList label={t("nav.label")} items={APP_ITEMS} />
+          <NavList label={t("nav.label")} items={appItems} />
           <ProfileMenu />
         </div>
         <div inert={!inSettings} className={cn(menuClass, !inSettings && "max-md:hidden")}>
@@ -57,6 +57,25 @@ export function LeftNav() {
       </div>
     </aside>
   );
+}
+
+/** The app's pages; Applications shows how many apps await the owner's decision. */
+function useAppItems(): NavItem[] {
+  const { me } = useRouteContext({ from: "/_authenticated" });
+  const { data } = useQuery(NavCountsDocument, {
+    skip: !me.operations.includes("MANAGE_WORKSPACE"),
+  });
+  const discovered = data?.appCounts.discovered ?? 0;
+  return [
+    { to: "/", label: t("nav.today"), icon: House },
+    {
+      to: "/apps",
+      label: t("nav.applications"),
+      icon: SquaresFour,
+      badge: discovered > 0 ? discovered : undefined,
+    },
+    { to: "/people", label: t("nav.people"), icon: Users },
+  ];
 }
 
 const menuClass =
