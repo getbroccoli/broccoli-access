@@ -1,9 +1,10 @@
-import type { Tx } from "../../../core/db";
+import type { Orm, Tx } from "../../../core/db";
 import { createOwnerService } from "../../../core/instance";
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { type EmployeeRepository, employeeRepository } from "../db";
 import {
+  changesAvatar,
   directoryChanges,
   type DirectoryLinks,
   type DirectoryPerson,
@@ -18,9 +19,10 @@ const recordHistory = createRecordHistoryService();
 export interface DirectorySyncService {
   /**
    * Creates the employees the directory lists and nobody has the email of, updates the names and
-   * managers of the others, and links the owner's user to their employee, joining `tx`; appends
-   * the history of each change with `cause`. Employees the directory no longer lists stay as they
-   * are. Returns each listed email's employee id. System only.
+   * managers of the others, replaces or clears the avatar of each person with a changed photo,
+   * and links the owner's user to their employee, joining `tx`; appends the history of each change
+   * with `cause`. Employees the directory no longer lists stay as they are. Returns each listed
+   * email's employee id. System only.
    */
   syncDirectoryPeople: (
     ctx: SecurityContext,
@@ -28,6 +30,12 @@ export interface DirectorySyncService {
     people: readonly DirectoryPerson[],
     cause: HistoryAppend["cause"],
   ) => Promise<Map<string, string>>;
+  /** The emails, among these lowercased ones, whose employee has a photo. System only. */
+  findEmailsWithPhoto: (
+    ctx: SecurityContext,
+    db: Orm | Tx,
+    emails: readonly string[],
+  ) => Promise<Set<string>>;
 }
 
 export function createDirectorySyncService(): DirectorySyncService {
@@ -52,6 +60,11 @@ export function createDirectorySyncService(): DirectorySyncService {
       await recordChanges(ctx, tx, { created, saved, managerNames, cause });
       return new Map(people.map(({ email }) => [email, links.idsByEmail.get(email)!]));
     },
+    async findEmailsWithPhoto(ctx, db, emails) {
+      ctx.requireSystem();
+      const employees = await employeeRepository(db).findByEmails(emails);
+      return new Set(employees.flatMap(({ email, avatarFileId }) => (avatarFileId ? [email] : [])));
+    },
   };
 }
 
@@ -72,7 +85,7 @@ async function unlinkedOwner(
 
 // shortcut: one update per changed employee, so a first scan of a directory of thousands writes
 // each manager on its own; batch the updates if very large directories come (out of circle 1).
-/** Saves each listed employee's directory fields that changed; returns them before and after. */
+/** Saves each listed employee's changed directory fields and photo; returns before and after. */
 async function saveDirectoryFields(
   repository: EmployeeRepository,
   employees: readonly Employee[],
@@ -83,15 +96,20 @@ async function saveDirectoryFields(
   const saved: EmployeeChange[] = [];
   for (const person of people) {
     const before = byEmail.get(person.email)!;
-    const after = employeeFromDirectory(before, person, links);
+    const avatarFileId = changesAvatar(before, person.photo)
+      ? await repository.replaceAvatar(before, person.photo)
+      : before.avatarFileId;
+    const after = { ...employeeFromDirectory(before, person, links), avatarFileId };
     const { firstName, lastName, managerId, userId } = after;
-    const changed =
+    const fieldsChanged =
       firstName !== before.firstName ||
       lastName !== before.lastName ||
       managerId !== before.managerId ||
       userId !== before.userId;
-    if (changed) {
+    if (fieldsChanged) {
       await repository.saveDirectoryFields(before.id, { firstName, lastName, managerId, userId });
+    }
+    if (fieldsChanged || avatarFileId !== before.avatarFileId) {
       saved.push({ before, after });
     }
   }

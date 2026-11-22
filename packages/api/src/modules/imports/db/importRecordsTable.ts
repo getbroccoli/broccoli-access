@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
+import type { AccountValues, ImportedAccount } from "../../../core/connectors";
 import { jsonb } from "../../../core/db";
 import { files } from "../../../core/files";
 import { importSources } from "./importSourcesTable";
@@ -22,8 +23,9 @@ export const importRecords = pgTable(
     typeVersion: integer("type_version").notNull(),
     /** The source's own id for the account, such as the Google user id. */
     sourceKey: text("source_key").notNull(),
-    raw: jsonb("raw").notNull(),
-    values: jsonb("values").notNull(),
+    raw: jsonb("raw").$type<ImportedAccount["raw"]>().notNull(),
+    // Version 1 is the only one so far.
+    values: jsonb("values").$type<AccountValues>().notNull(),
     /** Unused in circle 1: where the person's photo can be downloaded. */
     photoUrl: text("photo_url"),
     /** Unused in circle 1: the stored copy of the photo at `photo_url`. */

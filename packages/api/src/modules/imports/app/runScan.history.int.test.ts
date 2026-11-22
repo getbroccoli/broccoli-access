@@ -35,14 +35,11 @@ test("labels the previous manager by name even when the directory no longer list
   expect(edges[0]!.node).toMatchObject({
     operation: "UPDATED",
     cause: { kind: "FOUND_BY_SCAN", ref: sourceId },
-    changes: [
-      {
-        field: "manager",
-        oldValue: olive.id,
-        oldLabel: "Olive Stone",
-        newLabel: "David Okafor",
-      },
-    ],
+  });
+  expect(edges[0]!.node.changes.find(({ field }) => field === "manager")).toMatchObject({
+    oldValue: olive.id,
+    oldLabel: "Olive Stone",
+    newLabel: "David Okafor",
   });
 });
 
@@ -71,15 +68,12 @@ test("labels a manager renamed by the same scan with their new name", async ({
   expect(edges[0]!.node).toMatchObject({
     operation: "UPDATED",
     cause: { kind: "FOUND_BY_SCAN", ref: sourceId },
-    changes: [
-      {
-        field: "manager",
-        oldValue: null,
-        newValue: david.id,
-        oldLabel: null,
-        newLabel: "David Okafor",
-      },
-    ],
+  });
+  expect(edges[0]!.node.changes.find(({ field }) => field === "manager")).toMatchObject({
+    oldValue: null,
+    newValue: david.id,
+    oldLabel: null,
+    newLabel: "David Okafor",
   });
 });
 

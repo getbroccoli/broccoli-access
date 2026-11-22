@@ -11,6 +11,7 @@ export {
   type NewEmployeeInput,
 } from "./employee";
 export {
+  changesAvatar,
   directoryChanges,
   type DirectoryLinks,
   type DirectoryPerson,

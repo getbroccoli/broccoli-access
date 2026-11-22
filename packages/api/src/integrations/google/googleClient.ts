@@ -20,6 +20,8 @@ export interface GoogleClient {
   findUser(accessToken: string, userId: string): Promise<GoogleUser | null>;
   /** One page of the customer's users, from a null page token; `nextPageToken` is null on the last. */
   listUsers(accessToken: string, pageToken: string | null): Promise<GoogleUserPage>;
+  /** The user's photo, which Google downsizes to 96×96; null when the user has none. */
+  readPhoto(accessToken: string, userId: string): Promise<GooglePhoto | null>;
   /** The apps the user with Google's user id `userId` granted access; empty once the user is gone. */
   listTokens(accessToken: string, userId: string): Promise<GoogleToken[]>;
   /** One page of the `authorize` events logged since `startTime`, from a null page token. */
@@ -81,6 +83,11 @@ export interface GoogleUser {
 export interface GoogleUserPage {
   users: GoogleUser[];
   nextPageToken: string | null;
+}
+
+export interface GooglePhoto {
+  content: Buffer;
+  mimeType: (typeof PHOTO_MIME_TYPES)[number];
 }
 
 /** An app's grant to a user, from the user's tokens list. */
@@ -170,6 +177,14 @@ export function createGoogleClient({
       return null;
     },
     listUsers: (accessToken, pageToken) => readUserPage(directoryUrl, accessToken, pageToken),
+    readPhoto: async (accessToken, userId) => {
+      const url = directoryUrl(`users/${encodeURIComponent(userId)}/photos/thumbnail`);
+      const photo = await fetchGoogleJson(url, USER_PHOTO, bearer(accessToken));
+      // Node's base64url decoder also reads the `*` and `.` padding Google's web-safe base64 allows.
+      return (
+        photo && { content: Buffer.from(photo.photoData, "base64url"), mimeType: photo.mimeType }
+      );
+    },
     listTokens: async (accessToken, userId) => {
       const url = directoryUrl(`users/${encodeURIComponent(userId)}/tokens`);
       const list = await fetchGoogleJson(url, TOKEN_LIST, bearer(accessToken));
@@ -225,6 +240,11 @@ const USERS_PAGE = z.object({
   users: z.array(z.record(z.string(), z.unknown())).optional(),
   nextPageToken: z.string().optional(),
 });
+
+/** Image types browsers show and never run as a page, so an avatar served from them is safe. */
+const PHOTO_MIME_TYPES = ["image/jpeg", "image/png", "image/gif"] as const;
+
+const USER_PHOTO = z.object({ mimeType: z.enum(PHOTO_MIME_TYPES), photoData: z.string() });
 
 // Tokens stay as Google sent them, so each keeps every field for its import record.
 const TOKEN_LIST = z.object({ items: z.array(z.record(z.string(), z.unknown())).optional() });

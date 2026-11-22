@@ -101,6 +101,7 @@ test("maps all 42 Google directory users to their own app's accounts", async ({
       }),
       customerId: ACME.customer.id,
       creationTime: person.creationTime,
+      ...(person.photo !== null && { thumbnailPhotoEtag: expect.any(String) as unknown }),
     });
     expect(account).toMatchObject({
       values: {

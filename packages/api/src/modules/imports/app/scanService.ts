@@ -16,7 +16,8 @@ import type { SecurityContext } from "../../../core/security";
 import { importSourceRepository } from "../db";
 import { type Scan, type ScanCounts, type ScanProgress, scanOf } from "../domain";
 import type { DirectoryPeople, ScannedApps } from "../ports";
-import { syncAccounts } from "./syncAccounts";
+import { readChangedPhotos } from "./readChangedPhotos";
+import { type ScanFindings, syncAccounts } from "./syncAccounts";
 
 const setupSteps = createSetupStepService();
 
@@ -39,8 +40,9 @@ export interface ScanService {
    */
   scanNow: (ctx: SecurityContext, connectionId: string) => Promise<Scan>;
   /**
-   * The scan's job: reads every page of the connection's accounts, trying a rate-limited or
-   * unavailable call again, then in one transaction replaces the source's records, syncs them,
+   * The scan's job: reads every page of the connection's accounts and a directory's changed
+   * photos, trying a rate-limited or unavailable call again, then in one transaction replaces the
+   * source's records, syncs them,
    * marks it scanned and moves setup from the scan to selecting the apps. A connector error marks
    * it failed and changes nothing else. System only.
    */
@@ -157,7 +159,7 @@ async function scanSource(
   { sourceId, connectionId }: { sourceId: string; connectionId: string },
   progressBySource: Map<string, ScanProgress>,
 ): Promise<void> {
-  const { orm, transact, logger, apps } = dependencies;
+  const { orm, logger, apps } = dependencies;
   const connection = (await apps.readConnectionById(orm, connectionId))!;
   const connector = connectorOf(dependencies, connection.connector);
   const secrets = await apps.readSecrets(orm, connectionId);
@@ -168,27 +170,49 @@ async function scanSource(
   const accounts = await readAllAccounts((cursor) => retrying(() => session.listAccounts(cursor)));
   const found = foundCounts(accounts);
   progressBySource.set(sourceId, { found });
-  const { saved, finishedSetupScan } = await transact(async (tx) => {
-    const sources = importSourceRepository(tx);
-    if ((await sources.lockById(sourceId))?.status !== "scanning") {
-      return { saved: false, finishedSetupScan: false };
-    }
-    await sources.replaceRecords(sourceId, accounts);
-    await syncAccounts(ctx, tx, { sourceId, connection, connector, accounts }, dependencies);
-    await sources.markScanned(sourceId, new Date());
-    return { saved: true, finishedSetupScan: await setupSteps.finishScanStep(ctx, tx) };
+  const photos = await readChangedPhotos(ctx, dependencies, {
+    sourceId,
+    connector,
+    session,
+    accounts,
+    retrying,
   });
+  const findings = { sourceId, connection, connector, accounts, photos };
+  const { saved, finishedSetupScan } = await saveScan(ctx, dependencies, findings);
   logger.info(
     {
       sourceId,
       accounts: accounts.length,
       people: found.people,
       apps: found.apps,
+      photoChanges: photos.size,
       saved,
       finishedSetupScan,
     },
     "Scan finished",
   );
+}
+
+/**
+ * Replaces the source's records with what the scan found, syncs them and moves setup on, in one
+ * transaction; saves nothing when the scan is no longer queued.
+ */
+async function saveScan(
+  ctx: SecurityContext,
+  dependencies: ScanDependencies,
+  findings: ScanFindings,
+): Promise<{ saved: boolean; finishedSetupScan: boolean }> {
+  const { sourceId, accounts } = findings;
+  return dependencies.transact(async (tx) => {
+    const sources = importSourceRepository(tx);
+    if ((await sources.lockById(sourceId))?.status !== "scanning") {
+      return { saved: false, finishedSetupScan: false };
+    }
+    await sources.replaceRecords(sourceId, accounts);
+    await syncAccounts(ctx, tx, findings, dependencies);
+    await sources.markScanned(sourceId, new Date());
+    return { saved: true, finishedSetupScan: await setupSteps.finishScanStep(ctx, tx) };
+  });
 }
 
 async function readAllAccounts(

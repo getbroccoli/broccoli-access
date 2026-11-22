@@ -61,6 +61,28 @@ export function scanOf(
   return { id, status, failure, readAt, ...steps(status, progress, saved) };
 }
 
+/** What a directory scan does with a person's photo. */
+export type PhotoUpdate = "read" | "clear" | "keep";
+
+/**
+ * Reads a photo whose version changed since the last scan, or one the person has none stored of,
+ * so a failed read is tried again; clears a photo the directory removed, and keeps the rest.
+ */
+export function photoUpdateOf({
+  version,
+  previousVersion,
+  hasPhoto,
+}: {
+  version: string | null;
+  previousVersion: string | null;
+  hasPhoto: boolean;
+}): PhotoUpdate {
+  if (version === null) {
+    return hasPhoto ? "clear" : "keep";
+  }
+  return version !== previousVersion || !hasPhoto ? "read" : "keep";
+}
+
 function steps(
   status: ScanStatus,
   progress: ScanProgress | null,

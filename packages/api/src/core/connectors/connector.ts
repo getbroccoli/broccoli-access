@@ -24,6 +24,11 @@ export interface Connector {
   sourceName(settings: unknown): string;
   /** Checks the connection's settings and secrets and signs in to the app. */
   openSession(connection: { settings: unknown; secrets: unknown }): Promise<ConnectorSession>;
+  /**
+   * The version of a directory account's photo, read from its `raw`, which changes with the
+   * photo; null without one. A directory whose sessions read photos has it.
+   */
+  photoVersion?(raw: Record<string, unknown>): string | null;
 }
 
 export interface ConnectionField {
@@ -37,6 +42,8 @@ export interface ConnectorSession {
   testConnection(): Promise<ConnectionDetails>;
   /** One page of accounts, starting from a null cursor; `nextCursor` is null on the last page. */
   listAccounts(cursor: string | null): Promise<AccountPage>;
+  /** The photo of the directory account with this source key; null when it has none. */
+  readPhoto?(sourceKey: string): Promise<AccountPhoto | null>;
 }
 
 export interface ConnectionDetails {
@@ -81,6 +88,12 @@ export interface AccountValues {
 export const ACCOUNT_STATUSES = ["active", "suspended"] as const;
 
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
+
+/** A person's photo as the app gave it, in an image format browsers show. */
+export interface AccountPhoto {
+  content: Buffer;
+  mimeType: string;
+}
 
 /** The version of `AccountValues` the import records store. */
 export const ACCOUNT_VALUES_VERSION = 1;
