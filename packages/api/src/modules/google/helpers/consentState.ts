@@ -9,11 +9,24 @@ import type { SecretBox } from "../../../core/secrets";
  * browser that started it, so only that browser redeems it: what the consent is for and the ID
  * token's nonce.
  */
-export type ConsentState = WorkspaceConsentState | SignInState;
+export type ConsentState = WorkspaceConsentState | SignInState | GoogleAppChangeState;
 
 /** Setup's consent, carrying the client credentials, which are stored only once it succeeds. */
 export interface WorkspaceConsentState {
   flow: "connect_google_workspace";
+  clientId: string;
+  clientSecret: string;
+  nonce: string;
+  /** Epoch milliseconds after which Google's answer is refused. */
+  expiresAt: number;
+}
+
+/**
+ * The owner changing the connection's Google app, carrying the new client credentials, which
+ * replace the old ones only once the consent succeeds.
+ */
+export interface GoogleAppChangeState {
+  flow: "change_google_app";
   clientId: string;
   clientSecret: string;
   nonce: string;
@@ -39,7 +52,10 @@ export const CONSENT_LIFETIME_MS = 10 * 60_000;
  */
 export function sealConsentState(
   secretBox: SecretBox,
-  state: Omit<WorkspaceConsentState, "expiresAt"> | Omit<SignInState, "expiresAt">,
+  state:
+    | Omit<WorkspaceConsentState, "expiresAt">
+    | Omit<SignInState, "expiresAt">
+    | Omit<GoogleAppChangeState, "expiresAt">,
   { browserToken, now }: { browserToken: string; now: Date },
 ): string {
   const expiresAt = now.getTime() + CONSENT_LIFETIME_MS;
@@ -105,6 +121,13 @@ const CONSENT_STATE = z.discriminatedUnion("flow", [
   }),
   z.object({
     flow: z.literal("sign_in_with_google"),
+    nonce: z.string(),
+    expiresAt: z.number(),
+  }),
+  z.object({
+    flow: z.literal("change_google_app"),
+    clientId: z.string(),
+    clientSecret: z.string(),
     nonce: z.string(),
     expiresAt: z.number(),
   }),

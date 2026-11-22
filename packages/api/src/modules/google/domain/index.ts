@@ -8,6 +8,9 @@ export {
   googleRedirectAddress,
   type GoogleWorkspaceSettings,
   NotSuperAdminError,
+  OtherWorkspaceError,
   parseGoogleWorkspaceSettings,
+  requireSameWorkspace,
   UnknownGoogleAccountError,
+  withGoogleApp,
 } from "./googleWorkspace";

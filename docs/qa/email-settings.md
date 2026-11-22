@@ -8,7 +8,7 @@ A manual check of how the instance sends email against a development stack.
 
 ## Settings page
 
-- [ ] "Email" under System in the settings menu opens `/settings/email`, with the saved mail choice selected.
+- [ ] "Email" in the settings menu opens `/settings/email`, titled "Email", with the saved mail choice selected.
 - [ ] "Your mail server (SMTP)" shows the SMTP URL and From address fields; "Resend" shows the API key and From address fields; "No email" shows none.
 - [ ] Under `pnpm dev`, a fresh instance opens with SMTP selected, `access@example.com`, and its URL shown as "Saved" with Replace. "Send me a test email" is available immediately, without saving first.
 - [ ] After Replace, entering `smtp://mailpit:1025` and choosing "Check and save" shows "Checking…", then "Email settings saved"; the URL field becomes "Saved" with Replace.

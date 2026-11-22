@@ -48,7 +48,12 @@ export { storedTextProbe } from "./storedTextProbe";
 export { startFakeHttpServer } from "./fakeHttpServer";
 export { expectHistoryReplaysTo } from "./employeeHistory";
 export { registerGoogleRedirect, consentAtGoogle } from "./googleConsent";
-export { storedAppConnections, storedGoogleAccounts, storedUsers } from "./storedGoogleConnection";
+export {
+  storedAppConnections,
+  storedGoogleAccounts,
+  storedUsers,
+  changeStoredGoogleDomain,
+} from "./storedGoogleConnection";
 export { googleSetup, GOOGLE_SCOPES } from "./googleSetup";
 export { googleScanSetup } from "./googleScanSetup";
 export { connectorContract, type ConnectorContractCase } from "./connectorContract";

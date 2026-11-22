@@ -3,5 +3,5 @@ export const navEn = {
   "nav.label": "Main",
   "nav.today": "Today",
   "nav.people": "People",
-  "nav.backToApp": "Back to app",
+  "nav.backToApp": "Back to the app",
 } as const;

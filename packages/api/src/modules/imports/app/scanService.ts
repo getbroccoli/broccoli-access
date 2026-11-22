@@ -30,6 +30,12 @@ export interface ScanService {
     connectionId: string,
   ) => Promise<{ sourceId: string }>;
   /**
+   * "Scan now": queues a scan of the connection as `scanConnection` does, in its own transaction,
+   * and returns the scan, now scanning. Needs MANAGE_WORKSPACE; refuses an unknown connection
+   * with NOT_FOUND.
+   */
+  scanNow: (ctx: SecurityContext, connectionId: string) => Promise<Scan>;
+  /**
    * The scan's job: reads every page of the connection's accounts, trying a rate-limited or
    * unavailable call again, then in one transaction replaces the source's records, syncs them
    * and marks it scanned. A connector error marks it failed and changes nothing else. System only.
@@ -59,7 +65,7 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
   // shortcut: progress lives in this process, so a restart loses it and the page falls back to the
   // source's status; keep it in Postgres if the API ever runs as more than one process.
   const progressBySource = new Map<string, ScanProgress>();
-  return {
+  const service: ScanService = {
     async scanConnection(ctx, tx, connectionId) {
       ctx.require("MANAGE_WORKSPACE");
       const connection = await apps.readConnectionById(tx, connectionId);
@@ -82,6 +88,11 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
       }
       await jobs.send(tx, SCAN_JOB, { sourceId });
       return { sourceId };
+    },
+    async scanNow(ctx, connectionId) {
+      const { sourceId } = await transact((tx) => service.scanConnection(ctx, tx, connectionId));
+      logger.info({ connectionId, sourceId }, "Scan now requested");
+      return (await service.readScan(ctx, connectionId))!;
     },
     async runScan(ctx, sourceId) {
       ctx.requireSystem();
@@ -124,6 +135,7 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
       return scanOf(source, { progress: progressBySource.get(source.id) ?? null, saved });
     },
   };
+  return service;
 }
 
 const SCAN_JOB = "imports.scanConnection";

@@ -23,8 +23,15 @@ export interface AppConnectionRepository {
     settings: Record<string, unknown>;
     encryptedSecrets: string;
   }): Promise<AppConnection>;
+  /** Replaces the connection's settings and secrets; null for an unknown id. */
+  update(
+    id: string,
+    connection: { settings: Record<string, unknown>; encryptedSecrets: string },
+  ): Promise<AppConnection | null>;
   findByConnector(connector: string): Promise<AppConnection | null>;
   findById(id: string): Promise<AppConnection | null>;
+  /** Like `findById`, locking the row until the transaction ends. */
+  lockById(id: string): Promise<AppConnection | null>;
   /** The connection's `encrypted_secrets`, or null for an unknown id. */
   findEncryptedSecrets(id: string): Promise<string | null>;
 }
@@ -41,6 +48,14 @@ export function appConnectionRepository(db: Orm | Tx): AppConnectionRepository {
       const [stored] = await orm().insert(appConnections).values(connection).returning(columns);
       return stored!;
     },
+    update: async (id, connection) => {
+      const [stored] = await orm()
+        .update(appConnections)
+        .set(connection)
+        .where(eq(appConnections.id, id))
+        .returning(columns);
+      return stored ?? null;
+    },
     findByConnector: async (connector) => {
       const [connection] = await orm()
         .select(columns)
@@ -53,6 +68,14 @@ export function appConnectionRepository(db: Orm | Tx): AppConnectionRepository {
         .select(columns)
         .from(appConnections)
         .where(eq(appConnections.id, id));
+      return connection ?? null;
+    },
+    lockById: async (id) => {
+      const [connection] = await orm()
+        .select(columns)
+        .from(appConnections)
+        .where(eq(appConnections.id, id))
+        .for("update");
       return connection ?? null;
     },
     findEncryptedSecrets: async (id) => {

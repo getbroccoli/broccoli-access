@@ -1,4 +1,4 @@
-export { ConnectGoogleStep } from "./ConnectGoogleStep";
+export { ConnectGoogleStep, GoogleAppForm } from "./ConnectGoogleStep";
 export { connectSearch } from "./connectSearch";
 export { readSession } from "./readSession";
 export { ScanStep } from "./ScanStep";

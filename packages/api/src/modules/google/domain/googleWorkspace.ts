@@ -38,6 +38,11 @@ export interface GoogleWorkspaceSettings {
   organizationName: string;
   adminEmail: string;
   grantedScopes: string[];
+  /**
+   * The Google apps used before `clientId`: consenting left a grant to each in Google, which the
+   * scans skip like the current one's, since none is one of the company's apps.
+   */
+  previousClientIds: string[];
 }
 
 /** The stored settings of the Google Workspace connection, checked as they are read. */
@@ -53,6 +58,8 @@ export const GOOGLE_WORKSPACE_SETTINGS = z.object({
   organizationName: z.string(),
   adminEmail: z.string(),
   grantedScopes: z.array(z.string()),
+  // A connection stored before the Google app could change has none.
+  previousClientIds: z.array(z.string()).default([]),
 });
 
 /** The connection's secrets, stored encrypted: the Google app's client secret and the admin's refresh token. */
@@ -60,6 +67,32 @@ export const GOOGLE_WORKSPACE_SECRETS = z.object({
   clientSecret: z.string(),
   refreshToken: z.string(),
 });
+
+/**
+ * Refuses with `OtherWorkspaceError` a new consent from outside the connected workspace, which
+ * Google names by its primary domain.
+ */
+export function requireSameWorkspace(
+  settings: GoogleWorkspaceSettings,
+  consentingDomain: string,
+): void {
+  if (consentingDomain.toLowerCase() !== settings.domain.toLowerCase()) {
+    throw new OtherWorkspaceError();
+  }
+}
+
+/**
+ * The settings with `clientId` the connection's Google app: the old one joins the previous ones,
+ * each once, and the new one is never among them.
+ */
+export function withGoogleApp(
+  settings: GoogleWorkspaceSettings,
+  clientId: string,
+): GoogleWorkspaceSettings {
+  const previous = new Set([...settings.previousClientIds, settings.clientId]);
+  previous.delete(clientId);
+  return { ...settings, clientId, previousClientIds: [...previous] };
+}
 
 /** Only a Google super admin may connect the workspace and become the owner. */
 export class NotSuperAdminError extends Error {
@@ -74,5 +107,13 @@ export class UnknownGoogleAccountError extends Error {
   constructor() {
     super("The Google account that signed in belongs to no user");
     this.name = "UnknownGoogleAccountError";
+  }
+}
+
+/** A new Google app must read the connected workspace, never another one. */
+export class OtherWorkspaceError extends Error {
+  constructor() {
+    super("The consenting Google account belongs to another workspace");
+    this.name = "OtherWorkspaceError";
   }
 }

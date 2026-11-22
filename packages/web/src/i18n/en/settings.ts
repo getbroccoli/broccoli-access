@@ -1,7 +1,25 @@
 /** English copy under `settings.*`. */
 export const settingsEn = {
   "settings.title": "Settings",
-  "settings.system": "System",
+  "settings.connections.title": "Connections",
+  "settings.connections.description": "Where Broccoli Access finds your people and their accounts.",
+  "settings.connections.googleWorkspace": "Google Workspace",
+  "settings.connections.connected": "Connected",
+  "settings.connections.summary": "{domain}, connected as {email} with your own Google app.",
+  "settings.connections.scanNow": "Scan now",
+  "settings.connections.scanning": "Scanning…",
+  "settings.connections.scanFailed": "The last scan failed. Try Scan now again.",
+  "settings.connections.scanNowFailed": "Couldn’t start the scan. Try again.",
+  "settings.connections.changeApp": "Change Google app",
+  "settings.connections.loadFailed": "Couldn’t load the connections.",
+  "settings.connections.retry": "Try again",
+  "settings.googleApp.title": "Change Google app",
+  "settings.googleApp.description":
+    "Connect Google Workspace with another Google app of your own. Your people, apps and decisions stay as they are.",
+  "settings.googleApp.cancelled": "You cancelled at Google. The Google app hasn’t changed.",
+  "settings.googleApp.otherWorkspace":
+    "That Google account belongs to another Google Workspace. Sign in with a super admin account of the connected workspace.",
+  "settings.googleApp.failed": "Couldn’t change the Google app. Try again.",
   "settings.email.title": "Email",
   "settings.email.description":
     "How Broccoli Access sends email, such as password reset links. People need email to reset a forgotten password.",

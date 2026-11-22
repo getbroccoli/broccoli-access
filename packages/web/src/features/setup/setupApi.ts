@@ -15,15 +15,17 @@ export async function startSetup(): Promise<boolean> {
 }
 
 /**
- * Starts connecting Google Workspace with the admin's own Google app: the address of Google's
- * consent page, or null when the API refused or could not be reached.
+ * Starts Google's consent for the admin's own Google app at `path`, setup's connection or the
+ * owner's change of app: the address of Google's consent page, or null when the API refused or
+ * could not be reached.
  */
-export async function startGoogleConnection(
+export async function startGoogleConsent(
+  path: GoogleConsentPath,
   clientId: string,
   clientSecret: string,
 ): Promise<string | null> {
   try {
-    const response = await postJson("/api/google/connect", { clientId, clientSecret });
+    const response = await postJson(path, { clientId, clientSecret });
     if (!response.ok) {
       return null;
     }
@@ -33,6 +35,9 @@ export async function startGoogleConnection(
     return null;
   }
 }
+
+/** Where a Google consent starts: setup's connection, or the owner's change of Google app. */
+export type GoogleConsentPath = "/api/google/connect" | "/api/google/change-app";
 
 /** Who holds setup after one start: this browser, or nobody yet; null when the API refused. */
 async function postSetupStart(): Promise<"you" | "nobody" | null> {
