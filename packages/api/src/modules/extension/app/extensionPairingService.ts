@@ -75,11 +75,11 @@ export function createExtensionPairingService({
       return { token: formatPairingToken({ pairingId: pairing.id, secret }) };
     },
     readPairingOfToken: async ({ token, now }) => {
-      const pairing = await authenticate(pairings, token);
+      const pairing = await authenticate(pairings, token, logger);
       return pairing && pairings.touch(pairing.id, now);
     },
     unpairWithToken: async (token) => {
-      const pairing = await authenticate(pairings, token);
+      const pairing = await authenticate(pairings, token, logger);
       if (!pairing) {
         return false;
       }
@@ -112,10 +112,16 @@ function pairingUserOf(ctx: SecurityContext): string {
 async function authenticate(
   pairings: ExtensionPairingRepository,
   token: string,
+  logger: Logger,
 ): Promise<ExtensionPairing | null> {
   const parsed = parsePairingToken(token);
   const found = parsed && (await pairings.findWithTokenHash(parsed.pairingId));
-  return found && secretMatches(parsed.secret, found.tokenHash) ? found.pairing : null;
+  if (found && secretMatches(parsed.secret, found.tokenHash)) {
+    return found.pairing;
+  }
+  // Expected after unpairing or pairing again; the id says which pairing a token claimed.
+  logger.info({ pairingId: parsed?.pairingId ?? null }, "Extension token refused");
+  return null;
 }
 
 /** Marks `code` used; false when it already was. Forgets codes that have expired by `now`. */
