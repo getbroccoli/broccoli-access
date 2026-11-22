@@ -1,8 +1,11 @@
-import { type FormEvent, useState } from "react";
+import type { FragmentType } from "@apollo/client";
+import { useFragment } from "@apollo/client/react";
+import { type FormEvent, type ReactElement, useState } from "react";
 
 import {
+  type ConnectContainerConnectorDialog_ConnectorFragment,
+  ConnectContainerConnectorDialog_ConnectorFragmentDoc,
   ConnectContainerConnectorDocument,
-  type ContainerConnectorsSettingsQuery,
 } from "@/__generated__/graphql";
 import { useCache, usePayloadMutation } from "@/apollo";
 import { AppMark } from "@/components/AppMark";
@@ -25,20 +28,26 @@ import { t } from "@/i18n";
 import { forgetAppLists } from "./cache";
 import { inSentence } from "./connectingFieldName";
 
-type Connector = ContainerConnectorsSettingsQuery["containerConnectors"][number];
-
 type Props = {
-  connector: Pick<Connector, "id" | "name" | "connectionFields">;
+  connector: FragmentType<ConnectContainerConnectorDialog_ConnectorFragment>;
+  /** The button that opens it; "Connect <app>" by default. */
+  trigger?: ReactElement;
+  /** Runs once the app is connected, for a page showing what only the server computes. */
+  onConnected?: () => void;
 };
 
 /** Connect <app>: a dialog asking for each value the connector needs, which the app then checks. */
-export function ConnectContainerConnectorDialog({ connector }: Props) {
+export function ConnectContainerConnectorDialog({ connector: from, trigger, onConnected }: Props) {
+  const { data: connector, complete } = useFragment({
+    fragment: ConnectContainerConnectorDialog_ConnectorFragmentDoc,
+    from,
+  });
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const cache = useCache();
   const [connect, { loading, error, payloadError, reset }] = usePayloadMutation(
     ConnectContainerConnectorDocument,
-    // Connecting approves the app, which moves the app lists and their counts.
+    // Connecting approves the app, which moves the app lists, their counts and the apps to connect.
     {
       update: (_cache, { data }) => {
         if (data?.connectors.connect.containerConnector) {
@@ -47,6 +56,9 @@ export function ConnectContainerConnectorDialog({ connector }: Props) {
       },
     },
   );
+  if (!complete) {
+    return null;
+  }
   const app = connector.name;
   const changeOpen = (next: boolean) => {
     // Closed only once the check ends, so a pending connect never runs behind another try.
@@ -65,7 +77,10 @@ export function ConnectContainerConnectorDialog({ connector }: Props) {
     };
     // `usePayloadMutation` keeps a failure for display, so the rejection needs no handling here.
     connect({ variables: { input } }).then(
-      () => setOpen(false),
+      () => {
+        setOpen(false);
+        onConnected?.();
+      },
       () => undefined,
     );
   };
@@ -78,9 +93,15 @@ export function ConnectContainerConnectorDialog({ connector }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger render={<Button type="button" size="lg" className="px-4" />}>
-        {t("settings.apps.connect", { app })}
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          trigger ?? (
+            <Button type="button" size="lg" className="px-4">
+              {t("settings.apps.connect", { app })}
+            </Button>
+          )
+        }
+      />
       <DialogContent className="gap-5 p-6 sm:max-w-lg">
         <DialogHeader className="gap-3">
           <div className="flex items-center gap-3 pr-8">

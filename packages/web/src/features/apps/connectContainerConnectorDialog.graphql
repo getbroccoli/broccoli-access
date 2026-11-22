@@ -1,3 +1,14 @@
+fragment ConnectContainerConnectorDialog_connector on ContainerConnector {
+  id
+  name
+  connectionFields {
+    key
+    label
+    help
+    secret
+  }
+}
+
 mutation ConnectContainerConnector($input: ContainerConnectorConnectInput!) {
   connectors {
     connect(input: $input) {

@@ -4,3 +4,4 @@ export { appsSearch } from "./appsSearch";
 export { forgetAppLists } from "./cache";
 export { ConnectContainerConnectorDialog } from "./ConnectContainerConnectorDialog";
 export { connectingFieldName } from "./connectingFieldName";
+export { connectsWithText } from "./connectsWithText";

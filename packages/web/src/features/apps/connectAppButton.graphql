@@ -1,0 +1,9 @@
+fragment ConnectAppButton_connector on ContainerConnector {
+  id
+  name
+  connectionFields {
+    key
+    kind
+  }
+  ...ConnectContainerConnectorDialog_connector
+}
