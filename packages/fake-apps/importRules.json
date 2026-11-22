@@ -1,6 +1,7 @@
 {
   "elements": {
-    "src/main": ["src/google"],
+    "src/main": ["src/env", "src/google"],
+    "src/env": [],
     "src/index": ["src/google", "src/seed"],
     "src/google": ["src/seed"],
     "src/seed": [],
