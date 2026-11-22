@@ -66,7 +66,6 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
     });
   });
   for (const fixture of fixtures) {
-    const cannotCause = parseCannotCause(fixture);
     describe(
       `${fixture.connector} conformance`,
       { timeout: NO_CHECK_TIMEOUT, concurrent: false },
@@ -77,15 +76,16 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
           checkList(url, fixture));
         it("changes the member once when an action repeats, and reports the status read afterwards", () =>
           checkRepeatedActions(url, fixture));
+        // A check, not a throw while collecting: Vitest would then skip the caller's afterAll(stop).
+        if (fixture.cannotCause !== undefined)
+          it("lists in cannotCause only errors its connector can never give, each with a one-line reason", () =>
+            checkCannotCause(url, fixture));
         it.for(CONNECTOR_ERROR_CODES)(
           "answers %s, when the fixture causes it, as that error",
-          async (code, { skip }) => {
-            const reason = cannotCause.get(code);
-            if (reason !== undefined) {
-              await expectMayNotCause(url, fixture, code);
-              skip(`${fixture.connector} cannot cause ${code}: ${reason}`);
-            }
-            await checkError(url, fixture, code);
+          (code, { skip }) => {
+            const reason = cannotCauseReason(fixture, code);
+            if (reason !== undefined) skip(`${fixture.connector} cannot cause ${code}: ${reason}`);
+            return checkError(url, fixture, code);
           },
         );
         it("answers a runtime the connector does not list with HTTP 400", () =>
@@ -173,34 +173,27 @@ async function checkError(
   expect(CONNECTOR_ERROR_ANSWER.parse(answer).error.code).toBe(code);
 }
 
-/** A connector that runs in the owner's browser can lose it, so it must cause `owner_browser_lost`. */
-async function expectMayNotCause(
-  url: string,
-  fixture: ConnectorFixture,
-  code: ConnectorErrorCode,
-): Promise<void> {
-  if (code !== "owner_browser_lost") return;
+/**
+ * Every key of `cannotCause`, since its type lets through the extra keys of an object built
+ * elsewhere; and a connector that runs in the owner's browser can lose it, so it must cause that.
+ */
+async function checkCannotCause(url: string, fixture: ConnectorFixture): Promise<void> {
+  const allowed = OPTIONAL_ERROR_CODES.join(" and ");
+  for (const [code, reason] of Object.entries(fixture.cannotCause ?? {})) {
+    expect(OPTIONAL_ERROR_CODES, `cannotCause may list only ${allowed}, not ${code}`).toContain(
+      code,
+    );
+    expect(isOneLineText(reason), `cannotCause needs a one-line reason for ${code}`).toBe(true);
+  }
+  if (cannotCauseReason(fixture, "owner_browser_lost") === undefined) return;
   const runtimes = await runtimesOf(url, fixture.connector);
-  const message = `${fixture.connector} lists the owner_browser runtime, so its fixture must cause ${code}, not list it in cannotCause`;
+  const message = `${fixture.connector} lists the owner_browser runtime, so its fixture must cause owner_browser_lost, not list it in cannotCause`;
   expect(runtimes, message).not.toContain("owner_browser");
 }
 
-/**
- * Each code the fixture's `cannotCause` lists, with its reason. Checked before any test runs,
- * since its type lets through the extra keys of an object built elsewhere.
- */
-function parseCannotCause(fixture: ConnectorFixture): Map<string, string> {
-  const reasons = new Map<string, string>();
-  for (const [code, reason] of Object.entries(fixture.cannotCause ?? {})) {
-    if (!(OPTIONAL_ERROR_CODES as readonly string[]).includes(code)) {
-      const allowed = OPTIONAL_ERROR_CODES.join(" and ");
-      throw new Error(`${fixture.connector}'s cannotCause may list only ${allowed}, not ${code}`);
-    }
-    if (!isOneLineText(reason))
-      throw new Error(`${fixture.connector}'s cannotCause needs a one-line reason for ${code}`);
-    reasons.set(code, reason);
-  }
-  return reasons;
+/** Why the fixture says its connector cannot cause `code`, if it says so. */
+function cannotCauseReason(fixture: ConnectorFixture, code: string): string | undefined {
+  return Object.entries(fixture.cannotCause ?? {}).find(([listed]) => listed === code)?.[1];
 }
 
 /** A plain JavaScript fixture may pass anything, so the type is checked too. */
