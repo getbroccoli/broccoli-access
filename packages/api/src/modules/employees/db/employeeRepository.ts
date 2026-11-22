@@ -14,6 +14,7 @@ import {
   orderByKeyset,
   type Tx,
 } from "../../../core/db";
+import { createFileStorageService, type StoredFile } from "../../../core/files";
 import { inRecordScope, type RecordScope } from "../../../core/security";
 import type { KeysetQuery, KeysetRow } from "../../../core/pagination";
 import {
@@ -41,11 +42,21 @@ export interface EmployeeRepository {
   ): Promise<{ before: Employee; after: Employee } | null>;
   /** Saves the fields an employee takes from the directory, without reading them first. */
   saveDirectoryFields(id: string, fields: DirectoryFields): Promise<void>;
+  /**
+   * Makes `photo` the employee's avatar, or removes it with null, and deletes the file it
+   * replaces; returns the new avatar's file id.
+   */
+  replaceAvatar(
+    employee: Pick<Employee, "id" | "avatarFileId">,
+    photo: StoredFile | null,
+  ): Promise<string | null>;
   findById(id: string): Promise<Employee | null>;
   /** The employee linked to this user, or null. */
   findByUserId(userId: string): Promise<Employee | null>;
   /** The employees among these ids that exist, sorted by name as the employee list sorts them. */
   findByIds(ids: readonly string[]): Promise<Employee[]>;
+  /** The employees with these lowercased emails. */
+  findByEmails(emails: readonly string[]): Promise<Employee[]>;
   /** The employees with these lowercased emails, locked until the transaction ends. */
   lockByEmails(emails: readonly string[]): Promise<Employee[]>;
   /** The employees whose avatar is this file. */
@@ -55,6 +66,8 @@ export interface EmployeeRepository {
   /** How many employees there are. */
   count(): Promise<number>;
 }
+
+const fileStorage = createFileStorageService();
 
 /** The order of `findByIds`: by name, as the employee list sorts by default. */
 const NAME_ORDER: EmployeeOrder = { field: "NAME", direction: "ASC" };
@@ -127,6 +140,15 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
       await orm().update(employees).set(fields).where(eq(employees.id, id));
     },
 
+    replaceAvatar: async ({ id, avatarFileId }, photo) => {
+      const newFileId = photo && (await fileStorage.storeFile(db, photo));
+      await orm().update(employees).set({ avatarFileId: newFileId }).where(eq(employees.id, id));
+      if (avatarFileId) {
+        await fileStorage.deleteFiles(db, [avatarFileId]);
+      }
+      return newFileId;
+    },
+
     findById: async (id) => {
       const [employee] = await orm().select().from(employees).where(eq(employees.id, id));
       return employee ?? null;
@@ -143,6 +165,8 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
         .from(employees)
         .where(isAnyOf(ids))
         .orderBy(...orderByKeyset(keysetColumns(NAME_ORDER, []))),
+
+    findByEmails: (emails) => orm().select().from(employees).where(anyOf(employees.email, emails)),
 
     lockByEmails: (emails) =>
       orm().select().from(employees).where(anyOf(employees.email, emails)).for("update"),

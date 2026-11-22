@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 
 import type { ImportSource } from "./importSource";
-import { scanOf } from "./scan";
+import { photoUpdateOf, scanOf } from "./scan";
 
 it("shows all steps done with progress counts while the scan is still running", () => {
   const scan = scanOf(SOURCE, {
@@ -86,6 +86,53 @@ it.each([null, { found: null }])(
     });
   },
 );
+
+it.each([
+  {
+    name: "reads a first photo",
+    version: "v1",
+    previousVersion: null,
+    hasPhoto: false,
+    expected: "read",
+  },
+  {
+    name: "keeps an unchanged stored photo",
+    version: "v1",
+    previousVersion: "v1",
+    hasPhoto: true,
+    expected: "keep",
+  },
+  {
+    name: "reads an unchanged photo when none is stored",
+    version: "v1",
+    previousVersion: "v1",
+    hasPhoto: false,
+    expected: "read",
+  },
+  {
+    name: "reads a changed photo",
+    version: "v2",
+    previousVersion: "v1",
+    hasPhoto: true,
+    expected: "read",
+  },
+  {
+    name: "clears a removed photo",
+    version: null,
+    previousVersion: "v1",
+    hasPhoto: true,
+    expected: "clear",
+  },
+  {
+    name: "keeps no photo when none is stored",
+    version: null,
+    previousVersion: null,
+    hasPhoto: false,
+    expected: "keep",
+  },
+])("$name", ({ version, previousVersion, hasPhoto, expected }) => {
+  expect(photoUpdateOf({ version, previousVersion, hasPhoto })).toBe(expected);
+});
 
 const SOURCE: ImportSource = {
   id: "source-google",

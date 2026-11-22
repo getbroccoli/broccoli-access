@@ -113,6 +113,21 @@ Google's paths under the Admin API address, with a bearer access token.
   }
   ```
 
+- `GET /admin/directory/v1/users/{userKey}/photos/thumbnail` needs `admin.directory.user.readonly`; it returns `404` with Google's not-found body when a person has no photo. `users.list` also gives `thumbnailPhotoEtag` for people with a photo.
+
+  ```json
+  {
+    "kind": "admin#directory#user#photo",
+    "id": "104857392018374650123",
+    "etag": "\"p1\"",
+    "primaryEmail": "ana@acme.example",
+    "mimeType": "image/png",
+    "width": 96,
+    "height": 96,
+    "photoData": "<web-safe base64 PNG>"
+  }
+  ```
+
 - `GET /admin/directory/v1/users/{userKey}/tokens` needs `admin.directory.user.security`. `userKey` is the user id or email. The list is not paged, as in Google.
 
   ```json
@@ -220,6 +235,7 @@ These numbers are the circle 1 design canvas's; screens and checks rely on them.
   - Named people: Ana Ruiz, Ben Ito, Chloé Martin, David Okafor, Elif Demir, Farah Haddad, Gabriel Silva, Hannah Weber, Ivan Petrov, Jun Park and Lena Fischer. Generated names fill the rest.
   - Ana Ruiz and Ben Ito are suspended.
   - Managers form a small tree under Mia. Ana's manager is David.
+  - The 11 named people get a generated placeholder portrait (made up, no real faces); generated people have none.
 - **37 apps**, each with a stable client ID: Slack 41 people, Notion 31, Figma 16, Miro 12, Loom 11, Claude 9, ChatGPT 7, Canva 5, Calendly 4, Zoom 4, Typeform 3, Grammarly 2, and 25 more apps with 1 or 2 people each.
   - Apps in the built-in catalog use the client IDs the catalog lists, so they match it in development.
   - Everyone except Ivan Petrov has Slack.

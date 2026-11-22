@@ -11,40 +11,55 @@ import {
   signIn,
   test as it,
   USERS_PATH,
+  type TestFakeGoogle,
 } from "#test/support";
 import { ACME } from "../seed";
 import openidConfiguration from "./discovery/openidConfiguration.json";
 
-it.for(["seed", "suspend", "add grant", "delete grant", "own-client consent"])(
-  "conforms to Google's Directory and Reports schemas after %s",
-  async (change, { fake }) => {
-    const tokens = await signIn(fake.url, { scope: ADMIN_SCOPES });
-    await changeState(fake.url, change);
-    const endpoints = [
-      { path: CUSTOMER_PATH, api: "directory", schema: "Customer" },
-      { path: `${USERS_PATH}&projection=full`, api: "directory", schema: "Users" },
-      { path: `${USERS_PATH}&maxResults=10`, api: "directory", schema: "Users" },
-      { path: REPORTS_PATH, api: "reports", schema: "Activities" },
-      { path: `${REPORTS_PATH}&maxResults=5`, api: "reports", schema: "Activities" },
-      ...ACME.people.map((person) => ({
-        path: `/admin/directory/v1/users/${person.id}/tokens`,
+it.for([
+  "seed",
+  "suspend",
+  "add grant",
+  "delete grant",
+  "own-client consent",
+  "changed photo",
+  "removed photo",
+])("conforms to Google's Directory and Reports schemas after %s", async (change, { fake }) => {
+  const tokens = await signIn(fake.url, { scope: ADMIN_SCOPES });
+  await changeState(fake, change);
+  const peopleWithPhotos = ACME.people.filter(({ photo }) => photo !== null);
+  expect(peopleWithPhotos).toHaveLength(11);
+  const endpoints = [
+    { path: CUSTOMER_PATH, api: "directory", schema: "Customer" },
+    { path: `${USERS_PATH}&projection=full`, api: "directory", schema: "Users" },
+    { path: `${USERS_PATH}&maxResults=10`, api: "directory", schema: "Users" },
+    { path: REPORTS_PATH, api: "reports", schema: "Activities" },
+    { path: `${REPORTS_PATH}&maxResults=5`, api: "reports", schema: "Activities" },
+    ...ACME.people.map((person) => ({
+      path: `/admin/directory/v1/users/${person.id}/tokens`,
+      api: "directory",
+      schema: "Tokens",
+    })),
+    ...peopleWithPhotos
+      .filter(({ email }) => change !== "removed photo" || email !== "ana@acme.example")
+      .map((person) => ({
+        path: `/admin/directory/v1/users/${person.id}/photos/thumbnail`,
         api: "directory",
-        schema: "Tokens",
+        schema: "UserPhoto",
       })),
-    ];
+  ];
 
-    for (const { path, api, schema } of endpoints) {
-      const response = await fetch(`${fake.url}${path}`, {
-        headers: { authorization: `Bearer ${tokens.access_token}` },
-      });
-      expect(response.status, path).toBe(200);
-      expect(
-        schemaViolations(api as "directory" | "reports", schema, await response.json()),
-        path,
-      ).toEqual([]);
-    }
-  },
-);
+  for (const { path, api, schema } of endpoints) {
+    const response = await fetch(`${fake.url}${path}`, {
+      headers: { authorization: `Bearer ${tokens.access_token}` },
+    });
+    expect(response.status, path).toBe(200);
+    expect(
+      schemaViolations(api as "directory" | "reports", schema, await response.json()),
+      path,
+    ).toEqual([]);
+  }
+});
 
 it("publishes only Google's OpenID keys and supported values", async ({ fake }) => {
   const response = await fetch(`${fake.url}/.well-known/openid-configuration`);
@@ -103,8 +118,18 @@ it.for(["online", "offline", "refresh"])(
   },
 );
 
-async function changeState(url: string, change: string): Promise<void> {
+async function changeState(fake: TestFakeGoogle, change: string): Promise<void> {
+  const { url } = fake;
   switch (change) {
+    case "changed photo":
+      fake.setPhoto(
+        "ana@acme.example",
+        ACME.people.find(({ email }) => email === "ben@acme.example")!.photo,
+      );
+      return;
+    case "removed photo":
+      fake.setPhoto("ana@acme.example", null);
+      return;
     case "suspend":
       await control(url, "/users/chloe@acme.example/suspend");
       return;

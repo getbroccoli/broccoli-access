@@ -10,6 +10,7 @@ export {
 // Public types.
 export type {
   AccountPage,
+  AccountPhoto,
   AccountStatus,
   AccountValues,
   ConnectionDetails,

@@ -24,6 +24,8 @@ export interface ImportSourceRepository {
   markScanning(id: string): Promise<void>;
   /** Makes the source's records exactly `accounts`. */
   replaceRecords(id: string, accounts: readonly ImportedAccount[]): Promise<void>;
+  /** The accounts the source's last saved scan found. */
+  findRecords(id: string): Promise<ImportedAccount[]>;
   markScanned(id: string, readAt: Date): Promise<void>;
   markFailed(id: string, failure: ConnectorErrorCode): Promise<void>;
 }
@@ -64,6 +66,15 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
         await orm().insert(importRecords).values(batch);
       }
     },
+    findRecords: (id) =>
+      orm()
+        .select({
+          sourceKey: importRecords.sourceKey,
+          raw: importRecords.raw,
+          values: importRecords.values,
+        })
+        .from(importRecords)
+        .where(eq(importRecords.sourceId, id)),
     markScanned: async (id, readAt) => {
       await orm()
         .update(importSources)

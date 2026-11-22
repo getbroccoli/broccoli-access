@@ -1,3 +1,4 @@
+import type { StoredFile } from "../../../core/files";
 import type { FieldChange } from "../../../core/records";
 import { type Employee, employeeChanges } from "./employee";
 
@@ -9,6 +10,8 @@ export interface DirectoryPerson {
   lastName: string;
   /** Lowercased; null without a manager. */
   managerEmail: string | null;
+  /** Their new photo, or null when the directory removed it; left out when it did not change. */
+  photo?: StoredFile | null;
 }
 
 /** Who the directory's employees are linked to: each employee's id by email, and the owner. */
@@ -40,6 +43,17 @@ export function employeeFromDirectory(
 }
 
 /**
+ * Whether the directory's photo changes the employee's avatar: a photo replaces it and null clears
+ * one, while a photo left out keeps it.
+ */
+export function changesAvatar(
+  employee: Employee,
+  photo: DirectoryPerson["photo"],
+): photo is StoredFile | null {
+  return photo !== undefined && (photo !== null || employee.avatarFileId !== null);
+}
+
+/**
  * The changes history keeps from `before` to `after`: each manager named as they were then, and
  * the owner's user by the employee's email, which is theirs.
  */
@@ -58,6 +72,10 @@ export function directoryChanges(
       oldLabel: oldManager && (managerNames.before.get(oldManager) ?? null),
       newLabel: after.managerId && (managerNames.after.get(after.managerId) ?? null),
     });
+  }
+  const oldAvatar = before?.avatarFileId ?? null;
+  if (oldAvatar !== after.avatarFileId) {
+    changes.push({ field: "avatar", oldValue: oldAvatar, newValue: after.avatarFileId });
   }
   const oldUser = before?.userId ?? null;
   if (oldUser !== after.userId) {

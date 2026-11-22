@@ -1,4 +1,6 @@
-import { expect, finishSetupWithPreselectedApps, test } from "#test/support";
+import { ACME } from "@broccoli-access/fake-apps";
+
+import { expect, finishSetupWithPreselectedApps, test, type Browser } from "#test/support";
 
 test("reads a suspended person's current access through the API", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
@@ -56,3 +58,48 @@ test("refuses a person's current access without a session", async ({ env }) => {
     fieldErrors: [],
   });
 });
+
+test("serves a scanned person's photo to the owner", async ({ env }) => {
+  const { browser } = await env.signInAsOwner();
+  const avatarUrl = await scannedAvatarUrl(browser);
+
+  const response = await browser.get(avatarUrl);
+
+  expect(response.status).toBe(200);
+  expect(response.headers.get("content-type")).toBe("image/png");
+  expect(Buffer.from(await response.arrayBuffer())).toEqual(
+    ACME.people.find(({ email }) => email === "ana@acme.example")!.photo,
+  );
+}, 90_000);
+
+test("refuses a scanned person's photo without a session", async ({ env }) => {
+  const { browser } = await env.signInAsOwner();
+  const avatarUrl = await scannedAvatarUrl(browser);
+
+  const response = await env.browser().get(avatarUrl);
+
+  expect(response.status).toBe(401);
+}, 90_000);
+
+async function scannedAvatarUrl(browser: Browser): Promise<string> {
+  await expect
+    .poll(
+      async () => {
+        const response = await browser.graphql("{ setup { googleWorkspace { scan { status } } } }");
+        return response.json();
+      },
+      { timeout: 60_000, interval: 250 },
+    )
+    .toEqual({
+      data: { setup: { googleWorkspace: { scan: { status: "SCANNED" } } } },
+    });
+  const people = await browser.graphql(`{
+    employees(filter: { search: "ana@acme.example" }) { edges { node { avatarUrl } } }
+  }`);
+  const { data } = (await people.json()) as {
+    data: { employees: { edges: { node: { avatarUrl: string | null } }[] } };
+  };
+  const { avatarUrl } = data.employees.edges[0]!.node;
+  expect(avatarUrl).toEqual(expect.stringMatching(/^\/api\/employees\/avatar\//));
+  return avatarUrl!;
+}

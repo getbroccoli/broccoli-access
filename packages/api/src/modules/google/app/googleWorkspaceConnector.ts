@@ -75,7 +75,17 @@ export function createGoogleWorkspaceConnector(addresses: {
             const accounts = [...page.users.map(directoryAccount), ...grants];
             return { accounts, nextCursor: page.nextPageToken };
           }),
+        readPhoto: (userId) =>
+          asConnectorError(directoryError, async () => google.readPhoto(accessToken, userId)),
       };
+    },
+    // Google gives a user's photo etag only to a user with a photo.
+    photoVersion: ({ thumbnailPhotoEtag }) =>
+      typeof thumbnailPhotoEtag === "string" ? thumbnailPhotoEtag : null,
+    withoutPhotoVersion: (raw) => {
+      const user = { ...raw };
+      delete user.thumbnailPhotoEtag;
+      return user;
     },
   };
 }
