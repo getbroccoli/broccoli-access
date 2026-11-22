@@ -1,1 +1,1 @@
-export { createScanService, type ScanDependencies, type ScanService } from "./scanService";
+export { createScanService, type ScanService } from "./scanService";

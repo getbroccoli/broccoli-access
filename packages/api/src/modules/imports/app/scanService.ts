@@ -71,12 +71,12 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
       if (source?.status === "scanning") {
         return { sourceId: source.id };
       }
-      const name = connectorOf(dependencies, connection.connector).sourceName(connection.settings);
-      const sourceId = source
-        ? source.id
-        : (await sources.insertScanning({ connectionId, name })).id;
-      if (source) {
+      let sourceId = source?.id;
+      if (sourceId) {
         await sources.markScanning(sourceId);
+      } else {
+        const name = connectorOf(dependencies, connection.connector).sourceName(connection.settings);
+        sourceId = (await sources.insertScanning({ connectionId, name })).id;
       }
       await jobs.send(tx, SCAN_JOB, { sourceId });
       return { sourceId };

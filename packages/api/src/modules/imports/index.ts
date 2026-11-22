@@ -8,7 +8,7 @@ import { createResolvers } from "./graphql";
 export { createScanService } from "./app";
 
 // Public types.
-export type { ScanDependencies, ScanService } from "./app";
+export type { ScanService } from "./app";
 
 /** Scans of connected apps into import sources, and the sync of what they find. */
 export function importsModule(scans: ScanService): ModuleManifest {
