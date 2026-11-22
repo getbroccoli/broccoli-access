@@ -16,29 +16,31 @@ export function useChromeExtension() {
   const pairing = query.data?.me?.extensionPairing ?? null;
   const isInstalled = useExtensionDetection();
   useRefetchOnFocus(query.refetch);
-  // Each "Pair this Chrome" is a new attempt with its own deadline; 0 while none is waiting.
-  const [attempt, setAttempt] = useState(0);
+  // The pair window while it waits for the owner; null once they paired, cancelled or ran out of time.
+  const [pairWindow, setPairWindow] = useState<Window | null>(null);
+  const [isWindowBlocked, setWindowBlocked] = useState(false);
   const [start, { loading: isStarting, error: startError }] = usePayloadMutation(
     StartExtensionPairingDocument,
   );
-  if (attempt !== 0 && pairing) {
+  if (pairWindow && pairing) {
     // Paired: waiting ends here, so unpairing later does not bring it back.
-    setAttempt(0);
+    setPairWindow(null);
   }
-  usePollWhileAwaitingPair(attempt, query, setAttempt);
+  usePollWhilePairWindowOpen(pairWindow, query.refetch, setPairWindow);
 
   const startPairing = async () => {
     // Opened in the click itself: Chrome blocks a window opened after the click's activation ends.
-    const pairWindow = openBlankPairWindow();
-    if (!pairWindow) {
+    const opened = openBlankPairWindow();
+    setWindowBlocked(opened === null);
+    if (!opened) {
       return;
     }
     try {
       const { code } = await start();
-      pairWindow.location.replace(pairPageUrl(code));
-      setAttempt((current) => current + 1);
+      opened.location.replace(pairPageUrl(code));
+      setPairWindow(opened);
     } catch (error) {
-      pairWindow.close();
+      opened.close();
       throw error;
     }
   };
@@ -50,7 +52,12 @@ export function useChromeExtension() {
     startPairing,
     isStarting,
     startFailed: startError !== undefined,
-    isAwaitingPair: attempt !== 0,
+    isWindowBlocked,
+    isAwaitingPair: pairWindow !== null,
+    // A read on its way could answer from before an unpair and show the pairing again.
+    isReading: query.loading,
+    loadFailed: query.error !== undefined && !query.data,
+    retry: () => void query.refetch().catch(() => undefined),
   };
 }
 
@@ -115,26 +122,31 @@ function useRefetchOnFocus(refetch: () => Promise<unknown>): void {
   }, [refetch]);
 }
 
-/** Polls while pairing `attempt` waits, until its code expires; 0 waits for nothing. */
-function usePollWhileAwaitingPair(
-  attempt: number,
-  {
-    startPolling,
-    stopPolling,
-  }: { startPolling: (interval: number) => void; stopPolling: () => void },
-  setAttempt: (attempt: number) => void,
+/**
+ * Asks for the pairing every second while `pairWindow` is open, and once more when it closes, as
+ * it does after Pair or Cancel; gives up when the code has expired.
+ */
+function usePollWhilePairWindowOpen(
+  pairWindow: Window | null,
+  refetch: () => Promise<unknown>,
+  setPairWindow: (pairWindow: Window | null) => void,
 ): void {
   useEffect(() => {
-    if (attempt === 0) {
+    if (!pairWindow) {
       return;
     }
-    startPolling(PAIR_POLL_INTERVAL_MS);
-    const giveUp = setTimeout(() => setAttempt(0), PAIRING_CODE_LIFETIME_MS);
+    const poll = setInterval(() => {
+      void refetch().catch(() => undefined);
+      if (pairWindow.closed) {
+        setPairWindow(null);
+      }
+    }, PAIR_POLL_INTERVAL_MS);
+    const giveUp = setTimeout(() => setPairWindow(null), PAIRING_CODE_LIFETIME_MS);
     return () => {
-      stopPolling();
+      clearInterval(poll);
       clearTimeout(giveUp);
     };
-  }, [attempt, startPolling, stopPolling, setAttempt]);
+  }, [pairWindow, refetch, setPairWindow]);
 }
 
 /** A small empty window for the pair page, cut off from this page, which it gives nothing back. */

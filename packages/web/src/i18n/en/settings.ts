@@ -26,6 +26,9 @@ export const settingsEn = {
     "Pairing needs HTTPS: open Broccoli Access at its https address to pair this Chrome.",
   "settings.extension.confirmInPopup": "Chrome shows the extension’s popup for you to confirm.",
   "settings.extension.pairFailed": "Couldn’t start pairing. Try again.",
+  "settings.extension.windowBlocked":
+    "Chrome blocked the pairing window. Allow pop-ups for this site, then try again.",
+  "settings.extension.loadFailed": "Couldn’t load this Chrome’s pairing.",
   "settings.extension.unpairFailed": "Couldn’t unpair. Try again.",
   "settings.extension.unpair": "Unpair",
   "settings.googleApp.title": "Change Google app",

@@ -66,6 +66,19 @@ export function ChromeExtensionCard() {
               {t("settings.extension.confirmInPopup")}
             </p>
           )}
+          {extension.isWindowBlocked && (
+            <p role="alert" className="text-sm text-destructive">
+              {t("settings.extension.windowBlocked")}
+            </p>
+          )}
+          {extension.loadFailed && (
+            <div role="alert" className="flex flex-col items-start gap-2">
+              <p className="text-sm text-destructive">{t("settings.extension.loadFailed")}</p>
+              <Button type="button" variant="outline" onClick={extension.retry}>
+                {t("settings.connections.retry")}
+              </Button>
+            </div>
+          )}
           {(extension.startFailed || unpairError) && (
             <p role="alert" className="text-sm text-destructive">
               {t(
@@ -105,7 +118,7 @@ export function ChromeExtensionCard() {
               variant="outline"
               size="lg"
               className="px-4"
-              disabled={isUnpairing}
+              disabled={isUnpairing || extension.isReading}
               onClick={() => void unpair().catch(() => undefined)}
             >
               {t("settings.extension.unpair")}
