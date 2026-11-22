@@ -10,8 +10,6 @@ type ExtensionPairing {
   "As the extension reported it, such as `Chrome on macOS`."
   browser: String!
   pairedAt: DateTime!
-  "When the extension last called the instance."
-  lastSeenAt: DateTime!
 }
 
 type ExtensionMutations {

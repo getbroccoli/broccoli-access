@@ -50,6 +50,7 @@ const PAIR_POLL_INTERVAL_MS = 1_000;
 const PAIRING_CODE_LIFETIME_MS = 5 * 60_000;
 
 /** A file the extension lets every site load, holding nothing, only to tell it is installed. */
+// shortcut: any site can load it and so tell the extension is installed; narrow its matches if instances ever share known origins.
 const DETECTION_URL = `chrome-extension://${EXTENSION_ID}/installed.txt`;
 
 function statusOf(isPaired: boolean, isInstalled: boolean | null): ChromeExtensionStatus {
