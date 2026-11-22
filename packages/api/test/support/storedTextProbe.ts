@@ -48,22 +48,19 @@ export async function storedTextProbe(
       },
     };
   }
-  if (entry.startsWith("employee.reason.")) {
+  if (entry === "employee.reason.update") {
     const service = employeeServices(orm);
     const unique = await seed.employee();
     const user = await seed.user({ email: `user-${unique.id}@example.com` });
     const employee = await seed.employee({ userId: user.id });
     return {
       expected: expected || null,
-      act: async () => {
-        if (entry.endsWith("update"))
-          await service.updateEmployee(OWNER, {
-            id: employee.id,
-            firstName: "Changed",
-            changeReason: value,
-          });
-        else await service.deleteEmployee(OWNER, { id: employee.id, changeReason: value });
-      },
+      act: () =>
+        service.updateEmployee(OWNER, {
+          id: employee.id,
+          firstName: "Changed",
+          changeReason: value,
+        }),
       read: async () =>
         (await recordHistory.read(orm, "employee", employee.id, { first: 1 })).edges[0]!.node
           .reason,

@@ -22,7 +22,7 @@ export interface AppAccountRepository {
   countEmployeesWithAccounts(): Promise<number>;
   /** The employees whose account in the app is suspended. */
   findSuspendedEmployeeIds(appId: string): Promise<string[]>;
-  /** Every account with an employee, with its app's name and status. */
+  /** Every account with an employee, with its app's name and status and its dates. */
   findEmployeeAccounts(): Promise<EmployeeAppAccount[]>;
 }
 
@@ -34,8 +34,11 @@ export interface AppUserAccount extends Pick<
   employeeId: string;
 }
 
-/** An employee's account with its app's name and status, as the People list reads it. */
-export interface EmployeeAppAccount extends Pick<AppAccount, "appId" | "status"> {
+/** An employee's account with its app's name and status, as People and a person's page read it. */
+export interface EmployeeAppAccount extends Pick<
+  AppAccount,
+  "appId" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
+> {
   employeeId: string;
   appName: string;
   appStatus: AppStatus;
@@ -124,6 +127,10 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
           appName: apps.name,
           appStatus: apps.status,
           status: appAccounts.status,
+          foundVia: appAccounts.foundVia,
+          grantedAt: appAccounts.grantedAt,
+          grantedBefore: appAccounts.grantedBefore,
+          firstSeenAt: appAccounts.firstSeenAt,
         })
         .from(appAccounts)
         .innerJoin(apps, eq(apps.id, appAccounts.appId))

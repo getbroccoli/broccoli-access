@@ -16,6 +16,18 @@ type Employee implements AnyRecord {
   status: EmployeeStatus
   "Names of the approved apps, other than the directory, where they have an active account, sorted. Admins only."
   approvedAppNames: [String!]!
+  "Suspended in the directory with an active account in another approved app. Admins only."
+  suspendedWithAccess: Boolean!
+  "Their active accounts in approved apps other than the directory, by app name. Admins only."
+  currentAccess: [AppAccess!]!
+}
+
+"An approved app someone has an active account in, how the account was found and since when."
+type AppAccess {
+  appName: String!
+  "The finding kinds that saw the account, sorted, such as `google_sign_in`; connector modules register them."
+  foundVia: [String!]!
+  since: Since!
 }
 
 "Whether someone's directory account, such as their Google Workspace account, is in use."
@@ -84,19 +96,11 @@ input EmployeeUpdateInput {
   changeReason: String
 }
 
-input EmployeeDeleteInput {
-  id: ID!
-  "Why the employee is removed, kept on the history line as its reason; at most 500 characters."
-  changeReason: String
-}
-
 type EmployeesMutations {
   "Adds an employee. Admins only."
   create(input: EmployeeCreateInput!): EmployeeCreatePayload!
   "Changes an employee's fields and records the change in their history. Refused, naming each field, for a field the caller may not change; see `access`."
   update(input: EmployeeUpdateInput!): EmployeeUpdatePayload!
-  "Removes an employee and their avatar; their history stays. Admins only; never the owner."
-  delete(input: EmployeeDeleteInput!): EmployeeDeletePayload!
 }
 
 "The new employee, or why it was refused."
@@ -116,14 +120,6 @@ type EmployeeUpdatePayload {
 }
 
 union EmployeeUpdateError = InvalidInputError | NotFoundError
-
-"The removed employee's id, or why the removal was refused."
-type EmployeeDeletePayload {
-  deletedEmployeeId: ID
-  error: EmployeeDeleteError
-}
-
-union EmployeeDeleteError = InvalidInputError | NotFoundError
 
 # Adds the employee to an app's user; the server merges the types of the modules.
 type AppUser {

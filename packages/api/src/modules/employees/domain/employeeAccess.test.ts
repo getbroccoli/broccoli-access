@@ -18,7 +18,7 @@ it("has no status without a directory account", () => {
 
   expect(access.get("ana")).toEqual({
     status: null,
-    approvedAppNames: ["Slack"],
+    currentAccess: [{ appName: "Slack", foundVia: slack.foundVia, since: slack.since }],
     suspendedWithAccess: false,
   });
 });
@@ -28,7 +28,7 @@ it("gives no access for a suspended account in an approved app", () => {
 
   expect(access.get("ana")).toEqual({
     status: "suspended",
-    approvedAppNames: [],
+    currentAccess: [],
     suspendedWithAccess: false,
   });
 });
@@ -42,7 +42,7 @@ it("gives no access for discovered or ignored apps", () => {
 
   expect(access.get("ana")).toEqual({
     status: "suspended",
-    approvedAppNames: [],
+    currentAccess: [],
     suspendedWithAccess: false,
   });
 });
@@ -55,13 +55,13 @@ it("excludes the directory from approved apps and access", () => {
 
   expect(access).toEqual(
     new Map([
-      ["ana", { status: "suspended", approvedAppNames: [], suspendedWithAccess: false }],
-      ["mia", { status: "active", approvedAppNames: [], suspendedWithAccess: false }],
+      ["ana", { status: "suspended", currentAccess: [], suspendedWithAccess: false }],
+      ["mia", { status: "active", currentAccess: [], suspendedWithAccess: false }],
     ]),
   );
 });
 
-it("sorts approved app names by name", () => {
+it("sorts current access by app name", () => {
   const access = accessOfEmployees([
     directory,
     slack,
@@ -69,7 +69,11 @@ it("sorts approved app names by name", () => {
     { ...slack, appName: "Figma" },
   ]);
 
-  expect(access.get("ana")?.approvedAppNames).toEqual(["Figma", "Notion", "Slack"]);
+  expect(access.get("ana")?.currentAccess).toEqual([
+    { appName: "Figma", foundVia: slack.foundVia, since: slack.since },
+    { appName: "Notion", foundVia: slack.foundVia, since: slack.since },
+    { appName: "Slack", foundVia: slack.foundVia, since: slack.since },
+  ]);
 });
 
 it("marks a suspended employee with an active approved account as suspended with access", () => {
@@ -77,7 +81,7 @@ it("marks a suspended employee with an active approved account as suspended with
 
   expect(access.get("ana")).toEqual({
     status: "suspended",
-    approvedAppNames: ["Slack"],
+    currentAccess: [{ appName: "Slack", foundVia: slack.foundVia, since: slack.since }],
     suspendedWithAccess: true,
   });
 });
@@ -87,7 +91,7 @@ it("does not mark an active employee with approved apps as suspended with access
 
   expect(access.get("ana")).toEqual({
     status: "active",
-    approvedAppNames: ["Slack"],
+    currentAccess: [{ appName: "Slack", foundVia: slack.foundVia, since: slack.since }],
     suspendedWithAccess: false,
   });
 });
@@ -98,6 +102,8 @@ const directory: EmployeeAccount = {
   appStatus: "approved",
   status: "suspended",
   inDirectory: true,
+  foundVia: ["google_directory"],
+  since: { at: new Date("2021-04-01T00:00:00Z"), before: false },
 };
 
 const slack: EmployeeAccount = {
@@ -106,4 +112,6 @@ const slack: EmployeeAccount = {
   appStatus: "approved",
   status: "active",
   inDirectory: false,
+  foundVia: ["google_sign_in"],
+  since: { at: new Date("2026-05-25T12:00:00Z"), before: true },
 };

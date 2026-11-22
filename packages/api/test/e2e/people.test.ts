@@ -2,7 +2,7 @@ import {
   expect,
   test,
   readGoogleConnection,
-  scannedApps,
+  finishSetupWithPreselectedApps,
   suspendAtFakeGoogle,
 } from "#test/support";
 
@@ -11,17 +11,7 @@ test("lists and counts people suspended with access after Scan now", async ({
   fakeGoogle,
 }) => {
   const { browser } = await env.signInAsOwner();
-  const discovered = await scannedApps(browser);
-  const approvedAppIds = discovered.filter(({ preselected }) => preselected).map(({ id }) => id);
-  const setup = await browser.graphql(
-    `mutation ($input: SetupFinishInput!) {
-    apps { finishSetup(input: $input) { setup { step } error { __typename } } }
-  }`,
-    { input: { approvedAppIds } },
-  );
-  expect(await setup.json()).toEqual({
-    data: { apps: { finishSetup: { setup: { step: "DONE" }, error: null } } },
-  });
+  await finishSetupWithPreselectedApps(browser);
   const connection = await readGoogleConnection(browser);
   await suspendAtFakeGoogle(fakeGoogle.url, "elif@acme.example");
 

@@ -10,10 +10,7 @@ test.for(
         limit: field === "email" ? 254 : 100,
       })),
     ),
-    ...["update", "delete"].map((operation) => ({
-      entry: `employee.reason.${operation}`,
-      limit: 500,
-    })),
+    { entry: "employee.reason.update", limit: 500 },
     { entry: "mail.from", limit: 254 },
     { entry: "mail.secret", limit: 1000 },
   ].flatMap((entry) =>

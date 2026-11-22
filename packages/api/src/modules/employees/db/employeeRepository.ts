@@ -14,8 +14,6 @@ import {
   orderByKeyset,
   type Tx,
 } from "../../../core/db";
-import { user } from "../../../core/auth";
-import { createFileStorageService } from "../../../core/files";
 import { inRecordScope, type RecordScope } from "../../../core/security";
 import type { KeysetQuery, KeysetRow } from "../../../core/pagination";
 import {
@@ -26,8 +24,6 @@ import {
   type NewEmployee,
 } from "../domain";
 import { employees } from "./employeesTable";
-
-const fileStorage = createFileStorageService();
 
 /** Employees stored in Postgres, through the pool or inside a transaction, which inserts need. */
 export interface EmployeeRepository {
@@ -45,11 +41,6 @@ export interface EmployeeRepository {
   ): Promise<{ before: Employee; after: Employee } | null>;
   /** Saves the fields an employee takes from the directory, without reading them first. */
   saveDirectoryFields(id: string, fields: DirectoryFields): Promise<void>;
-  /**
-   * Deletes an employee, their avatar and the user who signs in as them, and returns what was
-   * deleted; null when no employee has the id.
-   */
-  delete(id: string): Promise<Employee | null>;
   findById(id: string): Promise<Employee | null>;
   /** The employee linked to this user, or null. */
   findByUserId(userId: string): Promise<Employee | null>;
@@ -134,18 +125,6 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
 
     saveDirectoryFields: async (id, fields) => {
       await orm().update(employees).set(fields).where(eq(employees.id, id));
-    },
-
-    delete: async (id) => {
-      const [employee] = await orm().delete(employees).where(eq(employees.id, id)).returning();
-      if (employee?.avatarFileId) {
-        await fileStorage.deleteFiles(db, [employee.avatarFileId]);
-      }
-      if (employee?.userId) {
-        // Their sessions and password go with the user.
-        await orm().delete(user).where(eq(user.id, employee.userId));
-      }
-      return employee ?? null;
     },
 
     findById: async (id) => {
