@@ -2,6 +2,7 @@
 export {
   ACCOUNT_STATUSES,
   ACCOUNT_VALUES_VERSION,
+  canChangeAccounts,
   CONNECTOR_ERROR_CODES,
   ConnectorError,
 } from "./connector";

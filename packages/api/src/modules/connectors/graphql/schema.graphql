@@ -44,6 +44,19 @@ type ContainerConnection {
 type App {
   "Its connection through the connectors container; null for an app without one, and while the container has not listed its connectors since the API started."
   containerConnection: ContainerConnection
+  "The container connector that can disable and enable its accounts: the one whose key is its catalog key; null when none can, such as for Google Workspace."
+  managingConnector: ContainerConnector
+}
+
+"An app a container connector can manage that no scan has found and nothing has connected, as the catalog names it; computed when read, and connecting it adds the app."
+type AppToConnect {
+  "Its catalog key, such as `linear`."
+  id: ID!
+  name: String!
+  "Such as `linear.app`."
+  domain: String!
+  "The connector that connects it, whose key is its catalog key."
+  connector: ContainerConnector!
 }
 
 input ContainerConnectorConnectInput {
@@ -78,6 +91,8 @@ type ConnectorsMutations {
 type Query {
   "The connectors container's connectors, in its order; empty without a container, and while it has not listed them since the API started. Admins only."
   containerConnectors: [ContainerConnector!]!
+  "The apps a container connector can manage that have no app yet, in the container's order; empty without a container. Admins only."
+  appsToConnect: [AppToConnect!]!
 }
 
 type Mutation {

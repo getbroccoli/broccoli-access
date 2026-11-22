@@ -17,6 +17,11 @@ export interface ConnectedApps {
       secrets: Record<string, unknown>;
     },
   ): Promise<{ appId: string; connectionId: string }>;
+  /** The catalog apps among `catalogKeys` that have no app yet, whatever its status. */
+  readCatalogAppsWithoutApp(
+    db: Orm | Tx,
+    catalogKeys: readonly string[],
+  ): Promise<{ key: string; name: string; domain: string }[]>;
   /** Every connection, without its secrets. */
   readConnections(db: Orm | Tx): Promise<
     {

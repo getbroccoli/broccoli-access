@@ -9,7 +9,7 @@ export {
   type NewApp,
   planAppMatches,
 } from "./app";
-export { catalogApp, type CatalogApp } from "./catalog";
+export { CATALOG_KEYS, catalogApp, type CatalogApp } from "./catalog";
 export {
   APP_CONNECTION_STATUSES,
   type ConnectedApp,

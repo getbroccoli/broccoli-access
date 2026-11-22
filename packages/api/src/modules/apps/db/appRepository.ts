@@ -31,6 +31,8 @@ export interface App {
 export interface AppRepository {
   insertMany(apps: readonly NewApp[], status: AppStatus): Promise<App[]>;
   findAll(): Promise<App[]>;
+  /** The apps whose catalog key is among `catalogKeys`. */
+  findByCatalogKeys(catalogKeys: readonly string[]): Promise<App[]>;
   updateExternalIds(id: string, externalIds: readonly string[]): Promise<void>;
   /** One page of the apps with `status`, the most people first, then by name. */
   findPage(query: AppPageQuery): Promise<KeysetRow<App, unknown[]>[]>;
@@ -66,6 +68,8 @@ export function appRepository(db: Orm | Tx): AppRepository {
       return inserted;
     },
     findAll: () => orm().select().from(apps),
+    findByCatalogKeys: (catalogKeys) =>
+      orm().select().from(apps).where(anyOf(apps.catalogKey, catalogKeys)),
     updateExternalIds: async (id, externalIds) => {
       await orm()
         .update(apps)

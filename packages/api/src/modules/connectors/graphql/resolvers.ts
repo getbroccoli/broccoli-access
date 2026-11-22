@@ -7,7 +7,11 @@ import {
   type ResolversTypes,
   toEnum,
 } from "../../../core/graphql";
-import type { ContainerConnection, ContainerConnectionService } from "../app";
+import type {
+  ConnectorWithConnection,
+  ContainerConnection,
+  ContainerConnectionService,
+} from "../app";
 
 export function createResolvers(connections: ContainerConnectionService): Resolvers {
   const connectionsOfApps = perRequest(
@@ -17,10 +21,18 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
         return appIds.map((appId) => byApp.get(appId) ?? null);
       }),
   );
+  const managingConnectorsOfApps = perRequest(
+    (context) =>
+      new DataLoader<string, ConnectorWithConnection | null>(async (catalogKeys) => {
+        const byKey = await connections.readManagingConnectors(context.getActor(), catalogKeys);
+        return catalogKeys.map((catalogKey) => byKey.get(catalogKey) ?? null);
+      }),
+  );
   return {
     Query: {
       containerConnectors: (_parent, _args, context) =>
         connections.listConnectors(context.getActor()),
+      appsToConnect: (_parent, _args, context) => connections.listAppsToConnect(context.getActor()),
     },
     Mutation: {
       connectors: () => ({}),
@@ -48,6 +60,13 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
     },
     App: {
       containerConnection: (app, _args, context) => connectionsOfApps(context).load(app.id),
+      managingConnector: (app, _args, context) =>
+        app.catalogKey ? managingConnectorsOfApps(context).load(app.catalogKey) : null,
+    },
+    AppToConnect: {
+      id: ({ catalogKey }) => catalogKey,
+      // An app to connect has no connection: connecting it adds the app.
+      connector: ({ connector }) => ({ connector, connection: null }),
     },
   };
 }

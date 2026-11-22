@@ -142,3 +142,8 @@ export class ConnectorError extends Error {
     this.name = "ConnectorError";
   }
 }
+
+/** Whether it can disable and enable its app's accounts: it lists both `suspend` and `reactivate`. */
+export function canChangeAccounts({ capabilities }: Pick<Connector, "capabilities">): boolean {
+  return capabilities.includes("suspend") && capabilities.includes("reactivate");
+}

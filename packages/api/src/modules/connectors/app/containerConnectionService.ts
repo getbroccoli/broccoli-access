@@ -1,5 +1,6 @@
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
 import {
+  canChangeAccounts,
   type ConnectionDetails,
   ConnectorError,
   type ConnectorErrorCode,
@@ -34,6 +35,21 @@ export interface ContainerConnectionService {
     ctx: SecurityContext,
     appIds: readonly string[],
   ) => Promise<Map<string, ContainerConnection>>;
+  /**
+   * The connectors that can manage the apps with `catalogKeys`, each with its connection, by
+   * catalog key: those whose key is the app's catalog key and that change accounts. Needs
+   * MANAGE_WORKSPACE.
+   */
+  readManagingConnectors: (
+    ctx: SecurityContext,
+    catalogKeys: readonly string[],
+  ) => Promise<Map<string, ConnectorWithConnection>>;
+  /**
+   * The apps a connector can manage that have no app yet, named as the catalog names them, in the
+   * container's order; computed when read, so nothing is stored until one connects. Needs
+   * MANAGE_WORKSPACE.
+   */
+  listAppsToConnect: (ctx: SecurityContext) => Promise<AppToConnect[]>;
 }
 
 /** A container connector with its connection; null until connected. */
@@ -48,6 +64,15 @@ export interface ContainerConnection {
   /** Where the owner manages the app's members; null when the settings lack a value it names. */
   adminUrl: string | null;
   /** The connector it connects through. */
+  connector: ContainerConnector;
+}
+
+/** An app a connector can manage that no scan found and nothing connected yet. */
+export interface AppToConnect {
+  catalogKey: string;
+  name: string;
+  domain: string;
+  /** The connector that connects it, whose key is its catalog key. */
   connector: ContainerConnector;
 }
 
@@ -78,16 +103,9 @@ export function createContainerConnectionService(
       const details = await testedConnection(dependencies, connector, connection);
       return saveConnection(dependencies, ctx, { connector, connection, details });
     },
-    async listConnectors(ctx) {
+    listConnectors(ctx) {
       ctx.require("MANAGE_WORKSPACE");
-      const [connectors, connections] = await Promise.all([
-        containerConnectors.list(),
-        connectedApps.readConnections(orm),
-      ]);
-      return connectors.map((connector) => {
-        const connection = connections.find((candidate) => candidate.connector === connector.key);
-        return { connector, connection: connection ? summaryOf(connector, connection) : null };
-      });
+      return connectorsWithConnections(dependencies);
     },
     async readConnectionsOfApps(ctx, appIds) {
       ctx.require("MANAGE_WORKSPACE");
@@ -104,7 +122,46 @@ export function createContainerConnectionService(
         }),
       );
     },
+    async readManagingConnectors(ctx, catalogKeys) {
+      ctx.require("MANAGE_WORKSPACE");
+      const connectors = await connectorsWithConnections(dependencies);
+      return new Map(
+        connectors
+          .filter(
+            ({ connector }) => catalogKeys.includes(connector.key) && canChangeAccounts(connector),
+          )
+          .map((managing) => [managing.connector.key, managing]),
+      );
+    },
+    async listAppsToConnect(ctx) {
+      ctx.require("MANAGE_WORKSPACE");
+      const managing = (await containerConnectors.list()).filter(canChangeAccounts);
+      const catalogApps = await connectedApps.readCatalogAppsWithoutApp(
+        orm,
+        managing.map(({ key }) => key),
+      );
+      return managing.flatMap((connector) => {
+        const app = catalogApps.find(({ key }) => key === connector.key);
+        return app ? [{ catalogKey: app.key, name: app.name, domain: app.domain, connector }] : [];
+      });
+    },
   };
+}
+
+/** The container's connectors in its order, each with its connection; null until connected. */
+async function connectorsWithConnections({
+  orm,
+  containerConnectors,
+  connectedApps,
+}: ContainerConnectionDependencies): Promise<ConnectorWithConnection[]> {
+  const [connectors, connections] = await Promise.all([
+    containerConnectors.list(),
+    connectedApps.readConnections(orm),
+  ]);
+  return connectors.map((connector) => {
+    const connection = connections.find((candidate) => candidate.connector === connector.key);
+    return { connector, connection: connection ? summaryOf(connector, connection) : null };
+  });
 }
 
 /** The connector errors that mean the app refused the values, which the owner can correct. */
