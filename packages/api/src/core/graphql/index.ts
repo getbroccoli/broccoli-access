@@ -4,6 +4,7 @@ export { mutationPayload } from "./mutationPayload";
 export { perRequest } from "./perRequest";
 export { DateScalar, DateTimeScalar } from "./scalars";
 export { readSdl } from "./sdl";
+export { signedInUserOf } from "./signedInUser";
 export { toEnum } from "./toEnum";
 
 // Public types.
