@@ -14,6 +14,7 @@ import {
   employeeDirectory,
   employeesModule,
 } from "./employees";
+import { extensionModule } from "./extension";
 import { createGoogleWorkspaceConnector, googleModule } from "./google";
 import { createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
@@ -70,6 +71,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
         employees: createEmployeeReadService({ ...core, accounts: apps }),
       }),
     }),
+    extensionModule(core),
   ];
   return {
     manifests: [...manifests, recordsManifest(core, manifests)],

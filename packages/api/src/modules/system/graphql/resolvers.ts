@@ -1,12 +1,17 @@
 import type { Orm } from "../../../core/db";
-import { mutationPayload, type Resolvers, type ResolversTypes } from "../../../core/graphql";
+import {
+  mutationPayload,
+  type Resolvers,
+  type ResolversTypes,
+  signedInUserOf,
+} from "../../../core/graphql";
 import {
   createSetupSessionService,
   createInstanceService,
   type MailConfig,
   type MailSettingsService,
 } from "../../../core/instance";
-import { OPERATIONS, type SecurityContext } from "../../../core/security";
+import type { SecurityContext } from "../../../core/security";
 
 const setupSessions = createSetupSessionService();
 const instances = createInstanceService();
@@ -41,17 +46,7 @@ export function createResolvers({
     Query: {
       ping: () => "pong",
       setup: (_parent, _args, { security }) => readSetup(security),
-      me: (_parent, _args, { security }) => {
-        const user = security?.user;
-        return user
-          ? {
-              id: user.userId,
-              email: user.email,
-              isOwner: user.isOwner,
-              operations: OPERATIONS.filter((operation) => security.can(operation)),
-            }
-          : null;
-      },
+      me: (_parent, _args, { security }) => signedInUserOf(security),
     },
     Setup: {
       mail: async (_parent, _args, context) =>

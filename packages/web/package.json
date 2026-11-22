@@ -42,6 +42,7 @@
   "dependencies": {
     "@apollo/client": "4.3.3",
     "@base-ui/react": "1.8.0",
+    "@broccoli-access/extension": "workspace:*",
     "@fontsource-variable/hanken-grotesk": "5.3.0",
     "@phosphor-icons/react": "2.1.10",
     "@tanstack/react-form": "1.33.5",

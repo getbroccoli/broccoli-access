@@ -19,6 +19,10 @@ import {
   type AppService,
   type AppUserService,
 } from "../../src/modules/apps";
+import {
+  createExtensionPairingService,
+  type ExtensionPairingService,
+} from "../../src/modules/extension";
 import { createScanService, type ScanService } from "../../src/modules/imports";
 import {
   createGoogleConnectionService,
@@ -44,6 +48,14 @@ export function employeeServices(
     ...createEmployeeService(dependencies),
     ...createEmployeeReadService({ ...dependencies, accounts: apps(orm) }),
   };
+}
+
+export function extensionPairings(orm: Orm): ExtensionPairingService {
+  return createExtensionPairingService({
+    orm,
+    secretBox: TEST_SECRET_BOX,
+    logger: createLogger("silent"),
+  });
 }
 
 export function mailSettings(

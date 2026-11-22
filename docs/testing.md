@@ -163,3 +163,27 @@ describeConnectorConformance({ urls, fixtures: [/* one ConnectorFixture per conn
 ```
 
 A fixture lists in `cannotCause` the errors its connector can never give, each with a one-line reason, such as `{ owner_browser_lost: "no owner_browser runtime" }`: only `blocked_by_check`, and `owner_browser_lost` for a connector without the `owner_browser` runtime. Their checks show as skipped with the reason (`--reporter=verbose` prints it). The fake causes every error, so its fixtures list none.
+
+## The Chrome extension
+
+`packages/extension` builds the extension to `packages/extension/dist`, which Chrome loads unpacked. Its ID is `pocgaplgfhgpfpgblaobjabmmgchhbld`, fixed by the manifest's `key`.
+
+```sh
+pnpm --filter @broccoli-access/extension build
+```
+
+Start the stack and set `URL` as in [QA setup](qa/setup.md). Load the extension in its own Chromium profile, never in a profile in daily use, and sign in there as the owner (`admin@acme.example`) with "Sign in with Google". Extensions need a headed browser, so give it a display (such as `Xvfb :121` and `DISPLAY=:121`). With agent-browser, set the whole launch in the environment and keep it the same for every call; a call without it starts the browser again without the extension:
+
+```sh
+export AGENT_BROWSER_HEADED=1
+export AGENT_BROWSER_PROFILE="$(mktemp -d)"
+export AGENT_BROWSER_EXTENSIONS="$PWD/packages/extension/dist"
+export AGENT_BROWSER_ARGS="--no-sandbox"
+agent-browser open "$URL/settings/connections"
+```
+
+- Settings → Connections finds the extension by loading `chrome-extension://<id>/installed.txt`. Without it the "Chrome extension" card shows Not installed.
+- "Pair this Chrome" opens the pair page in a small window, a tab for agent-browser (`agent-browser tab list`). The page clears its one-time code from the address as it opens. Its Pair button asks Chrome for access to the instance's origin in Chrome's own prompt, which is browser UI outside the page: answer it on the display, such as `xdotool key Tab Return` for Allow. Chrome remembers an allowed origin even after unpairing removes the access, so the prompt shows again only for an origin the profile never allowed; use a new profile to see it again.
+- agent-browser turns Chrome's popup blocker off, and can list the pair window as `about:blank`; `agent-browser eval location.pathname` tells. Check pop-up blocking in a Chrome started without `--disable-popup-blocking`.
+- The extension's popup is `chrome-extension://<id>/popup.html`; open it in a tab to read or drive it.
+- After code changes, build again, then turn on "Developer mode" in `chrome://extensions` and press the extension's Reload, or start with a new profile. Chrome reads the pages from `dist` when they open, but keeps running the old service worker, even across browser restarts.

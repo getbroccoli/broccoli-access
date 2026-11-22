@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Broccoli Access",
+  "version": "1.0",
+  "description": "Pairs this Chrome with your Broccoli Access, to hand over your session in an app when you connect it.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsHEXsQ+B1U81DyPOwLGyXk87FQ3v/C2fiE4mRfJGQnOJ7Q127Ywr4eCHyh3MmgbuTjxuYgPRMXdgwxBgwC4iGU6djkrcQk98fSWlId+6XbI31rug09u0grCUegINy8UkvAe/ig7yYY4WrbOipZke/sVDD0VQrSDvpkY2xGMyFUeubbBkZTisEpK1fWA/oHrsG7TeFvuKKcKRTV8oHOeDaP2HT+7iv+FNX4ckcFUvpEi2to+Ml3peD/ptr/9SCEeSRp98jCzIgeev2Eu/wOKYPmaOlzz1YaQIugCsAXvsTZa2HwD8qQOGmqYpA2sx+hAU3WO7mXu5THReGCdpn7T75QIDAQAB",
+  "action": { "default_popup": "popup.html", "default_title": "Broccoli Access" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "web_accessible_resources": [
+    { "resources": ["installed.txt", "pair.html"], "matches": ["http://*/*", "https://*/*"] }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-ancestors 'none'"
+  }
+}

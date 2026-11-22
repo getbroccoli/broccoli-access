@@ -7,6 +7,7 @@ import { t } from "@/i18n";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { PageHeader } from "@/shell";
 
+import { ChromeExtensionCard } from "./ChromeExtensionCard";
 import { GoogleWorkspaceCard } from "./GoogleWorkspaceCard";
 
 /** Settings' Connections page: where Broccoli Access finds people and their accounts. */
@@ -35,6 +36,7 @@ export function ConnectionsSettings() {
       ) : (
         !data && <Skeleton className="h-[150px] rounded-xl" />
       )}
+      <ChromeExtensionCard />
     </div>
   );
 }

@@ -1,0 +1,35 @@
+# Adds the Chrome extension's pairing to the signed-in user; the server merges the `User` types of the modules.
+type User {
+  "The user's Chrome with the extension, paired with this instance; null when none is. Admins only."
+  extensionPairing: ExtensionPairing
+}
+
+"A user's Chrome with the extension, paired with this instance."
+type ExtensionPairing {
+  id: ID!
+  "As the extension reported it, such as `Chrome on macOS`."
+  browser: String!
+  pairedAt: DateTime!
+}
+
+type ExtensionMutations {
+  "Starts pairing the caller's Chrome: a one-time code its extension redeems within five minutes, at `POST /api/extension/pairings`. Pairing again replaces the pairing. Admins only."
+  startPairing: ExtensionPairingStartPayload!
+  "Unpairs the caller's Chrome; its extension's token stops working. Admins only."
+  unpair: UserMutationPayload!
+}
+
+"The code that pairs the caller's Chrome."
+type ExtensionPairingStartPayload {
+  "Single use; only the instance can read it."
+  code: String!
+}
+
+"The signed-in user after a change."
+type UserMutationPayload {
+  user: User
+}
+
+type Mutation {
+  extension: ExtensionMutations!
+}
