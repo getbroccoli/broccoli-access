@@ -17,15 +17,15 @@ A manual check of the Applications page, the home page, against a development st
 
 - [ ] The table lists App (initial, name, domain), Users, Found via and Suspended in Google: Google Workspace 42 "Google directory", Slack 41, Notion 31, Figma 16, Miro 12, Loom 11 and Claude 9, each "Google sign-in".
 - [ ] Slack shows "2 still have access", Notion and Figma "1 still has access"; the others show nothing there.
-- [ ] Every row but Google Workspace has "Ignore"; no row has "Approve".
-- [ ] Clicking an app's name opens `/apps/<id>`, which shows "Page not found" until the app page exists.
+- [ ] Every row but Google Workspace has an outlined "Ignore"; no row has "Approve".
+- [ ] Clicking an app's name opens its page (see [App page](app-page.md)).
 
 ## Moving apps
 
 - [ ] "Ignore" on Claude removes it from Approved without a reload; the tabs read "Approved 6" and "Ignored 32".
 - [ ] Ignored lists App, People, Found via and Since; each row has "Approve" and no "Ignore".
 - [ ] "Approve" on ChatGPT in Ignored removes it there; the tabs read "Approved 7" and "Ignored 31", and Approved lists it.
-- [ ] Claude's and ChatGPT's history (the app page, once it exists, or `record_history`) holds one line each for the change.
+- [ ] Claude's and ChatGPT's history (`record_history`) holds one line each for the change.
 
 ## Scan now
 
