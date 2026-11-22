@@ -1,0 +1,134 @@
+# Architecture
+
+This document records Broccoli Access's architecture decisions and their reasons. It is edited in place; the git history is its change log. Its scope follows [RULE61](code-quality.md#docs-and-comments).
+
+## Layout of the API
+
+```
+packages/api/src/
+├── core/          shared infrastructure, instance-wide concerns and the primitives features build on
+├── modules/       business modules, one folder per domain
+├── integrations/  clients of external services; know no business module
+└── utils/         helpers that know nothing about Broccoli Access
+```
+
+Each package declares its allowed dependencies, enforced by lint with no cycles ([RULE2, RULE3](code-quality.md#modules-and-files)). Core never imports a business module; startup composes them through their public surfaces.
+
+## 1. Shape of the system
+
+- **Modular monolith.** One API process, one web single-page app, one container image. Business modules own their rules; integrations own external transport. This keeps deployment simple without giving up module boundaries.
+- **Single-tenant.** One deployment and one Postgres database per company. There is no tenant column or row-level security.
+- **Layers per module** separate business decisions, persistence, application coordination and transport, as described below. State-owning parts of core follow the same structure.
+- **Composition.** Startup supplies each module with only the dependencies it needs and collects its API, routes, event handlers and jobs. Modules communicate through public operations or events, never through another module's tables ([RULE21](code-quality.md#layers-and-place)).
+- **Domain-driven design is tiered.** A plain domain layer with unit tests is the default. Aggregates, value objects and domain events are introduced where invariants demand them, with each business decision owned in one place ([RULE52](code-quality.md#layers-and-place)).
+- **Records.** A record stays a typed entity in its owning module; shared record capabilities live in `core/records`, which modules use without core knowing them, so records do not become a generic storage engine. History is the first.
+
+### Module layers
+
+Layers live inside the module that owns the feature. For example, an employee's avatar belongs to the employees module even when another page shows it. Shared technical folders hold concerns with no feature owner. This organization keeps business decisions usable from every transport and testable without a database, while persistence and transport can change independently ([RULE56, RULE17](code-quality.md#layers-and-place)).
+
+- **`domain` — business decisions.** Holds business facts, invariants, calculations and valid state transitions. It works on domain values without I/O or knowledge of storage, requests or frameworks. A business decision has one owner here, so every caller applies the same rule.
+- **`db` — persistence.** Owns tables, queries, persistence constraints, locking and mapping between stored data and domain objects. Repositories hide SQL and ORM details and return whole domain items, with encrypted secrets and facts derived from other records read separately, so callers do not assemble business state from storage fragments.
+- **`app` — application coordination.** Use cases and services coordinate authorization, domain decisions, repositories, integrations, transactions and events or jobs. This layer owns the operation's workflow and transaction boundary. It gathers the facts a domain decision needs and applies its result without duplicating that decision.
+- **`ports` — what a module needs from others.** Interfaces the module's `app` reads through, which another module implements. Keeping them in their own folder shows each module's outside dependencies at a glance.
+- **`adapters` — implementations of another module's ports.** Each adapter fills a port with this module's services and repositories; startup hands it to the module that owns the port.
+- **`graphql`, `http` — transport adapters.** Handle request parsing, caller identity, transport-specific responses and error translation. They delegate operations to the application layer, so permissions and business behavior remain the same for every transport.
+- **`helpers` — module-local technical work.** Holds concerns such as parsing an origin or hashing a secret. Every layer may use these helpers, which cannot depend back on those layers. This keeps technical concerns out of the domain model; helpers with no Broccoli knowledge belong in `utils`.
+
+Dependencies point inward: transport and `adapters` → `app` → `db` → `domain`; `app` also uses `domain` and its own `ports` directly. Layers expose their public contracts through their folder's entry point. The allowed imports are enforced, rather than relying on convention ([RULE16, RULE17, RULE58](code-quality.md#layers-and-place)).
+
+**Use cases and services.** A use case represents an action a caller can perform. Related operations on one subject form a service, keeping that subject's lifecycle and formats together; every `app` subject is a service, even with one operation. Adapters translate each operation into one use-case call and retain only transport concerns such as cookies and redirects ([RULE18](code-quality.md#layers-and-place)).
+
+**Applying the boundaries.** Authorization belongs to the use case even when an adapter already authenticated the caller. The use case owns the transaction; composed operations share it, and database adapters supply the locks and constraints that keep concurrent writes safe. External calls stay outside database locks. Repositories that reference a stored file call core's file storage service in their own write: it is shared storage with no authorization or workflow, the one place `db` calls `app`. These choices keep an operation consistent across transports and under concurrency ([RULE19, RULE20](code-quality.md#layers-and-place)).
+
+For example, a domain rule decides whether an employee's new values are valid. The application layer checks the caller and coordinates the change; the repository persists it under the required concurrency checks, and the adapter presents the result. The decision is not repeated in a resolver or SQL query ([RULE52, RULE60](code-quality.md#layers-and-place)).
+
+## 2. API
+
+- **GraphQL is the primary API**, currently an internal contract for the web app. It may change before 1.0; there is no published schema or deprecation policy yet.
+- **Schema-first.** Modules own their SDL and resolvers, composed into one schema. Generated types connect the API and web app to that contract.
+- **Connected graph.** Related types link in both directions so components can select their data through fragments without adding root queries ([RULE23](code-quality.md#api)). Related-object reads use request-scoped batching to avoid N+1 queries ([RULE25](code-quality.md#api)).
+- **Mutation payloads** carry the changed object, or its parent after removal, and typed expected failures. This lets clients select the result in the same request and lets contracts grow without changing unrelated operations ([RULE24, RULE27](code-quality.md#api)). Authentication, authorization, query and pre-execution failures remain top-level GraphQL errors; unexpected errors are masked.
+- **Update inputs: left out, null, a value.** An update input names only the fields to change, and each changeable field is optional. A field left out stays as it is, `null` clears a field that may be empty, and a value sets it. GraphQL keeps the difference: a left-out field is absent from the resolver's input, and an explicit `null` is present. The service reads `undefined` as "keep" and `null` as "clear", and refuses `null` on a field that can't be empty, as invalid input on that field. A field that must always hold a value on create stays required there. The input's description states the rule ("The fields to change; a field left out stays as it is, and null clears a field that may be empty.").
+- **Namespaced mutations** group operations by module: one namespace per module, named after it. GraphQL guarantees serial execution only for root mutation fields; nested fields may run in parallel. The server therefore permits one namespace and one operation per mutation. Naming follows [RULE26](code-quality.md#api).
+- **Pagination.** Lists use Relay connections over keyset queries with a stable order and a unique tie-breaker. Cursors are opaque and bound to their sort order. Inserts and deletes do not shift other rows, but a row whose sort value changes during paging can appear twice or be skipped in that pass.
+- **Dates.** A calendar date stays a `YYYY-MM-DD` string end to end. A date-time represents an instant, accepts an explicit time zone and returns UTC ([RULE29](code-quality.md#data-configuration-and-logs)).
+- **Transport.** Express and Apollo serve the API on the web app's origin. API routes are separate from health probes and the web fallback. Query depth and page sizes are bounded; production introspection is disabled. There are no subscriptions.
+- **Files** use bounded HTTP uploads.
+
+## 3. Data access
+
+- **Drizzle ORM.** The TypeScript schema is the source of truth for generated SQL migrations, which are reviewed. Hand-written SQL remains available for constraints, extensions and queries that need Postgres features. Kysely and Prisma were considered; Drizzle keeps one schema source, at the cost of reviewing generated SQL.
+- **One Postgres role** owns the schema without requiring superuser access, for compatibility with managed Postgres. Startup migrations are serialized with an advisory lock; readiness waits for them to succeed.
+- **Transactions belong to use cases.** Operations that compose join the caller's transaction explicitly. There are no nested transactions or savepoints, and ORM details stay in database adapters ([RULE20](code-quality.md#layers-and-place)). External work happens outside database locks.
+- **Files live in Postgres**, so their writes roll back with the owning data and database backups include their bytes. The referencing module owns authorization and lifetime; references protect files from premature deletion. Files are immutable, allowing permanent caching of each version. There is no generic download route. External images are normalized before storage to bound serving costs and remove metadata.
+- **Definitions that change over time are versioned.** A record people configure and others depend on keeps its content in a versions table beside it: each version is `draft` or `published`, with at most one draft per record. A draft is edited until it is published, its `revision` counting saves so publishing sees what the admin reviewed; a published version never changes, so whatever used it keeps meaning what it meant. A version stored as JSON carries its shape's number (`definition_schema_version`): parsing refuses a shape it does not know, and a migration that changes the shape rewrites every stored version, published ones included, without changing its meaning.
+- **Extensions follow demand.** Vector search is introduced only when a feature needs it.
+
+## 4. Events, jobs and workflows
+
+- **Domain changes notify through events**, never injected callbacks or callback ports ([RULE72](code-quality.md#layers-and-place)). The publisher owns the fact and each receiving module owns its reaction, so adding a reaction does not add dependencies to the publisher or its callers. Work that must commit together uses direct public operations in one transaction.
+- **Postgres is the durable work store.** pg-boss runs background jobs in the API process, using the instance's database. Enqueuing joins the business transaction, so rollback drops the work. Handlers run as the system, are idempotent and reject stale work; retries and terminal failures belong to the job lifecycle.
+- **Scheduled jobs** are pg-boss schedules a module declares beside its job handler (a cron and a time zone); a missed occurrence runs once on the next start.
+- **Events reach handlers at two moments.** Before the commit, a module's before-commit handler receives all of a transaction's new events at once, inside it, round after round while handlers publish more (at most ten rounds); its failure rolls the transaction back, so its reaction commits with the change or not at all. After the commit, in-process handlers run sequentially and are awaited; their failures are logged without undoing the committed operation, and a crash between commit and dispatch can lose an event, an accepted limitation for them. Rollback drops both.
+- **Record changes publish `records.changed`**, one event per history line with the record, the operation, the changed field keys and the cause, never values. It notifies; reactions to a domain fact handle its own domain event instead.
+- **Durable delivery after the commit is a transactional outbox**, a pg-boss job queued with the business change (`jobs.send(tx, …)`), for reactions that are slow or call outside systems: a rollback drops the job, the commit makes it runnable, and it is retried. This avoids an external queue or a second workflow engine.
+- **Workflows** such as approvals are domain state machines, with durable jobs executing their steps; none is built yet.
+
+## 5. Auth and sessions
+
+- **Better Auth** owns authentication and session mechanics, backed by Postgres through Drizzle. Broccoli Access owns owner bootstrap and recovery, and password policy.
+- **Sessions** use opaque database-backed tokens in HttpOnly cookies, CSRF protection and no cookie caching. Revocation and permission changes take effect immediately. Cookie security depends on the configured public origin (§11).
+- **Password reset** is Better Auth's flow, offered while the instance has a mail choice. The token is stored hashed and lasts an hour; its email goes out from a job whose payload holds the token encrypted, so every address gets the same answer at the same speed and a failed send retries. A user without a password never gets a reset email, since the reset would give them a password. Resetting ends every session of the user. Links point at the configured public origin, else the origin the email choice was saved from, never the requesting browser's.
+- **Setup.** There is no public sign-up. The first browser becomes the setup holder, with authority limited to setup operations. Setup stays locked to that holder even after the session expires. Owner creation, setup completion and the end of the setup session are atomic. Setup endpoints enforce origin checks and rate limits.
+
+## 6. Permissions and audit
+
+- **Authorization belongs to the application layer.** Adapters establish identity; every use case checks its security context. Background work has explicit system authority. GraphQL denies access by default, with narrowly designated public bootstrap fields.
+- **Permission profiles decide access.** Each signed-in user has `EMPLOYEE`, and the owner `OWNER`: profiles of grants (actions on an object within a scope relative to their employee, themselves or everyone) and operations, built into the code (`core/security/permissions.ts`). Scope filters apply on each record's subject, before pagination and counting, and unreadable fields, once some exist, must not leak through results, filtering or sorting. All adapters share these rules.
+- **Record history is one mechanism for every record type.** A use case appends its history lines in the transaction of the change, never from an event handler: each line holds the author from the security context, the cause, an optional reason and each changed field's old and new value. Records stay typed tables in their modules; a module registers each record's subject, core decides from it who may read the record and its history, and reads will filter hidden fields. A record no permission scope describes registers its own reading rule instead and is read-only through `access`. Lines are only appended: a removal keeps the history and appends a deletion line.
+- **Audit records are append-only and separate from history.** The audit design records every action, including reads and refusals, with the real actor, effective identity during impersonation, client and trace; it will point at a history line instead of copying values. Impersonation cannot change credentials or grants. Audit is not built yet.
+- **Custom fields do not use runtime DDL.** Their remaining design belongs with the feature that first needs them.
+
+## 7. Frontend
+
+- **React single-page app**, built with Vite and served by the API container with a deep-link fallback. There is no server-side rendering.
+- **TanStack Router** owns navigation, authenticated routes and setup gates. Routes and the shell compose features; dependencies between features are explicitly constrained ([RULE38](code-quality.md#frontend)).
+- **Apollo Client** owns server data through a normalized cache, generated operation types and component fragments with data masking. Session changes clear the cache so one identity never inherits another's data.
+- **The cache follows mutation payloads, not refetches** ([RULE62](code-quality.md#frontend)). A payload returns what the change touched: changed objects update in place, and a delete evicts its record, which every connection then reads without. An addition is written into a cached list only where its place is certain: one fixed order and no filter, such as a record's history. Lists that are sorted, searched or paged on the server are not recomputed in the browser: they show a new or moved record when they next load. A refetch stays only for results the server computes, when carrying them in the payload would cost more code than the refetch saves. The trade-off: after a delete a page can show one row fewer, and after a rename an old order, until it next loads; this saves round trips, and the server's search and sort rules are never copied into the browser. Each feature keeps its cache writes in its `cache.ts` ([RULE63](code-quality.md#frontend)).
+- **Update inputs send changes only.** A form builds its update input from its draft and the saved values: an unchanged field is left out, an emptied one is sent as `null`, and a changed one as its value. The generated input types (`field?: InputMaybe<T>`) allow both. The builder is a pure function with its own test, as `employeeDraft` is for the person panel.
+- **State ownership.** Navigable state, such as filtering, sorting and paging, lives in validated search parameters. React state holds local UI state ([RULE37](code-quality.md#frontend)).
+- **Shared UI.** shadcn/ui on Base UI, Tailwind design tokens and Phosphor icons provide the common UI. Lists share interaction patterns while features own their queries and validation. Fonts are bundled to avoid third-party browser requests. The initial theme is light.
+- **Forms** use TanStack Form and Zod, sharing input validation with the API where practical.
+- **Language and dates.** English is the first language, with user-facing strings ready for translation. Calendar dates retain their meaning in every time zone; date-times stay strings until display formatting ([RULE29](code-quality.md#data-configuration-and-logs)).
+
+## 8. Testing
+
+- **Vitest at three levels:** pure domain and frontend unit tests, use-case integration tests against real Postgres, and a smaller set of API end-to-end tests over HTTP. Most behavior belongs in integration tests.
+- **Isolation.** Each test has an isolated database, allowing parallel runs. Fixtures use repositories independently of the use cases under test; external systems are the mock boundary.
+- **UI checks are manual** for now, with no component or browser test suite.
+
+Test design and execution belong in [testing.md](testing.md). UI verification starts with [QA setup](qa/setup.md).
+
+## 9. Tooling and layout
+
+- **pnpm workspaces and Turborepo** organize the monorepo. Packages live under `packages/`; shared packages are added when there is actual code to share. The repository root stays small ([RULE8](code-quality.md#modules-and-files)).
+- **Builds** use Vite for the web app and tsdown for the API, with bundler-style TypeScript module resolution.
+- **Automated quality checks** cover formatting, lint, types, module boundaries, duplicate code and tests. GitHub Actions also scans for secrets. Containerized CI jobs reach their isolated services over the container network.
+
+## 10. Development environment
+
+- **Compose mirrors self-hosting**, with development overrides for source mounts and live reload. Each checkout or worktree has its own services, network and persistent development data; dynamically assigned ports allow parallel stacks.
+- **Development email works immediately.** Before printing its ready address, the development launcher configures Mailpit through the instance's mail settings service if no mail choice was saved. It preserves explicit choices and updates Mailpit links to the current development port. Settings shows the saved choice without browser-only defaults.
+- **Shutdown preserves data.** Database reset is explicit, and cleanup targets only identified abandoned checkouts. Integration and end-to-end tests use a separate disposable Postgres instance.
+
+Installation is in the [README](../README.md), setup in the [setup guide](guides/setup-guide.md), and test procedures in [testing.md](testing.md).
+
+## 11. Configuration, secrets, observability and self-hosting
+
+- **Configuration** comes from environment variables validated with Zod at startup. Mode-specific settings cannot compete with the other mode's settings ([RULE30](code-quality.md#data-configuration-and-logs)).
+- **Public origin.** An instance can use a configured browser-facing origin or trust the request address when unset. Secure cookies require an explicitly configured HTTPS origin; deployments must preserve that trust boundary.
+- **Secrets survive restarts and database resets.** Generated encryption keys and cookie secrets live in restricted files in the data folder, outside the database. Third-party credentials are encrypted with AES-256-GCM; the database holds hashes and ciphertext, never encryption keys. Backups must include both the database and secrets volume.
+- **Observability.** Structured logs use pino and carry identifiers, never contents ([RULE31](code-quality.md#data-configuration-and-logs)). Separate liveness and readiness probes distinguish a running process from one ready to serve after migrations and required services start. No third-party error service is required.
+- **Self-hosting** uses one image for the API, static web app and migrations, plus Postgres on a private Compose network. Publishing the database requires password authentication. The updater design pins images by digest, checks health and rolls back failed updates. Backups use Postgres tools rather than a product-specific engine.
+- **Email is an admin's choice.** An admin chooses in the app between their own SMTP server, a Resend key, or no email, the default. The SMTP URL or key is encrypted and never returned; an SMTP server is checked by signing in before it is saved. One mail integration sends every email. Templates describe an email as blocks (heading, paragraph, button and so on), which one renderer draws in Broccoli Access's layout (tables and inline styles, with the mark each instance serves itself); mailers are built per send from the saved choice so a change applies at once. There are no environment variables for it. No email sets a reply-to.

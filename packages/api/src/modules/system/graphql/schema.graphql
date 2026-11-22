@@ -1,0 +1,104 @@
+type Query {
+  "Answers `pong`; checks that the GraphQL API is reachable."
+  ping: String! @public
+  "Where the instance is in its first-run flow; readable without signing in, so the web app can route."
+  setup: Setup! @public
+  "The signed-in user; null without a session. Readable without signing in, so the web app can route."
+  me: User @public
+}
+
+"The signed-in user."
+type User {
+  id: ID!
+  "Login email, lowercased."
+  email: String!
+  "True for the instance owner."
+  isOwner: Boolean!
+  "The operations the user may do, so the app shows only what they can use."
+  operations: [Operation!]!
+}
+
+"Where a new instance is in its first-run flow: the owner account is created, then setup is done."
+enum SetupStep {
+  "Nobody has an account yet; the browser holding setup creates the owner."
+  OWNER
+  "Setup is finished."
+  DONE
+}
+
+"Which browser holds setup before the owner exists."
+enum SetupHolder {
+  "This browser holds setup."
+  YOU
+  "Another browser holds setup, or held it until its session expired."
+  ANOTHER_DEVICE
+  "Nobody: setup is free to start, or the owner exists."
+  NOBODY
+}
+
+type Setup {
+  "Always `instance`: one instance, so the client caches one object."
+  id: ID!
+  step: SetupStep!
+  holder: SetupHolder!
+  "How this instance sends email. Owner only, though the rest of `Setup` is public."
+  mail: MailSettings
+  "Whether \"Forgot password?\" can email a link: true while email is chosen."
+  passwordResetByEmail: Boolean!
+}
+
+"How the instance sends email."
+type MailSettings {
+  "Always `mail`: one per instance."
+  id: ID!
+  source: MailSource!
+  "The address emails come from; null until the owner gives one."
+  from: String
+  "Whether an SMTP URL or Resend key is saved for `source`; never the secret itself."
+  hasSecret: Boolean!
+}
+
+"How the instance sends email."
+enum MailSource {
+  "The owner's own mail server, through an SMTP URL."
+  SMTP_SERVER
+  "Resend, with the owner's API key."
+  RESEND_API
+  "Broccoli Access sends no email; the default."
+  NO_EMAIL
+}
+
+input MailSettingsInput {
+  source: MailSource!
+  "Needed for `SMTP_SERVER` and `RESEND_API`."
+  from: String
+  "The SMTP URL or Resend key; blank keeps the saved one of the same source."
+  secret: String
+}
+
+type SystemMutations {
+  "Checks the mail choice, then sends email with it from now on. Admins only. A malformed or refused SMTP URL is `secret` / `invalid` or `rejected`; a missing one `secret` / `required`; a bad From `from` / `required` or `invalid`."
+  saveMailSettings(input: MailSettingsInput!): SetupSaveMailSettingsPayload!
+  "Sends the caller a test email with the saved mail choice; refused with a ConflictError without one, and an UnavailableError carries the provider's reason. Admins only."
+  sendTestEmail: SetupSendTestEmailPayload!
+}
+
+"Setup after choosing how email is sent."
+type SetupSaveMailSettingsPayload {
+  setup: Setup
+  error: SetupSaveMailSettingsError
+}
+
+union SetupSaveMailSettingsError = InvalidInputError | UnavailableError | ConflictError
+
+"Setup after sending the owner a test email."
+type SetupSendTestEmailPayload {
+  setup: Setup
+  error: SetupSendTestEmailError
+}
+
+union SetupSendTestEmailError = UnavailableError | ConflictError
+
+type Mutation {
+  system: SystemMutations!
+}

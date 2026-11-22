@@ -1,0 +1,46 @@
+import fc from "fast-check";
+import { expect, hostileText, storedTextProbe, storedTextSnapshot, test } from "#test/support";
+import { ApplicationError } from "../../../core/applicationError";
+
+test.for(
+  [
+    ...["create", "update"].flatMap((operation) =>
+      ["firstName", "lastName", "email"].map((field) => ({
+        entry: `employee.${operation}.${field}`,
+        limit: field === "email" ? 254 : 100,
+      })),
+    ),
+    ...["update", "delete"].map((operation) => ({
+      entry: `employee.reason.${operation}`,
+      limit: 500,
+    })),
+    { entry: "mail.from", limit: 254 },
+    { entry: "mail.secret", limit: 1000 },
+  ].flatMap((entry) =>
+    (["nul", "unicode", "limits"] as const).map((family) => ({ ...entry, family })),
+  ),
+)(
+  "property: $entry stores or refuses $family text atomically",
+  async ({ entry, family, limit }, { orm, seed }) => {
+    await fc.assert(
+      fc.asyncProperty(hostileText(family, limit), async (value) => {
+        // Arrange
+        const probe = await storedTextProbe(orm, seed, entry, value);
+        const before = await storedTextSnapshot(orm);
+
+        // Act
+        const [result] = await Promise.allSettled([probe.act()]);
+
+        // Assert
+        if (result.status === "rejected") {
+          expect(await storedTextSnapshot(orm)).toEqual(before);
+          expect(result.reason).toBeInstanceOf(ApplicationError);
+          expect(["INVALID_INPUT", "NOT_FOUND", "CONFLICT", "FORBIDDEN"]).toContain(
+            (result.reason as ApplicationError).code,
+          );
+        } else expect(await probe.read()).toBe(probe.expected?.toWellFormed() ?? null);
+      }),
+      { numRuns: 12 },
+    );
+  },
+);

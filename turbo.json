@@ -1,0 +1,35 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "agentGuidance": false,
+  "remoteCache": {
+    "enabled": false
+  },
+  "tasks": {
+    "codegen": {
+      "outputs": ["src/**/*.gen.ts", "src/__generated__/**"]
+    },
+    "build": {
+      "dependsOn": ["^build", "codegen"],
+      "outputs": ["dist/**"]
+    },
+    "lint": {
+      "dependsOn": ["codegen"]
+    },
+    "typecheck": {
+      "dependsOn": ["codegen"]
+    },
+    "test": {
+      "dependsOn": ["codegen"]
+    },
+    "test:integration": {
+      "dependsOn": ["^build", "codegen"],
+      "cache": false,
+      "passThroughEnv": ["TEST_DATABASE_URL", "DOCKER_*"]
+    },
+    "test:e2e": {
+      "dependsOn": ["^build", "codegen"],
+      "cache": false,
+      "passThroughEnv": ["TEST_DATABASE_URL", "DOCKER_*"]
+    }
+  }
+}

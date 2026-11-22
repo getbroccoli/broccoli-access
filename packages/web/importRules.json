@@ -1,0 +1,97 @@
+{
+  "elements": {
+    "src/main": ["src/apollo", "src/routeTree.gen", "src/styles.css"],
+    "src/routeTree.gen": ["src/routes"],
+    "src/routes": [
+      "src/features/auth",
+      "src/features/employees",
+      "src/features/settings",
+      "src/features/setup",
+      "src/features/today",
+      "src/i18n",
+      "src/shell"
+    ],
+    "src/shell": [
+      "src/__generated__",
+      "src/components/ui",
+      "src/features/auth",
+      "src/features/employees",
+      "src/features/setup",
+      "src/i18n",
+      "src/lib/class-names",
+      "src/lib/useSessionChange"
+    ],
+    "src/features/auth": [
+      "src/__generated__",
+      "src/components/form",
+      "src/components/ui",
+      "src/features/setup",
+      "src/i18n",
+      "src/lib/postJson",
+      "src/lib/useFragmentToken",
+      "src/lib/useSessionChange"
+    ],
+    "src/features/employees": [
+      "src/__generated__",
+      "src/apollo",
+      "src/components/dataTable",
+      "src/components/form",
+      "src/components/ui",
+      "src/features/records",
+      "src/i18n",
+      "src/lib/calendarDay",
+      "src/lib/class-names",
+      "src/lib/initials",
+      "src/lib/listPage"
+    ],
+    "src/features/today": ["src/__generated__", "src/i18n", "src/shell"],
+    "src/features/records": [
+      "src/__generated__",
+      "src/components/ui",
+      "src/i18n",
+      "src/lib/calendarDay",
+      "src/lib/class-names",
+      "src/lib/sentenceCase"
+    ],
+    "src/features/settings": [
+      "src/__generated__",
+      "src/apollo",
+      "src/components/form",
+      "src/components/ui",
+      "src/features/employees",
+      "src/features/records",
+      "src/i18n",
+      "src/lib/calendarDay",
+      "src/lib/class-names"
+    ],
+    "src/features/setup": [
+      "src/__generated__",
+      "src/apollo",
+      "src/components/form",
+      "src/components/ui",
+      "src/i18n",
+      "src/lib/class-names",
+      "src/lib/postJson",
+      "src/lib/useCopyToClipboard",
+      "src/lib/useSessionChange"
+    ],
+    "src/components/dataTable": ["src/components/ui", "src/i18n", "src/lib/class-names"],
+    "src/components/form": ["src/components/ui", "src/lib/class-names"],
+    "src/components/ui": ["src/lib/class-names"],
+    "src/lib/listPage": ["src/apollo", "src/components/dataTable"],
+    "src/lib/class-names": [],
+    "src/lib/postJson": [],
+    "src/lib/useCopyToClipboard": [],
+    "src/apollo": ["src/__generated__"],
+    "src/i18n": [],
+    "src/__generated__": [],
+    "src/styles.css": [],
+    "src/lib/initials": [],
+    "src/lib/useRouteAction": [],
+    "src/lib/useSessionChange": ["src/lib/useRouteAction"],
+    "src/lib/calendarDay": [],
+    "src/lib/sentenceCase": [],
+    "src/lib/useFragmentToken": []
+  },
+  "deepImports": ["src/components/ui", "src/__generated__"]
+}

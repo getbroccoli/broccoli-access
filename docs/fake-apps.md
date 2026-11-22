@@ -46,6 +46,7 @@
   - server-to-server ones, such as the token endpoint and the Admin APIs, at the address the app's container can reach.
 
   With `pnpm dev` in Docker the two differ, so the fake takes both as settings.
+
 - A real install never sets these. The app logs a warning at start when either points somewhere other than Google.
 - **Ports:**
   - `pnpm dev` starts the fake on a free port per checkout, beside the app.
@@ -78,7 +79,13 @@ Google's paths under the Admin API address, with a bearer access token.
 - `GET /admin/directory/v1/customers/my_customer` needs `admin.directory.customer.readonly`.
 
   ```json
-  { "kind": "admin#directory#customer", "id": "C03acme01", "customerDomain": "acme.example", "postalAddress": { "organizationName": "Acme" }, "customerCreationTime": "2021-03-02T09:00:00.000Z" }
+  {
+    "kind": "admin#directory#customer",
+    "id": "C03acme01",
+    "customerDomain": "acme.example",
+    "postalAddress": { "organizationName": "Acme" },
+    "customerCreationTime": "2021-03-02T09:00:00.000Z"
+  }
   ```
 
 - `GET /admin/directory/v1/users?customer=my_customer` needs `admin.directory.user.readonly`.
@@ -86,13 +93,43 @@ Google's paths under the Admin API address, with a bearer access token.
   - It returns `users` and, while more remain, an opaque `nextPageToken`.
 
   ```json
-  { "kind": "admin#directory#users", "users": [{ "kind": "admin#directory#user", "id": "104857392018374650123", "primaryEmail": "ana@acme.example", "name": { "givenName": "Ana", "familyName": "Ruiz", "fullName": "Ana Ruiz" }, "isAdmin": false, "suspended": true, "orgUnitPath": "/", "relations": [{ "value": "david@acme.example", "type": "manager" }], "customerId": "C03acme01", "creationTime": "2022-05-10T08:00:00.000Z" }], "nextPageToken": "Cg1hbmFAYWNtZS5leGFtcGxl" }
+  {
+    "kind": "admin#directory#users",
+    "users": [
+      {
+        "kind": "admin#directory#user",
+        "id": "104857392018374650123",
+        "primaryEmail": "ana@acme.example",
+        "name": { "givenName": "Ana", "familyName": "Ruiz", "fullName": "Ana Ruiz" },
+        "isAdmin": false,
+        "suspended": true,
+        "orgUnitPath": "/",
+        "relations": [{ "value": "david@acme.example", "type": "manager" }],
+        "customerId": "C03acme01",
+        "creationTime": "2022-05-10T08:00:00.000Z"
+      }
+    ],
+    "nextPageToken": "Cg1hbmFAYWNtZS5leGFtcGxl"
+  }
   ```
 
 - `GET /admin/directory/v1/users/{userKey}/tokens` needs `admin.directory.user.security`. `userKey` is the user id or email. The list is not paged, as in Google.
 
   ```json
-  { "kind": "admin#directory#tokenList", "items": [{ "kind": "admin#directory#token", "clientId": "871234567890-figma.apps.googleusercontent.com", "displayText": "Figma", "scopes": ["openid", "email", "profile"], "userKey": "104857392018374650123", "anonymous": false, "nativeApp": false }] }
+  {
+    "kind": "admin#directory#tokenList",
+    "items": [
+      {
+        "kind": "admin#directory#token",
+        "clientId": "871234567890-figma.apps.googleusercontent.com",
+        "displayText": "Figma",
+        "scopes": ["openid", "email", "profile"],
+        "userKey": "104857392018374650123",
+        "anonymous": false,
+        "nativeApp": false
+      }
+    ]
+  }
   ```
 
 ## Grant events
@@ -102,7 +139,33 @@ Google's paths under the Admin API address, with a bearer access token.
   - It returns only events from the last 180 days, newest first. An older grant has no event, as in Google, and the app then shows "Before" the log's start.
 
   ```json
-  { "kind": "admin#reports#activities", "items": [{ "kind": "admin#reports#activity", "id": { "time": "2026-09-10T14:12:00.000Z", "uniqueQualifier": "-7310462093812215871", "applicationName": "token", "customerId": "C03acme01" }, "actor": { "email": "chloe@acme.example", "profileId": "104857392018374650456" }, "events": [{ "type": "auth", "name": "authorize", "parameters": [{ "name": "client_id", "value": "301234567890-claude.apps.googleusercontent.com" }, { "name": "app_name", "value": "Claude" }, { "name": "client_type", "value": "WEB" }, { "name": "scope", "multiValue": ["openid", "email", "profile"] }] }] }] }
+  {
+    "kind": "admin#reports#activities",
+    "items": [
+      {
+        "kind": "admin#reports#activity",
+        "id": {
+          "time": "2026-09-10T14:12:00.000Z",
+          "uniqueQualifier": "-7310462093812215871",
+          "applicationName": "token",
+          "customerId": "C03acme01"
+        },
+        "actor": { "email": "chloe@acme.example", "profileId": "104857392018374650456" },
+        "events": [
+          {
+            "type": "auth",
+            "name": "authorize",
+            "parameters": [
+              { "name": "client_id", "value": "301234567890-claude.apps.googleusercontent.com" },
+              { "name": "app_name", "value": "Claude" },
+              { "name": "client_type", "value": "WEB" },
+              { "name": "scope", "multiValue": ["openid", "email", "profile"] }
+            ]
+          }
+        ]
+      }
+    ]
+  }
   ```
 
 ## Errors
@@ -116,7 +179,20 @@ Google's error bodies, one way to produce each connector error:
 - `unexpected_response`: `200` with a body that breaks Google's schema.
 
 ```json
-{ "error": { "code": 403, "message": "Request had insufficient authentication scopes.", "errors": [{ "message": "Insufficient Permission", "domain": "global", "reason": "insufficientPermissions" }], "status": "PERMISSION_DENIED" } }
+{
+  "error": {
+    "code": 403,
+    "message": "Request had insufficient authentication scopes.",
+    "errors": [
+      {
+        "message": "Insufficient Permission",
+        "domain": "global",
+        "reason": "insufficientPermissions"
+      }
+    ],
+    "status": "PERMISSION_DENIED"
+  }
+}
 ```
 
 ## Control endpoints
@@ -161,6 +237,7 @@ These numbers are the circle 1 design canvas's; screens and checks rely on them.
   - Lena: Figma and Slack
 
   Generated people fill the rest of each app's count.
+
 - **Grant dates:**
   - Most grants are older than the log and have no event.
   - These have events: the first grants of Claude (141 days before start), ChatGPT (162), Calendly (107), Typeform (52) and Grammarly (40); Gabriel's Figma grant (101); and Lena's Figma grant (76).

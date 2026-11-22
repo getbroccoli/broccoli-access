@@ -1,0 +1,63 @@
+"Readable without signing in. Every other root field of Query and Mutation needs a session."
+directive @public on FIELD_DEFINITION
+
+"A calendar day in `YYYY-MM-DD` format."
+scalar Date
+
+"An instant in ISO 8601 format with a time zone; returned in UTC."
+scalar DateTime
+
+# Shared by every module's connections (Relay uses one PageInfo type): a schema can
+# hold only one type of this name, and no module should depend on another's SDL.
+"Where a page of a connection ends."
+type PageInfo {
+  hasNextPage: Boolean!
+  "The cursor to pass as `after` for the next page; null on an empty page."
+  endCursor: String
+}
+
+"Which way a list is sorted."
+enum OrderDirection {
+  ASC
+  DESC
+}
+
+# A mutation's expected failure is a payload error, typed by these shared types; see
+# "Errors" in docs/architecture.md §2.
+"An expected failure of a mutation. `message` is for people and agents; clients read the type and fields."
+interface Error {
+  message: String!
+}
+
+"The input was refused; one field error per refused field."
+type InvalidInputError implements Error {
+  message: String!
+  fields: [FieldError!]!
+}
+
+"Why one input field was refused, such as `email` and `taken`."
+type FieldError {
+  field: String!
+  code: String!
+}
+
+"The data is not in a state that allows this yet, such as a file still being read."
+type ConflictError implements Error {
+  message: String!
+}
+
+"Nothing the caller may see has this id."
+type NotFoundError implements Error {
+  message: String!
+}
+
+"An external service, such as a mail server, refused or failed."
+type UnavailableError implements Error {
+  message: String!
+}
+
+"Something done outside any record."
+enum Operation {
+  "People and email settings."
+  MANAGE_WORKSPACE
+}

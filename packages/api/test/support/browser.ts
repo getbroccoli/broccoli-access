@@ -1,0 +1,68 @@
+/** A client that keeps cookies like a browser and sends its own address as the Origin. */
+export interface Browser {
+  postForm(path: string, body: URLSearchParams, formOrigin: string): Promise<Response>;
+  post(path: string, body: unknown): Promise<Response>;
+  put(path: string, body: Buffer): Promise<Response>;
+  get(path: string): Promise<Response>;
+  /** Answers a redirect with the redirect itself instead of following it. */
+  getManual(path: string): Promise<Response>;
+  graphql(query: string, variables?: Record<string, unknown>): Promise<Response>;
+}
+
+export function createBrowser(baseUrl: string | (() => string), origin?: string): Browser {
+  const cookies = new Map<string, string>();
+
+  async function request(
+    path: string,
+    method: string,
+    body?: unknown,
+    redirect: "follow" | "manual" = "follow",
+    requestOrigin = origin,
+  ): Promise<Response> {
+    const url = typeof baseUrl === "function" ? baseUrl() : baseUrl;
+    const response = await fetch(new URL(path, url), {
+      method,
+      redirect,
+      headers: {
+        "content-type":
+          body instanceof URLSearchParams
+            ? "application/x-www-form-urlencoded"
+            : Buffer.isBuffer(body)
+              ? "application/octet-stream"
+              : "application/json",
+        origin: requestOrigin ?? url,
+        cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join("; "),
+      },
+      body:
+        body instanceof URLSearchParams
+          ? body.toString()
+          : Buffer.isBuffer(body)
+            ? body
+            : body === undefined
+              ? undefined
+              : JSON.stringify(body),
+    });
+
+    for (const cookie of response.headers.getSetCookie()) {
+      const pair = cookie.split(";", 1)[0]!;
+      const separator = pair.indexOf("=");
+      const name = pair.slice(0, separator);
+      const value = pair.slice(separator + 1);
+      if (value === "") cookies.delete(name);
+      else cookies.set(name, value);
+    }
+
+    return response;
+  }
+
+  return {
+    postForm: (path: string, body: URLSearchParams, formOrigin: string) =>
+      request(path, "POST", body, "manual", formOrigin),
+    post: (path: string, body: unknown) => request(path, "POST", body),
+    put: (path: string, body: Buffer) => request(path, "PUT", body),
+    get: (path: string) => request(path, "GET"),
+    getManual: (path: string) => request(path, "GET", undefined, "manual"),
+    graphql: (query: string, variables?: Record<string, unknown>) =>
+      request("/api/graphql", "POST", { query, variables }),
+  };
+}

@@ -12,13 +12,28 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Temporary: checks that the shared self-hosted runners take this repository's jobs, with the same
-# container and Postgres service the real test jobs use. The Broccoli copy replaces it with the real CI.
 # Jobs run inside containers so that they share no host ports or file ownership
 # with other jobs on the same self-hosted machine.
 jobs:
-  runner-check:
-    name: Runner check
+  test:
+    name: Test
+    runs-on: self-hosted
+    container:
+      image: node:24.21.0-bookworm
+      options: --cpus 4 --memory 8g --memory-swap 8g
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Installs pnpm from packageManager; pnpm then installs Node from devEngines.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          standalone: true
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm build
+
+  e2e:
+    name: End-to-end tests
     runs-on: self-hosted
     container:
       image: node:24.21.0-bookworm
@@ -27,23 +42,24 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_USER: broccoli
+          POSTGRES_USER: broccoli_access
           # Reachable only on the job network.
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
           --cpus 2 --memory 2g --memory-swap 2g
           --tmpfs /var/lib/postgresql:size=1g
-          --health-cmd "pg_isready -U broccoli -d postgres"
+          --health-cmd "pg_isready -U broccoli_access -d postgres"
           --health-interval 2s
           --health-timeout 5s
           --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://broccoli_access@postgres:5432/postgres
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: node --version
-      - name: Reach Postgres on the job network
-        run: |
-          node -e "
-            const socket = require('node:net').connect(5432, 'postgres');
-            socket.on('connect', () => { console.log('postgres:5432 reachable'); socket.end(); });
-            socket.on('error', (error) => { console.error(error.message); process.exit(1); });
-          "
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          standalone: true
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:integration
+      - run: pnpm test:e2e

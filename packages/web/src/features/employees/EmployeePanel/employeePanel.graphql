@@ -1,0 +1,56 @@
+query EmployeePanel($id: ID!) {
+  employee(id: $id) {
+    ...EmployeePanel_employee @unmask
+  }
+}
+
+mutation UpdateEmployee($input: EmployeeUpdateInput!) {
+  employees {
+    update(input: $input) {
+      employee {
+        ...EmployeePanel_employee @unmask
+      }
+      historyLine {
+        ...RecordHistory_line @unmask
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+        ... on InvalidInputError {
+          fields {
+            field
+            code
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation DeleteEmployee($input: EmployeeDeleteInput!) {
+  employees {
+    delete(input: $input) {
+      deletedEmployeeId
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+fragment EmployeePanel_employee on Employee {
+  id
+  firstName
+  lastName
+  email
+  avatarUrl
+  access {
+    canDelete
+    editableFields
+  }
+}

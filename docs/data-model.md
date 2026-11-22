@@ -145,7 +145,16 @@ One row per place a scan reads from.
 
 ```json
 [
-  { "id": "src_google", "kind": "app_connection", "connection_id": "con_google", "name": "acme.example", "status": "scanned", "failure": null, "read_at": "2026-11-21T08:00:41Z", "created_at": "2026-11-20T07:58:05Z" }
+  {
+    "id": "src_google",
+    "kind": "app_connection",
+    "connection_id": "con_google",
+    "name": "acme.example",
+    "status": "scanned",
+    "failure": null,
+    "read_at": "2026-11-21T08:00:41Z",
+    "created_at": "2026-11-20T07:58:05Z"
+  }
 ]
 ```
 
@@ -172,8 +181,24 @@ Every account a source saw in its last scan, one row each. `raw` keeps the sourc
     "type": "app_account",
     "type_version": 1,
     "source_key": "104857392018374650123",
-    "raw": { "id": "104857392018374650123", "primaryEmail": "ana@acme.example", "name": { "givenName": "Ana", "familyName": "Ruiz" }, "suspended": true, "relations": [{ "type": "manager", "value": "david@acme.example" }] },
-    "values": { "email": "ana@acme.example", "status": "suspended", "firstName": "Ana", "lastName": "Ruiz", "managerEmail": "david@acme.example", "appName": "Google Workspace", "appExternalId": null, "grantedAt": null, "grantedBefore": null }
+    "raw": {
+      "id": "104857392018374650123",
+      "primaryEmail": "ana@acme.example",
+      "name": { "givenName": "Ana", "familyName": "Ruiz" },
+      "suspended": true,
+      "relations": [{ "type": "manager", "value": "david@acme.example" }]
+    },
+    "values": {
+      "email": "ana@acme.example",
+      "status": "suspended",
+      "firstName": "Ana",
+      "lastName": "Ruiz",
+      "managerEmail": "david@acme.example",
+      "appName": "Google Workspace",
+      "appExternalId": null,
+      "grantedAt": null,
+      "grantedBefore": null
+    }
   },
   {
     "id": "rec_ana_figma",
@@ -181,8 +206,23 @@ Every account a source saw in its last scan, one row each. `raw` keeps the sourc
     "type": "app_account",
     "type_version": 1,
     "source_key": "104857392018374650123:871234567890-figma.apps.googleusercontent.com",
-    "raw": { "clientId": "871234567890-figma.apps.googleusercontent.com", "displayText": "Figma", "scopes": ["openid", "email", "profile"], "userKey": "104857392018374650123" },
-    "values": { "email": "ana@acme.example", "status": "active", "firstName": null, "lastName": null, "managerEmail": null, "appName": "Figma", "appExternalId": "google:871234567890-figma.apps.googleusercontent.com", "grantedAt": null, "grantedBefore": "2026-05-25T08:00:00Z" }
+    "raw": {
+      "clientId": "871234567890-figma.apps.googleusercontent.com",
+      "displayText": "Figma",
+      "scopes": ["openid", "email", "profile"],
+      "userKey": "104857392018374650123"
+    },
+    "values": {
+      "email": "ana@acme.example",
+      "status": "active",
+      "firstName": null,
+      "lastName": null,
+      "managerEmail": null,
+      "appName": "Figma",
+      "appExternalId": "google:871234567890-figma.apps.googleusercontent.com",
+      "grantedAt": null,
+      "grantedBefore": "2026-05-25T08:00:00Z"
+    }
   }
 ]
 ```
@@ -198,8 +238,26 @@ Everyone with an account in the directory app. The table knows nothing about Goo
 
 ```json
 [
-  { "id": "emp_ana", "first_name": "Ana", "last_name": "Ruiz", "email": "ana@acme.example", "manager_id": "emp_david", "user_id": null, "avatar_file_id": null, "created_at": "2026-11-20T07:58:20Z" },
-  { "id": "emp_admin", "first_name": "Mia", "last_name": "Novak", "email": "admin@acme.example", "manager_id": null, "user_id": "usr_admin", "avatar_file_id": null, "created_at": "2026-11-20T07:58:20Z" }
+  {
+    "id": "emp_ana",
+    "first_name": "Ana",
+    "last_name": "Ruiz",
+    "email": "ana@acme.example",
+    "manager_id": "emp_david",
+    "user_id": null,
+    "avatar_file_id": null,
+    "created_at": "2026-11-20T07:58:20Z"
+  },
+  {
+    "id": "emp_admin",
+    "first_name": "Mia",
+    "last_name": "Novak",
+    "email": "admin@acme.example",
+    "manager_id": null,
+    "user_id": "usr_admin",
+    "avatar_file_id": null,
+    "created_at": "2026-11-20T07:58:20Z"
+  }
 ]
 ```
 
@@ -216,6 +274,7 @@ Every app a source found, and the connected apps themselves.
   4. otherwise, a new app named after `appName`.
 
   In cases 2 to 4, the id is added to the app's `external_ids`, and a catalog app is created if missing. A record without an `appExternalId` belongs to its connection's app.
+
 - A Google grant to the instance's own Google app (the Google Workspace connection's `clientId`) is skipped: broccoli-access is not one of the company's apps.
 - `status`: `discovered`, `approved`, `ignored`.
   - A connected app is `approved` when it is connected.
@@ -226,9 +285,33 @@ Every app a source found, and the connected apps themselves.
 
 ```json
 [
-  { "id": "app_google_workspace", "name": "Google Workspace", "domain": "workspace.google.com", "catalog_key": "google_workspace", "external_ids": [], "status": "approved", "created_at": "2026-11-20T07:58:00Z" },
-  { "id": "app_figma", "name": "Figma", "domain": "figma.com", "catalog_key": "figma", "external_ids": ["google:871234567890-figma.apps.googleusercontent.com"], "status": "approved", "created_at": "2026-11-20T07:58:31Z" },
-  { "id": "app_expenses", "name": "Expense Helper", "domain": null, "catalog_key": null, "external_ids": ["google:555012345678-xyz.apps.googleusercontent.com"], "status": "ignored", "created_at": "2026-11-20T07:58:31Z" }
+  {
+    "id": "app_google_workspace",
+    "name": "Google Workspace",
+    "domain": "workspace.google.com",
+    "catalog_key": "google_workspace",
+    "external_ids": [],
+    "status": "approved",
+    "created_at": "2026-11-20T07:58:00Z"
+  },
+  {
+    "id": "app_figma",
+    "name": "Figma",
+    "domain": "figma.com",
+    "catalog_key": "figma",
+    "external_ids": ["google:871234567890-figma.apps.googleusercontent.com"],
+    "status": "approved",
+    "created_at": "2026-11-20T07:58:31Z"
+  },
+  {
+    "id": "app_expenses",
+    "name": "Expense Helper",
+    "domain": null,
+    "catalog_key": null,
+    "external_ids": ["google:555012345678-xyz.apps.googleusercontent.com"],
+    "status": "ignored",
+    "created_at": "2026-11-20T07:58:31Z"
+  }
 ]
 ```
 
@@ -247,9 +330,42 @@ One person's account in one app. The name avoids Better Auth's `account` table.
 
 ```json
 [
-  { "id": "acc_ana_google", "app_id": "app_google_workspace", "email": "ana@acme.example", "employee_id": "emp_ana", "status": "suspended", "found_via": ["google_directory"], "granted_at": null, "granted_before": null, "first_seen_at": "2026-11-20T07:58:20Z", "created_at": "2026-11-20T07:58:20Z" },
-  { "id": "acc_ana_figma", "app_id": "app_figma", "email": "ana@acme.example", "employee_id": "emp_ana", "status": "active", "found_via": ["google_sign_in"], "granted_at": null, "granted_before": "2026-05-25T08:00:00Z", "first_seen_at": "2026-11-20T07:58:31Z", "created_at": "2026-11-20T07:58:31Z" },
-  { "id": "acc_chloe_claude", "app_id": "app_claude", "email": "chloe@acme.example", "employee_id": "emp_chloe", "status": "active", "found_via": ["google_sign_in"], "granted_at": "2026-09-10T14:12:00Z", "granted_before": null, "first_seen_at": "2026-11-20T07:58:31Z", "created_at": "2026-11-20T07:58:31Z" }
+  {
+    "id": "acc_ana_google",
+    "app_id": "app_google_workspace",
+    "email": "ana@acme.example",
+    "employee_id": "emp_ana",
+    "status": "suspended",
+    "found_via": ["google_directory"],
+    "granted_at": null,
+    "granted_before": null,
+    "first_seen_at": "2026-11-20T07:58:20Z",
+    "created_at": "2026-11-20T07:58:20Z"
+  },
+  {
+    "id": "acc_ana_figma",
+    "app_id": "app_figma",
+    "email": "ana@acme.example",
+    "employee_id": "emp_ana",
+    "status": "active",
+    "found_via": ["google_sign_in"],
+    "granted_at": null,
+    "granted_before": "2026-05-25T08:00:00Z",
+    "first_seen_at": "2026-11-20T07:58:31Z",
+    "created_at": "2026-11-20T07:58:31Z"
+  },
+  {
+    "id": "acc_chloe_claude",
+    "app_id": "app_claude",
+    "email": "chloe@acme.example",
+    "employee_id": "emp_chloe",
+    "status": "active",
+    "found_via": ["google_sign_in"],
+    "granted_at": "2026-09-10T14:12:00Z",
+    "granted_before": null,
+    "first_seen_at": "2026-11-20T07:58:31Z",
+    "created_at": "2026-11-20T07:58:31Z"
+  }
 ]
 ```
 
@@ -262,8 +378,32 @@ One person's account in one app. The name avoids Better Auth's `account` table.
 
 ```json
 [
-  { "id": 1042, "record_type": "app", "record_id": "app_figma", "operation": "updated", "occurred_at": "2026-11-20T08:02:10Z", "author_kind": "signed_in_user", "author_id": "usr_admin", "cause_kind": "edited_directly", "cause_ref": null, "reason": null, "changes": [{ "field": "status", "oldValue": "discovered", "newValue": "approved" }] },
-  { "id": 1043, "record_type": "app_account", "record_id": "acc_ana_slack", "operation": "created", "occurred_at": "2026-11-20T07:58:31Z", "author_kind": "broccoli_itself", "author_id": null, "cause_kind": "found_by_scan", "cause_ref": "src_google", "reason": null, "changes": [{ "field": "found_via", "oldValue": null, "newValue": "google_sign_in" }] }
+  {
+    "id": 1042,
+    "record_type": "app",
+    "record_id": "app_figma",
+    "operation": "updated",
+    "occurred_at": "2026-11-20T08:02:10Z",
+    "author_kind": "signed_in_user",
+    "author_id": "usr_admin",
+    "cause_kind": "edited_directly",
+    "cause_ref": null,
+    "reason": null,
+    "changes": [{ "field": "status", "oldValue": "discovered", "newValue": "approved" }]
+  },
+  {
+    "id": 1043,
+    "record_type": "app_account",
+    "record_id": "acc_ana_slack",
+    "operation": "created",
+    "occurred_at": "2026-11-20T07:58:31Z",
+    "author_kind": "broccoli_itself",
+    "author_id": null,
+    "cause_kind": "found_by_scan",
+    "cause_ref": "src_google",
+    "reason": null,
+    "changes": [{ "field": "found_via", "oldValue": null, "newValue": "google_sign_in" }]
+  }
 ]
 ```
 

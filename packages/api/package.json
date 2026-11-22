@@ -1,0 +1,57 @@
+{
+  "name": "@broccoli-access/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Broccoli Access API server.",
+  "imports": {
+    "#test/support": "./test/support/index.ts"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "codegen": "graphql-codegen",
+    "start": "node dist/main.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --maxWorkers=2 --passWithNoTests",
+    "test:integration": "vitest run --maxWorkers=2 -c vitest.integration.config.ts",
+    "test:e2e": "vitest run --maxWorkers=2 -c vitest.e2e.config.ts",
+    "test:pbt": "vitest run -c vitest.pbt.config.ts",
+    "test:load": "vitest run -c vitest.load.config.ts",
+    "db:generate": "drizzle-kit generate"
+  },
+  "devDependencies": {
+    "@broccoli-access/config": "workspace:*",
+    "@graphql-codegen/cli": "7.4.3",
+    "@graphql-codegen/typescript": "6.1.0",
+    "@graphql-codegen/typescript-resolvers": "6.1.0",
+    "@types/express": "5.0.6",
+    "@types/node": "24.19.1",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11",
+    "eslint": "10.12.0",
+    "fast-check": "4.3.0",
+    "tsdown": "0.23.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3"
+  },
+  "dependencies": {
+    "@apollo/server": "5.5.1",
+    "@as-integrations/express5": "1.1.2",
+    "@better-auth/core": "1.7.7",
+    "@better-auth/drizzle-adapter": "1.7.7",
+    "@graphql-tools/schema": "10.1.1",
+    "better-auth": "1.7.7",
+    "dataloader": "2.2.3",
+    "drizzle-orm": "0.45.3",
+    "express": "5.2.1",
+    "express-rate-limit": "8.7.0",
+    "graphql": "16.14.2",
+    "nodemailer": "10.1.0",
+    "pg": "8.23.1",
+    "pg-boss": "12.35.1",
+    "pino": "10.4.0",
+    "zod": "4.6.5"
+  }
+}

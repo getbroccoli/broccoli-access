@@ -1,0 +1,83 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+
+import { createLogger, type Logger } from "../../src/core/logger";
+import { startServer, type RunningServer } from "../../src/core/server";
+import { createModules } from "../../src/modules";
+
+export interface Readiness {
+  httpStatus: number;
+  status: string;
+}
+
+const STARTUP_TIMEOUT_MS = 10_000;
+const POLL_INTERVAL_MS = 25;
+
+export interface TestServerOptions {
+  /** Captures application logs when a test checks what a failure exposes. */
+  logger?: Logger;
+  webDir?: string;
+  /** Defaults to a new temporary folder, removed when the server stops. */
+  dataDir?: string;
+  publicUrl?: string;
+  resendApiUrl?: string;
+}
+
+/**
+ * Starts Broccoli Access itself, the real API with every module, on a free port and a test
+ * database. End-to-end tests reach it through `TestEnv`.
+ */
+export async function startTestServer(
+  databaseUrl: string,
+  {
+    logger = createLogger("silent"),
+    webDir,
+    dataDir,
+    publicUrl,
+    resendApiUrl = "http://127.0.0.1:9",
+  }: TestServerOptions = {},
+): Promise<RunningServer> {
+  const ownsDataDir = dataDir === undefined;
+  const folder = dataDir ?? (await mkdtemp(join(tmpdir(), "broccoli-access-data-")));
+  const server = await startServer(
+    { databaseUrl, port: 0, webDir, publicUrl, dataDir: folder },
+    logger,
+    (core) => createModules(core, { publicUrl, resendApiUrl }),
+  );
+  return {
+    url: server.url,
+    stop: async () => {
+      await server.stop();
+      if (ownsDataDir) {
+        await rm(folder, { recursive: true, force: true });
+      }
+    },
+  };
+}
+
+/** Polls `/readyz` until the server has finished starting and returns its answer. */
+export async function waitForStartup(server: RunningServer): Promise<Readiness> {
+  const deadline = Date.now() + STARTUP_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const readiness = await fetchReadiness(server, Math.max(0, deadline - Date.now()));
+    if (readiness.status !== "starting") {
+      return readiness;
+    }
+    await delay(POLL_INTERVAL_MS);
+  }
+  throw new Error(`Server did not finish starting within ${STARTUP_TIMEOUT_MS} ms`);
+}
+
+/** One `/readyz` answer. */
+export async function fetchReadiness(
+  server: RunningServer,
+  timeoutMs = STARTUP_TIMEOUT_MS,
+): Promise<Readiness> {
+  const response = await fetch(`${server.url}/readyz`, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const body = (await response.json()) as { status: string };
+  return { httpStatus: response.status, status: body.status };
+}
