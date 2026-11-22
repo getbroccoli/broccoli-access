@@ -118,6 +118,9 @@ const OPTIONAL_ERROR_CODES = [
   "owner_browser_lost",
 ] as const satisfies readonly ConnectorErrorCode[];
 
+/** Any character that ends a line, which would break a one-line skip note. */
+const LINE_BREAK = /[\n\r\u2028\u2029]/;
+
 /** An address that answers nothing: the suite never drives an owner's browser. */
 const UNUSED_BROWSER_URL = "ws://127.0.0.1:9/conformance";
 
@@ -178,9 +181,8 @@ async function expectMayNotCause(
 ): Promise<void> {
   if (code !== "owner_browser_lost") return;
   const runtimes = await runtimesOf(url, fixture.connector);
-  expect(runtimes, `runtimes of a connector that cannot cause ${code}`).not.toContain(
-    "owner_browser",
-  );
+  const message = `${fixture.connector} lists the owner_browser runtime, so its fixture must cause ${code}, not list it in cannotCause`;
+  expect(runtimes, message).not.toContain("owner_browser");
 }
 
 /**
@@ -201,8 +203,9 @@ function parseCannotCause(fixture: ConnectorFixture): Map<string, string> {
   return reasons;
 }
 
-function isOneLineText(text: string | undefined): text is string {
-  return text !== undefined && text.trim() !== "" && !text.includes("\n");
+/** A plain JavaScript fixture may pass anything, so the type is checked too. */
+function isOneLineText(text: unknown): text is string {
+  return typeof text === "string" && text.trim() !== "" && !LINE_BREAK.test(text);
 }
 
 /** Each call as it would succeed, with only its runtime changed. */
