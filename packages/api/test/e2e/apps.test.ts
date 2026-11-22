@@ -59,6 +59,30 @@ test("approves and ignores an app through GraphQL after the scan", async ({ env 
   });
 }, 90_000);
 
+test("returns ConflictError when ignoring Google Workspace through GraphQL", async ({ env }) => {
+  const { browser } = await env.signInAsOwner();
+  const approved = await browser.graphql(
+    "{ apps(status: APPROVED) { edges { node { id name } } } }",
+  );
+  const { data } = (await approved.json()) as {
+    data: { apps: { edges: { node: { id: string; name: string } }[] } };
+  };
+  const { node: google } = data.apps.edges.find(({ node }) => node.name === "Google Workspace")!;
+
+  const response = await browser.graphql(
+    `
+    mutation IgnoreApp($input: AppIgnoreInput!) {
+      apps { ignore(input: $input) { app { id } error { __typename } } }
+    }
+  `,
+    { input: { id: google.id } },
+  );
+
+  expect(await response.json()).toEqual({
+    data: { apps: { ignore: { app: null, error: { __typename: "ConflictError" } } } },
+  });
+});
+
 test.for([
   ["apps", "{ apps(status: DISCOVERED) { edges { node { id } } } }"],
   ["appCounts", "{ appCounts { approved discovered ignored } }"],

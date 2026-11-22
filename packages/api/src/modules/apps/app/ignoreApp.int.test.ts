@@ -6,6 +6,7 @@ import {
   OWNER,
   EMPLOYEE,
   apps,
+  googleScanSetup,
   storedApps,
   storedRecordHistory,
 } from "#test/support";
@@ -41,6 +42,19 @@ test("ignoring an ignored app changes nothing and appends no history", async ({ 
   expect(ignored).toMatchObject({ id: app.id, status: "ignored" });
   expect(await storedApps(orm)).toEqual([app]);
   expect(await storedRecordHistory(orm)).toEqual([]);
+});
+
+test("refuses to ignore a connected app and changes nothing", async ({ orm, fakeGoogle }) => {
+  await googleScanSetup(orm, fakeGoogle.url);
+  const before = { apps: await storedApps(orm), history: await storedRecordHistory(orm) };
+  const google = before.apps.find(({ name }) => name === "Google Workspace")!;
+
+  await expect(apps(orm).ignoreApp(OWNER, google.id)).rejects.toMatchObject({
+    code: "CONFLICT",
+    message: "A connected app stays approved.",
+  });
+
+  expect({ apps: await storedApps(orm), history: await storedRecordHistory(orm) }).toEqual(before);
 });
 
 test("refuses to ignore an unknown app", async ({ orm }) => {
