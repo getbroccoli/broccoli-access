@@ -489,7 +489,9 @@ Binary files, kept for employee photos in a later circle.
 
 One Disable or Enable of one app account, from the owner's click to its result. When no runtime can make it, the owner sees why, and can try again or make the change by hand.
 
-- `app_account_id`, `connection_id`.
+- `app_account_id`: the account the change is for. It turns null when a scan deletes that account; the change stays.
+- `app_id`, `email`: the account's app and its lowercase email, copied when the owner asks. Activity names the app and the person from them, so a change outlives its account. The person is the employee with that email, as for app accounts.
+- `connection_id`.
 - `action`: `suspend`, `reactivate`.
 - `source_key`: the member's id in the app, copied from the connection's import record for this email when the owner asks.
 - `status`:
@@ -510,6 +512,8 @@ One Disable or Enable of one app account, from the owner's click to its result. 
   {
     "id": "chg_ana_slack",
     "app_account_id": "acc_ana_slack",
+    "app_id": "app_slack",
+    "email": "ana@acme.example",
     "connection_id": "con_slack",
     "action": "suspend",
     "source_key": "U04ANA",
@@ -523,6 +527,8 @@ One Disable or Enable of one app account, from the owner's click to its result. 
   {
     "id": "chg_chloe_linear",
     "app_account_id": "acc_chloe_linear",
+    "app_id": "app_linear",
+    "email": "chloe@acme.example",
     "connection_id": "con_linear",
     "action": "suspend",
     "source_key": "9f2e…",
@@ -534,6 +540,21 @@ One Disable or Enable of one app account, from the owner's click to its result. 
     "requested_by": "usr_admin",
     "requested_at": "2026-12-02T10:05:00Z",
     "finished_at": "2026-12-02T10:05:10Z"
+  },
+  {
+    "id": "chg_ben_linear",
+    "app_account_id": null,
+    "app_id": "app_linear",
+    "email": "ben@acme.example",
+    "connection_id": "con_linear",
+    "action": "suspend",
+    "source_key": "7c1d…",
+    "status": "succeeded",
+    "attempts": [{ "runtime": "server", "error": null, "at": "2026-12-02T09:30:04Z" }],
+    "error": null,
+    "requested_by": "usr_admin",
+    "requested_at": "2026-12-02T09:30:00Z",
+    "finished_at": "2026-12-02T09:30:04Z"
   }
 ]
 ```
@@ -592,7 +613,7 @@ The owner's Chrome extension, paired with this instance.
 - **Can be managed**: an app whose catalog key equals the key of a connector that lists `suspend` and `reactivate`. Applications and the app's page show Connect for it while it has no connection.
 - **Disable and Enable offered**: on an app account whose app has a connection with a connector that lists `suspend` and `reactivate`, that is not the connection's own user (`isConnectionUser` on its record), and that has no `running` change. While the connection is `reconnect`, Reconnect shows instead. Disable on an `active` account, Enable on a `suspended` one.
 - **Couldn't change**: an app account whose latest account change `failed`. Its row shows why, with Try again and "I did it by hand". Try again is hidden after `not_allowed` or `account_not_found`; for `account_not_found`, Scan now is offered instead.
-- **Activity**: every account change, newest first: the person, the app, Disable or Enable, who asked, when, and how it ended: on the server, by hand, or not at all.
+- **Activity**: every account change, newest first: the person (the employee with the change's email, else the email), the app, Disable or Enable, who asked, when, and how it ended: on the server, by hand, or not at all. A change whose account was deleted still shows.
 - **Since**, for an account: its `granted_at`; otherwise "Before" its `granted_before`; otherwise its `first_seen_at`. For an app: the earliest of its accounts, shown as "Before …" when that earliest one only has `granted_before`.
 
 ## Removed
