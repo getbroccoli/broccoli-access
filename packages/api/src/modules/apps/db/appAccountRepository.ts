@@ -7,6 +7,11 @@ import { apps } from "./appsTable";
 
 /** App accounts in Postgres, through the pool or inside a transaction. */
 export interface AppAccountRepository {
+  /**
+   * Waits for any other transaction that took this lock, then holds it until this transaction
+   * ends, so account syncs and connects never interleave.
+   */
+  lockForSync(): Promise<void>;
   /** The accounts in `appIds`, and those `findingKind` saw, whatever their app. */
   findInAppsOrFoundVia(appIds: readonly string[], findingKind: string): Promise<AppAccount[]>;
   insertMany(accounts: readonly Omit<AppAccount, "id">[]): Promise<AppAccount[]>;
@@ -49,6 +54,10 @@ export interface EmployeeAppAccount extends Pick<
 export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
   const orm = () => ormOf(db);
   return {
+    lockForSync: async () => {
+      // A table lock: the builder cannot express it. It blocks other writers, never readers.
+      await orm().execute(sql`lock table ${appAccounts} in share row exclusive mode`);
+    },
     findInAppsOrFoundVia: (appIds, findingKind) =>
       orm()
         .select(columns)

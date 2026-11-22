@@ -31,6 +31,32 @@ export const settingsEn = {
   "settings.extension.loadFailed": "Couldn’t load this Chrome’s pairing.",
   "settings.extension.unpairFailed": "Couldn’t unpair. Try again.",
   "settings.extension.unpair": "Unpair",
+  "settings.connections.directory": "Directory",
+  "settings.apps.title": "Apps",
+  "settings.apps.description":
+    "Connect an app to see its members, and disable or enable their accounts from here.",
+  "settings.apps.notConnected": "Not connected",
+  "settings.apps.throughApi": "Through {app}’s API, with a {field} made by a {app} admin.",
+  "settings.apps.throughAppSession":
+    "{app} has no API for this on your plan, so Broccoli Access makes the calls {app}’s own admin pages make, with your {app} session. The Chrome extension hands it over.",
+  "settings.apps.connect": "Connect {app}",
+  "settings.apps.summary": "The {workspace} workspace, connected with a {field} of {email}.",
+  "settings.apps.summaryBeforeScan": "The {workspace} workspace, connected with a {field}.",
+  "settings.apps.oneMember": "1 member.",
+  "settings.apps.members": "{count} members.",
+  "settings.apps.dialog.description":
+    "Broccoli Access reads your {app} members and disables or enables them when you ask, through {app}’s API.",
+  "settings.apps.dialog.secretHint": "{help} Broccoli Access stores it encrypted on your server.",
+  "settings.apps.dialog.nextTitle": "What happens next",
+  "settings.apps.dialog.next":
+    "Broccoli Access checks the key, shows the workspace’s name, approves {app} and scans its members.",
+  "settings.apps.dialog.cancel": "Cancel",
+  "settings.apps.dialog.connecting": "Connecting…",
+  "settings.apps.dialog.required": "Enter the {field}.",
+  "settings.apps.dialog.refused": "{app} refused it. Check it and try again.",
+  "settings.apps.dialog.notAdmin": "{app} accepts only a key made by a {app} admin.",
+  "settings.apps.dialog.unavailable": "Couldn’t check the connection to {app}. Try again.",
+  "settings.apps.dialog.failed": "Couldn’t connect {app}. Try again.",
   "settings.googleApp.title": "Change Google app",
   "settings.googleApp.description":
     "Connect Google Workspace with another Google app of your own. Your people, apps and decisions stay as they are.",

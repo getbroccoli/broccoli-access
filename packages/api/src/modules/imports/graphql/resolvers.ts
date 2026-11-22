@@ -1,9 +1,15 @@
-import type { Resolvers } from "../../../core/graphql";
+import type { GraphqlContext, Resolvers } from "../../../core/graphql";
 import { toEnum } from "../../../core/graphql";
 import type { ScanService } from "../app";
 import type { Scan } from "../domain";
 
-export function createResolvers(scans: Pick<ScanService, "readScan" | "scanNow">): Resolvers {
+export function createResolvers(
+  scans: Pick<ScanService, "readScan" | "scanNow" | "readConnectionUserEmail">,
+): Resolvers {
+  const scanOfConnection = async (connectionId: string, context: GraphqlContext) => {
+    const scan = await scans.readScan(context.getActor(), connectionId);
+    return scan && toScanGraphql(scan);
+  };
   return {
     Mutation: {
       imports: () => ({}),
@@ -14,10 +20,12 @@ export function createResolvers(scans: Pick<ScanService, "readScan" | "scanNow">
       }),
     },
     GoogleWorkspaceConnection: {
-      scan: async (connection, _args, context) => {
-        const scan = await scans.readScan(context.getActor(), connection.id);
-        return scan && toScanGraphql(scan);
-      },
+      scan: (connection, _args, context) => scanOfConnection(connection.id, context),
+    },
+    ContainerConnection: {
+      scan: (connection, _args, context) => scanOfConnection(connection.id, context),
+      connectionUserEmail: (connection, _args, context) =>
+        scans.readConnectionUserEmail(context.getActor(), connection.id),
     },
   };
 }

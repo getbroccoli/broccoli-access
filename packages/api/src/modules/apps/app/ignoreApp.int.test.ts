@@ -7,6 +7,11 @@ import {
   EMPLOYEE,
   apps,
   googleScanSetup,
+  googleScanWithLinearGrant,
+  containerConnections,
+  LINEAR_INPUT,
+  holdBeforeCommit,
+  expectBlockedBy,
   storedApps,
   storedRecordHistory,
 } from "#test/support";
@@ -80,3 +85,30 @@ test("refuses to ignore an app without MANAGE_WORKSPACE and changes nothing", as
   expect(await storedApps(orm)).toEqual([app]);
   expect(await storedRecordHistory(orm)).toEqual([]);
 });
+
+test.for(["discovered", "approved"] as const)(
+  "connecting Linear keeps it approved after a concurrent Ignore (initial status %s)",
+  async (status, { orm, transact, fakeGoogle, fakeConnectors }) => {
+    await googleScanWithLinearGrant(orm, fakeGoogle.url, "hannah@acme.example");
+    const linear = (await storedApps(orm)).find((app) => app.name === "Linear")!;
+    if (status === "approved") await apps(orm).approveApp(OWNER, linear.id);
+    const held = holdBeforeCommit(transact);
+    const ignore = apps(orm, held.transact).ignoreApp(OWNER, linear.id);
+    const pid = await held.ready;
+    const connect = containerConnections(orm, fakeConnectors.url).service.connect(
+      OWNER,
+      LINEAR_INPUT,
+    );
+    try {
+      await expectBlockedBy(orm, pid);
+    } finally {
+      held.release();
+    }
+    await Promise.all([ignore, connect]);
+
+    expect(await apps(orm).readApp(OWNER, linear.id)).toMatchObject({
+      status: "approved",
+      connected: true,
+    });
+  },
+);

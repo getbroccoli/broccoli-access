@@ -11,6 +11,7 @@ it("shows all steps done with progress counts while the scan is still running", 
 
   expect(scan).toEqual({
     id: SOURCE.id,
+    sourceName: SOURCE.name,
     status: "scanning",
     failure: null,
     readAt: null,
@@ -34,6 +35,7 @@ it("shows saved counts for a scanned source", () => {
 
   expect(scan).toEqual({
     id: source.id,
+    sourceName: source.name,
     status: "scanned",
     failure: null,
     readAt: source.readAt,
@@ -58,6 +60,7 @@ it("shows all steps failed without counts even when progress and saved counts ex
 
   expect(scan).toEqual({
     id: source.id,
+    sourceName: source.name,
     status: "scan_failed",
     failure: "permission_missing",
     readAt: source.readAt,
@@ -77,6 +80,7 @@ it.each([null, { found: null }])(
 
     expect(scan).toEqual({
       id: SOURCE.id,
+      sourceName: SOURCE.name,
       status: "scanning",
       failure: null,
       readAt: null,

@@ -217,8 +217,8 @@ const linearDescription = {
     {
       key: "apiKey",
       kind: "text",
-      label: "Linear API key",
-      help: "Paste a personal API key made by a Linear admin.",
+      label: "Personal API key",
+      help: "Make it in Linear’s settings while signed in as a Linear admin.",
       secret: true,
     },
   ],

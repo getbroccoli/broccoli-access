@@ -1,3 +1,4 @@
+import type { AccountStatus } from "../../../core/connectors";
 import type { Orm } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { appAccountRepository, type AppUserAccount } from "../db";
@@ -22,6 +23,8 @@ export interface AppUser {
   employeeId: string;
   /** The account's email, lowercased. */
   email: string;
+  /** Whether the person may use the account in the app. */
+  status: AccountStatus;
   /** Whether the employee's account in the directory is suspended. */
   suspendedInDirectory: boolean;
   /** The finding kinds that saw the account, sorted, such as `google_sign_in`. */
@@ -70,12 +73,13 @@ export function createAppUserService({
 }
 
 function toAppUser(account: AppUserAccount, suspendedInDirectory: ReadonlySet<string>): AppUser {
-  const { id, appId, employeeId, email, foundVia } = account;
+  const { id, appId, employeeId, email, status, foundVia } = account;
   return {
     id,
     appId,
     employeeId,
     email,
+    status,
     suspendedInDirectory: suspendedInDirectory.has(employeeId),
     foundVia: foundVia.toSorted(),
     since: accountSince(account),

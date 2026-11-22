@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@broccoli-access/config": "workspace:*",
+    "@broccoli-access/connector-contract": "workspace:*",
     "@broccoli-access/fake-apps": "workspace:*",
     "@graphql-codegen/cli": "7.4.3",
     "@graphql-codegen/typescript": "6.1.0",

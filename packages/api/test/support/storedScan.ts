@@ -1,3 +1,5 @@
+import { eq } from "drizzle-orm";
+
 import type { Orm } from "../../src/core/db";
 import { recordHistory } from "../../src/core/records/db";
 import { apps, appAccounts } from "../../src/modules/apps/db";
@@ -22,4 +24,14 @@ export function storedImportRecords(orm: Orm) {
 }
 export function storedRecordHistory(orm: Orm) {
   return orm.select().from(recordHistory).orderBy(recordHistory.id);
+}
+
+/** Whether an account can take its employee foreign-key lock without waiting. */
+export async function canReferenceEmployee(orm: Orm, id: string): Promise<boolean> {
+  const rows = await orm
+    .select({ id: employees.id })
+    .from(employees)
+    .where(eq(employees.id, id))
+    .for("key share", { skipLocked: true });
+  return rows.length === 1;
 }

@@ -26,6 +26,7 @@ it("plans no update for a found account whose fields did not change", () => {
   const plan = planAccountSync([ACCOUNT], {
     findingKind: "google_directory",
     found: [ACCOUNT],
+    statusKeptIn: new Set(),
     now: NOW,
   });
 
@@ -37,6 +38,7 @@ it("deletes an account when its only finding kind no longer sees it", () => {
   const plan = planAccountSync([ACCOUNT], {
     findingKind: "google_directory",
     found: [],
+    statusKeptIn: new Set(),
     now: NOW,
   });
 
@@ -56,6 +58,7 @@ it("keeps an account another finding kind sees and removes only the missing kind
   const plan = planAccountSync([before], {
     findingKind: "google_directory",
     found: [],
+    statusKeptIn: new Set(),
     now: NOW,
   });
 
@@ -71,6 +74,7 @@ it("adds a second finding kind to a known account", () => {
   const plan = planAccountSync([ACCOUNT], {
     findingKind: "google_sign_in",
     found: [ACCOUNT],
+    statusKeptIn: new Set(),
     now: NOW,
   });
 
@@ -81,6 +85,43 @@ it("adds a second finding kind to a known account", () => {
       oldValue: "google_directory",
       newValue: "google_directory, google_sign_in",
     },
+  ]);
+});
+
+it("keeps the status read by the app's connection while adding a finding kind", () => {
+  const before = { ...ACCOUNT, status: "suspended" as const, foundVia: ["linear_members"] };
+
+  const plan = planAccountSync([before], {
+    findingKind: "google_sign_in",
+    found: [ACCOUNT],
+    now: NOW,
+    statusKeptIn: new Set([before.appId]),
+  });
+
+  expect(plan.updated).toEqual([
+    { before, after: { ...before, foundVia: ["linear_members", "google_sign_in"] } },
+  ]);
+});
+
+it("takes the found status for a new account in an app another connection reads", () => {
+  const plan = planAccountSync([], {
+    findingKind: "google_sign_in",
+    found: [
+      {
+        appId: ACCOUNT.appId,
+        email: ACCOUNT.email,
+        employeeId: ACCOUNT.employeeId,
+        status: "suspended",
+        grantedAt: null,
+        grantedBefore: null,
+      },
+    ],
+    now: NOW,
+    statusKeptIn: new Set([ACCOUNT.appId]),
+  });
+
+  expect(plan.created).toMatchObject([
+    { email: ACCOUNT.email, status: "suspended", foundVia: ["google_sign_in"] },
   ]);
 });
 
@@ -96,7 +137,12 @@ it.each([
     ...dates,
   };
 
-  const plan = planAccountSync([], { findingKind: "google_sign_in", found: [found], now: NOW });
+  const plan = planAccountSync([], {
+    findingKind: "google_sign_in",
+    found: [found],
+    statusKeptIn: new Set(),
+    now: NOW,
+  });
 
   expect(plan).toEqual({
     created: [{ ...found, foundVia: ["google_sign_in"], firstSeenAt: NOW }],
@@ -114,6 +160,7 @@ it.each([null, new Date("2026-05-24T08:00:00Z"), new Date("2026-05-26T08:00:00Z"
     const plan = planAccountSync([before], {
       findingKind: "google_directory",
       found: [found],
+      statusKeptIn: new Set(),
       now: NOW,
     });
 
@@ -128,6 +175,7 @@ it("does not add a grant date to an account first seen undated", () => {
   const plan = planAccountSync([before], {
     findingKind: "google_directory",
     found: [found],
+    statusKeptIn: new Set(),
     now: NOW,
   });
 
@@ -141,6 +189,7 @@ it("moves a known grant date earlier when the scan finds an older event", () => 
   const plan = planAccountSync([before], {
     findingKind: "google_directory",
     found: [after],
+    statusKeptIn: new Set(),
     now: NOW,
   });
 
@@ -154,6 +203,7 @@ it("does not move a known grant date later", () => {
   const plan = planAccountSync([before], {
     findingKind: "google_directory",
     found: [found],
+    statusKeptIn: new Set(),
     now: NOW,
   });
 
@@ -167,6 +217,7 @@ it("keeps a known grant date when its event falls out of the log", () => {
   const plan = planAccountSync([before], {
     findingKind: "google_directory",
     found: [found],
+    statusKeptIn: new Set(),
     now: NOW,
   });
 
@@ -204,6 +255,7 @@ it("merges two found grants for the same person and app into one active account"
       },
       { ...account, status: "active", grantedAt: null, grantedBefore },
     ],
+    statusKeptIn: new Set(),
     now: NOW,
   });
 

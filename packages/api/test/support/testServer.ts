@@ -23,6 +23,7 @@ export interface TestServerOptions {
   dataDir?: string;
   publicUrl?: string;
   resendApiUrl?: string;
+  connectorsUrl?: string;
   googleOpenIdConfigurationUrl?: string;
   googleAdminApiUrl?: string;
 }
@@ -38,6 +39,7 @@ export async function startTestServer(
     webDir,
     dataDir,
     publicUrl,
+    connectorsUrl,
     resendApiUrl = "http://127.0.0.1:9",
     googleOpenIdConfigurationUrl = "http://127.0.0.1:9/.well-known/openid-configuration",
     googleAdminApiUrl = "http://127.0.0.1:9",
@@ -52,6 +54,7 @@ export async function startTestServer(
       createModules(core, {
         publicUrl,
         resendApiUrl,
+        connectorsUrl,
         googleOpenIdConfigurationUrl,
         googleAdminApiUrl,
       }),

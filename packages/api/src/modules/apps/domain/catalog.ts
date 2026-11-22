@@ -52,4 +52,8 @@ const CATALOG: readonly CatalogApp[] = [
   { key: "zoom", name: "Zoom", domain: "zoom.us", externalIds: [] },
   { key: "typeform", name: "Typeform", domain: "typeform.com", externalIds: [] },
   { key: "grammarly", name: "Grammarly", domain: "grammarly.com", externalIds: [] },
+  { key: "linear", name: "Linear", domain: "linear.app", externalIds: [] },
 ];
+
+/** The catalog's keys, for a caller that must not throw on a key it lacks. */
+export const CATALOG_KEYS: ReadonlySet<string> = new Set(CATALOG.map(({ key }) => key));

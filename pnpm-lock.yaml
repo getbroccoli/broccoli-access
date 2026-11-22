@@ -81,6 +81,9 @@ importers:
       '@broccoli-access/config':
         specifier: workspace:*
         version: link:../config
+      '@broccoli-access/connector-contract':
+        specifier: workspace:*
+        version: link:../connector-contract
       '@broccoli-access/fake-apps':
         specifier: workspace:*
         version: link:../fake-apps

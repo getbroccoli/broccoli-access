@@ -29,9 +29,9 @@ export function GoogleWorkspaceCard({ connection }: Props) {
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 id="google-workspace-title" className="text-base font-semibold">
+          <h3 id="google-workspace-title" className="text-base font-semibold">
             {t("settings.connections.googleWorkspace")}
-          </h2>
+          </h3>
           <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
             {t("settings.connections.connected")}
           </span>

@@ -1,42 +1,57 @@
+import { isDeepStrictEqual } from "node:util";
+
 import { ApplicationError } from "../../../core/applicationError";
 import type { Orm, Tx } from "../../../core/db";
 import type { FieldChange } from "../../../core/records";
 import { createRecordHistoryService } from "../../../core/records";
 import type { SecretBox } from "../../../core/secrets";
 import type { SecurityContext } from "../../../core/security";
-import { type App, type AppConnection, appConnectionRepository, appRepository } from "../db";
-import { appChanges, catalogApp } from "../domain";
+import {
+  type App,
+  type AppConnection,
+  appAccountRepository,
+  appConnectionRepository,
+  appRepository,
+} from "../db";
+import { appChanges, connectedAppOf } from "../domain";
 
 const recordHistory = createRecordHistoryService();
 
 /** Connected apps: the app itself, approved, and its connector's settings and secrets. */
 export interface AppConnectionService {
   /**
-   * Creates the catalog app `catalogKey`, approved, and saves its connection with `secrets`
-   * encrypted under the connection's id, joining `tx`; appends the history of both. Admins only.
+   * Approves the connector's app (the app with the connector's key as catalog key, else its name,
+   * else a new one) and saves its connection with `secrets` encrypted under the connection's id,
+   * joining `tx`; appends the history of both. Connects and scan saves run one at a time. Admins
+   * only; refuses
+   * with CONFLICT a connector already connected, or an app another connector reads.
    */
   connectApp: (
     ctx: SecurityContext,
     tx: Tx,
     connection: {
-      catalogKey: string;
       connector: string;
+      /** The connector's app, created from these when no app matches. */
+      app: { name: string; domain: string | null };
       settings: Record<string, unknown>;
-      secrets: Record<string, string>;
+      secrets: Record<string, unknown>;
     },
   ) => Promise<{ appId: string; connectionId: string }>;
   /**
-   * Replaces the connection's settings and secrets, joining `tx`, and appends the settings' change
-   * to its history, never the secrets. Admins only; refuses an unknown connection with NOT_FOUND.
+   * Replaces the connection's settings or secrets, whichever `update` carries, joining `tx`; new
+   * settings add a line to its history, secrets never. Admins only; refuses an unknown connection
+   * with NOT_FOUND.
    */
   changeConnection: (
     ctx: SecurityContext,
     tx: Tx,
     connectionId: string,
-    connection: { settings: Record<string, unknown>; secrets: Record<string, string> },
+    update: { settings?: Record<string, unknown>; secrets?: Record<string, unknown> },
   ) => Promise<void>;
   /** The connection of `connector` without its secrets, or null. Trusted read: no `ctx`. */
   readConnection: (db: Orm | Tx, connector: string) => Promise<AppConnection | null>;
+  /** Every connection without its secrets. Trusted read: no `ctx`. */
+  readConnections: (db: Orm | Tx) => Promise<AppConnection[]>;
   /** The connection with id `connectionId` without its secrets, or null. Trusted read: no `ctx`. */
   readConnectionById: (db: Orm | Tx, connectionId: string) => Promise<AppConnection | null>;
   /**
@@ -52,10 +67,17 @@ export function createAppConnectionService({
   secretBox: SecretBox;
 }): AppConnectionService {
   return {
-    async connectApp(ctx, tx, { catalogKey, connector, settings, secrets }) {
+    async connectApp(ctx, tx, { connector, app: appFields, settings, secrets }) {
       ctx.require("MANAGE_WORKSPACE");
-      const app = await createApprovedApp(ctx, tx, catalogKey);
+      // The lock scans take before they add apps, so a connect and a scan never both add one.
+      await appAccountRepository(tx).lockForSync();
       const connections = appConnectionRepository(tx);
+      const app = await approveConnectedApp(ctx, tx, { key: connector, ...appFields });
+      const sameConnector = await connections.findByConnector(connector);
+      const sameApp = await connections.findByApps([app.id]);
+      if (sameConnector || sameApp.length > 0) {
+        throw new ApplicationError("CONFLICT", "This app is already connected.");
+      }
       const id = await connections.newId();
       const encryptedSecrets = secretBox.encrypt(JSON.stringify(secrets), id);
       await connections.insert({ id, connector, appId: app.id, settings, encryptedSecrets });
@@ -74,8 +96,11 @@ export function createAppConnectionService({
       if (!old) {
         throw new ApplicationError("NOT_FOUND", "No app connection has this id.");
       }
-      const encryptedSecrets = secretBox.encrypt(JSON.stringify(secrets), connectionId);
+      const encryptedSecrets = secrets && secretBox.encrypt(JSON.stringify(secrets), connectionId);
       await connections.update(connectionId, { settings, encryptedSecrets });
+      if (!settings || isDeepStrictEqual(settings, old.settings)) {
+        return;
+      }
       await recordHistory.append(ctx, tx, {
         recordType: "app_connection",
         operation: "UPDATED",
@@ -95,6 +120,7 @@ export function createAppConnectionService({
       });
     },
     readConnection: (db, connector) => appConnectionRepository(db).findByConnector(connector),
+    readConnections: (db) => appConnectionRepository(db).findAll(),
     readConnectionById: (db, connectionId) => appConnectionRepository(db).findById(connectionId),
     async readSecrets(db, connectionId) {
       const encrypted = await appConnectionRepository(db).findEncryptedSecrets(connectionId);
@@ -105,16 +131,43 @@ export function createAppConnectionService({
   };
 }
 
-/** Creates the catalog app, approved, with its history line. */
-async function createApprovedApp(ctx: SecurityContext, tx: Tx, catalogKey: string): Promise<App> {
-  const app = await appRepository(tx).insertCatalogApp(catalogApp(catalogKey), "approved");
+/** The connector's app, approved or created approved, with its history line when it changes. */
+async function approveConnectedApp(
+  ctx: SecurityContext,
+  tx: Tx,
+  connector: { key: string; name: string; domain: string | null },
+): Promise<App> {
+  const repository = appRepository(tx);
+  const match = connectedAppOf(await repository.findAll(), connector);
+  if ("created" in match) {
+    const [app] = await repository.insertMany([match.created], "approved");
+    await appendAppHistory(ctx, tx, "CREATED", null, app!);
+    return app!;
+  }
+  // Locked as Ignore locks it, so Ignore either runs first or sees the new connection.
+  const before = (await repository.lockById(match.known.id))!;
+  if (before.status === "approved") {
+    return before;
+  }
+  const after: App = { ...before, status: "approved" };
+  await repository.updateStatus([before.id], "approved");
+  await appendAppHistory(ctx, tx, "UPDATED", before, after);
+  return after;
+}
+
+async function appendAppHistory(
+  ctx: SecurityContext,
+  tx: Tx,
+  operation: "CREATED" | "UPDATED",
+  before: App | null,
+  after: App,
+): Promise<void> {
   await recordHistory.append(ctx, tx, {
     recordType: "app",
-    operation: "CREATED",
+    operation,
     cause: { kind: "EDITED_DIRECTLY" },
-    records: [{ recordId: app.id, changes: appChanges(null, app) }],
+    records: [{ recordId: after.id, changes: appChanges(before, after) }],
   });
-  return app;
 }
 
 /** A new connection's fields; its secrets never reach history. */

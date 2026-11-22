@@ -8,6 +8,8 @@ export default defineConfig({
   unbundle: true,
   fixedExtension: false,
   sourcemap: true,
+  // Workspace packages ship TypeScript source, which Node does not run from node_modules.
+  noExternal: [/^@broccoli-access\//],
   // Modules read their SDL from next to their code.
   copy: [{ from: "src/**/*.graphql", flatten: false }],
 });

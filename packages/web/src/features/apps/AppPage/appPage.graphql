@@ -8,8 +8,23 @@ query AppPage($id: ID!) {
     connected
     peopleCount
     suspendedWithAccessCount
+    containerConnection {
+      id
+      adminUrl
+      connector {
+        id
+        findingKind
+      }
+      scan {
+        id
+        status
+        readAt
+        sourceName
+      }
+    }
     users {
       id
+      status
       foundVia
       since {
         at
@@ -22,6 +37,22 @@ query AppPage($id: ID!) {
         email
         avatarUrl
         status
+      }
+    }
+  }
+}
+
+# Polled while a connected app's scan runs, reading scans only; the users reload once when it ends.
+query AppConnectionScan {
+  containerConnectors {
+    id
+    connection {
+      id
+      scan {
+        id
+        status
+        readAt
+        sourceName
       }
     }
   }

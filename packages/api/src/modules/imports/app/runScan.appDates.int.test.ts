@@ -94,7 +94,9 @@ test("keeps Ana's original grant bound when a later scan finds an authorize even
     appName: "Figma",
     grantedAt: new Date(Date.now() - 10 * DAY_MS).toISOString(),
   });
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 

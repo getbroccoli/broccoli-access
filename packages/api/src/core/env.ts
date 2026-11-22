@@ -18,6 +18,8 @@ export interface Env {
   googleOpenIdConfigurationUrl: string;
   /** Where the connector calls Google's Admin APIs. */
   googleAdminApiUrl: string;
+  /** The connectors container's address; unset means no app connects through it. */
+  connectorsUrl?: string;
 }
 
 /** Google's own addresses; only development and tests, with the fake Google, change them. */
@@ -46,6 +48,7 @@ const envSchema = z
       blankAsUnset,
       z.url({ protocol: /^https?$/ }).default(GOOGLE_ADMIN_API_URL),
     ),
+    CONNECTORS_URL: z.preprocess(blankAsUnset, z.url({ protocol: /^https?$/ }).optional()),
   })
   .transform((variables): Env => ({
     databaseUrl: variables.DATABASE_URL,
@@ -56,6 +59,7 @@ const envSchema = z
     dataDir: variables.DATA_DIR,
     googleOpenIdConfigurationUrl: variables.GOOGLE_OPENID_CONFIGURATION_URL,
     googleAdminApiUrl: variables.GOOGLE_ADMIN_API_URL,
+    connectorsUrl: variables.CONNECTORS_URL,
   }));
 
 /** Reads and validates the environment; throws one error listing every problem. */

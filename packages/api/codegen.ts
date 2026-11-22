@@ -2,6 +2,7 @@ import type { CodegenConfig } from "@graphql-codegen/cli";
 
 import { codegenMappers as recordMappers } from "./src/core/records/codegen";
 import { codegenMappers as appMappers } from "./src/modules/apps/codegen";
+import { codegenMappers as connectorMappers } from "./src/modules/connectors/codegen";
 import { codegenMappers as employeeMappers } from "./src/modules/employees/codegen";
 import { codegenMappers as extensionMappers } from "./src/modules/extension/codegen";
 import { codegenMappers as googleMappers } from "./src/modules/google/codegen";
@@ -22,6 +23,7 @@ const config: CodegenConfig = {
         // Each module owns its mappers; they meet only in this one generated file.
         mappers: {
           ...appMappers,
+          ...connectorMappers,
           ...employeeMappers,
           ...extensionMappers,
           ...googleMappers,

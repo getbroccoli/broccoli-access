@@ -39,13 +39,24 @@ export interface AccountSyncPlan {
 /**
  * Brings `known` accounts in line with what `findingKind` saw: a found account is created or takes
  * the found status and employee, and an account the kind no longer sees loses the kind, going
- * when no kind is left. Two found grants of one person to one app are one account, since the
- * earlier. Grant dates are fixed when a scan first sees the account: a later scan only moves
- * `grantedAt` earlier, since a later event is a renewed consent, not the first grant.
+ * when no kind is left. A known account in an app of `statusKeptIn` keeps its status: another
+ * connection's records decide it. Two found grants of one person to one app are one account,
+ * since the earlier. Grant dates are fixed when a scan first sees the account: a later scan only
+ * moves `grantedAt` earlier, since a later event is a renewed consent, not the first grant.
  */
 export function planAccountSync(
   known: readonly AppAccount[],
-  { findingKind, found, now }: { findingKind: string; found: readonly FoundAccount[]; now: Date },
+  {
+    findingKind,
+    found,
+    now,
+    statusKeptIn,
+  }: {
+    findingKind: string;
+    found: readonly FoundAccount[];
+    now: Date;
+    statusKeptIn: ReadonlySet<string>;
+  },
 ): AccountSyncPlan {
   const knownByKey = new Map(known.map((account) => [accountKey(account), account]));
   const foundKeys = new Set(found.map(accountKey));
@@ -56,18 +67,9 @@ export function planAccountSync(
       plan.created.push({ ...account, foundVia: [findingKind], firstSeenAt: now });
       continue;
     }
-    const foundVia = before.foundVia.includes(findingKind)
-      ? before.foundVia
-      : [...before.foundVia, findingKind];
     plan.updated.push({
       before,
-      after: {
-        ...before,
-        status: account.status,
-        employeeId: account.employeeId,
-        foundVia,
-        grantedAt: earlierGrant(before.grantedAt, account.grantedAt),
-      },
+      after: foundAgain(before, account, { findingKind, statusKeptIn }),
     });
   }
   for (const before of known) {
@@ -132,6 +134,23 @@ const HISTORY_FIELDS = [
   "grantedAt",
   "grantedBefore",
 ] as const;
+
+/** A known account as a scan of `findingKind` found it again. */
+function foundAgain(
+  before: AppAccount,
+  account: FoundAccount,
+  { findingKind, statusKeptIn }: { findingKind: string; statusKeptIn: ReadonlySet<string> },
+): AppAccount {
+  return {
+    ...before,
+    status: statusKeptIn.has(before.appId) ? before.status : account.status,
+    employeeId: account.employeeId,
+    foundVia: before.foundVia.includes(findingKind)
+      ? before.foundVia
+      : [...before.foundVia, findingKind],
+    grantedAt: earlierGrant(before.grantedAt, account.grantedAt),
+  };
+}
 
 /** The found accounts, once each. */
 function foundOnce(found: readonly FoundAccount[]): FoundAccount[] {

@@ -332,12 +332,13 @@ async function saveConnection(
     );
     const owner = ownerContext(userId, admin.email, employeeDirectory);
     const { connectionId } = await connectedApps.connectApp(owner, tx, {
-      catalogKey: GOOGLE_WORKSPACE,
       connector: GOOGLE_WORKSPACE,
+      app: { name: "Google Workspace", domain: null },
       settings: { ...settings },
       secrets: { clientSecret: consent.clientSecret, refreshToken: grant.tokens.refreshToken },
     });
-    const { sourceId } = await scans.scanConnection(owner, tx, connectionId);
+    const scan = { connectionId, sourceName: admin.domain };
+    const { sourceId } = await scans.scanConnection(owner, tx, scan);
     return { userId, connectionId, sourceId };
   });
   logger.info(saved, "Google Workspace connected; its admin is the owner and its scan is queued");

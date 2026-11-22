@@ -18,6 +18,7 @@ const server = await startServer(env, logger, (core) =>
     resendApiUrl: "https://api.resend.com",
     googleOpenIdConfigurationUrl: env.googleOpenIdConfigurationUrl,
     googleAdminApiUrl: env.googleAdminApiUrl,
+    connectorsUrl: env.connectorsUrl,
   }),
 );
 logger.info({ port: env.port }, "Broccoli Access API listening");

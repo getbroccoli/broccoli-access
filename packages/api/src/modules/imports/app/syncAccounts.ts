@@ -7,21 +7,22 @@ import type { DirectoryPeople, ScannedApps } from "../ports";
 /** What one scan found, to sync into employees, apps and app accounts. */
 export interface ScanFindings {
   sourceId: string;
-  connection: { appId: string };
+  connection: { id: string; appId: string };
   connector: Connector;
   accounts: readonly ImportedAccount[];
   /** The directory's changed photos by source key; null for a removed one. */
   photos: ReadonlyMap<string, AccountPhoto | null>;
 }
 
-// shortcut: syncs the scanned source's records only, which are every source's in circle 1, and
-// links accounts to the employees the directory's own scan returns; read every source's records
-// and match employees by email once a second connector comes.
+// shortcut: syncs the scanned source's records only, and links another app's accounts to the
+// employees as they are now, so a person who joins the directory after an app's scan is linked at
+// its next scan; read every source's records once that wait matters.
 /**
  * The sync after a scan, joining `tx`: the directory's own accounts create and update employees,
- * with their changed photos, then become the connection's app accounts, found via the
- * connector's own-app finding kind; the accounts in other apps go to their matched apps, found
- * via its other-app finding kind. Every change is found by the scan of `sourceId`.
+ * with their changed photos; another connector's link to the employee with the same email. They
+ * become the connection's app accounts, found via the connector's own-app finding kind; the
+ * accounts in other apps go to their matched apps, found via its other-app finding kind. Every
+ * change is found by the scan of `sourceId`.
  */
 export async function syncAccounts(
   ctx: SecurityContext,
@@ -38,9 +39,14 @@ export async function syncAccounts(
         ownAccounts.map((account) => directoryPerson(account, photos)),
         cause,
       )
-    : new Map<string, string>();
+    : await directory.findEmployeeIdsByEmail(
+        ctx,
+        tx,
+        ownAccounts.map(({ values }) => values.email),
+      );
   await apps.syncAccounts(ctx, tx, {
     findingKind: connector.findingKinds.ownAppAccounts,
+    connectionId: connection.id,
     accounts: ownAccounts.map((account) => foundAccount(account, connection.appId, employeeIds)),
     cause,
   });
@@ -49,6 +55,7 @@ export async function syncAccounts(
     const otherAccounts = accounts.filter(({ values }) => values.appExternalId !== null);
     await syncOtherAppAccounts(ctx, tx, apps, {
       findingKind: otherAppAccounts,
+      connectionId: connection.id,
       accounts: otherAccounts,
       employeeIds,
       cause,
@@ -63,11 +70,13 @@ async function syncOtherAppAccounts(
   apps: ScannedApps,
   {
     findingKind,
+    connectionId,
     accounts,
     employeeIds,
     cause,
   }: {
     findingKind: string;
+    connectionId: string;
     accounts: readonly ImportedAccount[];
     employeeIds: Map<string, string>;
     cause: HistoryAppend["cause"];
@@ -82,6 +91,7 @@ async function syncOtherAppAccounts(
   });
   await apps.syncAccounts(ctx, tx, {
     findingKind,
+    connectionId,
     accounts: accounts.map((account) =>
       foundAccount(account, appIds.get(account.values.appExternalId!)!, employeeIds),
     ),

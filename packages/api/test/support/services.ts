@@ -1,5 +1,5 @@
 import type { Orm, Transact } from "../../src/core/db";
-import type { Connector } from "../../src/core/connectors";
+import type { ConnectorRegistry } from "../../src/core/connectors";
 import type { JobQueue } from "../../src/core/jobs";
 import { createMailSettingsService, type MailSettingsService } from "../../src/core/instance";
 import { createLogger } from "../../src/core/logger";
@@ -107,10 +107,10 @@ export function googleSignIn(orm: Orm, { googleUrl }: { googleUrl: string }) {
 }
 
 /** App selection with real transactions and silent logs, with Google Workspace as the directory. */
-export function apps(orm: Orm): AppService {
+export function apps(orm: Orm, transact: Transact = testTransactor(orm)): AppService {
   return createAppService({
     orm,
-    transact: testTransactor(orm),
+    transact,
     logger: createLogger("silent"),
     connectors: GOOGLE_DIRECTORY,
   });
@@ -129,26 +129,31 @@ export function appUsers(orm: Orm): AppUserService {
 export function scans(
   orm: Orm,
   {
-    googleUrl,
+    googleUrl = "http://127.0.0.1:9",
     jobs = recordingJobQueue().jobs,
     connectors,
+    transact = testTransactor(orm),
   }: {
-    googleUrl: string;
+    googleUrl?: string;
     jobs?: JobQueue;
-    connectors?: readonly Connector[];
+    connectors?: ConnectorRegistry;
+    transact?: Transact;
   },
 ): ScanService {
   return createScanService({
     orm,
-    transact: testTransactor(orm),
+    transact,
     logger: createLogger("silent"),
     jobs,
-    connectors: connectors ?? [
-      createGoogleWorkspaceConnector({
-        openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
-        adminApiUrl: googleUrl,
-      }),
-    ],
+    connectors: connectors ?? {
+      list: () =>
+        Promise.resolve([
+          createGoogleWorkspaceConnector({
+            openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
+            adminApiUrl: googleUrl,
+          }),
+        ]),
+    },
     apps: {
       ...createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
       ...createAppAccountService(),

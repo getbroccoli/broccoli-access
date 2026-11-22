@@ -33,7 +33,8 @@ export function createGoogleWorkspaceConnector(addresses: {
     key: GOOGLE_WORKSPACE,
     version: 1,
     name: APP_NAME,
-    transport: "api",
+    capabilities: ["list_accounts"],
+    runtimes: ["server"],
     findingKinds: { ownAppAccounts: "google_directory", otherAppAccounts: "google_sign_in" },
     isDirectory: true,
     connectionFields: [
@@ -43,7 +44,6 @@ export function createGoogleWorkspaceConnector(addresses: {
     ],
     settings: GOOGLE_WORKSPACE_SETTINGS,
     secrets: GOOGLE_WORKSPACE_SECRETS,
-    sourceName: (settings) => parseGoogleWorkspaceSettings(settings).domain,
     async openSession(connection) {
       const { clientId, previousClientIds } = parseGoogleWorkspaceSettings(connection.settings);
       const secrets = GOOGLE_WORKSPACE_SECRETS.parse(connection.secrets);
@@ -183,6 +183,7 @@ function grantAccount(user: GoogleUser, token: GoogleToken, log: GrantLog): Impo
       appExternalId: `google:${token.clientId}`,
       grantedAt: grantedAt?.toISOString() ?? null,
       grantedBefore: grantedAt ? null : log.start.toISOString(),
+      isConnectionUser: false,
     },
   };
 }
@@ -206,6 +207,8 @@ function directoryAccount(user: GoogleUser): ImportedAccount {
       appExternalId: null,
       grantedAt: null,
       grantedBefore: null,
+      // Google Workspace never offers Disable, so no member needs telling apart.
+      isConnectionUser: false,
     },
   };
 }

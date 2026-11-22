@@ -7,7 +7,8 @@ import { googleSetup } from "./googleSetup";
 import { scans } from "./services";
 import { storedAppConnections } from "./storedGoogleConnection";
 import { storedImportSources } from "./storedScan";
-import { SETUP_HOLDER } from "./testSecurityContext";
+import { grantAtFakeGoogle } from "./fakeGoogleControls";
+import { SETUP_HOLDER, SYSTEM } from "./testSecurityContext";
 
 /** Completes real consent, leaving its first scan queued for the test to run. */
 export async function googleScanSetup(orm: Orm, googleUrl: string, jobs?: JobQueue) {
@@ -29,4 +30,12 @@ export async function googleScanSetup(orm: Orm, googleUrl: string, jobs?: JobQue
     sourceId: source.id,
     scans: scans(orm, { googleUrl, jobs }),
   };
+}
+
+/** Finishes a Google scan after the fake grants one person access to Linear. */
+export async function googleScanWithLinearGrant(orm: Orm, googleUrl: string, email: string) {
+  await grantAtFakeGoogle(googleUrl, { email, clientId: "linear-client", appName: "Linear" });
+  const google = await googleScanSetup(orm, googleUrl);
+  await google.scans.runScan(SYSTEM, google.sourceId);
+  return google;
 }
