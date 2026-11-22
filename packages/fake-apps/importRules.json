@@ -4,9 +4,11 @@
     "src/connectorsMain": ["src/connectors"],
     "src/env": [],
     "src/index": ["src/connectors", "src/google", "src/seed"],
-    "src/connectors": ["src/seed"],
-    "src/google": ["src/seed"],
+    "src/connectors": ["src/seed", "src/utils"],
+    "src/google": ["src/seed", "src/utils"],
     "src/seed": [],
+    "src/utils": [],
+    "test/e2e": ["src/seed", "test/support"],
     "test/support": ["src/connectors", "src/google", "src/seed"]
   },
   "testsMayImport": {

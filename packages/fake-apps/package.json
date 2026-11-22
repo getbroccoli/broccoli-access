@@ -13,7 +13,8 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --maxWorkers=2"
+    "test": "vitest run --maxWorkers=2",
+    "test:e2e": "FAKE_CONNECTORS_IMAGE=$(docker build --quiet --file Dockerfile ../..) vitest run --maxWorkers=2 -c vitest.e2e.config.ts"
   },
   "devDependencies": {
     "@broccoli-access/config": "workspace:*",
