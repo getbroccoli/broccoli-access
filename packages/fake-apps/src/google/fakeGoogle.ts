@@ -15,35 +15,42 @@ import { seededState } from "./state";
 export interface FakeGoogleOptions {
   /** Redirect addresses registered for the seed's OAuth client. */
   redirectUris?: string[];
+  /** Interface to listen on; defaults to `127.0.0.1`, so only this machine reaches the controls. */
+  host?: string;
+  /** Defaults to a free port. */
+  port?: number;
   /** Address browsers use for the consent page; defaults to `url`. */
   browserUrl?: string;
+  /** Address servers use for the token endpoint, user info and keys; defaults to `url`. */
+  serverUrl?: string;
   /** The clock; its value at start is the fake's start, which the seed's grant dates count back from. */
   now?: () => Date;
 }
 
 export interface RunningFakeGoogle {
-  /** `http://127.0.0.1:<free port>`, also the address servers use. */
+  /** The address it listens on, such as `http://127.0.0.1:<free port>`. */
   url: string;
   stop: () => Promise<void>;
 }
 
-/** Starts a fake Google serving the seeded Acme on a free local port. */
+/** Starts a fake Google serving the seeded Acme, by default on a free local port. */
 export async function startFakeGoogle(options: FakeGoogleOptions = {}): Promise<RunningFakeGoogle> {
   const now = options.now ?? (() => new Date());
   const start = now();
   const redirectUris = options.redirectUris ?? [];
+  const host = options.host ?? "127.0.0.1";
   const signingKey = await createSigningKey();
   const server = createServer();
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
+    server.listen(options.port ?? 0, host, resolve);
   });
-  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const url = `http://${host}:${(server.address() as AddressInfo).port}`;
   const context: FakeGoogleContext = {
     state: seededState(ACME, start, redirectUris),
     now,
     browserUrl: options.browserUrl ?? url,
-    serverUrl: url,
+    serverUrl: options.serverUrl ?? url,
     signingKey,
     reset: () => {
       context.state = seededState(ACME, start, redirectUris);

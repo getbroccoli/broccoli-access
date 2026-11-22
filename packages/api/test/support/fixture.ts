@@ -1,3 +1,4 @@
+import { startFakeGoogle, type RunningFakeGoogle } from "@broccoli-access/fake-apps";
 import { inject, test as baseTest } from "vitest";
 
 import { connectDatabase, type Orm, type Transact } from "../../src/core/db";
@@ -11,8 +12,10 @@ import { testTransactor } from "./testTransactor";
  * Vitest's `test` with fixtures, each created only for the tests that use it:
  * `env`, a running Broccoli Access for end-to-end tests (seed it with `env.seed`), and
  * `orm` and `seed`, a fresh migrated database for use-case integration tests (its
- * URL is `databaseUrl`), and `transact`, transactions on `orm` whose events nobody
- * receives.
+ * URL is `databaseUrl`), `transact`, transactions on `orm` whose events nobody
+ * receives, and `fakeGoogle`, Google with the demo company Acme on a free local port, fresh for
+ * each test. A test registers its server's redirect address, `<its origin>/api/google/callback`,
+ * with the fake's `POST /_fake/clients`.
  */
 export const test = baseTest.extend<{
   env: TestEnv;
@@ -20,6 +23,7 @@ export const test = baseTest.extend<{
   databaseUrl: string;
   seed: TestSeed;
   transact: Transact;
+  fakeGoogle: RunningFakeGoogle;
 }>({
   // eslint-disable-next-line no-empty-pattern -- Vitest reads fixture dependencies from this pattern.
   env: async ({}, use) => {
@@ -49,5 +53,14 @@ export const test = baseTest.extend<{
   },
   transact: async ({ orm }, use) => {
     await use(testTransactor(orm));
+  },
+  // eslint-disable-next-line no-empty-pattern -- Vitest reads fixture dependencies from this pattern.
+  fakeGoogle: async ({}, use) => {
+    const fake = await startFakeGoogle();
+    try {
+      await use(fake);
+    } finally {
+      await fake.stop();
+    }
   },
 });

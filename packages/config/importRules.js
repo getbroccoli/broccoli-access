@@ -47,6 +47,8 @@ export function importRulesConfig(packageDir) {
           { selector: "TSImportType > Literal.source", kind: "type", name: "import-type" },
         ],
         "import/resolver": { typescript: { project: join(packageDir, "tsconfig.json") } },
+        // Another workspace package resolves outside this one; it is a dependency like any other.
+        "boundaries/flag-as-external": { outsideRootPath: true },
       },
       rules: {
         "boundaries/dependencies": [

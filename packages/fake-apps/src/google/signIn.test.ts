@@ -34,9 +34,10 @@ it("publishes the fake's server endpoints and Google's issuer", async ({ fake })
   });
 });
 
-it("uses the browser address only for browser-facing discovery endpoints", async () => {
+it("uses the browser address for browser-facing discovery endpoints and the server address for the rest", async () => {
   const fake = await startFakeGoogle({
     browserUrl: "http://google.example:4000",
+    serverUrl: "http://fake-google:4000",
     now: () => new Date("2026-11-21T08:00:00.000Z"),
   });
   onTestFinished(() => fake.stop());
@@ -45,9 +46,9 @@ it("uses the browser address only for browser-facing discovery endpoints", async
 
   expect(await response.json()).toMatchObject({
     authorization_endpoint: "http://google.example:4000/o/oauth2/v2/auth",
-    token_endpoint: `${fake.url}/token`,
-    userinfo_endpoint: `${fake.url}/v1/userinfo`,
-    jwks_uri: `${fake.url}/oauth2/v3/certs`,
+    token_endpoint: "http://fake-google:4000/token",
+    userinfo_endpoint: "http://fake-google:4000/v1/userinfo",
+    jwks_uri: "http://fake-google:4000/oauth2/v3/certs",
   });
 });
 
