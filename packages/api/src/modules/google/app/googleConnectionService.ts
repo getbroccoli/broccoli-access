@@ -203,7 +203,9 @@ export function createGoogleConnectionService(
       ctx.require("MANAGE_WORKSPACE");
       const { browserToken, now } = answer;
       const change =
-        browserToken === null ? null : openConsentState(secretBox, answer.state, { browserToken, now });
+        browserToken === null
+          ? null
+          : openConsentState(secretBox, answer.state, { browserToken, now });
       if (change?.flow !== "change_google_app") {
         throw new ApplicationError(
           "INVALID_INPUT",
