@@ -15,11 +15,8 @@ const FIRST_USERS = 8;
 /** An app: its status and actions, how many use it and keep access though suspended, and its users. */
 export function AppPage() {
   const { appId } = useParams({ from: "/_authenticated/apps_/$appId" });
-  const { data } = useQuery(AppPageDocument, {
-    variables: { id: appId },
-    // A scan moves the app's users outside this cache.
-    fetchPolicy: "cache-and-network",
-  });
+  // The route's loader has just read the page into the cache.
+  const { data } = useQuery(AppPageDocument, { variables: { id: appId } });
   const app = data?.app;
   // The route's loader found the app, so it is missing only while a reload replaces it.
   if (!app) {
