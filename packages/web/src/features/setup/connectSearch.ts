@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Why connecting Google failed, as `/api/google/callback` reports it. */
-export const CONNECT_ERRORS = ["cancelled", "not_super_admin", "failed"] as const;
+const CONNECT_ERRORS = ["cancelled", "not_super_admin", "failed"] as const;
 
 export type ConnectError = (typeof CONNECT_ERRORS)[number];
 

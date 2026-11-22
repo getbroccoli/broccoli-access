@@ -8,7 +8,7 @@ import { googleRouter } from "./http";
 export { createGoogleConnectionService } from "./app";
 
 // Public types.
-export type { GoogleConnectionDependencies, GoogleConnectionService } from "./app";
+export type { GoogleConnectionService } from "./app";
 
 /** Google Workspace connected with the instance's own Google app: the consent at setup and Google's redirect. */
 export function googleModule(dependencies: GoogleConnectionDependencies): ModuleManifest {

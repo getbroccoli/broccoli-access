@@ -5,5 +5,5 @@ export {
   type MailIntegration,
   type MailSettingsService,
 } from "./mailSettingsService";
-export { createOwnerService, type GoogleAdmin, type OwnerService } from "./ownerService";
+export { createOwnerService } from "./ownerService";
 export { createSetupSessionService, type SetupHolder } from "./setupSessionService";

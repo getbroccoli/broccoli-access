@@ -10,11 +10,5 @@ export { selfHostedServer } from "./selfHostedServer";
 export { MAIL_SOURCES } from "./domain";
 
 // Public types.
-export type {
-  GoogleAdmin,
-  InstanceMailer,
-  MailIntegration,
-  MailSettingsService,
-  OwnerService,
-} from "./app";
+export type { InstanceMailer, MailIntegration, MailSettingsService } from "./app";
 export type { MailChoice, MailConfig, MailSource } from "./domain";
