@@ -29,7 +29,7 @@ export const importSources = pgTable(
     check("import_sources_status", sql`${table.status} in ('scanning', 'scanned', 'scan_failed')`),
     check(
       "import_sources_failure",
-      sql`${table.failure} in ('authentication_failed', 'permission_missing', 'rate_limited', 'app_unavailable', 'unexpected_response')`,
+      sql`${table.failure} in ('authentication_failed', 'permission_missing', 'rate_limited', 'app_unavailable', 'unexpected_response', 'blocked_by_check', 'account_not_found', 'wrong_workspace', 'not_allowed', 'owner_browser_lost')`,
     ),
     check(
       "import_sources_failure_when_failed",

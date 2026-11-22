@@ -74,20 +74,24 @@ test("reads no photo on a scan where no photo changed", async ({ orm, fakeGoogle
   const proxy = await startCountingGoogleProxy(fakeGoogle.url);
   onTestFinished(() => proxy.stop());
   const scans = scanServices(orm, {
-    googleUrl: fakeGoogle.url,
-    connectors: [
-      createGoogleWorkspaceConnector({
-        openIdConfigurationUrl: `${fakeGoogle.url}/.well-known/openid-configuration`,
-        adminApiUrl: proxy.url,
-      }),
-    ],
+    connectors: {
+      list: () =>
+        Promise.resolve([
+          createGoogleWorkspaceConnector({
+            openIdConfigurationUrl: `${fakeGoogle.url}/.well-known/openid-configuration`,
+            adminApiUrl: proxy.url,
+          }),
+        ]),
+    },
   });
   await scans.runScan(SYSTEM, sourceId);
   const before = await storedEmployees(orm);
   expect(before.filter(({ avatarFileId }) => avatarFileId !== null)).toHaveLength(11);
   expect(proxy.paths.filter((path) => path.endsWith("/photos/thumbnail"))).toHaveLength(11);
   proxy.paths.length = 0;
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 
@@ -107,7 +111,9 @@ test("replaces a changed photo, deletes the old file and records the change", as
   const ana = (await storedEmployees(orm)).find(({ email }) => email === "ana@acme.example")!;
   expect(ana.avatarFileId).toEqual(expect.any(String));
   fakeGoogle.setPhoto(ana.email, PNG);
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 
@@ -142,7 +148,9 @@ test("clears a removed photo, deletes its file and records the change", async ({
   const ben = (await storedEmployees(orm)).find(({ email }) => email === "ben@acme.example")!;
   expect(ben.avatarFileId).toEqual(expect.any(String));
   fakeGoogle.setPhoto(ben.email, null);
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 
@@ -186,7 +194,9 @@ test.for([
         count: 1,
       });
     }
-    await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+    await transact((tx) =>
+      scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+    );
 
     await scans.runScan(SYSTEM, sourceId);
 
@@ -218,7 +228,9 @@ test("reads on the next scan a photo whose first read failed", async ({
   expect(
     (await storedEmployees(orm)).filter(({ avatarFileId }) => avatarFileId !== null),
   ).toHaveLength(10);
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 
@@ -241,9 +253,13 @@ test("reads again on the next scan a changed photo whose read failed", async ({
     error: "unexpected_response",
     count: 1,
   });
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
   await scans.runScan(SYSTEM, sourceId);
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 

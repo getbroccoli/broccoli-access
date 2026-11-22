@@ -68,7 +68,9 @@ test("changes no app, account or history line on a second scan", async ({
   const apps = await storedApps(orm);
   const accounts = await storedAppAccounts(orm);
   const history = await storedRecordHistory(orm);
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 
@@ -143,7 +145,9 @@ test("adds another client named figma to the existing app and Ana's existing acc
   )!;
   const clientId = "999-figma-desktop.apps.googleusercontent.com";
   await grantAtFakeGoogle(fakeGoogle.url, { email: ana.email, clientId, appName: "figma" });
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 
@@ -168,7 +172,9 @@ test("discovers an unknown app and dates its new grant", async ({ orm, fakeGoogl
     clientId: "new-app",
     appName: "Acme Sketch",
   });
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 
@@ -208,7 +214,9 @@ test("deletes a revoked grant account while keeping its creation and deletion hi
   const history = (await storedRecordHistory(orm)).filter(({ recordId }) => recordId === ana.id);
   expect(history).toMatchObject([{ operation: "created" }]);
   await revokeAtFakeGoogle(fakeGoogle.url, { email: ana.email, clientId: FIGMA.clientId });
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 

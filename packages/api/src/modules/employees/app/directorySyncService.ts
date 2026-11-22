@@ -30,6 +30,15 @@ export interface DirectorySyncService {
     people: readonly DirectoryPerson[],
     cause: HistoryAppend["cause"],
   ) => Promise<Map<string, string>>;
+  /**
+   * The employees with these lowercased emails, their ids by email, for another app's accounts;
+   * an email nobody has is left out. System only.
+   */
+  findEmployeeIdsByEmail: (
+    ctx: SecurityContext,
+    db: Orm | Tx,
+    emails: readonly string[],
+  ) => Promise<Map<string, string>>;
   /** The emails, among these lowercased ones, whose employee has a photo. System only. */
   findEmailsWithPhoto: (
     ctx: SecurityContext,
@@ -59,6 +68,11 @@ export function createDirectorySyncService(): DirectorySyncService {
       const managerNames = await namesOfManagers(repository, employees, saved);
       await recordChanges(ctx, tx, { created, saved, managerNames, cause });
       return new Map(people.map(({ email }) => [email, links.idsByEmail.get(email)!]));
+    },
+    async findEmployeeIdsByEmail(ctx, db, emails) {
+      ctx.requireSystem();
+      const employees = await employeeRepository(db).findByEmails(emails);
+      return new Map(employees.map(({ email, id }) => [email, id]));
     },
     async findEmailsWithPhoto(ctx, db, emails) {
       ctx.requireSystem();

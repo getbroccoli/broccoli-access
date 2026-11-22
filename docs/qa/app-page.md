@@ -25,6 +25,16 @@ A manual check of an app's page, `/apps/<id>`, against a development stack.
 - [ ] A Discovered app's page has both "Approve" and "Ignore"; approving it removes the left menu's Discovered badge when it was the last one.
 - [ ] Google Workspace's page has no action button, and its amber card reads 0 without the tint.
 
+## A connected app
+
+Connect Linear in Settings → Connections as in [Connections settings](connections-settings.md#apps), then open Linear from Applications.
+
+- [ ] The header reads "Linear" with "Approved" and "Connected", "linear.app · the Acme workspace. Scanned today at HH:MM." below, and "Open Linear admin ↗" and "Scan now" on the right; "Open Linear admin" opens `https://linear.app/acme/settings/members` in a new tab.
+- [ ] The cards read "Users 7" and "Suspended in Google, still has access 1".
+- [ ] The table adds "In Linear" after Status: Hannah Weber reads "Disabled", the others "Active"; Found via reads "Linear members"; the pending invitation is not listed.
+- [ ] Suspend Chloé in the fake (`POST <fake connectors>/_fake/linear/members/chloe@acme.example/suspend`) and choose "Scan now": the header shows "Scanning…", then Chloé reads "Disabled" without a reload.
+- [ ] Google Workspace's page reads "Connected" too, and has no "In …" column.
+
 ## Not found
 
 - [ ] `/apps/00000000-0000-4000-8000-000000000001` and `/apps/not-an-id` show "Page not found".

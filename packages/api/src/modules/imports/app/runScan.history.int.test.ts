@@ -87,7 +87,9 @@ test("a rescan after the owner's employee changed email keeps the owner linked t
   const mia = (await storedEmployees(orm)).find(({ email }) => email === "admin@acme.example")!;
   expect(mia.userId).toBe(ownerUserId);
   await employeeServices(orm).updateEmployee(OWNER, { id: mia.id, email: "mia@example.com" });
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 

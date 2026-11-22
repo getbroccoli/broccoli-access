@@ -1,0 +1,90 @@
+import assert from "node:assert/strict";
+
+import type { ConnectorCall, ConnectorErrorCode } from "@broccoli-access/connector-contract";
+import { ACME_LINEAR } from "@broccoli-access/fake-apps";
+import express, { type RequestHandler } from "express";
+import { onTestFinished } from "vitest";
+
+import type { Orm, Transact } from "../../src/core/db";
+import { createLogger } from "../../src/core/logger";
+import { createAppConnectionService } from "../../src/modules/apps";
+import {
+  createContainerConnectionService,
+  createContainerConnectors,
+} from "../../src/modules/connectors";
+import { recordingJobQueue } from "./recordingJobQueue";
+import { startSimpleHttpServer } from "./simpleHttpServer";
+import { scans } from "./services";
+import { storedAppConnections } from "./storedGoogleConnection";
+import { storedImportSources } from "./storedScan";
+import { OWNER } from "./testSecurityContext";
+import { TEST_SECRET_BOX } from "./testSecretBox";
+import { testTransactor } from "./testTransactor";
+
+export const LINEAR_INPUT = {
+  connector: "linear",
+  values: [{ key: "apiKey", value: ACME_LINEAR.apiKey }],
+};
+
+export function containerConnectors(url?: string) {
+  return createContainerConnectors({ url, logger: createLogger("silent") });
+}
+
+/** Connects and scans through the container, recording the jobs for the test to run. */
+export function containerConnections(
+  orm: Orm,
+  url: string,
+  transact: Transact = testTransactor(orm),
+) {
+  const { jobs, sent } = recordingJobQueue();
+  const connectors = containerConnectors(url);
+  const scanService = scans(orm, { jobs, connectors });
+  const service = createContainerConnectionService({
+    orm,
+    transact,
+    wait: () => Promise.resolve(),
+    logger: createLogger("silent"),
+    containerConnectors: connectors,
+    connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
+    scans: scanService,
+  });
+  return { service, scans: scanService, sent };
+}
+
+/** Leaves the first Linear scan queued and returns its stored app, connection and source. */
+export async function connectLinear(orm: Orm, url: string) {
+  const { service, scans } = containerConnections(orm, url);
+  await service.connect(OWNER, LINEAR_INPUT);
+  const connection = (await storedAppConnections(orm)).find((row) => row.connector === "linear")!;
+  const source = (await storedImportSources(orm)).find(
+    (row) => row.connectionId === connection.id,
+  )!;
+  return { connectionId: connection.id, appId: connection.appId, sourceId: source.id, scans };
+}
+
+export async function failLinearCall(
+  url: string,
+  call: ConnectorCall,
+  code: ConnectorErrorCode,
+  count = 1,
+) {
+  const response = await fetch(`${url}/_fake/failures`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ connector: "linear", call, code, count }),
+  });
+  assert.equal(response.status, 204);
+}
+
+/** Serves the fake manifest and a test-specific accounts/list answer. */
+export async function serveAccountList(fakeUrl: string, list: RequestHandler) {
+  const manifest = await (await fetch(`${fakeUrl}/v1/connectors`)).text();
+  const app = express();
+  app.get("/v1/connectors", (_request, response) => {
+    response.type("json").send(manifest);
+  });
+  app.post("/v1/accounts/list", express.json(), list);
+  const server = await startSimpleHttpServer(app);
+  onTestFinished(() => server.stop());
+  return server;
+}

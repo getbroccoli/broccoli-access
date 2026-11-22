@@ -1,4 +1,4 @@
-import { eq, type SQL } from "drizzle-orm";
+import { and, count, eq, type SQL, sql } from "drizzle-orm";
 
 import {
   ACCOUNT_VALUES_VERSION,
@@ -26,6 +26,13 @@ export interface ImportSourceRepository {
   replaceRecords(id: string, accounts: readonly ImportedAccount[]): Promise<void>;
   /** The accounts the source's last saved scan found. */
   findRecords(id: string): Promise<ImportedAccount[]>;
+  /**
+   * The source's account of the member whose key or session the connection uses; null without
+   * one, as a version 1 record, which predates the flag, reads.
+   */
+  findConnectionUser(id: string): Promise<ImportedAccount | null>;
+  /** How many accounts the source's last saved scan found, and how many of them are suspended. */
+  countRecords(id: string): Promise<{ accounts: number; suspended: number }>;
   markScanned(id: string, readAt: Date): Promise<void>;
   markFailed(id: string, failure: ConnectorErrorCode): Promise<void>;
 }
@@ -75,6 +82,38 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
         })
         .from(importRecords)
         .where(eq(importRecords.sourceId, id)),
+    findConnectionUser: async (id) => {
+      const [record] = await orm()
+        .select({
+          sourceKey: importRecords.sourceKey,
+          raw: importRecords.raw,
+          values: importRecords.values,
+        })
+        .from(importRecords)
+        .where(
+          and(
+            eq(importRecords.sourceId, id),
+            // The builder has no JSON operators; the key is a constant.
+            sql`(${importRecords.values} ->> 'isConnectionUser') = 'true'`,
+          ),
+        )
+        .limit(1);
+      return record ?? null;
+    },
+    countRecords: async (id) => {
+      const [row] = await orm()
+        .select({
+          accounts: count(),
+          // The builder has no JSON operators or filtered counts; the values are constants.
+          suspended:
+            sql<number>`count(*) filter (where ${importRecords.values} ->> 'status' = 'suspended')`.mapWith(
+              Number,
+            ),
+        })
+        .from(importRecords)
+        .where(eq(importRecords.sourceId, id));
+      return row!;
+    },
     markScanned: async (id, readAt) => {
       await orm()
         .update(importSources)

@@ -44,7 +44,7 @@ export {
 } from "./testServer";
 export { EXAMPLE_JOB } from "./exampleJob";
 export { EXAMPLE_RECORD, EXAMPLE_REGISTRATION } from "./exampleRecord";
-export { expectBlockedBy } from "./expectBlockedBy";
+export { expectBlockedBy, holdBeforeCommit } from "./expectBlockedBy";
 export { recordChangedEvents } from "./recordChangedEvents";
 export { signedIn } from "./signedIn";
 export { fakeMail } from "./fakeMail";
@@ -64,7 +64,7 @@ export {
   changeStoredGoogleDomain,
 } from "./storedGoogleConnection";
 export { googleSetup, GOOGLE_SCOPES } from "./googleSetup";
-export { googleScanSetup } from "./googleScanSetup";
+export { googleScanSetup, googleScanWithLinearGrant } from "./googleScanSetup";
 export { approvedGoogleSetup } from "./approvedGoogleSetup";
 export { connectorContract, type ConnectorContractCase } from "./connectorContract";
 export { recordingJobQueue } from "./recordingJobQueue";
@@ -77,9 +77,18 @@ export {
 export {
   storedApps,
   storedEmployees,
+  canReferenceEmployee,
   storedAppAccounts,
   storedImportSources,
   storedImportRecords,
   storedRecordHistory,
 } from "./storedScan";
 export { readGoogleConnection, finishSetupWithPreselectedApps, scannedApps } from "./scannedGoogle";
+export {
+  connectLinear,
+  containerConnections,
+  containerConnectors,
+  failLinearCall,
+  serveAccountList,
+  LINEAR_INPUT,
+} from "./containerConnections";

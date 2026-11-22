@@ -4,8 +4,8 @@ export {
   ACCOUNT_VALUES_VERSION,
   CONNECTOR_ERROR_CODES,
   ConnectorError,
-  RETRIED_CONNECTOR_ERRORS,
 } from "./connector";
+export { withConnectorRetries } from "./connectorRetries";
 
 // Public types.
 export type {
@@ -15,8 +15,10 @@ export type {
   AccountValues,
   ConnectionDetails,
   ConnectionField,
+  ConnectionUpdate,
   Connector,
   ConnectorErrorCode,
+  ConnectorRegistry,
   ConnectorSession,
   ImportedAccount,
 } from "./connector";

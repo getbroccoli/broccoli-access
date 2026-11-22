@@ -29,6 +29,13 @@
       "when": 1795375878793,
       "tag": "0003_pair_chrome_extension",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795384632419,
+      "tag": "0004_connect_container_apps",
+      "breakpoints": true
     }
   ]
 }

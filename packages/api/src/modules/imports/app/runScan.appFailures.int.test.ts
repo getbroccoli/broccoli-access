@@ -30,7 +30,9 @@ test.for(["directory.tokens.list", "reports.activities.list"])(
       appName: "Acme Sketch",
     });
     await failFakeGoogle(fakeGoogle.url, { endpoint, error: "permission_missing", count: 1 });
-    await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+    await transact((tx) =>
+      scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+    );
 
     await scans.runScan(SYSTEM, sourceId);
 
@@ -64,7 +66,9 @@ test("fails a rescan whose sign-in log stays rate limited and keeps the last app
     error: "rate_limited",
     count: 3,
   });
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 

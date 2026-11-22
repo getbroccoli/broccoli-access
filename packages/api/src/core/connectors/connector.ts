@@ -1,3 +1,8 @@
+import {
+  type Capability,
+  CONNECTOR_ERROR_CODES as CONTRACT_ERROR_CODES,
+  type RuntimeKind,
+} from "@broccoli-access/connector-contract";
 import type { z } from "zod";
 
 /**
@@ -9,7 +14,10 @@ export interface Connector {
   key: string;
   version: number;
   name: string;
-  transport: "api";
+  /** What it can do with its app's accounts: `list_accounts`, plus `suspend` and `reactivate` to change them. */
+  capabilities: readonly Capability[];
+  /** Where its calls can run, in the order they are tried. */
+  runtimes: readonly RuntimeKind[];
   /** The finding kinds it registers: what finds accounts of its own app, and of other apps. */
   findingKinds: { ownAppAccounts: string; otherAppAccounts?: string };
   /** Whether its app's accounts are the company's employees. */
@@ -20,8 +28,6 @@ export interface Connector {
   settings: z.ZodType;
   /** Checks a connection's decrypted secrets. */
   secrets: z.ZodType;
-  /** What the UI calls the connection's import source, such as the Google domain. */
-  sourceName(settings: unknown): string;
   /** Checks the connection's settings and secrets and signs in to the app. */
   openSession(connection: { settings: unknown; secrets: unknown }): Promise<ConnectorSession>;
   /**
@@ -41,6 +47,12 @@ export interface ConnectionField {
   secret: boolean;
 }
 
+/** Every connector the instance can use: the core's own, and the connectors container's. */
+export interface ConnectorRegistry {
+  /** Every connector now known; the container's join once its list has loaded. */
+  list(): Promise<readonly Connector[]>;
+}
+
 /** A connection signed in to its app; each call fails with a `ConnectorError` only. */
 export interface ConnectorSession {
   /** What Settings shows about the connected account. */
@@ -55,11 +67,21 @@ export interface ConnectionDetails {
   organizationName: string;
   /** Null for an app without a domain. */
   domain: string | null;
+  /** New settings found by the test, such as the workspace's id. */
+  connection?: ConnectionUpdate;
 }
 
 export interface AccountPage {
   accounts: ImportedAccount[];
   nextCursor: string | null;
+  /** Renewed settings or secrets, saved before the page's accounts are used. */
+  connection?: ConnectionUpdate;
+}
+
+/** New settings or secrets an answer carries; each object it carries replaces the stored one. */
+export interface ConnectionUpdate {
+  settings?: Record<string, unknown>;
+  secrets?: Record<string, unknown>;
 }
 
 /** One account as an import record of type `app_account`, at `ACCOUNT_VALUES_VERSION`. */
@@ -87,6 +109,8 @@ export interface AccountValues {
   grantedAt: string | null;
   /** Set only when the grant is older than the log: the earliest moment the log covered. */
   grantedBefore: string | null;
+  /** The member whose key or session the connection uses; false in version 1 records. */
+  isConnectionUser: boolean;
 }
 
 /** Whether the person may use their account in the app. */
@@ -101,24 +125,15 @@ export interface AccountPhoto {
 }
 
 /** The version of `AccountValues` the import records store. */
-export const ACCOUNT_VALUES_VERSION = 1;
+export const ACCOUNT_VALUES_VERSION = 2;
 
-/** Why a connector failed; it never passes on the app's raw answer. */
-export const CONNECTOR_ERROR_CODES = [
-  "authentication_failed",
-  "permission_missing",
-  "rate_limited",
-  "app_unavailable",
-  "unexpected_response",
-] as const;
+/**
+ * Why a connector failed; it never passes on the app's raw answer. The connectors container's own
+ * codes, such as `wrong_workspace`, come from the connector contract.
+ */
+export const CONNECTOR_ERROR_CODES = CONTRACT_ERROR_CODES;
 
 export type ConnectorErrorCode = (typeof CONNECTOR_ERROR_CODES)[number];
-
-/** Failures that pass on their own, so the scan tries the call again before failing. */
-export const RETRIED_CONNECTOR_ERRORS: readonly ConnectorErrorCode[] = [
-  "rate_limited",
-  "app_unavailable",
-];
 
 /** A connector's failure, carrying only its code: no response, URL or token. */
 export class ConnectorError extends Error {

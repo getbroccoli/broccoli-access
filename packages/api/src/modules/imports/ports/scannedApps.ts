@@ -14,13 +14,27 @@ export interface ScannedApps {
     appId: string;
     settings: Record<string, unknown>;
   } | null>;
-  readSecrets(db: Orm | Tx, connectionId: string): Promise<Record<string, string> | null>;
-  /** Makes the accounts `findingKind` saw exactly `accounts`, with history, joining `tx`. */
+  readSecrets(db: Orm | Tx, connectionId: string): Promise<Record<string, unknown> | null>;
+  /** Holds off other account syncs and connects until `tx` ends; a scan's save takes it first. */
+  holdAccountSyncs(ctx: SecurityContext, tx: Tx): Promise<void>;
+  /** Replaces the settings or secrets `update` carries, joining `tx`; new settings add history. */
+  changeConnection(
+    ctx: SecurityContext,
+    tx: Tx,
+    connectionId: string,
+    update: { settings?: Record<string, unknown>; secrets?: Record<string, unknown> },
+  ): Promise<void>;
+  /**
+   * Makes the accounts `findingKind` saw exactly `accounts`, with history, joining `tx`; an account
+   * in an app that another connection than `connectionId` reads keeps its status.
+   */
   syncAccounts(
     ctx: SecurityContext,
     tx: Tx,
     sync: {
       findingKind: string;
+      /** The scanned connection. */
+      connectionId: string;
       accounts: readonly {
         appId: string;
         email: string;

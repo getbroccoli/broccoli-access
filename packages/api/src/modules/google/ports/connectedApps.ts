@@ -3,13 +3,13 @@ import type { SecurityContext } from "../../../core/security";
 
 /** What the Google module needs from the apps module: the connected app and its connection. */
 export interface ConnectedApps {
-  /** Creates the catalog app, approved, and saves its connection with the secrets encrypted, joining `tx`. */
+  /** Approves the connector's app and saves its connection with the secrets encrypted, joining `tx`. */
   connectApp(
     ctx: SecurityContext,
     tx: Tx,
     connection: {
-      catalogKey: string;
       connector: string;
+      app: { name: string; domain: string | null };
       settings: Record<string, unknown>;
       secrets: Record<string, string>;
     },

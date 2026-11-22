@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 
 import type { DataTableColumn } from "@/components/dataTable";
 import { t } from "@/i18n";
-import { describeFoundVia } from "@/lib/foundVia";
+import { FoundVia } from "@/components/FoundVia";
 import { formatSince } from "@/lib/since";
 
 import { AppRowActions } from "./AppRowActions";
@@ -23,7 +23,7 @@ const FOUND_VIA_COLUMN: DataTableColumn<AppRow> = {
   id: "foundVia",
   header: t("apps.column.foundVia"),
   className: "w-[22%]",
-  cell: ({ foundVia }) => describeFoundVia(foundVia),
+  cell: ({ foundVia }) => <FoundVia findingKinds={foundVia} />,
 };
 
 /** The columns of the approved apps: who uses each, how they were found, and who keeps access though suspended. */

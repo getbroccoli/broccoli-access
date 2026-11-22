@@ -42,13 +42,14 @@ test("saves all 42 directory people with lowercase emails and their names", asyn
     expect(records.find((record) => record.sourceKey === person.id)).toMatchObject({
       sourceId,
       type: "app_account",
-      typeVersion: 1,
+      typeVersion: 2,
       raw: {
         id: person.id,
         primaryEmail: person.email,
         name: { givenName: person.givenName, familyName: person.familyName },
       },
       values: {
+        isConnectionUser: false,
         email: person.email.toLowerCase(),
         firstName: person.givenName,
         lastName: person.familyName,
@@ -131,6 +132,7 @@ test("finishes scanned with the read time and counts of people and suspended acc
   });
   expect(await scans.readScan(OWNER, connectionId)).toEqual({
     id: sourceId,
+    sourceName: "acme.example",
     status: "scanned",
     failure: null,
     readAt: source!.readAt,
@@ -157,10 +159,14 @@ test("a failed second page preserves the last successful records, people and acc
   // Aisha is on the first page: its changed data must not escape a failed scan.
   await suspendAtFakeGoogle(fakeGoogle.url, "aisha@acme.example");
   const failingScan = scanService(orm, {
-    googleUrl: fakeGoogle.url,
-    connectors: [failingFakeGoogleOnSecondPage(fakeGoogle.url, "permission_missing")],
+    connectors: {
+      list: () =>
+        Promise.resolve([failingFakeGoogleOnSecondPage(fakeGoogle.url, "permission_missing")]),
+    },
   });
-  await transact((tx) => failingScan.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    failingScan.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await failingScan.runScan(SYSTEM, sourceId);
 
@@ -194,7 +200,9 @@ test("a rescan suspends Elif without duplicating people and appends just one his
   )!;
   const history = await storedRecordHistory(orm);
   await suspendAtFakeGoogle(fakeGoogle.url, elif.email);
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 
@@ -246,7 +254,9 @@ test("three rate-limited attempts fail the scan without changing previous record
     error: "rate_limited",
     count: 3,
   });
-  await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   await scans.runScan(SYSTEM, sourceId);
 

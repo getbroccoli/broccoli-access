@@ -22,7 +22,14 @@ export function connectorContract(
   expected: {
     description: Pick<
       Connector,
-      "key" | "version" | "name" | "transport" | "findingKinds" | "isDirectory" | "connectionFields"
+      | "key"
+      | "version"
+      | "name"
+      | "capabilities"
+      | "runtimes"
+      | "findingKinds"
+      | "isDirectory"
+      | "connectionFields"
     >;
     connection: { organizationName: string; domain: string | null };
   },
@@ -45,7 +52,7 @@ export function connectorContract(
     expect(await session.testConnection()).toEqual(expected.connection);
   });
 
-  test("pages through accounts with version-one values and unique source keys", async ({
+  test("pages through accounts with version-two values and unique source keys", async ({
     connectorCase,
   }) => {
     const session = await connectorCase.connector.openSession(connectorCase.connection);
@@ -113,6 +120,7 @@ export function connectorContract(
 
 const ACCOUNT_VALUES = z.object({
   email: z.email(),
+  isConnectionUser: z.boolean(),
   status: z.enum(["active", "suspended"]),
   firstName: z.string().nullable(),
   lastName: z.string().nullable(),

@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { t } from "@/i18n";
-import { describeFoundVia } from "@/lib/foundVia";
+import { FoundVia } from "@/components/FoundVia";
 import { formatSince } from "@/lib/since";
 
 type Props = {
@@ -50,7 +50,9 @@ export function CurrentAccessTable({ currentAccess }: Props) {
                   {appName}
                 </span>
               </TableCell>
-              <TableCell>{describeFoundVia(foundVia)}</TableCell>
+              <TableCell>
+                <FoundVia findingKinds={foundVia} />
+              </TableCell>
               <TableCell>{formatSince(since)}</TableCell>
             </TableRow>
           ))}

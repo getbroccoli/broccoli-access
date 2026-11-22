@@ -2,6 +2,7 @@ import {
   expect,
   test,
   SYSTEM,
+  connectLinear,
   googleScanSetup,
   instances,
   failFakeGoogle,
@@ -33,5 +34,19 @@ test("a failed scan leaves setup at the scan", async ({ orm, fakeGoogle }) => {
   expect(await storedImportSources(orm)).toMatchObject([
     { id: sourceId, status: "scan_failed", failure: "permission_missing" },
   ]);
+  expect((await instances.readInstance(orm)).step).toBe("scan");
+});
+
+test("a completed Linear scan leaves directory setup at the scan step", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  await seed.setupStep("scan");
+  const linear = await connectLinear(orm, fakeConnectors.url);
+
+  await linear.scans.runScan(SYSTEM, linear.sourceId);
+
+  expect(await storedImportSources(orm)).toMatchObject([{ status: "scanned" }]);
   expect((await instances.readInstance(orm)).step).toBe("scan");
 });

@@ -26,6 +26,8 @@ type App {
 "An account in an app that belongs to an employee."
 type AppUser {
   id: ID!
+  "Whether the person may use the account in the app."
+  status: AppAccountStatus!
   "The finding kinds that saw the account, sorted, such as `google_sign_in`; connector modules register them."
   foundVia: [String!]!
   since: Since!
@@ -36,6 +38,13 @@ type Since {
   at: DateTime!
   "The grant is older than the log, which began at `at`; false says nothing more about how exact `at` is."
   before: Boolean!
+}
+
+"Whether a person may use their account in an app."
+enum AppAccountStatus {
+  ACTIVE
+  "Suspended in the app; a connected app shows it as Disabled."
+  SUSPENDED
 }
 
 "Whether the company uses an app."

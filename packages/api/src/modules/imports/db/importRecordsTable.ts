@@ -24,7 +24,7 @@ export const importRecords = pgTable(
     /** The source's own id for the account, such as the Google user id. */
     sourceKey: text("source_key").notNull(),
     raw: jsonb("raw").$type<ImportedAccount["raw"]>().notNull(),
-    // Version 1 is the only one so far.
+    // Version 2 added `isConnectionUser`; a version 1 record reads as false.
     values: jsonb("values").$type<AccountValues>().notNull(),
     /** Unused in circle 1: where the person's photo can be downloaded. */
     photoUrl: text("photo_url"),

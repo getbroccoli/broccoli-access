@@ -8,6 +8,7 @@ import {
   createAppService,
   createAppUserService,
 } from "./apps";
+import { connectorsModule, createContainerConnectors } from "./connectors";
 import {
   createDirectorySyncService,
   createEmployeeReadService,
@@ -29,6 +30,8 @@ export interface ModuleSettings {
   googleOpenIdConfigurationUrl: string;
   /** `GOOGLE_ADMIN_API_URL`: where Google's Directory answers. */
   googleAdminApiUrl: string;
+  /** `CONNECTORS_URL`: the connectors container; unset means no app connects through it. */
+  connectorsUrl?: string;
 }
 
 /** Every module of the API, each given only the dependencies it uses. */
@@ -39,10 +42,14 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     openIdConfigurationUrl: settings.googleOpenIdConfigurationUrl,
     adminApiUrl: settings.googleAdminApiUrl,
   };
-  const connectors = [createGoogleWorkspaceConnector(googleAddresses)];
+  const { directoryConnectors, containerConnectors, connectors } = createConnectors(
+    core,
+    googleAddresses,
+    settings.connectorsUrl,
+  );
   const connectedApps = createAppConnectionService(core);
-  const apps = createAppService({ ...core, connectors });
-  // One scan service for the job, the page and the consent, which share its progress.
+  const apps = createAppService({ ...core, connectors: directoryConnectors });
+  // One scan service for the job, the page and the connect flows, which share its progress.
   const scans = createScanService({
     ...core,
     connectors,
@@ -63,11 +70,12 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       employeeDirectory: directory,
     }),
     importsModule(scans),
+    connectorsModule({ ...core, containerConnectors, connectedApps, scans }),
     appsModule({
       ...apps,
       ...createAppUserService({
         ...core,
-        connectors,
+        connectors: directoryConnectors,
         employees: createEmployeeReadService({ ...core, accounts: apps }),
       }),
     }),
@@ -77,4 +85,20 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     manifests: [...manifests, recordsManifest(core, manifests)],
     employeeDirectory: directory,
   };
+}
+
+/** Google Workspace, the directory, then the connectors container's, read at start. */
+function createConnectors(
+  { logger }: ModuleDependencies,
+  googleAddresses: { openIdConfigurationUrl: string; adminApiUrl: string },
+  connectorsUrl: string | undefined,
+) {
+  const directoryConnectors = [createGoogleWorkspaceConnector(googleAddresses)];
+  const containerConnectors = createContainerConnectors({ url: connectorsUrl, logger });
+  // Read at start, so the log shows at once whether the container answers.
+  void containerConnectors.list();
+  const connectors = {
+    list: async () => [...directoryConnectors, ...(await containerConnectors.list())],
+  };
+  return { directoryConnectors, containerConnectors, connectors };
 }

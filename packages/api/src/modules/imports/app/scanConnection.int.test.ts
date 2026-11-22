@@ -21,7 +21,9 @@ test("a second request for a queued scan returns its source without queuing anot
   const { jobs, sent } = recordingJobQueue();
   const { scans, sourceId, connectionId } = await googleScanSetup(orm, fakeGoogle.url, jobs);
 
-  const result = await transact((tx) => scans.scanConnection(OWNER, tx, connectionId));
+  const result = await transact((tx) =>
+    scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
+  );
 
   expect(result).toEqual({ sourceId });
   expect(await storedImportSources(orm)).toMatchObject([{ id: sourceId, status: "scanning" }]);
@@ -46,7 +48,9 @@ test("refuses a scan without MANAGE_WORKSPACE and writes nothing", async ({
   sent.length = 0;
 
   await expect(
-    transact((tx) => scans.scanConnection(EMPLOYEE, tx, connectionId)),
+    transact((tx) =>
+      scans.scanConnection(EMPLOYEE, tx, { connectionId, sourceName: "acme.example" }),
+    ),
   ).rejects.toMatchObject({ code: "FORBIDDEN" });
 
   expect(sent).toEqual([]);

@@ -5,6 +5,8 @@ import type { ImportSource, ScanStatus } from "./importSource";
 export interface Scan {
   /** The import source the scans read into. */
   id: string;
+  /** What the UI calls the source, such as the Google domain or the app's workspace name. */
+  sourceName: string;
   status: ScanStatus;
   failure: ConnectorErrorCode | null;
   readAt: Date | null;
@@ -57,8 +59,8 @@ export function scanOf(
   source: ImportSource,
   { progress, saved }: { progress: ScanProgress | null; saved: ScanCounts | null },
 ): Scan {
-  const { id, status, failure, readAt } = source;
-  return { id, status, failure, readAt, ...steps(status, progress, saved) };
+  const { id, name, status, failure, readAt } = source;
+  return { id, sourceName: name, status, failure, readAt, ...steps(status, progress, saved) };
 }
 
 /** What a directory scan does with a person's photo. */

@@ -11,6 +11,12 @@ export {
 } from "./app";
 export { catalogApp, type CatalogApp } from "./catalog";
 export {
+  APP_CONNECTION_STATUSES,
+  type ConnectedApp,
+  connectedAppOf,
+  RECONNECT_CAUSES,
+} from "./appConnection";
+export {
   type AccountSyncPlan,
   accountChanges,
   type AppAccount,

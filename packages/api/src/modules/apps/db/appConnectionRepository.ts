@@ -23,12 +23,14 @@ export interface AppConnectionRepository {
     settings: Record<string, unknown>;
     encryptedSecrets: string;
   }): Promise<AppConnection>;
-  /** Replaces the connection's settings and secrets; null for an unknown id. */
+  /** Replaces the connection's settings or secrets, whichever is set; null for an unknown id. */
   update(
     id: string,
-    connection: { settings: Record<string, unknown>; encryptedSecrets: string },
+    connection: { settings?: Record<string, unknown>; encryptedSecrets?: string },
   ): Promise<AppConnection | null>;
   findByConnector(connector: string): Promise<AppConnection | null>;
+  /** Every connection; an instance has at most one per connector. */
+  findAll(): Promise<AppConnection[]>;
   findById(id: string): Promise<AppConnection | null>;
   /** The connections of the apps `appIds`; an app nobody connected has none. */
   findByApps(appIds: readonly string[]): Promise<AppConnection[]>;
@@ -65,6 +67,7 @@ export function appConnectionRepository(db: Orm | Tx): AppConnectionRepository {
         .where(eq(appConnections.connector, connector));
       return connection ?? null;
     },
+    findAll: () => orm().select(columns).from(appConnections),
     findById: async (id) => {
       const [connection] = await orm()
         .select(columns)

@@ -62,6 +62,9 @@ export function createResolvers(
           return { setup: { id: "instance", step: "DONE", holder: "NOBODY" } };
         }, ["INVALID_INPUT", "CONFLICT"]),
     },
+    AppUser: {
+      status: ({ status }) => toEnum(status),
+    },
     App: {
       status: ({ status }) => toEnum(status),
       users: async (app, { first }, context) => {

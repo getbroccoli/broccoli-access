@@ -21,6 +21,12 @@ export interface DirectoryPeople {
     }[],
     cause: HistoryAppend["cause"],
   ): Promise<Map<string, string>>;
+  /** The employees with these lowercased emails, their ids by email; an email nobody has is left out. */
+  findEmployeeIdsByEmail(
+    ctx: SecurityContext,
+    db: Orm | Tx,
+    emails: readonly string[],
+  ): Promise<Map<string, string>>;
   /** The emails, among these lowercased ones, whose employee has a photo. */
   findEmailsWithPhoto(
     ctx: SecurityContext,

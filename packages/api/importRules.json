@@ -26,9 +26,16 @@
     ],
     "src/modules/imports": ["src/core/*", "!src/core/server"],
     "src/modules/extension": ["src/core/*", "!src/core/server"],
+    "src/modules/connectors": [
+      "src/core/*",
+      "!src/core/server",
+      "src/integrations/connectorsContainer",
+      "src/utils"
+    ],
     "src/modules/system": ["src/core/*", "!src/core/server"],
     "src/integrations/mail": ["src/utils"],
     "src/integrations/google": ["src/utils"],
+    "src/integrations/connectorsContainer": ["src/utils"],
     "src/utils": [],
     "src/core/server": ["src/core/*"],
     "src/core/moduleManifest": [

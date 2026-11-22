@@ -4,20 +4,30 @@ type GoogleWorkspaceConnection {
   scan: Scan
 }
 
+# Adds the scans to the connectors module's connections.
+type ContainerConnection {
+  "The connection's scans: the one running, or the last one's outcome; null before the first."
+  scan: Scan
+  "The email of the member whose key or session the connection uses, from its last successful scan; null before one."
+  connectionUserEmail: String
+}
+
 "The scans of one connected app: the one running, or the last one's outcome."
 type Scan {
   "The import source the scans read into."
   id: ID!
+  "What the UI calls the source: the Google domain, or the connected app's workspace name, such as `Acme`."
+  sourceName: String!
   status: ScanStatus!
   "Why the last scan failed; null unless `status` is `SCAN_FAILED`."
   failure: ScanFailure
   "When the last successful scan finished; null before one."
   readAt: DateTime
-  "Reading the directory's people."
+  "Reading the connection's people: the directory's, or the members an app's scan returned."
   people: ScanPeopleStep!
-  "Finding the apps people signed in to with the directory's accounts."
+  "Finding the apps people signed in to with the directory's accounts; an app's scan finds no other apps, and its step reads done with 0."
   apps: ScanAppsStep!
-  "Reading the sign-in logs that date when people granted the apps access."
+  "Reading the sign-in logs that date when people granted the apps access; an app's scan reads none, and its step follows the people's."
   signInLogs: ScanSignInLogsStep!
 }
 
@@ -43,12 +53,22 @@ enum ScanFailure {
   APP_UNAVAILABLE
   "The app answered something the connector does not understand."
   UNEXPECTED_RESPONSE
+  "A CAPTCHA, bot check or MFA prompt stopped the connector."
+  BLOCKED_BY_CHECK
+  "No single member matched."
+  ACCOUNT_NOT_FOUND
+  "The key or session reaches another workspace than the connection's."
+  WRONG_WORKSPACE
+  "The app refused the change."
+  NOT_ALLOWED
+  "The owner's Chrome went away during the call."
+  OWNER_BROWSER_LOST
 }
 
-"Reading the directory's people during a scan."
+"Reading the connection's people during a scan."
 type ScanPeopleStep {
   state: ScanStepState!
-  "How many people the directory holds; null until the step is done."
+  "How many people the directory holds, or how many members the app returned; null until the step is done."
   count: Int
   "How many of them are suspended; null until the step is done."
   suspended: Int

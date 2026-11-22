@@ -15,6 +15,7 @@ test("a queued scan shows people running with no counts", async ({ orm, fakeGoog
 
   expect(scan).toEqual({
     id: sourceId,
+    sourceName: "acme.example",
     status: "scanning",
     failure: null,
     readAt: null,
@@ -37,6 +38,7 @@ test("a failed first scan shows its failure and people failed", async ({ orm, fa
 
   expect(scan).toEqual({
     id: sourceId,
+    sourceName: "acme.example",
     status: "scan_failed",
     failure: "permission_missing",
     readAt: null,

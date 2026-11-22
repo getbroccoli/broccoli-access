@@ -7,6 +7,7 @@ import { t } from "@/i18n";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { PageHeader } from "@/shell";
 
+import { ContainerConnectorsSettings } from "../ContainerConnectorsSettings";
 import { ChromeExtensionCard } from "./ChromeExtensionCard";
 import { GoogleWorkspaceCard } from "./GoogleWorkspaceCard";
 
@@ -24,18 +25,26 @@ export function ConnectionsSettings() {
         title={t("settings.connections.title")}
         description={t("settings.connections.description")}
       />
-      {connection ? (
-        <GoogleWorkspaceCard connection={connection} />
-      ) : error ? (
-        <div role="alert" className="flex flex-col items-start gap-3">
-          <p className="text-sm text-destructive">{t("settings.connections.loadFailed")}</p>
-          <Button type="button" variant="outline" onClick={() => void refetch()}>
-            {t("settings.connections.retry")}
-          </Button>
-        </div>
-      ) : (
-        !data && <Skeleton className="h-[150px] rounded-xl" />
-      )}
+      <div className="flex flex-col gap-6">
+        <section aria-labelledby="directory-title" className="flex flex-col gap-2.5">
+          <h2 id="directory-title" className="text-sm font-semibold text-muted-foreground">
+            {t("settings.connections.directory")}
+          </h2>
+          {connection ? (
+            <GoogleWorkspaceCard connection={connection} />
+          ) : error ? (
+            <div role="alert" className="flex flex-col items-start gap-3">
+              <p className="text-sm text-destructive">{t("settings.connections.loadFailed")}</p>
+              <Button type="button" variant="outline" onClick={() => void refetch()}>
+                {t("settings.connections.retry")}
+              </Button>
+            </div>
+          ) : (
+            !data && <Skeleton className="h-[150px] rounded-xl" />
+          )}
+        </section>
+        <ContainerConnectorsSettings />
+      </div>
       <ChromeExtensionCard />
     </div>
   );
