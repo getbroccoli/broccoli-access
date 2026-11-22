@@ -1,15 +1,9 @@
 {
   "elements": {
-    "src/index": [
-      "src/connectorManifest",
-      "src/connectorCalls",
-      "src/conformance",
-      "src/containers"
-    ],
+    "src/index": ["src/connectorManifest", "src/connectorCalls"],
     "src/connectorManifest": [],
     "src/connectorCalls": [],
-    "src/conformance": ["src/connectorManifest", "src/connectorCalls"],
-    "src/containers": []
+    "src/conformance": ["src/connectorManifest", "src/connectorCalls"]
   },
   "testsMayImport": {}
 }

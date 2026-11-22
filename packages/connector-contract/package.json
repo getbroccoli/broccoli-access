@@ -6,7 +6,8 @@
   "description": "The connector contract's schemas and conformance suite, for any connectors container.",
   "license": "AGPL-3.0-only",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./conformance": "./src/conformance/index.ts"
   },
   "files": [
     "src",
@@ -22,6 +23,11 @@
   },
   "peerDependencies": {
     "vitest": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "24.19.1",

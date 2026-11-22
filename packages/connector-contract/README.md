@@ -17,7 +17,7 @@ allowBuilds:
   "@broccoli-access/connector-contract": false
 ```
 
-The package is TypeScript source: Vitest runs it and `tsc` checks it as it is, with no build step. It needs `vitest` 5 and Docker for the suite.
+The package is TypeScript source: Vitest runs it and `tsc` checks it as it is, with no build step. The schemas come from the package itself; the suite, from `@broccoli-access/connector-contract/conformance`, needs `vitest` 5 and Docker.
 
 ## Schemas
 
@@ -28,7 +28,10 @@ Zod schemas for each request and answer of the four calls, the manifest, the con
 In a Vitest test file, start two containers of your image with a read-only root file system, then describe the suite with one fixture for each connector in the manifest. Each connector must list the `server` runtime, where the suite calls it:
 
 ```ts
-import { describeConnectorConformance, startContainers } from "@broccoli-access/connector-contract";
+import {
+  describeConnectorConformance,
+  startContainers,
+} from "@broccoli-access/connector-contract/conformance";
 import { afterAll } from "vitest";
 
 const { urls, stop } = await startContainers("<image>", { dockerArgs: ["--network", "<network>"] });
@@ -45,11 +48,11 @@ describeConnectorConformance({
         /* make the next actions/run call through the container at url answer with code */
       },
       reset: async (url) => {
-        /* put the fake app back to its seed */
+        /* put the fake app back to its seed: the member active, the credentials working, no error waiting */
       },
     },
   ],
 });
 ```
 
-It checks every item under "Conformance" in the contract: each answer matches its schema, each error uses a listed code, a repeated action changes the member once, an action reports the status read afterwards, an unlisted runtime gets HTTP 400, and both containers give the same answers apart from renewed secrets. Like the core, it starts each series of calls with a connection test and applies the connection updates answers carry.
+It checks every item under "Conformance" in the contract: each answer matches its schema, each error the fixture causes comes back with its listed code (a check of the answer, not of how the connector meets that failure), a repeated action changes the member once, an action reports the status read afterwards, an unlisted runtime gets HTTP 400, and both containers give the same answers apart from renewed secrets. Like the core, it starts each series of calls with a connection test and applies the connection updates answers carry.

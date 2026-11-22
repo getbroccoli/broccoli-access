@@ -16,5 +16,6 @@ export function pageOf<T>(items: T[], { maxResults, offset }: PageRequest) {
 /** The offset a token from `pageOf` carries; undefined for any other text. */
 export function pageTokenOffset(pageToken: string): number | undefined {
   const match = /^o(\d+)$/.exec(Buffer.from(pageToken, "base64url").toString());
-  return match?.[1] === undefined ? undefined : Number(match[1]);
+  const offset = Number(match?.[1]);
+  return Number.isSafeInteger(offset) ? offset : undefined;
 }

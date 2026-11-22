@@ -15,8 +15,8 @@ import {
   type ConnectorCall,
   type ConnectorErrorCode,
   type ListedAccount,
-} from "./connectorCalls.js";
-import { CONNECTOR_MANIFEST, RUNTIME_KINDS } from "./connectorManifest.js";
+} from "../connectorCalls.js";
+import { CONNECTOR_MANIFEST, RUNTIME_KINDS } from "../connectorManifest.js";
 
 export interface ConformanceOptions {
   /**
@@ -37,7 +37,10 @@ export interface ConnectorFixture {
   member: { sourceKey: string; email: string };
   /** Makes the next `actions/run` call through the container at `url` fail with `code`. */
   causeError: (url: string, code: ConnectorErrorCode) => Promise<void>;
-  /** Puts the fake app behind the container at `url` back to its seed; runs before each check. */
+  /**
+   * Puts the fake app behind the container at `url` back to its seed before each check: the
+   * member active, the connection's credentials working, and no error waiting.
+   */
   reset: (url: string) => Promise<void>;
 }
 
@@ -48,8 +51,9 @@ export interface ConnectorFixture {
  */
 export function describeConnectorConformance({ urls, fixtures }: ConformanceOptions): void {
   const [url, otherUrl] = urls;
-  describe("container conformance", () => {
-    it("has a fixture for every connector in its manifest", async () => {
+  // The checks share the containers and reset their apps, so they never run concurrently.
+  describe("container conformance", { timeout: NO_CHECK_TIMEOUT, concurrent: false }, () => {
+    it("has a fixture for every connector in a manifest that matches its schema", async () => {
       const manifest = CONNECTOR_MANIFEST.parse(await getManifest(url));
 
       const keys = manifest.connectors.map(({ key }) => key);
@@ -57,35 +61,38 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
     });
   });
   for (const fixture of fixtures) {
-    describe(`${fixture.connector} conformance`, { timeout: NO_CHECK_TIMEOUT }, () => {
-      beforeEach(async () => {
-        await fixture.reset(url);
-        await fixture.reset(otherUrl);
-      });
-      it("lists the connector in a manifest that matches its schema", () =>
-        checkManifest(url, fixture));
-      it("answers a connection test that matches its schema", () => startFlow(url, fixture));
-      it("lists members on pages that match their schema, the fixture's member among them", () =>
-        checkList(url, fixture));
-      it("changes the member once when an action repeats, and reports the status read afterwards", () =>
-        checkRepeatedActions(url, fixture));
-      it.for(CONNECTOR_ERROR_CODES)("answers %s as a connector error", (code) =>
-        checkError(url, fixture, code),
-      );
-      it("answers a runtime the connector does not list with HTTP 400", () =>
-        checkUnlistedRuntimes(url, fixture));
-      it("gives the same answers from two containers of the same image, apart from renewed secrets", async () => {
-        expect(await answersOf(otherUrl, fixture)).toEqual(await answersOf(url, fixture));
-      });
-    });
+    describe(
+      `${fixture.connector} conformance`,
+      { timeout: NO_CHECK_TIMEOUT, concurrent: false },
+      () => {
+        beforeEach(() => withinDeadline(fixture.reset(url), "the fixture's reset"));
+        it("answers a connection test that matches its schema", () => startFlow(url, fixture));
+        it("lists members on pages that match their schema, the fixture's member among them", () =>
+          checkList(url, fixture));
+        it("changes the member once when an action repeats, and reports the status read afterwards", () =>
+          checkRepeatedActions(url, fixture));
+        it.for(CONNECTOR_ERROR_CODES)(
+          "answers %s, when the fixture causes it, as that error",
+          (code) => checkError(url, fixture, code),
+        );
+        it("answers a runtime the connector does not list with HTTP 400", () =>
+          checkUnlistedRuntimes(url, fixture));
+        it("gives the same answers from two containers of the same image, apart from renewed secrets", async () => {
+          expect(await answersOf(otherUrl, fixture)).toEqual(await answersOf(url, fixture));
+        });
+      },
+    );
   }
 }
 
 /** A connector answers within 90 seconds (contract "Answers"). */
 const CALL_TIMEOUT_MS = 90_000;
 
-/** Each call has its own deadline, so a check that makes many needs none. */
+/** Each call and fixture step has its own deadline, so a check that makes many needs none. */
 const NO_CHECK_TIMEOUT = 0;
+
+/** A fixture talks to a fake app on the same machine, so it gets a connector call's time too. */
+const FIXTURE_TIMEOUT_MS = CALL_TIMEOUT_MS;
 
 /** A paging loop that never ends is a failure, not a hang. */
 const MAX_PAGES = 1_000;
@@ -109,12 +116,6 @@ interface Flow {
   url: string;
   fixture: ConnectorFixture;
   connection: Connection;
-}
-
-async function checkManifest(url: string, fixture: ConnectorFixture): Promise<void> {
-  const manifest = CONNECTOR_MANIFEST.parse(await getManifest(url));
-
-  expect(manifest.connectors.map(({ key }) => key)).toContain(fixture.connector);
 }
 
 async function checkList(url: string, fixture: ConnectorFixture): Promise<void> {
@@ -143,7 +144,7 @@ async function checkError(
   code: ConnectorErrorCode,
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
-  await fixture.causeError(url, code);
+  await withinDeadline(fixture.causeError(url, code), "the fixture's causeError");
 
   const answer = await send(flow, "actions/run", actionFields(fixture, "suspend"));
 
@@ -183,7 +184,7 @@ async function expectAction(
 
 /** Every answer a freshly reset app gives, each a success, without the secrets a connection renews. */
 async function answersOf(url: string, fixture: ConnectorFixture): Promise<unknown[]> {
-  await fixture.reset(url);
+  await withinDeadline(fixture.reset(url), "the fixture's reset");
   const manifest = await getManifest(url);
   const [flow, testAnswer] = await startFlow(url, fixture);
   const pages = await listPages(flow);
@@ -194,7 +195,8 @@ async function answersOf(url: string, fixture: ConnectorFixture): Promise<unknow
 
 /** A connection that passed its test, with the settings the test found, and the test's answer. */
 async function startFlow(url: string, fixture: ConnectorFixture): Promise<[Flow, unknown]> {
-  const flow = { url, fixture, connection: await fixture.connection(url) };
+  const connection = await withinDeadline(fixture.connection(url), "the fixture's connection");
+  const flow = { url, fixture, connection };
   const answer = await send(flow, "connections/test", {});
   expect(CONNECTION_TEST_ANSWER.safeParse(answer).error, "the test's answer").toBeUndefined();
   return [flow, answer];
@@ -207,11 +209,14 @@ async function listAll(flow: Flow): Promise<ListedAccount[]> {
 
 async function listPages(flow: Flow): Promise<unknown[]> {
   const pages: unknown[] = [];
+  const cursors = new Set<string>();
   let cursor: string | null = null;
   do {
     const page = await send(flow, "accounts/list", { cursor });
     pages.push(page);
     cursor = ACCOUNTS_LIST_ANSWER.parse(page).nextCursor;
+    expect(cursors.has(cursor ?? ""), "a nextCursor seen before").toBe(false);
+    if (cursor !== null) cursors.add(cursor);
   } while (cursor !== null && pages.length < MAX_PAGES);
   expect(cursor, "the last page's nextCursor").toBeNull();
   return pages;
@@ -220,7 +225,7 @@ async function listPages(flow: Flow): Promise<unknown[]> {
 /** Calls on the server runtime and keeps the connection update a successful answer carries. */
 async function send(flow: Flow, path: ConnectorCall, fields: object): Promise<unknown> {
   const answer = await call(flow.url, path, { ...requestOf(flow, "connections/test"), ...fields });
-  const update = UPDATING_ANSWER.safeParse(answer).data?.connection;
+  const update = isError(answer) ? undefined : UPDATING_ANSWER.safeParse(answer).data?.connection;
   // Each object an update carries replaces the stored one (contract "The connection").
   if (update !== undefined) flow.connection = { ...flow.connection, ...update };
   return answer;
@@ -251,13 +256,40 @@ function unlistedRuntimes(listed: readonly string[]): { kind: string; url?: stri
   ];
 }
 
-/** A call's answer, which must come with HTTP 200 and match one of the contract's answers. */
+/**
+ * A call's answer, which must come with HTTP 200 and match one of the contract's answers: an
+ * error alone, with a listed code, or a success without an error.
+ */
 async function call(url: string, path: string, body: object): Promise<unknown> {
   const response = await post(url, path, body);
   expect(response.status, `HTTP status of ${path}`).toBe(200);
   const answer: unknown = await response.json();
   expect(ANY_ANSWER.safeParse(answer).error, `answer of ${path}`).toBeUndefined();
+  if (isError(answer)) {
+    expect(Object.keys(answer), `error answer of ${path}`).toEqual(["error"]);
+    expect(CONNECTOR_ERROR_CODES, `error code of ${path}`).toContain(answer.error.code);
+  }
   return answer;
+}
+
+function isError(answer: unknown): answer is { error: { code: unknown } } {
+  return typeof answer === "object" && answer !== null && "error" in answer;
+}
+
+/** Fails a fixture step that never settles, as a call past its deadline fails. */
+async function withinDeadline<T>(step: Promise<T>, name: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${name} took over ${FIXTURE_TIMEOUT_MS} ms`)),
+      FIXTURE_TIMEOUT_MS,
+    );
+  });
+  try {
+    return await Promise.race([step, late]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function getManifest(url: string): Promise<unknown> {
@@ -284,5 +316,6 @@ function post(url: string, path: string, body: object): Promise<Response> {
 function withoutRenewedSecrets(answer: unknown): unknown {
   if (typeof answer !== "object" || answer === null || !("connection" in answer)) return answer;
   const { connection, ...rest } = answer as { connection: Record<string, unknown> };
-  return { ...rest, connection: { ...connection, secrets: undefined } };
+  const kept = Object.fromEntries(Object.entries(connection).filter(([key]) => key !== "secrets"));
+  return Object.keys(kept).length === 0 ? rest : { ...rest, connection: kept };
 }

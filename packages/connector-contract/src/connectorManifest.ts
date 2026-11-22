@@ -33,7 +33,11 @@ export const CONNECTOR_DESCRIPTION = z.object({
   appDomain: z.string().min(1),
   /** In the order the core tries them. */
   runtimes: z.array(z.enum(RUNTIME_KINDS)).min(1),
-  capabilities: z.array(z.enum(CAPABILITIES)).min(1),
+  /** A capability a later v1 adds is left out, so an older reader still reads the manifest. */
+  capabilities: z
+    .array(z.string())
+    .min(1)
+    .transform((capabilities) => capabilities.filter(isCapability)),
   findingKind: z.string().min(1),
   connectionFields: z.array(z.discriminatedUnion("kind", [TEXT_FIELD, APP_SESSION_FIELD])),
   /** Shown before the first connection; null for an API connector. */
@@ -44,6 +48,10 @@ export const CONNECTOR_DESCRIPTION = z.object({
 
 /** The answer of `GET /v1/connectors`. */
 export const CONNECTOR_MANIFEST = z.object({ connectors: z.array(CONNECTOR_DESCRIPTION) });
+
+function isCapability(capability: string): capability is Capability {
+  return (CAPABILITIES as readonly string[]).includes(capability);
+}
 
 export type RuntimeKind = (typeof RUNTIME_KINDS)[number];
 export type Capability = (typeof CAPABILITIES)[number];

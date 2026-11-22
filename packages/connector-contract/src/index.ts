@@ -43,9 +43,3 @@ export {
   type ConnectorManifest,
   type RuntimeKind,
 } from "./connectorManifest.js";
-export {
-  describeConnectorConformance,
-  type ConformanceOptions,
-  type ConnectorFixture,
-} from "./conformance.js";
-export { startContainers, type RunningContainers } from "./containers.js";

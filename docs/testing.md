@@ -70,13 +70,13 @@ The connectors container is faked in `packages/fake-apps` for `slack` and `linea
 - API tests use the `fakeConnectors` fixture, and tests in `packages/fake-apps` the `connectors` fixture: a fresh fake on a free local port for each test, answering without delay.
 - Each answer takes 250 ms by default, so a change's progress shows; `POST /_fake/delay` changes it.
 
-Set `FAKE` to its address, such as `http://127.0.0.1:<printed port>`. The examples use `jq`.
+Set `FAKE` to its address, such as `http://127.0.0.1:<printed port>`. The examples use Bash and `jq`.
 
 ### Linear
 
 The key `lin_api_acme_fake` reaches Acme's Linear; any other key fails with `authentication_failed`.
 
-```sh
+```bash
 LINEAR='{"connector":"linear","runtime":{"kind":"server"},"connection":{"settings":{},"secrets":{"apiKey":"lin_api_acme_fake"}}}'
 curl -s "$FAKE/v1/connectors"
 curl -s -H 'content-type: application/json' -d "$LINEAR" "$FAKE/v1/connections/test"
@@ -98,13 +98,17 @@ curl -s -H 'content-type: application/json' \
   CONFIG=$(printf '%s' "$PAGE" | sed -n 's/.*id="localConfig_v2">\(.*\)<\/script>.*/\1/p')
   ```
 
-- The call carries them as the `appSession` secret, then works like Linear's above with `$SLACK`:
+- The call carries them as the `appSession` secret, then works like Linear's above with `$SLACK` and a Slack member, such as Ana:
 
-  ```sh
+  ```bash
   SLACK=$(jq -nc --arg d "$D" --arg config "$CONFIG" '{connector: "slack", runtime: {kind: "server"},
     connection: {settings: {}, secrets: {appSession: {storage: {localConfig_v2: $config}, cookies: [{name: "d",
     value: $d, domain: "slack.localhost", path: "/", httpOnly: true, secure: false, sameSite: "Lax"}]}}}}')
   curl -s -H 'content-type: application/json' -d "$SLACK" "$FAKE/v1/connections/test"
+  ANA=$(curl -s "$FAKE/_fake/state" | jq -c '.slack[] | select(.email == "ana@acme.example") | {sourceKey, email}')
+  curl -s -H 'content-type: application/json' \
+    -d "$(jq -c --argjson account "$ANA" '. + {action: "suspend", account: $account}' <<<"$SLACK")" \
+    "$FAKE/v1/actions/run"
   ```
 
 - The fake accepts only app sessions it issued since its last start, reset or session expiry. Its list has three pages: pass each `nextCursor` as the next `cursor`.
@@ -152,6 +156,7 @@ allowBuilds:
 ```
 
 ```ts
+// from "@broccoli-access/connector-contract/conformance"
 const { urls, stop } = await startContainers("<image>");
 afterAll(stop);
 describeConnectorConformance({ urls, fixtures: [/* one ConnectorFixture per connector */] });

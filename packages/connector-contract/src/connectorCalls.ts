@@ -62,7 +62,7 @@ export const APP_SESSION = z.object({
 /** Where a call runs; an owner's browser address works for one call only. */
 export const RUNTIME = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("server") }),
-  z.object({ kind: z.literal("owner_browser"), url: z.string().min(1) }),
+  z.object({ kind: z.literal("owner_browser"), url: z.url({ protocol: /^wss?$/ }) }),
 ]);
 
 const CALL = z.object({ connector: z.string().min(1), connection: CONNECTION, runtime: RUNTIME });

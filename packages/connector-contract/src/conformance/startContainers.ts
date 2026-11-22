@@ -2,6 +2,8 @@ import { execFile } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 
+import { CONNECTOR_MANIFEST } from "../connectorManifest.js";
+
 /** Two running containers of one image, for the conformance suite. */
 export interface RunningContainers {
   /** Where this machine reaches each container's port 4000. */
@@ -29,9 +31,11 @@ export async function startContainers(
     // One immutable id, so a tag moved by a rebuild cannot give the two containers different images.
     const imageId = (await docker("image", "inspect", "--format", "{{.Id}}", image)).trim();
     for (let index = 0; index < 2; index++) {
-      ids.push(await runContainer(imageId, options.dockerArgs));
+      ids.push(await createContainer(imageId, options.dockerArgs));
     }
     for (const id of ids) await expectReadOnly(id);
+    // Started only once created, so a container that fails to start is still removed.
+    await docker("start", ...ids);
     const [url, otherUrl] = await Promise.all(ids.map(readyUrl));
     return { urls: [url!, otherUrl!], stop };
   } catch (error) {
@@ -39,6 +43,9 @@ export async function startContainers(
     throw error;
   }
 }
+
+/** The one writable folder the contract gives the container, for its browser. */
+const TEMPORARY_FOLDER = "/tmp";
 
 /** Long enough for a container to start its server on a slow CI machine. */
 const READY_TIMEOUT_MS = 60_000;
@@ -50,13 +57,12 @@ const PROBE_TIMEOUT_MS = 5_000;
 /** The lines of a container's own log that a failed start shows. */
 const LOG_LINES_ON_FAILURE = "20";
 
-async function runContainer(imageId: string, dockerArgs: string[] = []): Promise<string> {
+async function createContainer(imageId: string, dockerArgs: string[] = []): Promise<string> {
   const id = await docker(
-    "run",
-    "--detach",
+    "create",
     "--read-only",
     "--tmpfs",
-    "/tmp",
+    TEMPORARY_FOLDER,
     "--publish",
     "127.0.0.1::4000",
     ...dockerArgs,
@@ -65,14 +71,20 @@ async function runContainer(imageId: string, dockerArgs: string[] = []): Promise
   return id.trim();
 }
 
-/** `dockerArgs` could undo `--read-only`, and an image's volumes stay writable despite it. */
+/**
+ * `dockerArgs` could undo `--read-only` or add a writable folder, and an image's volumes stay
+ * writable despite it: only the contract's temporary folder may be written.
+ */
 async function expectReadOnly(id: string): Promise<void> {
   const inspected = await docker("inspect", "--format", "{{json .}}", id);
   const { HostConfig, Mounts } = JSON.parse(inspected) as {
-    HostConfig: { ReadonlyRootfs: boolean };
+    HostConfig: { ReadonlyRootfs: boolean; Tmpfs: Record<string, string> | null };
     Mounts: { RW: boolean; Destination: string }[];
   };
-  const writable = Mounts.filter((mount) => mount.RW).map((mount) => mount.Destination);
+  const writable = [
+    ...Mounts.filter((mount) => mount.RW).map((mount) => mount.Destination),
+    ...Object.keys(HostConfig.Tmpfs ?? {}).filter((folder) => folder !== TEMPORARY_FOLDER),
+  ];
   if (!HostConfig.ReadonlyRootfs || writable.length > 0) {
     throw new Error(
       `Container ${id} must have a read-only root file system and no writable mount; writable: ${writable.join(", ") || "its root"}`,
@@ -89,7 +101,9 @@ async function readyUrl(id: string): Promise<string> {
     await sleep(READY_POLL_MS);
   }
   const logs = await docker("logs", "--tail", LOG_LINES_ON_FAILURE, id).catch(() => "");
-  throw new Error(`Container ${id} did not answer GET /v1/connectors with 200 at ${url}:\n${logs}`);
+  throw new Error(
+    `Container ${id} did not answer GET /v1/connectors with a manifest at ${url}:\n${logs}`,
+  );
 }
 
 async function answersManifest(url: string): Promise<boolean> {
@@ -98,7 +112,7 @@ async function answersManifest(url: string): Promise<boolean> {
       redirect: "manual",
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
-    return response.status === 200;
+    return response.status === 200 && CONNECTOR_MANIFEST.safeParse(await response.json()).success;
   } catch {
     return false;
   }

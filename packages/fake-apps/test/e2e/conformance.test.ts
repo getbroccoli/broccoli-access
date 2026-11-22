@@ -2,7 +2,7 @@ import {
   describeConnectorConformance,
   startContainers,
   type ConnectorFixture,
-} from "@broccoli-access/connector-contract";
+} from "@broccoli-access/connector-contract/conformance";
 import { afterAll } from "vitest";
 
 import { control, memberAccount, signInToFakeSlack } from "#test/support";
