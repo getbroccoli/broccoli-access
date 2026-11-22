@@ -13,6 +13,9 @@ test("stores only the token hash for a pairing", async ({ orm, seed }) => {
   expect(rows).toHaveLength(1);
   expect(rows[0]!.token_hash).toMatch(/\S/);
   expect(rows[0]!.token_hash).not.toContain(token);
+  const separator = token.indexOf(".");
+  expect(separator).toBeGreaterThan(0);
+  expect(rows[0]!.token_hash).not.toContain(token.slice(separator + 1));
 });
 
 test("pairing again replaces the browser and its token", async ({ orm, seed }) => {

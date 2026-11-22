@@ -19,6 +19,6 @@ export function extensionModule(
     name: "extension",
     typeDefs: readSdl(import.meta.url, "./graphql/schema.graphql"),
     resolvers: createResolvers(pairings),
-    router: () => extensionRouter(pairings),
+    router: () => extensionRouter(pairings, dependencies.logger),
   };
 }

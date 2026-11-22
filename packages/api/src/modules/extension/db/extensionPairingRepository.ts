@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { type Orm, ormOf, type Tx } from "../../../core/db";
 import type { ExtensionPairing } from "../domain";
@@ -6,7 +6,10 @@ import { extensionPairings } from "./extensionPairingsTable";
 
 /** Extension pairings in Postgres, through the pool or inside a transaction. */
 export interface ExtensionPairingRepository {
-  /** Pairs the user's browser, replacing their pairing and its token hash; keeps the row's id. */
+  /**
+   * Pairs the user's browser, replacing their pairing with a new id, so a call that checked the
+   * old token can no longer touch or delete the new pairing.
+   */
   save(pairing: {
     userId: string;
     tokenHash: string;
@@ -30,7 +33,10 @@ export function extensionPairingRepository(db: Orm | Tx): ExtensionPairingReposi
       const [saved] = await orm()
         .insert(extensionPairings)
         .values(values)
-        .onConflictDoUpdate({ target: extensionPairings.userId, set: values })
+        .onConflictDoUpdate({
+          target: extensionPairings.userId,
+          set: { ...values, id: sql`uuidv7()` },
+        })
         .returning(columns);
       return saved!;
     },

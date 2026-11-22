@@ -48,7 +48,7 @@ export function createExtensionPairingService({
   logger: Logger;
 }): ExtensionPairingService {
   const pairings = extensionPairingRepository(orm);
-  // shortcut: one API process keeps the used codes in memory; share them in Postgres once the API runs as several processes.
+  // shortcut: used codes live in this process's memory, so a restart, or a second API process, accepts a used code again until it expires; keep them in Postgres when that matters.
   const usedCodes = new Map<string, number>();
   return {
     // eslint-disable-next-line @typescript-eslint/require-await -- A refusal rejects, as in every other operation.
@@ -65,12 +65,18 @@ export function createExtensionPairingService({
         throw invalidInput([{ field: "code", code: "invalid" }]);
       }
       const secret = newTokenSecret();
-      const pairing = await pairings.save({
-        userId: opened.userId,
-        tokenHash: hashTokenSecret(secret),
-        browser: label,
-        pairedAt: now,
-      });
+      const pairing = await pairings
+        .save({
+          userId: opened.userId,
+          tokenHash: hashTokenSecret(secret),
+          browser: label,
+          pairedAt: now,
+        })
+        .catch((error: unknown) => {
+          // Nothing paired, so the owner may still use the code.
+          usedCodes.delete(opened.nonce);
+          throw error;
+        });
       logger.info({ pairingId: pairing.id, userId: pairing.userId }, "Extension paired");
       return { token: formatPairingToken({ pairingId: pairing.id, secret }) };
     },

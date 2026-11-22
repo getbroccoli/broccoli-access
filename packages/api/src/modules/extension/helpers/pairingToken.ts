@@ -6,7 +6,7 @@ import { z } from "zod";
  * The token a paired extension sends: `<pairing id>.<secret>`. The id finds the row; only the
  * secret's hash is stored, and it is compared in constant time.
  */
-export interface PairingToken {
+interface PairingToken {
   pairingId: string;
   secret: string;
 }

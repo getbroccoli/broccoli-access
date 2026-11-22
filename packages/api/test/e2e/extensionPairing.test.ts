@@ -80,6 +80,13 @@ test("returns the code field error when Chrome redeems a bad code", async ({ env
   });
 });
 
+test("refuses a JSON array as a pairing request", async ({ env }) => {
+  const response = await env.browser().post("/api/extension/pairings", []);
+
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({ code: "INVALID_INPUT" });
+});
+
 const START_PAIRING = "mutation { extension { startPairing { code } } }";
 const MY_PAIRING = "{ me { extensionPairing { browser pairedAt } } }";
 const BROWSER = "Chrome on macOS";

@@ -14,9 +14,6 @@ export interface PairingCode {
   expiresAt: number;
 }
 
-/** How long the owner has between "Pair this Chrome" and Pair in the extension: five minutes. */
-export const PAIRING_CODE_LIFETIME_MS = 5 * 60_000;
-
 /** A one-time code pairing `userId`'s Chrome, valid `PAIRING_CODE_LIFETIME_MS` from `now`. */
 export function sealPairingCode(secretBox: SecretBox, userId: string, now: Date): string {
   const code: PairingCode = {
@@ -42,6 +39,9 @@ export function openPairingCode(
   const code = PAIRING_CODE.parse(JSON.parse(plaintext));
   return code.expiresAt > now.getTime() ? code : null;
 }
+
+/** How long the owner has between "Pair this Chrome" and Pair in the extension: five minutes. */
+const PAIRING_CODE_LIFETIME_MS = 5 * 60_000;
 
 /** 128 random bits: unique among the codes of five minutes. */
 const NONCE_BYTES = 16;

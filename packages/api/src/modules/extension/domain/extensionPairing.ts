@@ -11,10 +11,13 @@ export interface ExtensionPairing {
   lastSeenAt: Date;
 }
 
-/** The browser label the extension reports, trimmed; refused when blank or too long to show. */
+/**
+ * The browser label the extension reports, trimmed; refused when blank, too long to show or holding
+ * a control character, which Postgres refuses (NUL) or Settings cannot show.
+ */
 export function parseBrowserLabel(raw: string): string {
   const browser = raw.trim();
-  if (browser === "" || browser.length > MAX_BROWSER_LENGTH) {
+  if (browser === "" || browser.length > MAX_BROWSER_LENGTH || CONTROL_CHARACTER.test(browser)) {
     throw invalidInput([{ field: "browser", code: "invalid" }]);
   }
   return browser;
@@ -22,3 +25,6 @@ export function parseBrowserLabel(raw: string): string {
 
 /** Far beyond "Chrome on Chrome OS"; keeps a label to one line in Settings. */
 const MAX_BROWSER_LENGTH = 100;
+
+// eslint-disable-next-line no-control-regex -- Control characters are what it finds.
+const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;

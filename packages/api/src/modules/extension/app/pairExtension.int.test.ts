@@ -101,6 +101,23 @@ test.for(["  ", "x".repeat(101)])(
   },
 );
 
+test("keeps the code usable after refusing a browser label with a control character", async ({
+  orm,
+  seed,
+}) => {
+  const { code, pairings } = await startedPairing(orm, seed);
+
+  await expect(
+    pairings.redeemCode({ code, browser: "Chrome\u0000on macOS", now: START }),
+  ).rejects.toMatchObject({
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "browser", code: "invalid" }],
+  });
+
+  const { token } = await pairings.redeemCode({ code, browser: BROWSER, now: START });
+  expect(token).toMatch(/\S/);
+});
+
 test("refuses an employee starting a pairing", async ({ orm }) => {
   await expect(extensionPairings(orm).startPairing(EMPLOYEE, { now: START })).rejects.toMatchObject(
     { code: "FORBIDDEN" },
