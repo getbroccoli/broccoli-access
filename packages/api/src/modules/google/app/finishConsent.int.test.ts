@@ -91,6 +91,29 @@ test("stores connection settings separately from secrets encrypted for this conn
   expect(JSON.stringify(saved.settings)).not.toContain(secrets.refreshToken);
 });
 
+test("accepts Google's full names for the email and profile scopes", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
+  const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
+  const url = new URL(authorizationUrl);
+  url.searchParams.set(
+    "scope",
+    `openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile ${GOOGLE_SCOPES.slice(3).join(" ")}`,
+  );
+  const callback = await consentAtGoogle(url);
+
+  await connection.finishConsent(SETUP_HOLDER, {
+    ...input,
+    code: callback.searchParams.get("code")!,
+    state: callback.searchParams.get("state")!,
+  });
+
+  const [saved] = await storedAppConnections(orm);
+  expect(saved?.settings.grantedScopes).toEqual(expect.arrayContaining(GOOGLE_SCOPES));
+});
+
 test("approves Google Workspace and records both creations as edits by the new owner", async ({
   orm,
   fakeGoogle,

@@ -3,7 +3,7 @@ import type { SecurityContext } from "../../../core/security";
 
 /** What the Google module needs from the apps module: the connected app and its connection. */
 export interface ConnectedApps {
-  /** Approves the catalog app and saves its connection with the secrets encrypted, joining `tx`. */
+  /** Creates the catalog app, approved, and saves its connection with the secrets encrypted, joining `tx`. */
   connectApp(
     ctx: SecurityContext,
     tx: Tx,

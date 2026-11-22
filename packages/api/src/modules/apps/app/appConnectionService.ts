@@ -11,9 +11,8 @@ const recordHistory = createRecordHistoryService();
 /** Connected apps: the app itself, approved, and its connector's settings and secrets. */
 export interface AppConnectionService {
   /**
-   * Approves the catalog app `catalogKey`, creating it when missing, and saves its connection with
-   * `secrets` encrypted under the connection's id, joining `tx`; appends the history of both.
-   * Admins only.
+   * Creates the catalog app `catalogKey`, approved, and saves its connection with `secrets`
+   * encrypted under the connection's id, joining `tx`; appends the history of both. Admins only.
    */
   connectApp: (
     ctx: SecurityContext,
@@ -37,7 +36,7 @@ export function createAppConnectionService({
   return {
     async connectApp(ctx, tx, { catalogKey, connector, settings, secrets }) {
       ctx.require("MANAGE_WORKSPACE");
-      const app = await approveCatalogApp(ctx, tx, catalogKey);
+      const app = await createApprovedApp(ctx, tx, catalogKey);
       const connections = appConnectionRepository(tx);
       const id = await connections.newId();
       const encryptedSecrets = secretBox.encrypt(JSON.stringify(secrets), id);
@@ -54,43 +53,26 @@ export function createAppConnectionService({
   };
 }
 
-/** The catalog app, created or moved to approved, with its history line; unchanged when approved. */
-async function approveCatalogApp(ctx: SecurityContext, tx: Tx, catalogKey: string): Promise<App> {
-  const repository = appRepository(tx);
-  const existing = await repository.lockByCatalogKey(catalogKey);
-  if (existing?.status === "approved") {
-    return existing;
-  }
-  if (existing) {
-    await repository.setStatus(existing.id, "approved");
-    await appendAppHistory(ctx, tx, existing.id, "UPDATED", [
-      { field: "status", oldValue: existing.status, newValue: "approved" },
-    ]);
-    return { ...existing, status: "approved" };
-  }
-  const created = await repository.insertCatalogApp(catalogApp(catalogKey), "approved");
-  await appendAppHistory(ctx, tx, created.id, "CREATED", [
-    { field: "name", oldValue: null, newValue: created.name },
-    { field: "domain", oldValue: null, newValue: created.domain },
-    { field: "catalogKey", oldValue: null, newValue: created.catalogKey },
-    { field: "status", oldValue: null, newValue: created.status },
-  ]);
-  return created;
-}
-
-async function appendAppHistory(
-  ctx: SecurityContext,
-  tx: Tx,
-  appId: string,
-  operation: "CREATED" | "UPDATED",
-  changes: FieldChange[],
-): Promise<void> {
+/** Creates the catalog app, approved, with its history line. */
+async function createApprovedApp(ctx: SecurityContext, tx: Tx, catalogKey: string): Promise<App> {
+  const app = await appRepository(tx).insertCatalogApp(catalogApp(catalogKey), "approved");
   await recordHistory.append(ctx, tx, {
     recordType: "app",
-    operation,
+    operation: "CREATED",
     cause: { kind: "EDITED_DIRECTLY" },
-    records: [{ recordId: appId, changes }],
+    records: [
+      {
+        recordId: app.id,
+        changes: [
+          { field: "name", oldValue: null, newValue: app.name },
+          { field: "domain", oldValue: null, newValue: app.domain },
+          { field: "catalogKey", oldValue: null, newValue: app.catalogKey },
+          { field: "status", oldValue: null, newValue: app.status },
+        ],
+      },
+    ],
   });
+  return app;
 }
 
 /** A new connection's fields; its secrets never reach history. */

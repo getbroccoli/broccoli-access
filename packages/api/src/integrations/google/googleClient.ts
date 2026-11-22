@@ -36,7 +36,7 @@ export interface GoogleTokens {
   idToken: string;
   /** Only on a consent with `access_type=offline` that Google asked for now. */
   refreshToken: string | null;
-  /** The scopes Google granted. */
+  /** The scopes Google granted, `email` and `profile` by the short names a consent asks for. */
   scopes: string[];
 }
 
@@ -87,7 +87,7 @@ export function createGoogleClient({
         accessToken: tokens.access_token,
         idToken: tokens.id_token,
         refreshToken: tokens.refresh_token ?? null,
-        scopes: tokens.scope.split(" ").filter(Boolean),
+        scopes: tokens.scope.split(" ").filter(Boolean).map(shortScopeName),
       };
     },
     readSigningKeys: async ({ jwksUri }) =>
@@ -103,6 +103,8 @@ export function createGoogleClient({
         organizationName: customer.postalAddress?.organizationName ?? customer.customerDomain,
       };
     },
+    // shortcut: pages the user list because the fake Google has no `users.get`; read the one user
+    // with `users.get` once the fake serves it, so a large directory takes one request.
     findUser: async (accessToken, userId) => {
       let pageToken: string | undefined;
       do {
@@ -166,6 +168,12 @@ const USERS_PAGE = z.object({
   nextPageToken: z.string().optional(),
 });
 
+/** Google's token response names the `email` and `profile` scopes by their full names. */
+const SHORT_SCOPE_NAMES: Partial<Record<string, string>> = {
+  "https://www.googleapis.com/auth/userinfo.email": "email",
+  "https://www.googleapis.com/auth/userinfo.profile": "profile",
+};
+
 /** An answer every call needs; a 404 is as wrong as any other failure here. */
 async function fetchRequired<T>(url: URL, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
   const answer = await fetchJson(url, schema, { timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES, init });
@@ -173,6 +181,10 @@ async function fetchRequired<T>(url: URL, schema: z.ZodType<T>, init?: RequestIn
     throw new Error(`${url.origin} answered 404`);
   }
   return answer;
+}
+
+function shortScopeName(scope: string): string {
+  return SHORT_SCOPE_NAMES[scope] ?? scope;
 }
 
 function bearer(accessToken: string): RequestInit {
