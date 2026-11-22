@@ -51,6 +51,8 @@ async function applyPlan(
 ): Promise<void> {
   const repository = appAccountRepository(tx);
   const inserted = await repository.insertMany(created);
+  // shortcut: one update per changed account; batch them if very large directories come (out of
+  // circle 1).
   for (const { after } of updated) {
     await repository.update(after);
   }

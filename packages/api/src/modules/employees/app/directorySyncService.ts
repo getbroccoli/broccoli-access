@@ -45,7 +45,7 @@ export function createDirectorySyncService(): DirectorySyncService {
       const employees = [...known, ...created];
       const links: DirectoryLinks = {
         idsByEmail: new Map(employees.map(({ email, id }) => [email, id])),
-        owner: await owners.readOwner(tx),
+        owner: await unlinkedOwner(repository, tx),
       };
       const saved = await saveDirectoryFields(repository, employees, people, links);
       const managerNames = await namesOfManagers(repository, employees, saved);
@@ -61,6 +61,17 @@ function emailsNamedBy(people: readonly DirectoryPerson[]): string[] {
   return [...new Set([...people.map(({ email }) => email), ...managers])];
 }
 
+/** The owner while no employee is linked to their user yet, else null: one user, one employee. */
+async function unlinkedOwner(
+  repository: EmployeeRepository,
+  tx: Tx,
+): Promise<DirectoryLinks["owner"]> {
+  const owner = await owners.readOwner(tx);
+  return owner && !(await repository.findByUserId(owner.userId)) ? owner : null;
+}
+
+// shortcut: one update per changed employee, so a first scan of a directory of thousands writes
+// each manager on its own; batch the updates if very large directories come (out of circle 1).
 /** Saves each listed employee's directory fields that changed; returns them before and after. */
 async function saveDirectoryFields(
   repository: EmployeeRepository,

@@ -14,6 +14,7 @@ export interface DirectoryPerson {
 /** Who the directory's employees are linked to: each employee's id by email, and the owner. */
 export interface DirectoryLinks {
   idsByEmail: ReadonlyMap<string, string>;
+  /** Null once an employee is linked to the owner's user, or before an owner exists. */
   owner: { userId: string; email: string } | null;
 }
 
