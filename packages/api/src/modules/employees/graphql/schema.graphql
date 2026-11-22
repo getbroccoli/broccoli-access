@@ -18,18 +18,6 @@ type Employee implements AnyRecord {
   approvedAppNames: [String!]!
   "Suspended in the directory with an active account in another approved app. Admins only."
   suspendedWithAccess: Boolean!
-  "Their active accounts in approved apps other than the directory, by app name. Admins only."
-  currentAccess: [AppAccess!]!
-}
-
-"An approved app someone has an active account in, how the account was found and since when."
-type AppAccess {
-  appName: String!
-  "The app's key in the built-in catalog, such as `slack`; null for another app."
-  catalogKey: String
-  "The finding kinds that saw the account, sorted, such as `google_sign_in`; connector modules register them."
-  foundVia: [String!]!
-  since: Since!
 }
 
 "Whether someone's directory account, such as their Google Workspace account, is in use."

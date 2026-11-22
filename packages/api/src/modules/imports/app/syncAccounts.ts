@@ -12,6 +12,8 @@ export interface ScanFindings {
   accounts: readonly ImportedAccount[];
   /** The directory's changed photos by source key; null for a removed one. */
   photos: ReadonlyMap<string, AccountPhoto | null>;
+  /** When the scan began reading: an account changed in its app since keeps its status. */
+  readStartedAt: Date;
 }
 
 // shortcut: syncs the scanned source's records only, and links another app's accounts to the
@@ -27,7 +29,7 @@ export interface ScanFindings {
 export async function syncAccounts(
   ctx: SecurityContext,
   tx: Tx,
-  { sourceId, connection, connector, accounts, photos }: ScanFindings,
+  { sourceId, connection, connector, accounts, photos, readStartedAt }: ScanFindings,
   { apps, directory }: { apps: ScannedApps; directory: DirectoryPeople },
 ): Promise<void> {
   const cause = { kind: "FOUND_BY_SCAN" as const, ref: sourceId };
@@ -49,6 +51,7 @@ export async function syncAccounts(
     connectionId: connection.id,
     accounts: ownAccounts.map((account) => foundAccount(account, connection.appId, employeeIds)),
     cause,
+    readStartedAt,
   });
   const { otherAppAccounts } = connector.findingKinds;
   if (otherAppAccounts) {
@@ -59,6 +62,7 @@ export async function syncAccounts(
       accounts: otherAccounts,
       employeeIds,
       cause,
+      readStartedAt,
     });
   }
 }
@@ -74,12 +78,14 @@ async function syncOtherAppAccounts(
     accounts,
     employeeIds,
     cause,
+    readStartedAt,
   }: {
     findingKind: string;
     connectionId: string;
     accounts: readonly ImportedAccount[];
     employeeIds: Map<string, string>;
     cause: HistoryAppend["cause"];
+    readStartedAt: Date;
   },
 ): Promise<void> {
   const appIds = await apps.matchFoundApps(ctx, tx, {
@@ -96,6 +102,7 @@ async function syncOtherAppAccounts(
       foundAccount(account, appIds.get(account.values.appExternalId!)!, employeeIds),
     ),
     cause,
+    readStartedAt,
   });
 }
 

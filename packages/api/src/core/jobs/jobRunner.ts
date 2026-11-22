@@ -21,6 +21,11 @@ export interface JobHandler<Name extends JobName> {
    */
   expireInSeconds?: number;
   /**
+   * How many of its jobs of one group run at once, across processes; one runs a group's jobs in
+   * the order sent. Unlimited by default.
+   */
+  groupConcurrency?: number;
+  /**
    * Also sends the job with `payload` when `cron` comes due in `timeZone`, at most once a minute;
    * a missed occurrence runs once on start.
    */
@@ -30,8 +35,16 @@ export interface JobHandler<Name extends JobName> {
 export type JobHandlers = { [Name in JobName]?: JobHandler<Name> };
 
 export interface JobQueue {
-  /** Queues the job inside `tx`: a rollback drops it, the commit makes it runnable. */
-  send<Name extends JobName>(tx: Tx, name: Name, payload: Jobs[Name]): Promise<void>;
+  /**
+   * Queues the job inside `tx`: a rollback drops it, the commit makes it runnable. `group` names
+   * the jobs its handler's `groupConcurrency` limits, such as one connection's.
+   */
+  send<Name extends JobName>(
+    tx: Tx,
+    name: Name,
+    payload: Jobs[Name],
+    options?: { group?: string },
+  ): Promise<void>;
 }
 
 /** Runs the modules' jobs in this process; their queue lives in Postgres. */
@@ -65,8 +78,11 @@ export function createJobRunner(
 
   return {
     queue: {
-      send: async (tx, name, payload) => {
-        await boss.send(name, payload, { db: fromDrizzle(ormOf(tx), sql) });
+      send: async (tx, name, payload, { group } = {}) => {
+        await boss.send(name, payload, {
+          db: fromDrizzle(ormOf(tx), sql),
+          ...(group && { group: { id: group } }),
+        });
       },
     },
 
@@ -122,20 +138,9 @@ async function workQueue(
   retryDelaySeconds: number,
   logger: Logger,
 ): Promise<void> {
-  const failedName = `${name}.failed`;
-  await boss.createQueue(failedName);
-  await boss.createQueue(name, {
-    retryLimit: RETRY_LIMIT,
-    retryDelay: retryDelaySeconds,
-    retryBackoff: true,
-    expireInSeconds: handler.expireInSeconds ?? EXPIRE_IN_SECONDS,
-    deadLetter: failedName,
-  });
-  if (handler.schedule) {
-    const { cron, timeZone, payload } = handler.schedule;
-    await boss.schedule(name, cron, payload, { tz: timeZone, missed: "once" });
-  }
-  await boss.work<Jobs[JobName]>(name, { localConcurrency: CONCURRENCY }, async ([job]) => {
+  const failedName = await createQueues(boss, name, handler, retryDelaySeconds);
+  const concurrency = { localConcurrency: CONCURRENCY, groupConcurrency: handler.groupConcurrency };
+  await boss.work<Jobs[JobName]>(name, concurrency, async ([job]) => {
     try {
       await handler.run(job!.data);
     } catch (error) {
@@ -164,4 +169,27 @@ async function workQueue(
       throw error;
     }
   });
+}
+
+/** Creates the job's queue, its dead-letter queue and its schedule; returns the dead-letter queue's name. */
+async function createQueues(
+  boss: PgBoss,
+  name: JobName,
+  handler: JobHandler<JobName>,
+  retryDelaySeconds: number,
+): Promise<string> {
+  const failedName = `${name}.failed`;
+  await boss.createQueue(failedName);
+  await boss.createQueue(name, {
+    retryLimit: RETRY_LIMIT,
+    retryDelay: retryDelaySeconds,
+    retryBackoff: true,
+    expireInSeconds: handler.expireInSeconds ?? EXPIRE_IN_SECONDS,
+    deadLetter: failedName,
+  });
+  if (handler.schedule) {
+    const { cron, timeZone, payload } = handler.schedule;
+    await boss.schedule(name, cron, payload, { tz: timeZone, missed: "once" });
+  }
+  return failedName;
 }

@@ -77,8 +77,6 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
         (await access(context).load(id)).currentAccess.map(({ appName }) => appName),
       suspendedWithAccess: async ({ id }, _args, context) =>
         (await access(context).load(id)).suspendedWithAccess,
-      currentAccess: async ({ id }, _args, context) =>
-        (await access(context).load(id)).currentAccess,
     },
   };
 }

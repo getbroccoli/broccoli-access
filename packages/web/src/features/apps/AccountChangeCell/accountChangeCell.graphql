@@ -1,0 +1,49 @@
+fragment AccountChangeCell_appUser on AppUser {
+  id
+  isConnectionUser
+  offeredChange
+  latestChange {
+    id
+    action
+    status
+    changesAhead
+    finishedAt
+  }
+  employee {
+    id
+    firstName
+    lastName
+    email
+    avatarUrl
+  }
+  app {
+    id
+    name
+    catalogKey
+    canChangeAccounts
+    containerConnection {
+      id
+      scan {
+        id
+        sourceName
+      }
+    }
+  }
+}
+
+mutation ChangeAccount($input: AppUserChangeInput!) {
+  apps {
+    changeAccount(input: $input) {
+      appUser {
+        id
+        ...AccountChangeCell_appUser
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}

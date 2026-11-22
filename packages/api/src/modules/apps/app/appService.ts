@@ -58,6 +58,8 @@ export interface AppService {
   ) => Promise<Connection<AppSummary>>;
   /** The app as the app list shows it; null for an unknown or malformed id. Needs MANAGE_WORKSPACE. */
   readApp: (ctx: SecurityContext, appId: string) => Promise<AppSummary | null>;
+  /** The apps with these ids as the app list shows them; an unknown id is left out. Needs MANAGE_WORKSPACE. */
+  readApps: (ctx: SecurityContext, appIds: readonly string[]) => Promise<AppSummary[]>;
   /** How many apps have each status. Needs MANAGE_WORKSPACE. */
   countApps: (ctx: SecurityContext) => Promise<Record<AppStatus, number>>;
   /** Approves the app, with its history line; refuses an unknown id with NOT_FOUND. Needs MANAGE_WORKSPACE. */
@@ -163,6 +165,10 @@ export function createAppService(dependencies: AppDependencies): AppService {
       }
       const [summary] = await summarize(dependencies, [app]);
       return summary!;
+    },
+    async readApps(ctx, appIds) {
+      ctx.require("MANAGE_WORKSPACE");
+      return summarize(dependencies, await appRepository(orm).findByIds(appIds));
     },
     async countApps(ctx) {
       ctx.require("MANAGE_WORKSPACE");

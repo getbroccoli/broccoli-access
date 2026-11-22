@@ -24,9 +24,10 @@ export const peopleEn = {
   "people.error.retry": "Try again",
   "people.person.suspendedInGoogle": "Suspended in Google",
   "people.person.suspendedWithAccess":
-    "{name} is suspended in Google but still has accounts in {count} approved apps.",
+    "{name} is suspended in Google but still has active accounts in {count} approved apps.",
   "people.person.suspendedWithAccessOne":
-    "{name} is suspended in Google but still has accounts in 1 approved app.",
+    "{name} is suspended in Google but still has an active account in 1 approved app.",
   "people.person.currentAccess": "Current access",
+  "people.person.column.inApp": "In the app",
   "people.person.noAccess": "No accounts in approved apps.",
 } as const;

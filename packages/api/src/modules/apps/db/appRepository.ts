@@ -40,6 +40,8 @@ export interface AppRepository {
   countByStatus(): Promise<Record<AppStatus, number>>;
   /** The app; null when there is none. */
   findById(id: string): Promise<App | null>;
+  /** The apps with these ids; an unknown id is left out. */
+  findByIds(ids: readonly string[]): Promise<App[]>;
   /** The app, locked until the transaction ends; null when there is none. */
   lockById(id: string): Promise<App | null>;
   /** The apps with `status`, locked until the transaction ends. */
@@ -100,6 +102,7 @@ export function appRepository(db: Orm | Tx): AppRepository {
         ]),
       ) as Record<AppStatus, number>;
     },
+    findByIds: (ids) => orm().select().from(apps).where(anyOf(apps.id, ids)),
     findById: async (id) => {
       const [app] = await orm().select().from(apps).where(eq(apps.id, id));
       return app ?? null;

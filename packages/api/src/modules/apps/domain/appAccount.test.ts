@@ -27,6 +27,7 @@ it("plans no update for a found account whose fields did not change", () => {
     findingKind: "google_directory",
     found: [ACCOUNT],
     statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
     now: NOW,
   });
 
@@ -39,6 +40,7 @@ it("deletes an account when its only finding kind no longer sees it", () => {
     findingKind: "google_directory",
     found: [],
     statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
     now: NOW,
   });
 
@@ -59,6 +61,7 @@ it("keeps an account another finding kind sees and removes only the missing kind
     findingKind: "google_directory",
     found: [],
     statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
     now: NOW,
   });
 
@@ -75,6 +78,7 @@ it("adds a second finding kind to a known account", () => {
     findingKind: "google_sign_in",
     found: [ACCOUNT],
     statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
     now: NOW,
   });
 
@@ -96,11 +100,26 @@ it("keeps the status read by the app's connection while adding a finding kind", 
     found: [ACCOUNT],
     now: NOW,
     statusKeptIn: new Set([before.appId]),
+    statusKeptFor: new Set(),
   });
 
   expect(plan.updated).toEqual([
     { before, after: { ...before, foundVia: ["linear_members", "google_sign_in"] } },
   ]);
+});
+
+it("keeps the status of a protected account while updating its employee", () => {
+  const before = { ...ACCOUNT, employeeId: null, status: "suspended" as const };
+
+  const plan = planAccountSync([before], {
+    findingKind: "google_directory",
+    found: [ACCOUNT],
+    now: NOW,
+    statusKeptIn: new Set(),
+    statusKeptFor: new Set([before.id]),
+  });
+
+  expect(plan.updated).toEqual([{ before, after: { ...before, employeeId: ACCOUNT.employeeId } }]);
 });
 
 it("takes the found status for a new account in an app another connection reads", () => {
@@ -118,6 +137,7 @@ it("takes the found status for a new account in an app another connection reads"
     ],
     now: NOW,
     statusKeptIn: new Set([ACCOUNT.appId]),
+    statusKeptFor: new Set(),
   });
 
   expect(plan.created).toMatchObject([
@@ -141,6 +161,7 @@ it.each([
     findingKind: "google_sign_in",
     found: [found],
     statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
     now: NOW,
   });
 
@@ -161,6 +182,7 @@ it.each([null, new Date("2026-05-24T08:00:00Z"), new Date("2026-05-26T08:00:00Z"
       findingKind: "google_directory",
       found: [found],
       statusKeptIn: new Set(),
+      statusKeptFor: new Set(),
       now: NOW,
     });
 
@@ -176,6 +198,7 @@ it("does not add a grant date to an account first seen undated", () => {
     findingKind: "google_directory",
     found: [found],
     statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
     now: NOW,
   });
 
@@ -190,6 +213,7 @@ it("moves a known grant date earlier when the scan finds an older event", () => 
     findingKind: "google_directory",
     found: [after],
     statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
     now: NOW,
   });
 
@@ -204,6 +228,7 @@ it("does not move a known grant date later", () => {
     findingKind: "google_directory",
     found: [found],
     statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
     now: NOW,
   });
 
@@ -218,6 +243,7 @@ it("keeps a known grant date when its event falls out of the log", () => {
     findingKind: "google_directory",
     found: [found],
     statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
     now: NOW,
   });
 
@@ -256,6 +282,7 @@ it("merges two found grants for the same person and app into one active account"
       { ...account, status: "active", grantedAt: null, grantedBefore },
     ],
     statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
     now: NOW,
   });
 

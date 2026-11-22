@@ -179,3 +179,39 @@ test("refuses a history cursor id beyond the signed 64-bit range", async ({ orm 
     fieldErrors: [{ field: "after", code: "invalid" }],
   });
 });
+
+test("credits a system change to the user who requested it", async ({ orm, transact }) => {
+  await transact((tx) =>
+    recordHistory.append(SYSTEM, tx, {
+      recordType: "example",
+      operation: "UPDATED",
+      cause: { kind: "EDITED_DIRECTLY" },
+      records: [EXAMPLE_RECORD],
+      requestedBy: OWNER.user!.userId,
+    }),
+  );
+
+  const { edges } = await recordHistory.read(orm, "example", EXAMPLE_RECORD.recordId, {});
+  expect(edges.map(({ node }) => node.author)).toEqual([
+    { kind: "SIGNED_IN_USER", id: OWNER.user!.userId },
+  ]);
+});
+
+test("refuses a signed-in caller attributing a change to another user", async ({
+  orm,
+  transact,
+}) => {
+  await expect(
+    transact((tx) =>
+      recordHistory.append(OWNER, tx, {
+        recordType: "example",
+        operation: "UPDATED",
+        cause: { kind: "EDITED_DIRECTLY" },
+        records: [EXAMPLE_RECORD],
+        requestedBy: "another-user",
+      }),
+    ),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+  expect((await recordHistory.read(orm, "example", EXAMPLE_RECORD.recordId, {})).edges).toEqual([]);
+});

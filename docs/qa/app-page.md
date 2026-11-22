@@ -51,6 +51,19 @@ On a new stack (`pnpm dev --drop-db`), add Linear grants for a few Acme people w
 - [ ] Linear's page shows "Approve", "Connect Linear" and the note.
 - [ ] Connecting it there with `lin_api_acme_fake` turns the page, without a reload, to "Approved" and "Connected" with "Open Linear admin" and "Scan now", and lists the users with "In Linear" once the scan ends.
 
+## Disable and Enable
+
+On Linear's page, connected as above. Set `FAKE=http://127.0.0.1:<port>`, the port of the printed "Fake connectors (Acme)" address. Make Chloé active again first: `curl -s -X POST "$FAKE/_fake/linear/members/chloe@acme.example/reactivate"`, then "Scan now" until "In Linear" reads "Active".
+
+- [ ] "Disable and Enable act in the Acme workspace." shows on the right of "Users".
+- [ ] Mia Novak reads "You" beside her name and "Connected as you" at the end of her row; Hannah Weber ends with "Enable", the others with "Disable".
+- [ ] "Disable" on Chloé opens "Disable Chloé Martin in Linear?" listing Person (initials, "Chloé Martin chloe@acme.example"), App (Linear) and Workspace (Acme), then "Chloé can no longer sign in to this workspace. You can enable the account again later.", "Broccoli Access makes the change in Linear with your connection, then reads the account back from Linear.", "Cancel" and "Disable in Linear"; "Cancel" and Escape change nothing.
+- [ ] "Disable in Linear" closes the dialog; the row reads "Disabling in Linear…" with a spinner, then "In Linear" reads "Disabled", the row "Disabled just now" with "Enable", and a toast "Chloé Martin is disabled in Linear." shows at the bottom right; `curl -s "$FAKE/_fake/state"` lists Chloé suspended.
+- [ ] With the fake slowed (`curl -s -H 'content-type: application/json' -d '{"milliseconds": 5000}' "$FAKE/_fake/delay"`), disable David, then confirm Gabriel's Disable while David's row still reads "Disabling in Linear…": Gabriel's row reads "Waiting for 1 change in Linear…" until David's change ends, then "Disabling in Linear…". Leaving the page and coming back shows each row where its change is.
+- [ ] "Enable" on Chloé opens "Enable Chloé Martin in Linear?" with "Chloé’s account in this workspace becomes active again. You can disable it again later." and "Enable in Linear"; it ends with "Active", "Enabled just now", "Disable" and the toast "Chloé Martin is enabled in Linear.".
+- [ ] After `curl -s -H 'content-type: application/json' -d '{"connector": "linear", "call": "actions/run", "code": "not_allowed", "count": 1}' "$FAKE/_fake/failures"`, disabling Chloé runs, then shows "Disable" again with Chloé still "Active".
+- [ ] Google Workspace's page has no Disable or Enable.
+
 ## Not found
 
 - [ ] `/apps/00000000-0000-4000-8000-000000000001` and `/apps/not-an-id` show "Page not found".

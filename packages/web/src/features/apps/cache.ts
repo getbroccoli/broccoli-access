@@ -10,3 +10,13 @@ export function forgetAppLists(cache: ApolloCache): void {
   cache.evict({ id: "ROOT_QUERY", fieldName: "appsToConnect" });
   cache.gc();
 }
+
+/**
+ * Drops what a Disable or Enable changes on other pages, which the server computes: the app lists'
+ * "still have access" and the People badge, so they load afresh.
+ */
+export function forgetAccessCounts(cache: ApolloCache): void {
+  cache.evict({ id: "ROOT_QUERY", fieldName: "apps" });
+  cache.evict({ id: "ROOT_QUERY", fieldName: "employeeCounts" });
+  cache.gc();
+}

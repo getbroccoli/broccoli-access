@@ -30,6 +30,7 @@ test("a concurrent Google sync keeps the status just committed by Linear", async
   const held = holdBeforeCommit(transact);
   const linearSync = held.transact((tx) =>
     service.syncAccounts(SYSTEM, tx, {
+      readStartedAt: new Date(),
       findingKind: "linear_members",
       connectionId: linear.connectionId,
       accounts: [{ ...hannah, status: "suspended" }],
@@ -39,6 +40,7 @@ test("a concurrent Google sync keeps the status just committed by Linear", async
   const pid = await held.ready;
   const googleSync = transact((tx) =>
     service.syncAccounts(SYSTEM, tx, {
+      readStartedAt: new Date(),
       findingKind: "google_sign_in",
       connectionId: google.connectionId,
       accounts: [hannah],

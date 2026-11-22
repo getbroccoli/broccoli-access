@@ -7,14 +7,25 @@ query PersonPage($id: ID!) {
     avatarUrl
     status
     suspendedWithAccess
-    currentAccess {
-      appName
-      catalogKey
+    approvedAppNames
+    appAccounts {
+      id
+      status
       foundVia
       since {
         at
         before
       }
+      app {
+        id
+        name
+        catalogKey
+      }
+      latestChange {
+        id
+        status
+      }
+      ...AccountChangeCell_appUser
     }
   }
 }

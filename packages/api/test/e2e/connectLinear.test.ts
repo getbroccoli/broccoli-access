@@ -4,24 +4,11 @@ import { onTestFinished } from "vitest";
 import {
   expect,
   test as baseTest,
+  connectorTest as test,
   finishSetupWithPreselectedApps,
   LINEAR_INPUT,
   TestEnv,
 } from "#test/support";
-
-const test = baseTest.extend<{ env: TestEnv }>({
-  env: async ({ fakeGoogle, fakeConnectors }, use) => {
-    const env = await TestEnv.start({
-      googleUrl: fakeGoogle.url,
-      connectorsUrl: fakeConnectors.url,
-    });
-    try {
-      await use(env);
-    } finally {
-      await env.stop();
-    }
-  },
-});
 
 test("the owner connects Linear and reads its seven members with their status", async ({ env }) => {
   const { browser } = await env.signInAsOwner();

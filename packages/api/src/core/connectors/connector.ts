@@ -1,4 +1,5 @@
 import {
+  type AccountAction,
   type Capability,
   CONNECTOR_ERROR_CODES as CONTRACT_ERROR_CODES,
   type RuntimeKind,
@@ -61,6 +62,14 @@ export interface ConnectorSession {
   listAccounts(cursor: string | null): Promise<AccountPage>;
   /** The photo of the directory account with this source key; null when it has none. */
   readPhoto?(sourceKey: string): Promise<AccountPhoto | null>;
+  /**
+   * Suspends or reactivates one member, then reads it again. A connector that lists `suspend` and
+   * `reactivate` has it.
+   */
+  runAction?(
+    action: AccountAction,
+    account: { sourceKey: string; email: string },
+  ): Promise<ActionResult>;
 }
 
 export interface ConnectionDetails {
@@ -75,6 +84,13 @@ export interface AccountPage {
   accounts: ImportedAccount[];
   nextCursor: string | null;
   /** Renewed settings or secrets, saved before the page's accounts are used. */
+  connection?: ConnectionUpdate;
+}
+
+/** A member as read after an action. */
+export interface ActionResult {
+  status: AccountStatus;
+  /** Renewed settings or secrets, saved before the result is used. */
   connection?: ConnectionUpdate;
 }
 
@@ -143,7 +159,17 @@ export class ConnectorError extends Error {
   }
 }
 
-/** Whether it can disable and enable its app's accounts: it lists both `suspend` and `reactivate`. */
-export function canChangeAccounts({ capabilities }: Pick<Connector, "capabilities">): boolean {
-  return capabilities.includes("suspend") && capabilities.includes("reactivate");
+/**
+ * Whether it can disable and enable its app's accounts: it lists both `suspend` and `reactivate`,
+ * and the `server` runtime, the only one the core calls them on yet.
+ */
+export function canChangeAccounts({
+  capabilities,
+  runtimes,
+}: Pick<Connector, "capabilities" | "runtimes">): boolean {
+  return (
+    capabilities.includes("suspend") &&
+    capabilities.includes("reactivate") &&
+    runtimes.includes("server")
+  );
 }

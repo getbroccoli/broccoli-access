@@ -3,6 +3,7 @@ import { and, arrayContains, countDistinct, eq, isNotNull, or, sql } from "drizz
 import { anyOf, insertBatches, type Orm, ormOf, type Tx } from "../../../core/db";
 import type { AppAccount, AppStatus } from "../domain";
 import { appAccounts } from "./appAccountsTable";
+import { appConnections } from "./appConnectionsTable";
 import { apps } from "./appsTable";
 
 /** App accounts in Postgres, through the pool or inside a transaction. */
@@ -12,6 +13,10 @@ export interface AppAccountRepository {
    * ends, so account syncs and connects never interleave.
    */
   lockForSync(): Promise<void>;
+  /** The accounts with these ids; an unknown id is left out. */
+  findByIds(ids: readonly string[]): Promise<AppAccount[]>;
+  /** The account, locked until the transaction ends; null for an unknown id. */
+  lockById(id: string): Promise<AppAccount | null>;
   /** The accounts in `appIds`, and those `findingKind` saw, whatever their app. */
   findInAppsOrFoundVia(appIds: readonly string[], findingKind: string): Promise<AppAccount[]>;
   insertMany(accounts: readonly Omit<AppAccount, "id">[]): Promise<AppAccount[]>;
@@ -23,6 +28,11 @@ export interface AppAccountRepository {
   countAppsFoundVia(findingKind: string): Promise<number>;
   /** The accounts with an employee in `appIds`: the apps' users. */
   findUsersOfApps(appIds: readonly string[]): Promise<AppUserAccount[]>;
+  /**
+   * The employees' accounts in approved apps: the active ones, and the suspended ones in apps with
+   * a connection; by app name.
+   */
+  findCurrentAccountsOfEmployees(employeeIds: readonly string[]): Promise<AppUserAccount[]>;
   /** How many employees hold an account in any app. */
   countEmployeesWithAccounts(): Promise<number>;
   /** The employees whose account in the app is suspended. */
@@ -57,6 +67,15 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
     lockForSync: async () => {
       // A table lock: the builder cannot express it. It blocks other writers, never readers.
       await orm().execute(sql`lock table ${appAccounts} in share row exclusive mode`);
+    },
+    findByIds: (ids) => orm().select(columns).from(appAccounts).where(anyOf(appAccounts.id, ids)),
+    lockById: async (id) => {
+      const [account] = await orm()
+        .select(columns)
+        .from(appAccounts)
+        .where(eq(appAccounts.id, id))
+        .for("update");
+      return account ?? null;
     },
     findInAppsOrFoundVia: (appIds, findingKind) =>
       orm()
@@ -97,20 +116,23 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
     },
     findUsersOfApps: (appIds) =>
       orm()
-        .select({
-          id: appAccounts.id,
-          appId: appAccounts.appId,
-          email: appAccounts.email,
-          // Never null: the query keeps only accounts with an employee.
-          employeeId: sql<string>`${appAccounts.employeeId}`,
-          status: appAccounts.status,
-          foundVia: appAccounts.foundVia,
-          grantedAt: appAccounts.grantedAt,
-          grantedBefore: appAccounts.grantedBefore,
-          firstSeenAt: appAccounts.firstSeenAt,
-        })
+        .select(userColumns)
         .from(appAccounts)
         .where(and(anyOf(appAccounts.appId, appIds), isNotNull(appAccounts.employeeId))),
+    findCurrentAccountsOfEmployees: (employeeIds) =>
+      orm()
+        .select(userColumns)
+        .from(appAccounts)
+        .innerJoin(apps, eq(apps.id, appAccounts.appId))
+        .leftJoin(appConnections, eq(appConnections.appId, appAccounts.appId))
+        .where(
+          and(
+            anyOf(appAccounts.employeeId, employeeIds),
+            eq(apps.status, "approved"),
+            or(eq(appAccounts.status, "active"), isNotNull(appConnections.id)),
+          ),
+        )
+        .orderBy(apps.name, appAccounts.id),
     countEmployeesWithAccounts: async () => {
       const [row] = await orm()
         .select({ employees: countDistinct(appAccounts.employeeId) })
@@ -155,6 +177,19 @@ const columns = {
   appId: appAccounts.appId,
   email: appAccounts.email,
   employeeId: appAccounts.employeeId,
+  status: appAccounts.status,
+  foundVia: appAccounts.foundVia,
+  grantedAt: appAccounts.grantedAt,
+  grantedBefore: appAccounts.grantedBefore,
+  firstSeenAt: appAccounts.firstSeenAt,
+};
+
+const userColumns = {
+  id: appAccounts.id,
+  appId: appAccounts.appId,
+  email: appAccounts.email,
+  // Never null: the queries keep only accounts with an employee.
+  employeeId: sql<string>`${appAccounts.employeeId}`,
   status: appAccounts.status,
   foundVia: appAccounts.foundVia,
   grantedAt: appAccounts.grantedAt,

@@ -1,7 +1,7 @@
 import type { Orm, Tx } from "../../../core/db";
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
-import { appAccountRepository, appConnectionRepository } from "../db";
+import { accountChangeRepository, appAccountRepository, appConnectionRepository } from "../db";
 import {
   type AccountSyncPlan,
   accountChanges,
@@ -18,7 +18,9 @@ export interface AppAccountService {
    * `accounts`: creates new ones, updates the status and employee of known ones, and takes the
    * kind off accounts it no longer sees, deleting those no kind sees; joins `tx` and appends the
    * history of each change with `cause`. A known account in an app another connection reads keeps
-   * its status, which that connection's records decide. Syncs run one at a time. System only.
+   * its status, which that connection's records decide, and so does one whose account change runs
+   * or succeeded since `readStartedAt`, which the scan may have read before. Syncs run one at a
+   * time. System only.
    */
   syncAccounts: (
     ctx: SecurityContext,
@@ -28,6 +30,8 @@ export interface AppAccountService {
       connectionId: string;
       accounts: readonly FoundAccount[];
       cause: HistoryAppend["cause"];
+      /** When the scan began reading its connection. */
+      readStartedAt: Date;
     },
   ) => Promise<void>;
   /**
@@ -44,7 +48,7 @@ export interface AppAccountService {
 
 export function createAppAccountService(): AppAccountService {
   return {
-    async syncAccounts(ctx, tx, { findingKind, connectionId, accounts, cause }) {
+    async syncAccounts(ctx, tx, { findingKind, connectionId, accounts, cause, readStartedAt }) {
       ctx.requireSystem();
       const repository = appAccountRepository(tx);
       // Another source's sync may have just changed these accounts: read them after it commits.
@@ -54,11 +58,16 @@ export function createAppAccountService(): AppAccountService {
       const otherConnections = (await appConnectionRepository(tx).findByApps(appIds)).filter(
         ({ id }) => id !== connectionId,
       );
+      const changed = await accountChangeRepository(tx).findAccountsChangedSince(
+        known.map(({ id }) => id),
+        readStartedAt,
+      );
       const plan = planAccountSync(known, {
         findingKind,
         found: accounts,
         now: new Date(),
         statusKeptIn: new Set(otherConnections.map(({ appId }) => appId)),
+        statusKeptFor: new Set(changed),
       });
       await applyPlan(ctx, tx, plan, cause);
     },

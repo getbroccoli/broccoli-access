@@ -80,3 +80,18 @@ export const test = baseTest.extend<{
     }
   },
 });
+
+/** A real API with both the directory and the connectors container. */
+export const connectorTest = test.extend<{ env: TestEnv }>({
+  env: async ({ fakeGoogle, fakeConnectors }, use) => {
+    const env = await TestEnv.start({
+      googleUrl: fakeGoogle.url,
+      connectorsUrl: fakeConnectors.url,
+    });
+    try {
+      await use(env);
+    } finally {
+      await env.stop();
+    }
+  },
+});

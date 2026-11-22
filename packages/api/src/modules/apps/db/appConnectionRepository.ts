@@ -10,6 +10,8 @@ export interface AppConnection {
   appId: string;
   settings: Record<string, unknown>;
   connectedAt: Date;
+  /** `reconnect` once its key or session stopped working. */
+  status: "connected" | "reconnect";
 }
 
 /** App connections in Postgres, through the pool or inside a transaction. */
@@ -101,4 +103,5 @@ const columns = {
   appId: appConnections.appId,
   settings: appConnections.settings,
   connectedAt: appConnections.connectedAt,
+  status: appConnections.status,
 };

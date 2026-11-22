@@ -6,6 +6,7 @@ import {
   authorOf,
   type CauseKind,
   type HistoryAppend,
+  type HistoryAuthor,
   type HistoryLine,
   type RecordOperation,
   type RecordType,
@@ -49,8 +50,8 @@ declare module "../../events" {
 
 export function createRecordHistoryService(): RecordHistoryService {
   return {
-    async append(ctx, tx, { recordType, operation, cause, reason = null, records }) {
-      const author = authorOf(ctx);
+    async append(ctx, tx, { recordType, operation, cause, reason = null, requestedBy, records }) {
+      const author = requestedBy ? requesterOf(ctx, requestedBy) : authorOf(ctx);
       const lines = await recordHistoryRepository(tx).insert(
         records.map(({ recordId, changes, cause: own = cause }) => ({
           recordType,
@@ -90,4 +91,10 @@ export function createRecordHistoryService(): RecordHistoryService {
           }),
       }),
   };
+}
+
+/** The user a system change was asked by, as its author; any other caller is refused. */
+function requesterOf(ctx: SecurityContext, userId: string): HistoryAuthor {
+  ctx.requireSystem();
+  return { kind: "SIGNED_IN_USER", id: userId };
 }

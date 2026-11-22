@@ -40,7 +40,8 @@ export interface AccountSyncPlan {
  * Brings `known` accounts in line with what `findingKind` saw: a found account is created or takes
  * the found status and employee, and an account the kind no longer sees loses the kind, going
  * when no kind is left. A known account in an app of `statusKeptIn` keeps its status: another
- * connection's records decide it. Two found grants of one person to one app are one account,
+ * connection's records decide it; so does an account in `statusKeptFor`, which a change may have
+ * changed after the scan read it. Two found grants of one person to one app are one account,
  * since the earlier. Grant dates are fixed when a scan first sees the account: a later scan only
  * moves `grantedAt` earlier, since a later event is a renewed consent, not the first grant.
  */
@@ -51,11 +52,14 @@ export function planAccountSync(
     found,
     now,
     statusKeptIn,
+    statusKeptFor,
   }: {
     findingKind: string;
     found: readonly FoundAccount[];
     now: Date;
     statusKeptIn: ReadonlySet<string>;
+    /** Accounts by id. */
+    statusKeptFor: ReadonlySet<string>;
   },
 ): AccountSyncPlan {
   const knownByKey = new Map(known.map((account) => [accountKey(account), account]));
@@ -69,7 +73,7 @@ export function planAccountSync(
     }
     plan.updated.push({
       before,
-      after: foundAgain(before, account, { findingKind, statusKeptIn }),
+      after: foundAgain(before, account, { findingKind, statusKeptIn, statusKeptFor }),
     });
   }
   for (const before of known) {
@@ -139,11 +143,20 @@ const HISTORY_FIELDS = [
 function foundAgain(
   before: AppAccount,
   account: FoundAccount,
-  { findingKind, statusKeptIn }: { findingKind: string; statusKeptIn: ReadonlySet<string> },
+  {
+    findingKind,
+    statusKeptIn,
+    statusKeptFor,
+  }: {
+    findingKind: string;
+    statusKeptIn: ReadonlySet<string>;
+    statusKeptFor: ReadonlySet<string>;
+  },
 ): AppAccount {
+  const keepsStatus = statusKeptIn.has(before.appId) || statusKeptFor.has(before.id);
   return {
     ...before,
-    status: statusKeptIn.has(before.appId) ? before.status : account.status,
+    status: keepsStatus ? before.status : account.status,
     employeeId: account.employeeId,
     foundVia: before.foundVia.includes(findingKind)
       ? before.foundVia

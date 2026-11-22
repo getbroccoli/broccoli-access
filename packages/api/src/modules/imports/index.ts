@@ -5,10 +5,10 @@ import type { ScanService } from "./app";
 import { createResolvers } from "./graphql";
 
 // Public values.
-export { createScanService } from "./app";
+export { createImportRecordService, createScanService } from "./app";
 
 // Public types.
-export type { ScanService } from "./app";
+export type { ImportRecordService, ScanService } from "./app";
 
 /** Scans of connected apps into import sources, and the sync of what they find. */
 export function importsModule(scans: ScanService): ModuleManifest {

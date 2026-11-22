@@ -9,6 +9,7 @@ export {
 export { withConnectorRetries } from "./connectorRetries";
 
 // Public types.
+export type { AccountAction } from "@broccoli-access/connector-contract";
 export type {
   AccountPage,
   AccountPhoto,

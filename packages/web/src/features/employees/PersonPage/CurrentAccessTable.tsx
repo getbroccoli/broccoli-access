@@ -8,52 +8,68 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AccountChangeCell, AppAccountStatusBadge } from "@/features/apps";
 import { t } from "@/i18n";
 import { FoundVia } from "@/components/FoundVia";
 import { formatSince } from "@/lib/since";
 
 type Props = {
-  currentAccess: NonNullable<PersonPageQuery["employee"]>["currentAccess"];
+  appAccounts: NonNullable<PersonPageQuery["employee"]>["appAccounts"];
 };
 
-/** A framed table of the approved apps a person has an account in, how each was found and since when. */
-export function CurrentAccessTable({ currentAccess }: Props) {
+/**
+ * A framed table of a person's accounts in approved apps: their status in each app, how each was
+ * found and since when, and Disable or Enable where the app's connection can change them.
+ */
+export function CurrentAccessTable({ appAccounts }: Props) {
   return (
-    <div className="overflow-hidden rounded-xl border border-border">
+    <div className="overflow-x-auto rounded-xl border border-border">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead className="h-12 w-[30%] pl-5 font-normal text-muted-foreground">
+            <TableHead className="h-12 w-[24%] pl-5 font-normal text-muted-foreground">
               {t("apps.column.app")}
             </TableHead>
-            <TableHead className="h-12 w-[30%] font-normal text-muted-foreground">
+            <TableHead className="h-12 w-[14%] font-normal text-muted-foreground">
+              {t("people.person.column.inApp")}
+            </TableHead>
+            <TableHead className="h-12 w-[26%] font-normal text-muted-foreground">
               {t("apps.column.foundVia")}
             </TableHead>
             <TableHead className="h-12 font-normal text-muted-foreground">
               {t("apps.column.since")}
             </TableHead>
+            <TableHead className="h-12 pr-5">
+              <span className="sr-only">{t("apps.page.column.actions")}</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {currentAccess.length === 0 && (
+          {appAccounts.length === 0 && (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={3} className="py-10 text-center text-muted-foreground">
+              <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                 {t("people.person.noAccess")}
               </TableCell>
             </TableRow>
           )}
-          {currentAccess.map(({ appName, catalogKey, foundVia, since }) => (
-            <TableRow key={appName}>
+          {appAccounts.map((account) => (
+            <TableRow key={account.id}>
               <TableCell className="h-[54px] pl-5">
                 <span className="flex items-center gap-3 font-medium">
-                  <AppMark name={appName} catalogKey={catalogKey} />
-                  {appName}
+                  <AppMark name={account.app.name} catalogKey={account.app.catalogKey} />
+                  {account.app.name}
                 </span>
               </TableCell>
               <TableCell>
-                <FoundVia findingKinds={foundVia} />
+                <AppAccountStatusBadge status={account.status} />
               </TableCell>
-              <TableCell>{formatSince(since)}</TableCell>
+              <TableCell>
+                <FoundVia findingKinds={account.foundVia} />
+              </TableCell>
+              <TableCell>{formatSince(account.since)}</TableCell>
+              <TableCell className="pr-5">
+                <AccountChangeCell appUser={account} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

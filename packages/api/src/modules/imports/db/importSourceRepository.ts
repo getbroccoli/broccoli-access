@@ -5,7 +5,14 @@ import {
   type ConnectorErrorCode,
   type ImportedAccount,
 } from "../../../core/connectors";
-import { insertBatches, type Orm, ormOf, type OrmTransaction, type Tx } from "../../../core/db";
+import {
+  anyOf,
+  insertBatches,
+  type Orm,
+  ormOf,
+  type OrmTransaction,
+  type Tx,
+} from "../../../core/db";
 import type { ImportSource } from "../domain";
 import { importRecords } from "./importRecordsTable";
 import { importSources } from "./importSourcesTable";
@@ -31,10 +38,27 @@ export interface ImportSourceRepository {
    * one, as a version 1 record, which predates the flag, reads.
    */
   findConnectionUser(id: string): Promise<ImportedAccount | null>;
+  /**
+   * The members with one of `emails` that the last saved scan of one of `connectionIds` found; a
+   * version 1 record, which predates the flag, reads as not the connection's user.
+   */
+  findConnectionMembers(members: {
+    connectionIds: readonly string[];
+    emails: readonly string[];
+  }): Promise<ConnectionMember[]>;
   /** How many accounts the source's last saved scan found, and how many of them are suspended. */
   countRecords(id: string): Promise<{ accounts: number; suspended: number }>;
   markScanned(id: string, readAt: Date): Promise<void>;
   markFailed(id: string, failure: ConnectorErrorCode): Promise<void>;
+}
+
+/** A member of a connected app as its connection's last saved scan found it. */
+export interface ConnectionMember {
+  connectionId: string;
+  /** Lowercased. */
+  email: string;
+  sourceKey: string;
+  isConnectionUser: boolean;
 }
 
 export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
@@ -100,6 +124,23 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
         .limit(1);
       return record ?? null;
     },
+    findConnectionMembers: ({ connectionIds, emails }) =>
+      orm()
+        .select({
+          connectionId: importSources.connectionId,
+          // The builder has no JSON operators; the keys are constants.
+          email: sql<string>`${importRecords.values} ->> 'email'`,
+          sourceKey: importRecords.sourceKey,
+          isConnectionUser: sql<boolean>`coalesce((${importRecords.values} ->> 'isConnectionUser')::boolean, false)`,
+        })
+        .from(importRecords)
+        .innerJoin(importSources, eq(importSources.id, importRecords.sourceId))
+        .where(
+          and(
+            anyOf(importSources.connectionId, connectionIds),
+            sql`(${importRecords.values} ->> 'email') = any(${sql.param([...emails])}::text[])`,
+          ),
+        ),
     countRecords: async (id) => {
       const [row] = await orm()
         .select({

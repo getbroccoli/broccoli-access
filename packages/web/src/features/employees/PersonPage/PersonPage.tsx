@@ -4,7 +4,9 @@ import { Link, useParams } from "@tanstack/react-router";
 
 import { PersonPageDocument } from "@/__generated__/graphql";
 import { Avatar } from "@/components/Avatar";
+import { useRefreshAfterChanges } from "@/features/apps";
 import { t } from "@/i18n";
+import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 
 import { CurrentAccessTable } from "./CurrentAccessTable";
 
@@ -12,13 +14,18 @@ import { CurrentAccessTable } from "./CurrentAccessTable";
 export function PersonPage() {
   const { employeeId } = useParams({ from: "/_authenticated/people_/$employeeId" });
   // The route's loader has just read the page into the cache.
-  const { data } = useQuery(PersonPageDocument, { variables: { id: employeeId } });
-  const person = data?.employee;
+  const pageQuery = useQuery(PersonPageDocument, { variables: { id: employeeId } });
+  const person = pageQuery.data?.employee;
+  // A running change moves its row; the page reads the person again until every change ends.
+  const isChanging =
+    person?.appAccounts.some((account) => account.latestChange?.status === "RUNNING") ?? false;
+  usePollWhileScanning(isChanging, pageQuery);
+  useRefreshAfterChanges(isChanging, pageQuery.refetch);
   // The route's loader found the person, so they are missing only while a reload replaces them.
   if (!person) {
     return null;
   }
-  const appCount = person.currentAccess.length;
+  const appCount = person.approvedAppNames.length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -65,7 +72,7 @@ export function PersonPage() {
       )}
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold tracking-tight">{t("people.person.currentAccess")}</h2>
-        <CurrentAccessTable currentAccess={person.currentAccess} />
+        <CurrentAccessTable appAccounts={person.appAccounts} />
       </section>
     </div>
   );
