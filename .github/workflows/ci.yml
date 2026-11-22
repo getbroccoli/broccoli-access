@@ -76,6 +76,7 @@ jobs:
         with:
           standalone: true
           cache: true
-      - run: pnpm install --frozen-lockfile
+      # Only what the suite needs; the root's postinstall generates code for the other packages.
+      - run: pnpm install --frozen-lockfile --ignore-scripts --filter @broccoli-access/fake-apps...
       # Builds the fake connectors image and runs the suite against two read-only containers of it.
       - run: pnpm --filter @broccoli-access/fake-apps test:e2e

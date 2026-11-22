@@ -16,7 +16,6 @@ const STORAGE_KEY = "localConfig_v2";
  * and the token Slack's page keeps in local storage. Only app sessions the fake issued count.
  */
 export const SLACK: FakeConnector = {
-  key: "slack",
   description: {
     key: "slack",
     version: 1,

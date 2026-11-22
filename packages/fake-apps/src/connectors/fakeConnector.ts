@@ -5,9 +5,8 @@ import type { ConnectorsState, FakeConnectorKey } from "./connectorsState";
 
 /** One app the fake answers for, as the real container's connector would on the wire. */
 export interface FakeConnector {
-  key: FakeConnectorKey;
-  /** Its entry in the manifest. */
-  description: ConnectorDescription;
+  /** Its entry in the manifest, whose key also names it in calls, controls and state. */
+  description: ConnectorDescription & { key: FakeConnectorKey };
   workspace: SeedWorkspace;
   /** The setting that names the workspace, which list and action calls check. */
   workspaceIdSetting: string;

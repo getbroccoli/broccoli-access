@@ -90,7 +90,7 @@ curl -s -H 'content-type: application/json' \
 ### Slack
 
 - In Chrome, open `http://slack.localhost:<printed port>/slack/signin`. The page shows "Sign in as Mia Novak" and signs Mia in at once: cookie `d` on `slack.localhost`, and Slack's token in local storage under `localConfig_v2`. `*.localhost` reaches this machine, so the cookie never mixes with the app's on `localhost`.
-- Read the app session from the browser's developer tools (Application: cookie `d`, local storage `localConfig_v2`), or with `agent-browser cookies get --json` and `agent-browser eval 'localStorage.getItem("localConfig_v2")'`. Without a browser, take both from one sign-in:
+- Set `D` to the value of cookie `d` and `CONFIG` to the text of local storage `localConfig_v2`, from the browser's developer tools (Application) or with `agent-browser cookies get --json` and `agent-browser eval 'localStorage.getItem("localConfig_v2")'`. Without a browser, set both from one sign-in:
 
   ```sh
   PAGE=$(curl -si "$FAKE/slack/signin")
@@ -108,10 +108,11 @@ curl -s -H 'content-type: application/json' \
   ```
 
 - The fake accepts only app sessions it issued since its last start, reset or session expiry. Its list has three pages: pass each `nextCursor` as the next `cursor`.
+- Cookies ignore the port, so two checkouts signed in from one browser profile replace each other's `d` cookie: use a profile per checkout.
 
 ### Controls
 
-They refuse requests with an `Origin` header, so a web page cannot call them.
+They have no authentication, and answer HTTP 403 to requests that carry an `Origin` header, which browsers send with every cross-site POST.
 
 ```sh
 curl -s -X POST "$FAKE/_fake/reset"

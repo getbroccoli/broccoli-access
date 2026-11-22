@@ -3,7 +3,6 @@ import type { FakeConnector } from "./fakeConnector";
 
 /** Linear through its API: the seed's key reaches Acme until the key revoke control. */
 export const LINEAR: FakeConnector = {
-  key: "linear",
   description: {
     key: "linear",
     version: 1,

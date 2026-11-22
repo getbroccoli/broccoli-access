@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type ErrorRequestHandler } from "express";
 
 import { listen } from "../utils";
 import { connectorCallRoutes } from "./connectorCalls";
@@ -42,9 +42,26 @@ export async function startFakeConnectors(
   const app = express();
   app.disable("x-powered-by");
   app.use(connectorCallRoutes(context), slackSignInRoutes(context), controlRoutes(context));
+  app.use(answerFailedRequest(context));
   server.on("request", app);
   return { url, stop };
 }
 
 /** Long enough that a change's progress state shows, short enough not to slow a run. */
 const SHORT_DELAY_MS = 250;
+
+/**
+ * Express's own handler logs and answers with the parser's message, which quotes the body and so
+ * any secret in it (RULE31): answer and log the status only.
+ */
+function answerFailedRequest(context: FakeConnectorsContext): ErrorRequestHandler {
+  // Express finds error handlers by their four parameters, so `next` stays though unused.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  return (error: { status?: unknown }, _request, response, _next) => {
+    const status = typeof error.status === "number" && error.status < 500 ? error.status : 500;
+    context.log(JSON.stringify({ outcome: "failed", status }));
+    response
+      .status(status)
+      .json({ error: status === 500 ? "The fake failed" : "Unreadable request" });
+  };
+}

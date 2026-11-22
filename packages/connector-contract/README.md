@@ -25,7 +25,7 @@ Zod schemas for each request and answer of the four calls, the manifest, the con
 
 ## Conformance suite
 
-In a Vitest test file, start two containers of your image with a read-only root file system, then describe the suite with one fixture per connector:
+In a Vitest test file, start two containers of your image with a read-only root file system, then describe the suite with one fixture for each connector in the manifest. Each connector must list the `server` runtime, where the suite calls it:
 
 ```ts
 import { describeConnectorConformance, startContainers } from "@broccoli-access/connector-contract";
@@ -52,4 +52,4 @@ describeConnectorConformance({
 });
 ```
 
-It checks every item under "Conformance" in the contract: each answer matches its schema, each error uses a listed code, a repeated action changes the member once, an action reports the status read afterwards, an unlisted runtime gets HTTP 400, and both containers give the same answers.
+It checks every item under "Conformance" in the contract: each answer matches its schema, each error uses a listed code, a repeated action changes the member once, an action reports the status read afterwards, an unlisted runtime gets HTTP 400, and both containers give the same answers apart from renewed secrets. Like the core, it starts each series of calls with a connection test and applies the connection updates answers carry.

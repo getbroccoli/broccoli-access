@@ -18,6 +18,7 @@ import express, { Router, type RequestHandler, type Response } from "express";
 import { z } from "zod";
 
 import type { SeedMember } from "../seed";
+import { pageOf, pageTokenOffset } from "../utils";
 import { membersOf, type ConnectorsState, type FakeConnectorsContext } from "./connectorsState";
 import type { FakeConnector } from "./fakeConnector";
 import { FAKE_CONNECTORS, findConnector } from "./fakeConnectorList";
@@ -40,11 +41,12 @@ export function connectorCallRoutes(context: FakeConnectorsContext): Router {
 /** Small enough that Acme's 41 Slack members take three pages, so callers page for real. */
 const PAGE_SIZE = 20;
 
-/** An opaque cursor: the next page's offset, in base64url. */
-const PAGE_CURSOR = z
-  .string()
-  .transform((cursor) => Number(Buffer.from(cursor, "base64url").toString("utf8")))
-  .pipe(z.int().nonnegative());
+/** An opaque cursor from an earlier page; any other text is refused with HTTP 400. */
+const PAGE_CURSOR = z.string().transform((cursor, context) => {
+  const offset = pageTokenOffset(cursor);
+  if (offset === undefined) context.addIssue({ code: "custom", message: "Unknown cursor" });
+  return offset ?? 0;
+});
 
 const LIST_REQUEST = ACCOUNTS_LIST_REQUEST.extend({ cursor: PAGE_CURSOR.nullable() });
 
@@ -70,11 +72,13 @@ function answerCall<R extends CallRequest>(
     if (!connector.description.runtimes.includes(body.data.runtime.kind)) {
       return refuse(context, response, call, "The connector does not list this runtime");
     }
-    await sleep(context.state.delayMs);
-    const result = checkedAnswer(context.state, call, connector, body.data, answer);
+    // A reset during the delay replaces the state, and the call keeps acting on the one it began with.
+    const state = context.state;
+    if (!(await waitUnlessClosed(response, state.delayMs))) return;
+    const result = checkedAnswer(state, call, connector, body.data, answer);
     context.log(
       JSON.stringify({
-        connector: connector.key,
+        connector: connector.description.key,
         call,
         ...actionOf(body.data),
         outcome: outcomeOf(result),
@@ -118,16 +122,15 @@ function listAccounts(
   state: ConnectorsState,
   request: ListRequest,
 ): AccountsListAnswer {
-  const members = membersOf(state, connector.key);
-  const offset = request.cursor ?? 0;
-  const next = offset + PAGE_SIZE;
+  const members = membersOf(state, connector.description.key);
+  const page = pageOf(members, { maxResults: PAGE_SIZE, offset: request.cursor ?? 0 });
   return {
-    accounts: members.slice(offset, next).map((member) => ({
+    accounts: page.items.map((member) => ({
       sourceKey: member.sourceKey,
       raw: connector.raw(member),
       values: valuesOf(member),
     })),
-    nextCursor: next < members.length ? Buffer.from(String(next)).toString("base64url") : null,
+    nextCursor: page.nextPageToken ?? null,
   };
 }
 
@@ -138,7 +141,7 @@ function runAction(
   request: ActionRunRequest,
 ): ActionRunAnswer | ConnectorErrorAnswer {
   const { sourceKey, email } = request.account;
-  const matches = membersOf(state, connector.key).filter(
+  const matches = membersOf(state, connector.description.key).filter(
     (member) => member.sourceKey === sourceKey && member.email === email,
   );
   const [member] = matches;
@@ -154,7 +157,7 @@ function takePlannedFailure(
   connector: FakeConnector,
   call: ConnectorCall,
 ): ConnectorErrorCode | undefined {
-  const key = `${connector.key} ${call}` as const;
+  const key = `${connector.description.key} ${call}` as const;
   const failure = state.failures.get(key);
   if (failure === undefined) return undefined;
   failure.remaining -= 1;
@@ -178,6 +181,18 @@ function valuesOf(member: SeedMember): AccountValues {
     displayName: member.displayName,
     isConnectionUser: member.isConnectionUser,
   };
+}
+
+/** False when the caller went away first, so nothing answers a closed connection. */
+async function waitUnlessClosed(response: Response, delayMs: number): Promise<boolean> {
+  const closed = new AbortController();
+  response.on("close", () => closed.abort());
+  try {
+    await sleep(delayMs, undefined, { signal: closed.signal });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function errorAnswer(code: ConnectorErrorCode): ConnectorErrorAnswer {

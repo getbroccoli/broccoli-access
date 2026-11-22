@@ -8,7 +8,9 @@ import { z } from "zod";
  */
 export const refuseBrowsers: RequestHandler = (request, response, next) => {
   if (request.get("origin") === undefined) return next();
-  response.status(403).json({ error: "The control endpoints refuse requests from browsers" });
+  response
+    .status(403)
+    .json({ error: "The control endpoints refuse requests with an Origin header" });
 };
 
 export function invalidBody(response: Response, error: z.ZodError): void {

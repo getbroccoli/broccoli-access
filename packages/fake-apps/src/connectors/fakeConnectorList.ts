@@ -6,5 +6,5 @@ import { SLACK } from "./slack";
 export const FAKE_CONNECTORS: readonly FakeConnector[] = [SLACK, LINEAR];
 
 export function findConnector(key: string): FakeConnector | undefined {
-  return FAKE_CONNECTORS.find((connector) => connector.key === key);
+  return FAKE_CONNECTORS.find((connector) => connector.description.key === key);
 }

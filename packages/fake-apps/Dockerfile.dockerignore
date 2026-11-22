@@ -3,8 +3,8 @@
 **/.turbo
 **/coverage
 .git
-.env
-.env.*
-!.env.example
-# Development data, including secrets
-.data
+# Development data and environment files hold secrets, in any folder.
+**/.data
+**/.env
+**/.env.*
+!**/.env.example
