@@ -16,3 +16,9 @@ export {
   type DirectoryPerson,
   employeeFromDirectory,
 } from "./directoryPerson";
+export {
+  accessOfEmployees,
+  NO_ACCESS,
+  type EmployeeAccess,
+  type EmployeeAccount,
+} from "./employeeAccess";

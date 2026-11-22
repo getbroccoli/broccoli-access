@@ -1,4 +1,88 @@
-import { employeeServices, expect, OWNER, test } from "#test/support";
+import {
+  approvedGoogleSetup,
+  employeeServices,
+  EMPLOYEE,
+  expect,
+  OWNER,
+  test,
+} from "#test/support";
+
+test("lists suspended employees first, then active employees by name", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  await approvedGoogleSetup(orm, fakeGoogle.url);
+
+  const page = await employeeServices(orm).listEmployees(OWNER, {
+    first: 3,
+    orderBy: { field: "STATUS", direction: "ASC" },
+  });
+
+  expect(page.edges.map(({ node }) => [node.firstName, node.lastName])).toEqual([
+    ["Ana", "Ruiz"],
+    ["Ben", "Ito"],
+    ["Aisha", "Khan"],
+  ]);
+});
+
+test("pages across suspended and active employees without repeating anyone", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  await approvedGoogleSetup(orm, fakeGoogle.url);
+  const { listEmployees } = employeeServices(orm);
+  const orderBy = { field: "STATUS", direction: "ASC" } as const;
+
+  const first = await listEmployees(OWNER, { first: 1, orderBy });
+  const second = await listEmployees(OWNER, { first: 1, orderBy, after: first.pageInfo.endCursor });
+  const third = await listEmployees(OWNER, { first: 1, orderBy, after: second.pageInfo.endCursor });
+
+  expect(
+    [first, second, third].map((page) => page.edges.map(({ node }) => node.firstName)),
+  ).toEqual([["Ana"], ["Ben"], ["Aisha"]]);
+  expect([first, second, third].map((page) => page.pageInfo.hasNextPage)).toEqual([
+    true,
+    true,
+    true,
+  ]);
+});
+
+test("lists only employees suspended with access in name order", async ({ orm, fakeGoogle }) => {
+  await approvedGoogleSetup(orm, fakeGoogle.url);
+
+  const page = await employeeServices(orm).listEmployees(OWNER, {
+    filter: { suspendedWithAccess: true },
+  });
+
+  expect(page.edges.map(({ node }) => node.email)).toEqual([
+    "ana@acme.example",
+    "ben@acme.example",
+  ]);
+});
+
+test("combines suspended with access and case-insensitive search", async ({ orm, fakeGoogle }) => {
+  await approvedGoogleSetup(orm, fakeGoogle.url);
+
+  const page = await employeeServices(orm).listEmployees(OWNER, {
+    filter: { suspendedWithAccess: true, search: "BEN" },
+  });
+
+  expect(page.edges.map(({ node }) => node.email)).toEqual(["ben@acme.example"]);
+});
+
+test("refuses STATUS order without MANAGE_WORKSPACE", async ({ orm }) => {
+  await expect(
+    employeeServices(orm).listEmployees(EMPLOYEE, {
+      orderBy: { field: "STATUS", direction: "ASC" },
+    }),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+});
+
+test("refuses the suspended with access filter without MANAGE_WORKSPACE", async ({ orm }) => {
+  await expect(
+    employeeServices(orm).listEmployees(EMPLOYEE, { filter: { suspendedWithAccess: true } }),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+});
 
 test("lists employees in name order across pages", async ({ orm, seed }) => {
   const { listEmployees } = employeeServices(orm);

@@ -47,7 +47,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       ...core,
       mailSettings: createMailSettingsService({ ...core, publicUrl, resendApiUrl }),
     }),
-    employeesModule(core),
+    employeesModule({ ...core, accounts: apps }),
     googleModule({
       ...core,
       ...googleAddresses,

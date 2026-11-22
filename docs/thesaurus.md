@@ -24,6 +24,7 @@ The words Broccoli Access's code and docs use, and what each one means. Only Bro
 - **Change cause**: why a change to a record happened or what started it, such as `EDITED_DIRECTLY`, with the id of what caused it when there is one. The module whose action is the cause declares it.
 - **Change reason**: why, in the change author's own words: `changeReason` on an input, the reason on its history line.
 - **Employee**: someone who works for the company. The People area lists employees.
+- **Suspended with access**: an employee suspended in the directory who still has an active account in another approved app. Computed when read; the People tab and the sidebar badge count them.
 - **Security context**: who is calling application code: a signed-in user, and whether they are the owner; the setup holder; or the system.
 - **System**: Broccoli Access acting on its own, such as creating the owner at setup.
 - **Domain event**: something that happened in the domain, published by one module in a transaction and handled by others after the commit, such as `records.changed`.

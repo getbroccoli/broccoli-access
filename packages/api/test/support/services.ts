@@ -40,7 +40,7 @@ export function employeeServices(
   const dependencies = { orm, transact, logger: createLogger("silent") };
   return {
     ...createEmployeeService(dependencies),
-    ...createEmployeeReadService(dependencies),
+    ...createEmployeeReadService({ ...dependencies, accounts: apps(orm) }),
   };
 }
 

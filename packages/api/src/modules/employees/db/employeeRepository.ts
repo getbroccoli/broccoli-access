@@ -61,6 +61,8 @@ export interface EmployeeRepository {
   findIdsByAvatar(fileId: string): Promise<string[]>;
   /** Up to `limit` employees after `after`, with their sort values as Postgres computed them. */
   findPage(query: EmployeePageQuery): Promise<KeysetRow<Employee, unknown[]>[]>;
+  /** How many employees there are. */
+  count(): Promise<number>;
 }
 
 const EMAIL_UNIQUE_CONSTRAINT = "employees_email_unique";
@@ -72,6 +74,7 @@ const sortText = z.string().refine((value) => !value.includes("\0"));
 export const EMPLOYEE_SORT_VALUES: Record<EmployeeOrderField, z.ZodType<unknown[]>> = {
   NAME: z.tuple([sortText, sortText, z.uuid()]),
   EMAIL: z.tuple([sortText, z.uuid()]),
+  STATUS: z.tuple([z.boolean(), sortText, sortText, z.uuid()]),
 };
 
 export interface EmployeePageQuery extends KeysetQuery<EmployeeOrderField, unknown[]> {
@@ -79,6 +82,10 @@ export interface EmployeePageQuery extends KeysetQuery<EmployeeOrderField, unkno
   search: string | null;
   /** The employees the caller may read; `inRecordScope` refuses "none". */
   scope: RecordScope;
+  /** Only these employees, or null for every one. */
+  employeeIds: readonly string[] | null;
+  /** The employees suspended in the directory, whom the STATUS order puts first. */
+  suspendedIds: readonly string[];
 }
 
 export function employeeRepository(db: Orm | Tx): EmployeeRepository {
@@ -148,11 +155,7 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
       return employee ?? null;
     },
 
-    findByIds: (ids) =>
-      orm()
-        .select()
-        .from(employees)
-        .where(sql`${employees.id} = any(${sql.param([...ids])}::uuid[])`),
+    findByIds: (ids) => orm().select().from(employees).where(isAnyOf(ids)),
 
     lockByEmails: (emails) =>
       orm().select().from(employees).where(anyOf(employees.email, emails)).for("update"),
@@ -165,8 +168,8 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
       return rows.map(({ id }) => id);
     },
 
-    findPage: async ({ order, after, limit, search, scope }) => {
-      const columns = keysetColumns(order);
+    findPage: async ({ order, after, limit, search, scope, employeeIds, suspendedIds }) => {
+      const columns = keysetColumns(order, suspendedIds);
       const keys = Object.fromEntries(
         columns.map(({ expression }, index) => [`key${index}`, expression]),
       );
@@ -178,6 +181,7 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
             [
               inRecordScope(scope, employees.id),
               ...(search ? [matches(search)] : []),
+              ...(employeeIds ? [isAnyOf(employeeIds)] : []),
               ...(after ? [afterKeyset(columns, after)] : []),
             ],
             sql` and `,
@@ -190,6 +194,8 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
         values: columns.map((_, index) => (row as Record<string, unknown>)[`key${index}`]),
       }));
     },
+
+    count: () => orm().$count(employees),
   };
 }
 
@@ -199,20 +205,32 @@ type DirectoryFields = Pick<Employee, "firstName" | "lastName" | "managerId" | "
 /** A new employee as stored, with the columns only the module itself sets. */
 type EmployeeRow = NewEmployee & Partial<Pick<Employee, "avatarFileId" | "userId" | "managerId">>;
 
-function keysetColumns({ field, direction }: EmployeeOrder): KeysetOrder {
+function keysetColumns(
+  { field, direction }: EmployeeOrder,
+  suspendedIds: readonly string[],
+): KeysetOrder {
   const descending = direction === "DESC";
   const by = (expression: SQL) => ({ expression, descending });
   const id = sql`${employees.id}`;
+  const byName = [by(sql`lower(${employees.firstName})`), by(sql`lower(${employees.lastName})`)];
   switch (field) {
     case "NAME":
+      return keysetOrder(byName, id, descending);
+    case "EMAIL":
+      return keysetOrder([by(sql`${employees.email}`)], id, descending);
+    case "STATUS":
+      // True sorts after false, so the suspended come first in ascending order.
       return keysetOrder(
-        [by(sql`lower(${employees.firstName})`), by(sql`lower(${employees.lastName})`)],
+        [{ expression: isAnyOf(suspendedIds), descending: !descending }, ...byName],
         id,
         descending,
       );
-    case "EMAIL":
-      return keysetOrder([by(sql`${employees.email}`)], id, descending);
   }
+}
+
+/** Whether the employee is among `employeeIds`; parenthesised, since a keyset compares it as a value. */
+function isAnyOf(employeeIds: readonly string[]): SQL {
+  return sql`(${anyOf(employees.id, employeeIds)})`;
 }
 
 function matches(search: string): SQL {

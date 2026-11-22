@@ -1,4 +1,4 @@
-import { expect, test, suspendAtFakeGoogle, type Browser } from "#test/support";
+import { expect, test, suspendAtFakeGoogle, readGoogleConnection } from "#test/support";
 
 test("Scan now picks up a suspension and advances the last scan time", async ({
   env,
@@ -6,11 +6,11 @@ test("Scan now picks up a suspension and advances the last scan time", async ({
 }) => {
   const { browser } = await env.signInAsOwner();
   await expect
-    .poll(() => readConnection(browser), { timeout: 60_000, interval: 250 })
+    .poll(() => readGoogleConnection(browser), { timeout: 60_000, interval: 250 })
     .toMatchObject({
       scan: { status: "SCANNED", people: { count: 42, suspended: 2 } },
     });
-  const before = await readConnection(browser);
+  const before = await readGoogleConnection(browser);
   expect(before.scan.readAt).toEqual(expect.any(String));
   await suspendAtFakeGoogle(fakeGoogle.url, "elif@acme.example");
 
@@ -30,11 +30,11 @@ test("Scan now picks up a suspension and advances the last scan time", async ({
     },
   });
   await expect
-    .poll(() => readConnection(browser), { timeout: 60_000, interval: 250 })
+    .poll(() => readGoogleConnection(browser), { timeout: 60_000, interval: 250 })
     .toMatchObject({
       scan: { status: "SCANNED", people: { count: 42, suspended: 3 } },
     });
-  const after = await readConnection(browser);
+  const after = await readGoogleConnection(browser);
   expect(new Date(after.scan.readAt!).getTime()).toBeGreaterThan(
     new Date(before.scan.readAt!).getTime(),
   );
@@ -42,7 +42,7 @@ test("Scan now picks up a suspension and advances the last scan time", async ({
 
 test("refuses Scan now without a session", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
-  const { id } = await readConnection(browser);
+  const { id } = await readGoogleConnection(browser);
 
   const response = await env.browser().graphql(SCAN_NOW, { connectionId: id });
 
@@ -56,25 +56,3 @@ const SCAN_NOW = `mutation ($connectionId: ID!) {
     scan { id status readAt people { count suspended } }
   } }
 }`;
-
-async function readConnection(browser: Browser) {
-  const response = await browser.graphql(`{
-    setup { googleWorkspace { id scan { id status readAt people { count suspended } } } }
-  }`);
-  const body = (await response.json()) as {
-    data: {
-      setup: {
-        googleWorkspace: {
-          id: string;
-          scan: {
-            id: string;
-            status: string;
-            readAt: string | null;
-            people: { count: number | null; suspended: number | null };
-          };
-        };
-      };
-    };
-  };
-  return body.data.setup.googleWorkspace;
-}

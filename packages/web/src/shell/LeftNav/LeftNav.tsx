@@ -6,6 +6,7 @@ import { NavCountsDocument } from "@/__generated__/graphql";
 
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
+import { useRefetchAfterScan } from "@/lib/useRefetchAfterScan";
 
 import { ProfileMenu } from "../ProfileMenu";
 import { useInSettings } from "../useInSettings";
@@ -59,12 +60,17 @@ export function LeftNav() {
   );
 }
 
-/** The app's pages; Applications, for admins, shows how many apps await their decision. */
+/**
+ * The app's pages; for admins, Applications shows how many apps await their decision, and People
+ * how many people are suspended with access.
+ */
 function useAppItems(): NavItem[] {
   const { me } = useRouteContext({ from: "/_authenticated" });
   const canManage = me.operations.includes("MANAGE_WORKSPACE");
-  const { data } = useQuery(NavCountsDocument, { skip: !canManage });
+  const { data, refetch } = useQuery(NavCountsDocument, { skip: !canManage });
+  useRefetchAfterScan(data?.setup.googleWorkspace?.scan?.status === "SCANNING", refetch);
   const discovered = data?.appCounts.discovered ?? 0;
+  const suspendedWithAccess = data?.employeeCounts.suspendedWithAccess ?? 0;
   const applications: NavItem = {
     to: "/apps",
     label: t("nav.applications"),
@@ -73,7 +79,13 @@ function useAppItems(): NavItem[] {
   };
   return [
     ...(canManage ? [applications] : []),
-    { to: "/people", label: t("nav.people"), icon: Users },
+    {
+      to: "/people",
+      label: t("nav.people"),
+      icon: Users,
+      badge: suspendedWithAccess > 0 ? suspendedWithAccess : undefined,
+      badgeTone: "warning",
+    },
   ];
 }
 

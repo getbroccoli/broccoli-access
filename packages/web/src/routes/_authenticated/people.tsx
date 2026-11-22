@@ -1,21 +1,13 @@
-import { createFileRoute, Outlet, stripSearchParams } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-import {
-  DEFAULT_EMPLOYEE_LIST_SEARCH,
-  employeeListSearch,
-  EmployeeDirectory,
-} from "@/features/employees";
-import { t } from "@/i18n";
-import { PageHeader } from "@/shell";
+import { PeoplePage, peopleSearch } from "@/features/employees";
 
+/** People: everyone in the directory with their status and apps; a person's panel opens over it. */
 export const Route = createFileRoute("/_authenticated/people")({
-  validateSearch: employeeListSearch,
-  search: { middlewares: [stripSearchParams(DEFAULT_EMPLOYEE_LIST_SEARCH)] },
+  validateSearch: peopleSearch,
   component: () => (
     <>
-      <PageHeader title={t("people.title")} />
-      <EmployeeDirectory />
-      {/* A person's panel opens over the list. */}
+      <PeoplePage />
       <Outlet />
     </>
   ),

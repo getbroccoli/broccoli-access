@@ -9,7 +9,7 @@ A manual check of opening a person from People, their tabs, editing them in plac
 
 ## Open and close
 
-- [ ] Clicking anywhere in a row opens that person's panel over the list; the URL becomes `/people/<id>` and keeps the list's search and sort.
+- [ ] Clicking a person's name opens their panel over the list; the URL becomes `/people/<id>` and keeps the list's tab and search.
 - [ ] Tab to a name and press Enter: the same panel opens.
 - [ ] The panel shows the avatar and name, then the tabs Overview and History; Overview shows Work email, then Details with Personal: First name and Last name.
 - [ ] Choosing History adds `?tab=history` to the URL; reloading keeps History open; Overview removes it again. Closing the panel leaves no tab in the People URL.

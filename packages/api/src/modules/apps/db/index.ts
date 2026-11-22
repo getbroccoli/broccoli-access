@@ -11,4 +11,5 @@ export {
   appAccountRepository,
   type AppAccountRepository,
   type AppUserAccount,
+  type EmployeeAppAccount,
 } from "./appAccountRepository";

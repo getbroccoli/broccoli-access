@@ -7,7 +7,7 @@ import type { NavItem } from "./NavList";
 type Props = { item: NavItem };
 
 /** A menu link, filled while its page is open. */
-export function NavLink({ item: { to, label, icon: Icon, badge } }: Props) {
+export function NavLink({ item: { to, label, icon: Icon, badge, badgeTone } }: Props) {
   return (
     <Link
       to={to}
@@ -23,7 +23,11 @@ export function NavLink({ item: { to, label, icon: Icon, badge } }: Props) {
             <span
               className={cn(
                 "rounded-full px-2 text-[11px] leading-[18px] font-medium tabular-nums",
-                isActive ? "bg-background/20" : "bg-foreground/10",
+                badgeTone === "warning"
+                  ? "bg-amber-100 text-amber-900"
+                  : isActive
+                    ? "bg-background/20"
+                    : "bg-foreground/10",
               )}
             >
               {badge}

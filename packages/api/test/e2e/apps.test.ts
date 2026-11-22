@@ -1,4 +1,4 @@
-import { expect, test, type Browser } from "#test/support";
+import { expect, test, scannedApps } from "#test/support";
 
 test("the owner's consent and scan open the app list and selecting apps finishes setup", async ({
   env,
@@ -141,30 +141,3 @@ test.for([
     fieldErrors: [],
   });
 });
-
-async function scannedApps(browser: Browser) {
-  let discovered: { id: string; name: string; preselected: boolean }[] = [];
-  await expect
-    .poll(
-      async () => {
-        const response = await browser.graphql(`{
-      apps(status: DISCOVERED) {
-        edges { node { id name domain status peopleCount foundVia since { at before } preselected } }
-        pageInfo { endCursor hasNextPage }
-      }
-      setup { step }
-    }`);
-        const body = (await response.json()) as {
-          data?: {
-            apps: { edges: { node: (typeof discovered)[number] }[] };
-            setup: { step: string };
-          };
-        };
-        discovered = body.data?.apps.edges.map(({ node }) => node) ?? [];
-        return { count: discovered.length, step: body.data?.setup.step };
-      },
-      { timeout: 60_000, interval: 250 },
-    )
-    .toEqual({ count: 37, step: "SELECT_APPS" });
-  return discovered;
-}
