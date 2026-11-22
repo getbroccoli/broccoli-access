@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Where sign-in leads without a usable `redirect`. */
+/** Where `/login` sends a signed-in visitor without a usable `redirect`. */
 export const DEFAULT_REDIRECT = "/";
 
 /**
@@ -41,8 +41,8 @@ const SIGN_IN_ERRORS = ["cancelled", "not_allowed", "failed"] as const;
 export type SignInError = (typeof SIGN_IN_ERRORS)[number];
 
 /**
- * The search params of `/login`: where to go after signing in, always a local path, and why the
- * last sign-in failed, when it did.
+ * The search params of `/login`: where a visitor who is already signed in goes, always a local
+ * path (Sign in with Google lands on Today), and why the last sign-in failed, when it did.
  */
 export const loginSearch = z.object({
   redirect: z
