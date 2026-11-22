@@ -1,6 +1,6 @@
 # Data model
 
-The tables broccoli-access uses, what each row means, and an example row from the seeded company, Acme. Circle 1 builds only the tables under "Circle 1". A table, column or enum value missing here is added to this file first.
+The tables broccoli-access uses, what each row means, and an example row from the seeded company, Acme. Each circle builds the tables and changes under its own heading. A table, column or enum value missing here is added to this file first.
 
 Conventions, as in Broccoli:
 
@@ -15,46 +15,59 @@ Conventions, as in Broccoli:
 ```mermaid
 flowchart LR
   G[Google Workspace] -->|scan| S[import_sources]
+  K[Connectors container] -->|scan| S
   S --> R[import_records]
   R -->|sync| A[apps]
   R -->|sync| C[app_accounts]
   C -->|directory accounts| E[employees]
+  C -->|Disable, Enable| X[account_changes]
+  X -->|run| K
 ```
 
-1. Each connector module adds a connector: only Google Workspace in circle 1. An `app_connections` row holds one connected app.
-2. A scan reads one connection: when it is connected, and on "Scan now".
+1. Each connector adds what it can connect: Google Workspace from the core, every other app from the connectors container. An `app_connections` row holds one connected app.
+2. A scan reads one connection: when it is connected, every day, and on "Scan now".
 3. The scan writes every account it saw as `import_records`. After a successful scan, a source's records are exactly what it returned this time.
 4. The sync updates `apps` and `app_accounts` from the records of every source. The accounts of the directory app create and update `employees`. Nothing in the UI reads `import_records` directly.
-5. Flags are computed when read, never stored (see "Computed when read").
+5. Disable and Enable write an `account_changes` row, which runs through the connectors container and updates the app account.
+6. Flags are computed when read, never stored (see "Computed when read").
 
-## Connector modules
+## Connectors
 
-Every connector module exports one definition in the same shape, and one shared contract test checks each of them.
+Connectors come from two places, and the core sees both in one shape:
+
+- **The core's own module**: Google Workspace, the directory. It exports its definition in code, and one shared contract test checks it.
+- **The connectors container**: every other app. The core reads their definitions from `GET /v1/connectors` when it starts and keeps them in memory, never in a table. See the [connector contract](connector-contract.md).
+
+Every connector has:
 
 - **Description**:
-  - `key`, such as `google_workspace`, plus `version` and `name`;
-  - `transport`: `api` in circle 1; later circles add `scim` and `browser`;
+  - `key`, such as `google_workspace` or `slack`, plus `version` and `name`;
+  - `capabilities`: `list_accounts`, plus `suspend` and `reactivate` for a connector that can change accounts. Google Workspace only lists in circle 2;
+  - `runtimes`: where its calls run, in order: `server`, `owner_browser`. Google Workspace runs on the server;
   - the finding kinds it registers, such as `google_directory` and `google_sign_in`;
-  - whether its app is the directory;
-  - its connection fields, each marked secret or not. Secret fields go to `encrypted_secrets`, the others to `settings`.
-- **Settings check**: a schema for its settings and secrets.
-- **Read functions**:
+  - whether its app is the directory: only Google Workspace;
+  - its connection fields, each marked secret or not. Secret fields go to `encrypted_secrets`, the others to `settings`;
+  - for a container connector, its `notice` and `adminUrl`.
+- **Settings check**: a schema for its settings and secrets. A container connector's settings and secrets are opaque to the core.
+- **Functions**:
   - `testConnection`: returns what Settings shows, such as the domain, or an error;
-  - `listAccounts(cursor)`: one page of accounts in the `import_records` shape, with the next cursor.
+  - `listAccounts(cursor)`: one page of accounts in the `import_records` shape, with the next cursor;
+  - `runAction`, for a connector that can change accounts: one suspend or reactivate, answered with the account as read afterwards.
 - **Errors**: a connector fails with one of these, and never passes on the app's raw response:
   - `authentication_failed`: its token was revoked or expired;
   - `permission_missing`: a scope or an admin right is missing;
-  - `rate_limited`: retried by the scan before it fails;
-  - `app_unavailable`: a timeout or server error, retried by the scan before it fails;
-  - `unexpected_response`: an answer the connector does not understand.
-- Later circles add write functions (create, suspend, delete, change access) and a list of what each connector can do.
+  - `rate_limited`: retried before it fails;
+  - `app_unavailable`: a timeout or server error, retried before it fails;
+  - `unexpected_response`: an answer the connector does not understand;
+  - from the connectors container only: `blocked_by_check`, `account_not_found`, `wrong_workspace`, `not_allowed`, `owner_browser_lost`. The [connector contract](connector-contract.md#errors) defines them.
 
 ## Words
 
 - **Employee**: someone in the company's directory. The UI calls employees "people"; "user" stays the person who signs in to broccoli-access.
 - **App**: an application people use, such as Figma, Slack or Google Workspace itself.
 - **App account**: one person's account in one app, whatever source found it.
-- **Connector**: a module that reads an app's API, such as the Google Workspace connector.
+- **Connector**: what reads, and may change, one app's accounts: the Google Workspace module in the core, or one in the connectors container.
+- **Account change**: one Disable or Enable of one app account, from the owner's click to its result.
 - **App connection**: one connected app, with the connector's settings and secrets.
 - **Directory**: the app whose accounts are the company's employees. In circle 1 it is Google Workspace, and its connector says so in code.
 - **Scan**: one read of one app connection.
@@ -412,11 +425,174 @@ One person's account in one app. The name avoids Better Auth's `account` table.
 
 Binary files, kept for employee photos in a later circle.
 
+## Circle 2
+
+### app_connections (changed)
+
+- `connector`: also a key from the connectors container. Still unique: one Slack workspace and one Linear workspace per instance.
+- `app_id`: the catalog app whose key equals the connector's key, else the app with the connector's name, else a new app from the connector's `name` and `appDomain`. Connecting approves it.
+- `status` (new): `connected`, `reconnect`.
+  - It turns to `reconnect` on `authentication_failed` on the server, `permission_missing` or `wrong_workspace`, from a scan or an account change.
+  - A connection test that passes when the owner reconnects turns it back to `connected`.
+- `reconnect_cause` (new): that error code, set exactly when `reconnect`.
+- `notice_accepted_at`, `notice_accepted_by` (new): when, and which user, accepted the connector's notice. Set exactly for a connector with a notice, which the owner accepts before connecting.
+- **Updates from the connectors container:** a `connection` in an answer replaces `settings` or `encrypted_secrets`, saved before the rest of the answer is used. A new `settings` adds a history line. A renewed secret adds none, and history never holds a secret.
+- **Slack:** `settings` hold `teamId`, `teamDomain` and `teamName`. The secret is `appSession`, the owner's Slack cookies and the token Slack's page keeps (see "App sessions" in the [connector contract](connector-contract.md#app-sessions)).
+- **Linear:** `settings` hold `organizationId`, `urlKey` and `organizationName`. The secret is `apiKey`.
+
+```json
+[
+  {
+    "id": "con_slack",
+    "connector": "slack",
+    "app_id": "app_slack",
+    "settings": { "teamId": "T04ACME", "teamDomain": "acme", "teamName": "Acme" },
+    "encrypted_secrets": "v1:…",
+    "status": "connected",
+    "reconnect_cause": null,
+    "notice_accepted_at": "2026-12-01T09:10:00Z",
+    "notice_accepted_by": "usr_admin",
+    "connected_at": "2026-12-01T09:10:30Z"
+  },
+  {
+    "id": "con_linear",
+    "connector": "linear",
+    "app_id": "app_linear",
+    "settings": { "organizationId": "4a1c…", "urlKey": "acme", "organizationName": "Acme" },
+    "encrypted_secrets": "v1:…",
+    "status": "reconnect",
+    "reconnect_cause": "authentication_failed",
+    "notice_accepted_at": null,
+    "notice_accepted_by": null,
+    "connected_at": "2026-12-01T09:05:00Z"
+  }
+]
+```
+
+### import_sources (changed)
+
+- Each Slack or Linear connection has one source, as Google Workspace does. Its `name` is the workspace name.
+- `failure`: any connector error (see "Connectors").
+
+### import_records (changed)
+
+- `values` version 2 adds `isConnectionUser`: true for the member whose key or session the connection uses, false for every Google record. Scans write version 2; a version 1 record reads as false until its next scan.
+- A container connector's record: `source_key` is the contract's `sourceKey`, and `raw` its `raw`. `email`, `status` and `isConnectionUser` come from its `values`, and `appName` is the connector's name. `appExternalId` is null, because the account belongs to the connection's app; the other values are null.
+
+### app_accounts (changed)
+
+- `found_via` adds `slack_members` and `linear_members`.
+- `status`: when the account's app has a connection, the record of that connection decides it, and other sources only add to `found_via`. A Google sign-in never marks a suspended Slack account active again.
+- An account change that succeeds, or one done by hand, sets `status` at once. The next scan confirms it.
+
+### account_changes (new)
+
+One Disable or Enable of one app account, from the owner's click to its result. When no runtime can make it, the owner sees why, and can try again or make the change by hand.
+
+- `app_account_id`, `connection_id`.
+- `action`: `suspend`, `reactivate`.
+- `source_key`: the member's id in the app, copied from the connection's import record for this email when the owner asks.
+- `status`:
+  - `running`: waiting for its turn or running;
+  - `succeeded`: the connector read the new status afterwards;
+  - `failed`: no runtime could make the change, or an error ended it (see "What the core does with errors" in the [connector contract](connector-contract.md#what-the-core-does-with-errors));
+  - `done_by_hand`: it had failed, and the owner made the change in the app and said so with "I did it by hand".
+- **Try again** writes a new account change. The failed one stays as it was.
+- `attempts`: each runtime tried, in order, as `{ "runtime", "error", "at" }`, with `error` null for the one that worked. Retries on the same runtime are not listed.
+- `error`: the last error, set exactly when `failed` or `done_by_hand`.
+- `requested_by`, `requested_at`.
+- `finished_at`: when it stopped `running`.
+- **One at a time:** an app account has at most one `running` change, enforced by a partial unique index. The core runs one change per connection at a time, in the order the owner asked.
+- **History:** an account change has no history of its own. Its app account's history lines point at it.
+
+```json
+[
+  {
+    "id": "chg_ana_slack",
+    "app_account_id": "acc_ana_slack",
+    "connection_id": "con_slack",
+    "action": "suspend",
+    "source_key": "U04ANA",
+    "status": "succeeded",
+    "attempts": [{ "runtime": "server", "error": null, "at": "2026-12-02T10:01:05Z" }],
+    "error": null,
+    "requested_by": "usr_admin",
+    "requested_at": "2026-12-02T10:00:00Z",
+    "finished_at": "2026-12-02T10:01:05Z"
+  },
+  {
+    "id": "chg_chloe_linear",
+    "app_account_id": "acc_chloe_linear",
+    "connection_id": "con_linear",
+    "action": "suspend",
+    "source_key": "9f2e…",
+    "status": "failed",
+    "attempts": [
+      { "runtime": "server", "error": "authentication_failed", "at": "2026-12-02T10:05:10Z" }
+    ],
+    "error": "authentication_failed",
+    "requested_by": "usr_admin",
+    "requested_at": "2026-12-02T10:05:00Z",
+    "finished_at": "2026-12-02T10:05:10Z"
+  }
+]
+```
+
+### extension_pairings (new)
+
+The owner's Chrome extension, paired with this instance.
+
+- `user_id`: unique. Circle 2 pairs one Chrome per user, and pairing again replaces the row.
+- `token_hash`: the hash of the token the extension holds. The token itself is never stored.
+- `browser`: what Settings shows, such as "Chrome on macOS", as the extension reports it.
+- `paired_at`, `last_seen_at`.
+- Unpairing deletes the row.
+
+```json
+{
+  "id": "pair_admin",
+  "user_id": "usr_admin",
+  "token_hash": "sha256:…",
+  "browser": "Chrome on macOS",
+  "paired_at": "2026-12-01T09:08:00Z",
+  "last_seen_at": "2026-12-02T10:01:05Z"
+}
+```
+
+### record_history (changed)
+
+- Record types: unchanged.
+- New causes:
+  - `changed_in_app`: an account change succeeded. The author is the user who asked, and the ref is the account change.
+  - `done_by_hand`: the owner made a failed account change in the app themselves. The author is the owner, and the ref is the account change.
+  - `connector_error`: a connection turned to Reconnect. The author is `broccoli_itself`, and the ref is the source or the account change.
+- Connecting, reconnecting and accepting a notice use `edited_directly` on the app connection.
+
+```json
+{
+  "id": 2051,
+  "record_type": "app_account",
+  "record_id": "acc_ana_slack",
+  "operation": "updated",
+  "occurred_at": "2026-12-02T10:01:05Z",
+  "author_kind": "signed_in_user",
+  "author_id": "usr_admin",
+  "cause_kind": "changed_in_app",
+  "cause_ref": "chg_ana_slack",
+  "reason": null,
+  "changes": [{ "field": "status", "oldValue": "active", "newValue": "suspended" }]
+}
+```
+
 ## Computed when read
 
 - **An employee's status**: the status of their account in the directory app. The UI shows "Suspended in Google", using the directory app's name.
 - **Suspended with access**: an employee suspended in the directory with at least one `active` account in another `approved` app. Their number is the Users badge and the "Suspended with access" tab.
 - **An app's users**: its accounts with an employee. "n still have access" counts the `active` ones whose employee is suspended in the directory.
+- **Can be managed**: an app whose catalog key equals the key of a connector that lists `suspend` and `reactivate`. Applications and the app's page show Connect for it while it has no connection.
+- **Disable and Enable offered**: on an app account whose app has a connection with a connector that lists `suspend` and `reactivate`, that is not the connection's own user (`isConnectionUser` on its record), and that has no `running` change. While the connection is `reconnect`, Reconnect shows instead. Disable on an `active` account, Enable on a `suspended` one.
+- **Couldn't change**: an app account whose latest account change `failed`. Its row shows why, with Try again and "I did it by hand". Try again is hidden after `not_allowed` or `account_not_found`; for `account_not_found`, Scan now is offered instead.
+- **Activity**: every account change, newest first: the person, the app, Disable or Enable, who asked, when, and how it ended: on the server, by hand, or not at all.
 - **Since**, for an account: its `granted_at`; otherwise "Before" its `granted_before`; otherwise its `first_seen_at`. For an app: the earliest of its accounts, shown as "Before …" when that earliest one only has `granted_before`.
 
 ## Removed
@@ -428,20 +604,20 @@ Each list is a group of Broccoli tables. The ones marked "later" come back when 
 - External agent: `external_agent_codes`, `external_agent_sessions`.
 - Managed mode: `managed_ticket`.
 - `slack_connection`: replaced by `app_connections`.
-- Later: `processes`, `process_versions`, `process_runs`, `run_step_progress`, `tasks`.
+- Later: `processes`, `process_versions`, `process_runs`, `run_step_progress`, `tasks`. Broccoli's tasks come back when tasks go to people other than the owner. Circle 2 has none: a failed account change shows why, and the owner can make it by hand.
 - Later: `employee_invites`, `user_permission_profiles`. In circle 1, only the owner signs in.
 - Later: `import_choices`.
 - Later: `agent_activity`, `agent_connection_endings`, `agent_invitation_closings`, and the `oauth_*` tables, which only the agent connection uses.
 
 ## Later circles
 
-These are planned, not built in circle 1. Each is added to the sections above when its circle starts. Removed Broccoli tables are copied back from Broccoli.
+These are planned, not built yet. Each is added to the sections above when its circle starts. Removed Broccoli tables are copied back from Broccoli.
 
-- Slack: connector `slack`, whose `settings` hold `teamId` and `teamName` and whose secret is the bot token; finding kind `slack_members`; a deactivated member is `suspended`.
 - Employees whose directory account disappears, for "Terminated users with access".
 - CSV upload: `import_sources.kind` `file`, one source per app, with `file_id` and the app's id.
 - Apps added by hand: no catalog key and no external ids.
-- API connectors (Notion, Figma, Claude, Codex): one connector key each, with an `app_connections` row and a source.
+- Robots and the owner's-browser runtime: `screenshot_file_id` on account changes, kept in `files`, and the one-time owner-browser addresses, held in memory.
+- More apps from the connectors container (Notion, Figma, Claude, Codex): one connector key each, with an `app_connections` row and a source, and no table change.
 - "Use the Broccoli app": `googleApp` `broccoli_google_app` in the Google Workspace settings.
 - Last used: `app_accounts.last_used_at`, from the source's log.
 - Requests, approvals and removal of access: processes, process runs and tasks on app accounts.

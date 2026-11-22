@@ -28,4 +28,13 @@ The words Broccoli Access's code and docs use, and what each one means. Only Bro
 - **Security context**: who is calling application code: a signed-in user, and whether they are the owner; the setup holder; or the system.
 - **System**: Broccoli Access acting on its own, such as creating the owner at setup.
 - **Domain event**: something that happened in the domain, published by one module in a transaction and handled by others after the commit, such as `records.changed`.
+- **Connectors container**: the container image, built from a separate repository, that holds the connectors for every app except Google Workspace. The core calls it through the connector contract. It keeps no state: each call carries the connection, and the core saves what comes back.
+- **Robot**: a connector that works an app's admin pages in a browser, for an app without an API on the company's plan.
+- **Runtime**: where a connector's call runs: `server`, the connectors container by itself, or `owner_browser`, the owner's Chrome through the extension. Not the Node.js runtime.
+- **App session**: the owner's signed-in session in an app, handed over by the extension and used by a connector. Not a session, which is a browser signed in to Broccoli Access.
+- **Extension**: the Broccoli Access extension for Chrome. It hands over app sessions.
+- **Disable, Enable**: the UI words for suspending an app account and making it active again (`suspend` and `reactivate` in code). A suspended account shows as "Disabled".
+- **Account change**: one Disable or Enable of one app account, from the owner's click to its result (`account_changes`).
+- **Done by hand**: a failed account change that the owner made in the app themselves, then confirmed with "I did it by hand".
+- **Activity**: the page listing every account change, newest first. Not History, which belongs to one record.
 - **Mail choice**: how the instance sends email: the owner's SMTP server, their Resend key, or no email. Saved on the instance in Settings.
