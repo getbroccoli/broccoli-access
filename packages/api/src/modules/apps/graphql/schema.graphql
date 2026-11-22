@@ -4,6 +4,8 @@ type App {
   name: String!
   "Such as `slack.com`; null when unknown."
   domain: String
+  "Its key in the built-in catalog, such as `slack`; null for an app the catalog lacks."
+  catalogKey: String
   status: AppStatus!
   "How many people have an account in it."
   peopleCount: Int!
@@ -18,7 +20,7 @@ type App {
   "Whether a connection reads it; a connected app stays approved, so it cannot be ignored."
   connected: Boolean!
   "Its users: the accounts in it that belong to an employee, those whose employee the directory suspended first, then by name."
-  users: [AppUser!]!
+  users("Keeps only the first this many, at least 1; all when null." first: Int): [AppUser!]!
 }
 
 "An account in an app that belongs to an employee."

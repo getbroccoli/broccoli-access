@@ -9,6 +9,7 @@ query PersonPage($id: ID!) {
     suspendedWithAccess
     currentAccess {
       appName
+      catalogKey
       foundVia
       since {
         at

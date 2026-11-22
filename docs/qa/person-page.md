@@ -11,13 +11,13 @@ A manual check of a person's page, `/people/<id>`, against a development stack.
 
 - [ ] The page shows "‹ People", which leads back to People, Ana's initials, "Ana Ruiz" with a "Suspended in Google" badge, and `ana@acme.example` below.
 - [ ] An amber box reads "Ana is suspended in Google but still has accounts in 3 approved apps."
-- [ ] Under "Current access", the table lists App, Found via and Since: Figma, Notion and Slack, in that order, each with its initial, "Google sign-in" and "Before <date>" about six months before the scan. Google Workspace is not listed.
+- [ ] Under "Current access", the table lists App, Found via and Since: Figma, Notion and Slack, in that order, Figma and Notion with their logo and Slack with its initial, "Google sign-in" and "Before <date>" about six months before the scan. Google Workspace is not listed.
 - [ ] Ben Ito's page reads "Ben is suspended in Google but still has accounts in 1 approved app." and lists Slack only.
 
 ## Active person
 
 - [ ] Chloé Martin's page has no badge and no amber box, and lists her approved apps by name.
-- [ ] Ignore Slack on Applications and open Ben's page again: the "Suspended in Google" badge stays, the amber box is gone and the table reads "No accounts in approved apps."
+- [ ] Ignore Slack on its page and open Ben's page again: the "Suspended in Google" badge stays, the amber box is gone and the table reads "No accounts in approved apps."
 
 ## No delete
 

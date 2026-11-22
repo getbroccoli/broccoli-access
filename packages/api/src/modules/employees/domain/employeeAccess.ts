@@ -4,6 +4,8 @@ import type { AccountStatus } from "../../../core/connectors";
 export interface EmployeeAccount {
   employeeId: string;
   appName: string;
+  /** The app's key in the built-in catalog, such as `slack`; null for another app. */
+  catalogKey: string | null;
   appStatus: "discovered" | "approved" | "ignored";
   status: AccountStatus;
   /** Whether the app is the directory, such as Google Workspace. */
@@ -25,7 +27,7 @@ export interface EmployeeAccess {
 }
 
 /** An approved app someone has an active account in, how the account was found and since when. */
-export type AppAccess = Pick<EmployeeAccount, "appName" | "foundVia" | "since">;
+export type AppAccess = Pick<EmployeeAccount, "appName" | "catalogKey" | "foundVia" | "since">;
 
 /** The access of an employee without accounts. */
 export const NO_ACCESS: EmployeeAccess = {
@@ -46,7 +48,12 @@ function accessOf(accounts: readonly EmployeeAccount[]): EmployeeAccess {
   const status = accounts.find(({ inDirectory }) => inDirectory)?.status ?? null;
   const currentAccess = accounts
     .filter(givesAccess)
-    .map(({ appName, foundVia, since }) => ({ appName, foundVia: foundVia.toSorted(), since }))
+    .map(({ appName, catalogKey, foundVia, since }) => ({
+      appName,
+      catalogKey,
+      foundVia: foundVia.toSorted(),
+      since,
+    }))
     .sort((a, b) => a.appName.localeCompare(b.appName));
   return {
     status,

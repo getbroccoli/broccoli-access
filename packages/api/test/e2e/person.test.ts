@@ -15,7 +15,7 @@ test("reads a suspended person's current access through the API", async ({ env }
     `query ($id: ID!) {
       employee(id: $id) {
         id status suspendedWithAccess
-        currentAccess { appName foundVia since { at before } }
+        currentAccess { appName catalogKey foundVia since { at before } }
       }
     }`,
     { id },
@@ -29,6 +29,7 @@ test("reads a suspended person's current access through the API", async ({ env }
         suspendedWithAccess: true,
         currentAccess: ["Figma", "Notion", "Slack"].map((appName) => ({
           appName,
+          catalogKey: appName.toLowerCase(),
           foundVia: ["google_sign_in"],
           since: {
             at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/) as unknown,

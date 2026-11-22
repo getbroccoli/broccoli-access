@@ -2,6 +2,7 @@ import { afterEach, vi } from "vitest";
 
 import {
   approvedGoogleSetup,
+  apps,
   employeeServices,
   EMPLOYEE,
   expect,
@@ -11,6 +12,7 @@ import {
 
 test("reads directory status and current access in the requested employee order", async ({
   orm,
+  seed,
   fakeGoogle,
 }) => {
   const now = Date.now();
@@ -22,20 +24,29 @@ test("reads directory status and current access in the requested employee order"
   const ana = edges.find(({ node }) => node.email === "ana@acme.example")!.node;
   const mia = edges.find(({ node }) => node.email === "admin@acme.example")!.node;
 
+  const appService = apps(orm);
+  const ignored = await appService.listApps(OWNER, { status: "ignored" });
+  const asana = ignored.edges.find(({ node }) => node.name === "Asana")!.node;
+  await appService.approveApp(OWNER, asana.id);
+  await seed.appAccount({ appId: asana.id, employeeId: mia.id, grantedBefore: since.at });
+
   const access = await service.readAccessOfEmployees(OWNER, [mia.id, ana.id]);
 
   expect(access).toEqual([
     {
       status: "active",
-      currentAccess: [{ appName: "Slack", foundVia: ["google_sign_in"], since }],
+      currentAccess: [
+        { appName: "Asana", catalogKey: null, foundVia: ["google_sign_in"], since },
+        { appName: "Slack", catalogKey: "slack", foundVia: ["google_sign_in"], since },
+      ],
       suspendedWithAccess: false,
     },
     {
       status: "suspended",
       currentAccess: [
-        { appName: "Figma", foundVia: ["google_sign_in"], since },
-        { appName: "Notion", foundVia: ["google_sign_in"], since },
-        { appName: "Slack", foundVia: ["google_sign_in"], since },
+        { appName: "Figma", catalogKey: "figma", foundVia: ["google_sign_in"], since },
+        { appName: "Notion", catalogKey: "notion", foundVia: ["google_sign_in"], since },
+        { appName: "Slack", catalogKey: "slack", foundVia: ["google_sign_in"], since },
       ],
       suspendedWithAccess: true,
     },
@@ -62,11 +73,11 @@ test("reads an active employee's current access without a suspended warning", as
     {
       status: "active",
       currentAccess: [
-        { appName: "Figma", foundVia: ["google_sign_in"], since },
-        { appName: "Loom", foundVia: ["google_sign_in"], since },
-        { appName: "Miro", foundVia: ["google_sign_in"], since },
-        { appName: "Notion", foundVia: ["google_sign_in"], since },
-        { appName: "Slack", foundVia: ["google_sign_in"], since },
+        { appName: "Figma", catalogKey: "figma", foundVia: ["google_sign_in"], since },
+        { appName: "Loom", catalogKey: "loom", foundVia: ["google_sign_in"], since },
+        { appName: "Miro", catalogKey: "miro", foundVia: ["google_sign_in"], since },
+        { appName: "Notion", catalogKey: "notion", foundVia: ["google_sign_in"], since },
+        { appName: "Slack", catalogKey: "slack", foundVia: ["google_sign_in"], since },
       ],
       suspendedWithAccess: false,
     },

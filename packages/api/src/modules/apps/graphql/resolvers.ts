@@ -1,5 +1,6 @@
 import DataLoader from "dataloader";
 
+import { invalidInput } from "../../../core/applicationError";
 import {
   mutationPayload,
   perRequest,
@@ -63,7 +64,12 @@ export function createResolvers(
     },
     App: {
       status: ({ status }) => toEnum(status),
-      users: (app, _args, context) => usersOfApps(context).load(app.id),
+      users: async (app, { first }, context) => {
+        if (first != null && first < 1) {
+          throw invalidInput([{ field: "first", code: "out_of_range" }]);
+        }
+        return (await usersOfApps(context).load(app.id)).slice(0, first ?? undefined);
+      },
     },
   };
 }

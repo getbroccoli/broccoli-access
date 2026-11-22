@@ -5,16 +5,16 @@ import { t } from "@/i18n";
 import { describeFoundVia } from "@/lib/foundVia";
 import { formatSince } from "@/lib/since";
 
-import { AppStatusActions } from "./AppStatusActions";
-import { AppNameCell, type AppRow } from "./AppTable";
+import { AppRowActions } from "./AppRowActions";
+import { AppNameCell, AppPeopleCell, type AppRow } from "./AppTable";
 
 const APP_COLUMN: DataTableColumn<AppRow> = {
   id: "app",
   header: t("apps.column.app"),
   className: "w-[34%] min-w-48",
-  cell: ({ id, name, domain }) => (
+  cell: ({ id, name, domain, catalogKey }) => (
     <Link to="/apps/$appId" params={{ appId: id }} className="block rounded-md hover:opacity-80">
-      <AppNameCell name={name} domain={domain} />
+      <AppNameCell name={name} domain={domain} catalogKey={catalogKey} />
     </Link>
   ),
 };
@@ -32,8 +32,8 @@ export const APPROVED_APP_COLUMNS: DataTableColumn<AppRow>[] = [
   {
     id: "users",
     header: t("apps.column.users"),
-    className: "w-[11%] tabular-nums",
-    cell: ({ peopleCount }) => peopleCount,
+    className: "w-[16%]",
+    cell: ({ users, peopleCount }) => <AppPeopleCell users={users} peopleCount={peopleCount} />,
   },
   FOUND_VIA_COLUMN,
   {
@@ -56,8 +56,8 @@ export const FOUND_APP_COLUMNS: DataTableColumn<AppRow>[] = [
   {
     id: "people",
     header: t("apps.column.people"),
-    className: "w-[13%] tabular-nums",
-    cell: ({ peopleCount }) => peopleCount,
+    className: "w-[16%]",
+    cell: ({ users, peopleCount }) => <AppPeopleCell users={users} peopleCount={peopleCount} />,
   },
   FOUND_VIA_COLUMN,
   {
@@ -67,10 +67,10 @@ export const FOUND_APP_COLUMNS: DataTableColumn<AppRow>[] = [
   },
 ];
 
-/** Approve and Ignore at the end of each row, as the app's status allows. */
+/** Approve at the end of each row of an app not approved yet; Ignore is on the app's page. */
 export const APP_ACTIONS_COLUMN: DataTableColumn<AppRow> = {
   id: "actions",
   header: "",
-  className: "w-44",
-  cell: (app) => <AppStatusActions app={app} />,
+  className: "w-28 text-right",
+  cell: (app) => <AppRowActions app={app} />,
 };

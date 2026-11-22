@@ -36,7 +36,7 @@ A manual check of setup held by one browser, which connects Google Workspace wit
 ## Select your apps
 
 - [ ] Applications opens on Discovered as on the design: the banner "Last step: select the apps your company uses" with "We found 37 apps…", tabs "Approved 1", "Discovered 37", "Ignored 0", and the left menu's Applications showing 37.
-- [ ] The table lists App (initial, name, domain), People, Found via and Since, the most people first; Slack, Notion, Figma, Miro, Loom and Claude are checked, and the button says "Approve 6 and finish".
+- [ ] The table lists App (logo or initial, name, domain), People (four avatars, then "+N" for the rest), Found via and Since, the most people first; Slack, Notion, Figma, Miro, Loom and Claude are checked, and the button says "Approve 6 and finish".
 - [ ] Below the first twelve apps, "Show 25 more apps" shows the rest.
 - [ ] Unchecking Claude makes the button "Approve 5 and finish"; checking ChatGPT makes it "Approve 6 and finish". The header checkbox selects all apps, and again none.
 - [ ] Reloading keeps the owner on Applications; `/setup`, `/people` and `/` lead back to it.
