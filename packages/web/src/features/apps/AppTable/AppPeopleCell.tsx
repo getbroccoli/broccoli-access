@@ -13,10 +13,10 @@ type Props = Pick<AppRow, "users" | "peopleCount">;
  * keyboard focus, then how many more; screen readers hear the exact total.
  */
 export function AppPeopleCell({ users, peopleCount }: Props) {
-  const more = peopleCount - users.length;
   if (users.length === 0) {
     return <span className="tabular-nums">{peopleCount}</span>;
   }
+  const more = peopleCount - users.length;
 
   return (
     <TooltipProvider>

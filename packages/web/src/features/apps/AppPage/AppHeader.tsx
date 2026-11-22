@@ -16,7 +16,7 @@ type Props = {
   >;
 };
 
-/** The way back to Applications, the app with its status and domain, and Approve or Ignore as its status allows. */
+/** The way back to Applications, the app with its status and domain, and Approve or Ignore. */
 export function AppHeader({ app }: Props) {
   return (
     <div className="flex flex-col gap-5">

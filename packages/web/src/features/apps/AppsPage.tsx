@@ -91,7 +91,8 @@ export function AppsPage() {
           // A new tab starts with its first apps only.
           key={tab}
           rows={apps}
-          // Selecting apps for setup replaces approving them one by one.
+          // Selecting apps for setup replaces approving them one by one, and approved apps have
+          // nothing to approve.
           columns={firstRun || tab === "approved" ? columns : [...columns, APP_ACTIONS_COLUMN]}
           firstRows={FIRST_APPS}
           showMoreLabel={(count) => t("apps.showMore", { count: String(count) })}

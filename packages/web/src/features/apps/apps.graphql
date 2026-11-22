@@ -14,6 +14,7 @@ query AppsPage($status: AppStatus!, $first: Int!) {
         status
         connected
         peopleCount
+        # The avatars a row shows before "+N".
         users(first: 4) {
           id
           employee {
