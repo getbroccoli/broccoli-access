@@ -37,6 +37,25 @@ it.for(["connections/test", "accounts/list", "actions/run"] as const)(
   },
 );
 
+it("answers malformed JSON with HTTP 400 without echoing the request", async ({
+  connectors: { url },
+}) => {
+  const response = await fetch(`${url}/v1/connections/test`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: '{"connector":"linear","secrets":{"apiKey":lin_api_acme_fake}}',
+  });
+
+  expect(response.status).toBe(400);
+  expect(await response.text()).not.toContain("lin_api");
+});
+
+it("rejects an empty cursor", async ({ connectors: { url } }) => {
+  const result = await callConnector(url, "accounts/list", { ...linearRequest, cursor: "" });
+
+  expect(result.status).toBe(400);
+});
+
 it("rejects an unknown connector key", async ({ connectors: { url } }) => {
   const result = await callConnector(url, "connections/test", {
     ...linearRequest,

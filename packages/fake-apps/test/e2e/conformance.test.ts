@@ -45,6 +45,7 @@ function failNextAction(connector: string): ConnectorFixture["causeError"] {
     control(url, "/failures", { connector, call: "actions/run", code, count: 1 });
 }
 
-function reset(url: string) {
-  return control(url, "/reset");
+async function reset(url: string) {
+  await control(url, "/reset");
+  await control(url, "/delay", { milliseconds: 0 });
 }
