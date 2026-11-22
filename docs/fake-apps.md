@@ -1,6 +1,6 @@
 # Fake apps
 
-`packages/fake-apps` holds fakes of the apps broccoli-access connects to. Circle 1 needs one: a fake Google. Every circle 1 task is built and checked against it, by automated tests, by agents clicking through the app, and by people running `pnpm dev`. Real Google appears only in the circle's last task, which checks the same journeys against a real test organisation.
+`packages/fake-apps` holds fakes of the apps broccoli-access connects to. Circle 1 needs one: a fake Google. Circle 2 adds a fake connectors container (see "Fake connectors container"). Every circle 1 task is built and checked against it, by automated tests, by agents clicking through the app, and by people running `pnpm dev`. Real Google appears only in the circle's last task, which checks the same journeys against a real test organisation.
 
 ## Why
 
@@ -20,7 +20,7 @@
 - Other Google APIs: Gmail, Drive, groups, or anything that writes.
 - Keeping data across restarts.
 - Running in a real install.
-- Slack and other apps: their fakes join this package when their connectors come.
+- Slack's and Linear's own APIs and pages: the connectors repository fakes those for its connectors. This package fakes the connectors container instead.
 
 ## Anti-goals
 
@@ -273,9 +273,63 @@ These numbers are the circle 1 design canvas's; screens and checks rely on them.
 - **Scanning apps:** grants and grant events.
 - **People and Settings checks:** the control endpoints, to suspend someone or add a grant, then scan.
 
+## Fake connectors container
+
+Circle 2's core is built and checked against a fake of the connectors container, as circle 1's is against the fake Google. It speaks the [connector contract](connector-contract.md) on the wire, so the core's connector client is the code that will talk to the real container. It answers for Acme's Slack and Linear workspaces from its own memory.
+
+### Goals
+
+- Serve the four contract calls for `slack` and `linear`, with the manifest the real container will serve.
+- Make any call fail with any contract error, so every failure and Reconnect can be tested.
+- Give a Slack sign-in page to test the extension's hand-over.
+- Pass the contract's conformance suite.
+
+### Not goals
+
+- Slack's real pages or Linear's real API. The connectors repository fakes those, and its connectors are tested there.
+- Keeping data across restarts, or running in a real install.
+
+### How it behaves
+
+- **Manifest:** `slack` with runtime `server`, an `app_session` field whose `domains` are the fake's own host and whose `storageKeys` name the fake's token, a notice and an `adminUrl`; `linear` with runtime `server`, an `apiKey` text field, no notice.
+- **Linear:** the key `lin_api_acme_fake` reaches Acme's Linear; any other key fails with `authentication_failed`.
+- **Slack sign-in:** `GET /slack/signin` shows "Sign in as Mia Novak". It sets the cookie `d` on the fake's host and keeps a token in local storage, as Slack's page does; both are the session the extension hands over. The fake accepts only sessions it issued and has not expired.
+- **Changes:** the fake changes the member in memory and answers as the contract says, after a short delay that a control can lengthen.
+
+### Control endpoints
+
+Under `/_fake`, as for the fake Google:
+
+- `POST /_fake/reset`: back to the seed.
+- `GET /_fake/state`: the members of each workspace, with their status.
+- `POST /_fake/{connector}/members/{email}/suspend` and `/reactivate`: change a member as an admin would in the app.
+- `POST /_fake/failures` with `connector`, `call` (`connections/test`, `accounts/list` or `actions/run`), an error code and a count: the next matching calls fail that way.
+- `POST /_fake/slack/sessions/expire`: every Slack session fails with `authentication_failed`, until the owner signs in again.
+- `POST /_fake/linear/keys/revoke`: the Linear key fails with `authentication_failed`.
+- `POST /_fake/delay` with milliseconds: how long each answer takes, so the progress state can be seen.
+
+### Seed: Acme in Slack and Linear
+
+- **Slack:** workspace "Acme", team id `T04ACME`, domain `acme`.
+  - Members: the 41 people the fake Google gives Slack, with the same emails and stable member ids.
+  - Mia Novak is the primary owner, and the member the session belongs to.
+  - Ana Ruiz and Ben Ito are active, so they show as suspended with access.
+  - Elif Demir is deactivated, to show Enable.
+  - One pending invitation, `new.hire@acme.example`, which the list leaves out.
+- **Linear:** workspace "Acme", url key `acme`.
+  - Members: Mia Novak (admin, owner of the key), Ana Ruiz, Chloé Martin, David Okafor, Gabriel Silva and Jun Park, all active; Hannah Weber, suspended.
+  - One pending invitation, which the list leaves out.
+
+### Which tasks use what
+
+- **Fake connectors container:** the fake, the seed, the control endpoints and the conformance suite.
+- **Connect Linear, Disable and Enable, failed changes and Activity:** Linear, failures and the key revoke.
+- **Connect Slack, daily scans, Reconnect:** the Slack sign-in, the session expiry and failures.
+
 ## Left to the builder
 
 - The file layout, the generated names and the page token format, which only has to be opaque.
 - The JWT library, and how the signing key is created at start.
+- How the fake connectors container drives the owner's tab, as long as it uses only the one-time address.
 
 The fake is an Express app, like the API.
