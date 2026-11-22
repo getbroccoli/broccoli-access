@@ -5,6 +5,7 @@
   "type": "module",
   "description": "The connector contract's schemas and conformance suite, for any connectors container.",
   "license": "AGPL-3.0-only",
+  "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
