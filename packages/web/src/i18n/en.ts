@@ -5,6 +5,7 @@ import { navEn } from "./en/nav";
 import { notFoundEn } from "./en/notFound";
 import { peopleEn } from "./en/people";
 import { recordsEn } from "./en/records";
+import { scansEn } from "./en/scans";
 import { settingsEn } from "./en/settings";
 import { setupEn } from "./en/setup";
 import { tableEn } from "./en/table";
@@ -19,6 +20,7 @@ export const en = {
   ...navEn,
   ...peopleEn,
   ...recordsEn,
+  ...scansEn,
   ...tableEn,
   ...notFoundEn,
   ...settingsEn,

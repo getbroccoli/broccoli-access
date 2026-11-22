@@ -4,21 +4,17 @@ import { EmailSettingsDocument } from "@/__generated__/graphql";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
+import { PageHeader } from "@/shell";
 
 import { EmailForm } from "./EmailForm";
 
-/** The Settings page's Email section: how the instance sends email. */
+/** Settings' Email page: how the instance sends email. */
 export function EmailSettings() {
   const { data, error, refetch } = useQuery(EmailSettingsDocument);
 
   return (
-    <section aria-labelledby="email-settings-title" className="flex max-w-2xl flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 id="email-settings-title" className="text-lg font-semibold">
-          {t("settings.email.title")}
-        </h2>
-        <p className="text-sm text-muted-foreground">{t("settings.email.description")}</p>
-      </div>
+    <div className="flex max-w-2xl flex-col">
+      <PageHeader title={t("settings.email.title")} description={t("settings.email.description")} />
       {data?.setup.mail ? (
         <EmailForm mail={data.setup.mail} />
       ) : error ? (
@@ -31,6 +27,6 @@ export function EmailSettings() {
       ) : (
         <Skeleton className="h-[240px] rounded-xl" />
       )}
-    </section>
+    </div>
   );
 }

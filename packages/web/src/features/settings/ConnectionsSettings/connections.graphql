@@ -1,0 +1,27 @@
+query ConnectionsSettings {
+  setup {
+    id
+    googleWorkspace {
+      id
+      domain
+      adminEmail
+      scan {
+        id
+        status
+        readAt
+      }
+    }
+  }
+}
+
+mutation ScanNow($connectionId: ID!) {
+  imports {
+    scanConnection(connectionId: $connectionId) {
+      scan {
+        id
+        status
+        readAt
+      }
+    }
+  }
+}

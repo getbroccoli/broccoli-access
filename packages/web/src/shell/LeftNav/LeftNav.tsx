@@ -13,7 +13,8 @@ const APP_ITEMS: NavItem[] = [
   { to: "/", label: t("nav.today"), icon: House },
   { to: "/people", label: t("nav.people"), icon: Users },
 ];
-const SETTINGS_SYSTEM_ITEMS: NavItem[] = [
+const SETTINGS_ITEMS: NavItem[] = [
+  { to: "/settings/connections", label: t("settings.connections.title") },
   { to: "/settings/email", label: t("settings.email.title") },
 ];
 
@@ -50,8 +51,7 @@ export function LeftNav() {
           <span className="px-2 pt-3 pb-4 text-lg font-bold tracking-tight max-md:hidden">
             {t("settings.title")}
           </span>
-          <span className={groupLabelClass}>{t("settings.system")}</span>
-          <NavList label={t("settings.system")} items={SETTINGS_SYSTEM_ITEMS} />
+          <NavList label={t("settings.title")} items={SETTINGS_ITEMS} />
           <ProfileMenu />
         </div>
       </div>
@@ -61,6 +61,3 @@ export function LeftNav() {
 
 const menuClass =
   "flex items-center gap-3 px-3 py-2 max-md:overflow-x-auto md:h-full md:w-56 md:flex-col md:items-stretch md:gap-1 md:py-4";
-
-const groupLabelClass =
-  "px-2 pb-1 text-[10.5px] font-medium tracking-wide text-foreground/40 uppercase max-md:hidden";
