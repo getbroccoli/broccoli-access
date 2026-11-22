@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { ContainerConnectorsSettingsQuery } from "@/__generated__/graphql";
+import type { ConnectAppSessionDialog_ConnectorFragment } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
 import { Button } from "@/components/ui/button";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,10 +16,7 @@ import { type ConnectStep, StepList } from "./StepList";
 import { useAppSessionHandOver } from "./useAppSessionHandOver";
 import type { useConnectAppSession } from "./useConnectAppSession";
 
-export type AppSessionConnector = Pick<
-  ContainerConnectorsSettingsQuery["containerConnectors"][number],
-  "id" | "name" | "appDomain" | "notice"
->;
+export type AppSessionConnector = ConnectAppSessionDialog_ConnectorFragment;
 
 type Props = {
   connector: AppSessionConnector;

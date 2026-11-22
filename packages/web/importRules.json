@@ -36,6 +36,7 @@
       "src/lib/class-names",
       "src/lib/lastScan",
       "src/lib/since",
+      "src/lib/useChromeExtension",
       "src/lib/usePollWhileScanning",
       "src/lib/useRefetchAfterScan",
       "src/lib/useRouteAction",

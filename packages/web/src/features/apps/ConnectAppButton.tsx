@@ -1,15 +1,14 @@
 import type { FragmentType } from "@apollo/client";
 import { useFragment } from "@apollo/client/react";
-import { Link } from "@tanstack/react-router";
 
 import {
   type ConnectAppButton_ConnectorFragment,
   ConnectAppButton_ConnectorFragmentDoc,
 } from "@/__generated__/graphql";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
-import { cn } from "@/lib/class-names";
 
+import { ConnectAppSessionDialog } from "./ConnectAppSessionDialog";
 import { ConnectContainerConnectorDialog } from "./ConnectContainerConnectorDialog";
 import { connectsWithText } from "./connectsWithText";
 
@@ -21,7 +20,7 @@ type Props = {
   onConnected?: () => void;
 };
 
-/** Connect for an app a connector can manage: its connect dialog, or Settings for an app session. */
+/** Connect for an app a connector can manage: its dialog for typed values or for an app session. */
 export function ConnectAppButton({ connector, size, onConnected }: Props) {
   const { data, complete } = useFragment({
     fragment: ConnectAppButton_ConnectorFragmentDoc,
@@ -35,28 +34,15 @@ export function ConnectAppButton({ connector, size, onConnected }: Props) {
   const name = t("settings.apps.connect", { app: data.name });
   const label = size === "lg" ? name : t("apps.connect");
   const className = size === "lg" ? "px-4" : "px-3 text-[13px] font-semibold";
+  const button = (
+    <Button type="button" size={size} aria-label={name} className={className}>
+      {label}
+    </Button>
+  );
   if (!connectsWithText(data)) {
-    // shortcut: an app session connects in Settings > Connections; open its own dialog here once
-    // the extension hands the session over from this page.
-    return (
-      <Link
-        to="/settings/connections"
-        aria-label={name}
-        className={cn(buttonVariants({ size }), className)}
-      >
-        {label}
-      </Link>
-    );
+    return <ConnectAppSessionDialog connector={data} onConnected={onConnected} trigger={button} />;
   }
   return (
-    <ConnectContainerConnectorDialog
-      connector={data}
-      onConnected={onConnected}
-      trigger={
-        <Button type="button" size={size} aria-label={name} className={className}>
-          {label}
-        </Button>
-      }
-    />
+    <ConnectContainerConnectorDialog connector={data} onConnected={onConnected} trigger={button} />
   );
 }

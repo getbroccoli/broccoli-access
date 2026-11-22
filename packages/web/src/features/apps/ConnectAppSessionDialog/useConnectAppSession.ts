@@ -1,6 +1,7 @@
 import { ConnectContainerConnectorDocument } from "@/__generated__/graphql";
 import { useCache, usePayloadMutation } from "@/apollo";
-import { forgetAppLists } from "@/features/apps";
+
+import { forgetAppLists } from "../cache";
 
 /** Connects an app with its handed-over session; the dialog holds it, so it stays open while connecting. */
 export function useConnectAppSession() {

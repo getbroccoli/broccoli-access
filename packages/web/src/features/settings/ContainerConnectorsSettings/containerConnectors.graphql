@@ -2,14 +2,13 @@ query ContainerConnectorsSettings {
   containerConnectors {
     id
     name
-    appDomain
-    notice
     connectionFields {
       kind
       label
       secret
     }
     ...ConnectContainerConnectorDialog_connector
+    ...ConnectAppSessionDialog_connector
     connection {
       id
       connectionUserEmail
@@ -24,14 +23,5 @@ query ContainerConnectorsSettings {
         }
       }
     }
-  }
-}
-
-query AppSessionHandOver($id: ID!) {
-  appSessionHandOver(id: $id) {
-    id
-    organizationName
-    domain
-    appSession
   }
 }

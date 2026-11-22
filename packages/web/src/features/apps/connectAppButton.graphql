@@ -5,4 +5,5 @@ fragment ConnectAppButton_connector on ContainerConnector {
     kind
   }
   ...ConnectContainerConnectorDialog_connector
+  ...ConnectAppSessionDialog_connector
 }
