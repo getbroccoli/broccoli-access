@@ -230,47 +230,27 @@ test("record history links each line to its employee", async ({ env }) => {
   });
 });
 
-test("deleting an employee keeps history with no linked record", async ({ env }) => {
+test("refuses the removed employee delete mutation", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
-  const created = await browser.graphql(createMutation, {
-    input: { firstName: "Avery", lastName: "Stone", email: "avery@example.com" },
-  });
-  const body = (await created.json()) as {
-    data: { employees: { create: { employee: { id: string } } } };
-  };
-  const { id } = body.data.employees.create.employee;
-  await browser.graphql(
-    `
-    mutation DeleteEmployee($input: EmployeeDeleteInput!) {
-      employees { delete(input: $input) {
-        deletedEmployeeId error { __typename ... on Error { message } }
-      } }
-    }
-  `,
-    { input: { id } },
-  );
+  const employee = await env.seed.employee();
 
-  const history = await browser.graphql(
-    `
-    query DeletedEmployeeHistory($id: ID!) {
-      employee(id: $id) { id }
-      recordHistory(recordType: EMPLOYEE, recordId: $id) {
-        edges { node { operation record { __typename ... on Employee { id firstName } } } }
-      }
-    }
-  `,
-    { id },
+  const response = await browser.graphql(
+    `mutation ($id: ID!) {
+      employees { delete(input: { id: $id }) { deletedEmployeeId } }
+    }`,
+    { id: employee.id },
   );
+  const body = await response.json();
 
-  expect(await history.json()).toEqual({
-    data: {
-      employee: null,
-      recordHistory: {
-        edges: [
-          { node: { operation: "DELETED", record: null } },
-          { node: { operation: "CREATED", record: null } },
-        ],
+  expect(body).not.toHaveProperty("data");
+  expect(body).toMatchObject({
+    errors: [
+      {
+        message: expect.stringContaining(
+          'Cannot query field "delete" on type "EmployeesMutations"',
+        ) as unknown,
+        extensions: { code: "GRAPHQL_VALIDATION_FAILED" },
       },
-    },
+    ],
   });
 });

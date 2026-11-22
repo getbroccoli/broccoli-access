@@ -48,27 +48,21 @@
     "src/features/employees": [
       "src/__generated__",
       "src/apollo",
+      "src/components/AppInitial",
       "src/components/Avatar",
       "src/components/dataTable",
       "src/components/form",
       "src/components/ui",
-      "src/features/records",
       "src/i18n",
       "src/lib/calendarDay",
       "src/lib/class-names",
+      "src/lib/foundVia",
       "src/lib/initials",
       "src/lib/lastScan",
+      "src/lib/since",
       "src/lib/usePollWhileScanning",
       "src/lib/useRefetchAfterScan",
       "src/shell"
-    ],
-    "src/features/records": [
-      "src/__generated__",
-      "src/components/ui",
-      "src/i18n",
-      "src/lib/calendarDay",
-      "src/lib/class-names",
-      "src/lib/sentenceCase"
     ],
     "src/features/settings": [
       "src/__generated__",
@@ -76,7 +70,6 @@
       "src/components/form",
       "src/components/ui",
       "src/features/employees",
-      "src/features/records",
       "src/features/setup",
       "src/i18n",
       "src/lib/calendarDay",
@@ -115,7 +108,6 @@
     "src/lib/useRefetchAfterScan": [],
     "src/lib/useSessionChange": ["src/lib/useRouteAction"],
     "src/lib/calendarDay": [],
-    "src/lib/sentenceCase": [],
     "src/lib/lastScan": ["src/i18n", "src/lib/calendarDay", "src/lib/since"],
     "src/lib/usePollWhileScanning": []
   },

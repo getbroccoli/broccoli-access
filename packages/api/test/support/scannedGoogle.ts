@@ -24,6 +24,21 @@ export async function readGoogleConnection(browser: Browser) {
   return body.data.setup.googleWorkspace;
 }
 
+/** Finishes setup after the scan, approving the preselected apps. */
+export async function finishSetupWithPreselectedApps(browser: Browser) {
+  const discovered = await scannedApps(browser);
+  const approvedAppIds = discovered.filter(({ preselected }) => preselected).map(({ id }) => id);
+  const response = await browser.graphql(
+    `mutation ($input: SetupFinishInput!) {
+      apps { finishSetup(input: $input) { setup { step } error { __typename } } }
+    }`,
+    { input: { approvedAppIds } },
+  );
+  expect(await response.json()).toEqual({
+    data: { apps: { finishSetup: { setup: { step: "DONE" }, error: null } } },
+  });
+}
+
 export async function scannedApps(browser: Browser) {
   let discovered: { id: string; name: string; preselected: boolean }[] = [];
   await expect

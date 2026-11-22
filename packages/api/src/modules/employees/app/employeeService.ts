@@ -1,11 +1,6 @@
 import { invalidInput } from "../../../core/applicationError";
-import type { Tx } from "../../../core/db";
 import type { ModuleDependencies } from "../../../core/moduleManifest";
-import {
-  createRecordHistoryService,
-  type HistoryLine,
-  parseChangeReason,
-} from "../../../core/records";
+import { createRecordHistoryService, type HistoryLine } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
 import { type EmployeeRepository, employeeRepository } from "../db";
@@ -25,7 +20,7 @@ import { recordCreatedEmployees } from "./recordCreatedEmployees";
 
 const recordHistory = createRecordHistoryService();
 
-/** Adds, changes and removes employees, each in one transaction with its history lines. */
+/** Adds and changes employees, each in one transaction with its history lines. */
 export interface EmployeeService {
   /** Adds an employee; returns null when the caller may not read them. */
   createEmployee: (ctx: SecurityContext, input: NewEmployeeInput) => Promise<Employee | null>;
@@ -39,14 +34,6 @@ export interface EmployeeService {
     ctx: SecurityContext,
     input: EmployeeUpdateInput & { id: string },
   ) => Promise<{ employee: Employee | null; historyLine: HistoryLine | null }>;
-  /**
-   * Removes an employee and their avatar and records what they held as a deletion line; their
-   * history stays. Refuses an unknown id with NOT_FOUND.
-   */
-  deleteEmployee: (
-    ctx: SecurityContext,
-    input: { id: string; changeReason?: string | null },
-  ) => Promise<{ deletedEmployeeId: string }>;
 }
 
 export function createEmployeeService({
@@ -102,40 +89,7 @@ export function createEmployeeService({
       }
       return readableResult(ctx, employee, historyLine);
     },
-    async deleteEmployee(ctx, { id, changeReason }) {
-      const reason = parseChangeReason(changeReason);
-      const employeeId = parseUuid(id);
-      if (!employeeId) {
-        ctx.requireEveryRecord("employee", "delete");
-        throw employeeNotFound();
-      }
-      await ctx.requireInScope("employee", "delete", employeeId);
-      const historyId = await transact((tx) => deleteWithHistory(ctx, tx, employeeId, reason));
-      logger.info({ employeeId, historyId }, "Deleted an employee");
-      return { deletedEmployeeId: employeeId };
-    },
   };
-}
-
-/** Deletes the employee, recording what they held as a deletion line; refuses an employee deleted meanwhile. */
-async function deleteWithHistory(
-  ctx: SecurityContext,
-  tx: Tx,
-  employeeId: string,
-  reason: string | null,
-): Promise<string> {
-  const deleted = await employeeRepository(tx).delete(employeeId);
-  if (!deleted) {
-    throw employeeNotFound();
-  }
-  const [line] = await recordHistory.append(ctx, tx, {
-    recordType: "employee",
-    operation: "DELETED",
-    cause: { kind: "EDITED_DIRECTLY" },
-    reason,
-    records: [{ recordId: employeeId, changes: employeeChanges(deleted, null) }],
-  });
-  return line!.id;
 }
 
 /** The employee before and after saving `changes`; refuses an unknown employee or a taken email. */

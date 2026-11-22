@@ -8,8 +8,6 @@ import { apps } from "./appsTable";
  * One person's account in one app. `employee_id` references `employees`; the migration adds that
  * foreign key, since a module's tables never import another module's.
  */
-// shortcut: deleting an employee clears `employee_id` without a history line; fine until the
-// copied delete-employee action goes with the old People panel.
 export const appAccounts = pgTable(
   "app_accounts",
   {

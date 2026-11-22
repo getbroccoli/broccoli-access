@@ -54,11 +54,6 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
           () => services.updateEmployee(context.getActor(), input),
           ["INVALID_INPUT", "NOT_FOUND"],
         ),
-      delete: (_parent, { input }, context) =>
-        mutationPayload<ResolversTypes["EmployeeDeletePayload"]>(
-          () => services.deleteEmployee(context.getActor(), input),
-          ["INVALID_INPUT", "NOT_FOUND"],
-        ),
     },
     AppUser: {
       employee: (user, _args, context) => employeesById(context).load(user.employeeId),
@@ -79,7 +74,11 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
         return status && toEnum(status);
       },
       approvedAppNames: async ({ id }, _args, context) =>
-        (await access(context).load(id)).approvedAppNames,
+        (await access(context).load(id)).currentAccess.map(({ appName }) => appName),
+      suspendedWithAccess: async ({ id }, _args, context) =>
+        (await access(context).load(id)).suspendedWithAccess,
+      currentAccess: async ({ id }, _args, context) =>
+        (await access(context).load(id)).currentAccess,
     },
   };
 }

@@ -50,7 +50,6 @@ const writes = {
       email: "anna@example.com",
     }),
   updateEmployee: (employees, ctx, id) => employees.updateEmployee(ctx, { id, firstName: "Lead" }),
-  deleteEmployee: (employees, ctx, id) => employees.deleteEmployee(ctx, { id }),
 } satisfies Record<
   string,
   (employees: EmployeeServices, ctx: SecurityContext, id: string) => Promise<unknown>

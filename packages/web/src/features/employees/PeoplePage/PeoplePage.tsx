@@ -1,5 +1,5 @@
 import { useQuery } from "@apollo/client/react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useRouter, useSearch } from "@tanstack/react-router";
 
 import { PeoplePageDocument } from "@/__generated__/graphql";
 import { TableSearchField } from "@/components/dataTable";
@@ -18,6 +18,7 @@ import { PeopleTabs } from "./PeopleTabs";
 export function PeoplePage() {
   const { view = "all", q } = useSearch({ from: "/_authenticated/people" });
   const navigate = useNavigate({ from: "/people" });
+  const router = useRouter();
   const suspendedOnly = view === "suspendedWithAccess";
   // The suspended tab shows no search field, so it never searches.
   const { data, error, refetch, startPolling, stopPolling } = useQuery(PeoplePageDocument, {
@@ -46,14 +47,11 @@ export function PeoplePage() {
         {!suspendedOnly && (
           <TableSearchField
             query={q}
-            onQueryChange={(next) =>
-              void navigate({
-                // A pending search may finish after a person's panel opens: keep the panel open.
-                unsafeRelative: "path",
-                search: (previous) => ({ ...previous, q: next }),
-                replace: true,
-              })
-            }
+            onQueryChange={(next) => {
+              // A search that settles while a person's page loads would pull the browser back here.
+              if (router.latestLocation.pathname !== "/people") return;
+              void navigate({ search: (previous) => ({ ...previous, q: next }), replace: true });
+            }}
             label={t("people.search.label")}
             placeholder={t("people.search.placeholder")}
             maxLength={SEARCH_MAX_LENGTH}

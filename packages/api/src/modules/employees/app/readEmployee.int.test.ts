@@ -12,6 +12,10 @@ test("returns null for an unknown employee", async ({ orm }) => {
   ).toBeNull();
 });
 
+test("returns null for a malformed id", async ({ orm }) => {
+  expect(await employeeServices(orm).readEmployee(OWNER, "not-an-id")).toBeNull();
+});
+
 test("returns history for an employee id written in uppercase", async ({ orm, seed }) => {
   const employee = await seed.employee();
   const employees = employeeServices(orm);

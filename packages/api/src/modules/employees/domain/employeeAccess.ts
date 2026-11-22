@@ -8,22 +8,29 @@ export interface EmployeeAccount {
   status: AccountStatus;
   /** Whether the app is the directory, such as Google Workspace. */
   inDirectory: boolean;
+  /** The finding kinds that saw it, such as `google_sign_in`. */
+  foundVia: string[];
+  /** Since when they have had it; `before` when the grant is older than the log, which began at `at`. */
+  since: { at: Date; before: boolean };
 }
 
 /** What an employee's accounts say about them, computed when read and never stored. */
 export interface EmployeeAccess {
   /** Their directory account's status; null without one. */
   status: AccountStatus | null;
-  /** The approved apps other than the directory where they have an active account, by name. */
-  approvedAppNames: string[];
+  /** Their active accounts in approved apps other than the directory, by app name. */
+  currentAccess: AppAccess[];
   /** Suspended in the directory with an active account in another approved app. */
   suspendedWithAccess: boolean;
 }
 
+/** An approved app someone has an active account in, how the account was found and since when. */
+export type AppAccess = Pick<EmployeeAccount, "appName" | "foundVia" | "since">;
+
 /** The access of an employee without accounts. */
 export const NO_ACCESS: EmployeeAccess = {
   status: null,
-  approvedAppNames: [],
+  currentAccess: [],
   suspendedWithAccess: false,
 };
 
@@ -37,14 +44,14 @@ export function accessOfEmployees(
 
 function accessOf(accounts: readonly EmployeeAccount[]): EmployeeAccess {
   const status = accounts.find(({ inDirectory }) => inDirectory)?.status ?? null;
-  const approvedAppNames = accounts
+  const currentAccess = accounts
     .filter(givesAccess)
-    .map(({ appName }) => appName)
-    .sort((a, b) => a.localeCompare(b));
+    .map(({ appName, foundVia, since }) => ({ appName, foundVia: foundVia.toSorted(), since }))
+    .sort((a, b) => a.appName.localeCompare(b.appName));
   return {
     status,
-    approvedAppNames,
-    suspendedWithAccess: status === "suspended" && approvedAppNames.length > 0,
+    currentAccess,
+    suspendedWithAccess: status === "suspended" && currentAccess.length > 0,
   };
 }
 

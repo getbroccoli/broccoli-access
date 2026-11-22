@@ -18,7 +18,6 @@ export function PersonCell({ person }: Props) {
         <Link
           to="/people/$employeeId"
           params={{ employeeId: person.id }}
-          search={(previous) => previous}
           className="truncate font-medium hover:underline"
         >
           {person.firstName} {person.lastName}

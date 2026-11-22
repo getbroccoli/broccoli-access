@@ -15,6 +15,8 @@ import {
   type EmployeeAppAccount,
 } from "../db";
 import {
+  type AccountDates,
+  accountSince,
   appChanges,
   appSince,
   type AppStatus,
@@ -83,16 +85,20 @@ export interface AppService {
   /** The employees whose account in the directory's app is suspended. Trusted read: no `ctx`. */
   findEmployeesSuspendedInDirectory: (db: Orm | Tx) => Promise<string[]>;
   /**
-   * Every account that belongs to an employee, with its app's name and status and whether the
-   * app is the directory's. Trusted read: no `ctx`.
+   * Every account that belongs to an employee, with its app's name and status, whether the app is
+   * the directory's, how it was found and since when. Trusted read: no `ctx`.
    */
   findEmployeeAccounts: (db: Orm | Tx) => Promise<EmployeeAccountInApp[]>;
 }
 
-/** An employee's account as the People list reads it. */
-export interface EmployeeAccountInApp extends Omit<EmployeeAppAccount, "appId"> {
+/** An employee's account as People and a person's page read it. */
+export interface EmployeeAccountInApp extends Omit<
+  EmployeeAppAccount,
+  "appId" | keyof AccountDates
+> {
   /** Whether the app is the directory's, such as Google Workspace. */
   inDirectory: boolean;
+  since: Since;
 }
 
 /** An app with what the app list shows of it, computed from its users' accounts. */
@@ -179,9 +185,10 @@ export function createAppService(dependencies: AppDependencies): AppService {
         appAccountRepository(db).findEmployeeAccounts(),
         findDirectoryAppId(db, connectors),
       ]);
-      return accounts.map(({ appId, ...account }) => ({
+      return accounts.map(({ appId, grantedAt, grantedBefore, firstSeenAt, ...account }) => ({
         ...account,
         inDirectory: appId === directoryAppId,
+        since: accountSince({ grantedAt, grantedBefore, firstSeenAt }),
       }));
     },
   };

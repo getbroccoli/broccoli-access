@@ -81,4 +81,4 @@ export {
   storedImportRecords,
   storedRecordHistory,
 } from "./storedScan";
-export { readGoogleConnection, scannedApps } from "./scannedGoogle";
+export { readGoogleConnection, finishSetupWithPreselectedApps, scannedApps } from "./scannedGoogle";
