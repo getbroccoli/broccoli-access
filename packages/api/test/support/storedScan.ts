@@ -1,10 +1,13 @@
 import type { Orm } from "../../src/core/db";
 import { recordHistory } from "../../src/core/records/db";
-import { appAccounts } from "../../src/modules/apps/db";
+import { apps, appAccounts } from "../../src/modules/apps/db";
 import { employees } from "../../src/modules/employees/db";
 import { importSources, importRecords } from "../../src/modules/imports/db";
 
 /** Stable raw reads to compare the complete persisted state before and after a scan. */
+export function storedApps(orm: Orm) {
+  return orm.select().from(apps).orderBy(apps.name, apps.id);
+}
 export function storedEmployees(orm: Orm) {
   return orm.select().from(employees).orderBy(employees.email);
 }

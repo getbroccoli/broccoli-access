@@ -1,6 +1,6 @@
 import { expect, test } from "#test/support";
 
-test("the owner's consent runs the scan and exposes its people counts through GraphQL", async ({
+test("the owner's consent runs the scan and exposes its people and app counts through GraphQL", async ({
   env,
 }) => {
   const { browser } = await env.signInAsOwner();
@@ -9,7 +9,7 @@ test("the owner's consent runs the scan and exposes its people counts through Gr
     .poll(
       async () => {
         const response = await browser.graphql(
-          "{ setup { googleWorkspace { scan { status people { state count suspended } } } } }",
+          "{ setup { googleWorkspace { scan { status people { state count suspended } apps { state count } signInLogs { state } } } } }",
         );
         return response.json();
       },
@@ -22,6 +22,8 @@ test("the owner's consent runs the scan and exposes its people counts through Gr
             scan: {
               status: "SCANNED",
               people: { state: "DONE", count: 42, suspended: 2 },
+              apps: { state: "DONE", count: 37 },
+              signInLogs: { state: "DONE" },
             },
           },
         },

@@ -11,7 +11,11 @@ import {
   type EmployeeReadService,
   type EmployeeService,
 } from "../../src/modules/employees";
-import { createAppConnectionService, createAppAccountService } from "../../src/modules/apps";
+import {
+  createAppConnectionService,
+  createAppAccountService,
+  createAppService,
+} from "../../src/modules/apps";
 import { createScanService, type ScanService } from "../../src/modules/imports";
 import {
   createGoogleConnectionService,
@@ -114,6 +118,7 @@ export function scans(
     apps: {
       ...createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
       ...createAppAccountService(),
+      ...createAppService(),
     },
     directory: createDirectorySyncService(),
     wait: () => Promise.resolve(),

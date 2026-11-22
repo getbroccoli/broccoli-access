@@ -75,7 +75,7 @@ test("maps all 42 Google directory users to their own app's accounts", async ({
   let cursor: string | null = null;
   do {
     const page = await session.listAccounts(cursor);
-    accounts.push(...page.accounts);
+    accounts.push(...page.accounts.filter(({ values }) => values.appExternalId === null));
     cursor = page.nextCursor;
   } while (cursor !== null);
 
@@ -114,4 +114,54 @@ test("maps all 42 Google directory users to their own app's accounts", async ({
       },
     });
   }
+});
+
+test("maps every grant except the instance's own client to an app account", async ({
+  connectorCase,
+}) => {
+  const openedAt = Date.now();
+  const session = await connectorCase.connector.openSession(connectorCase.connection);
+  const accounts: ImportedAccount[] = [];
+  let cursor: string | null = null;
+
+  do {
+    const page = await session.listAccounts(cursor);
+    accounts.push(...page.accounts.filter(({ values }) => values.appExternalId !== null));
+    cursor = page.nextCursor;
+  } while (cursor !== null);
+
+  expect(accounts).toHaveLength(ACME.grants.length);
+  expect(accounts.map(({ values }) => [values.email, values.appExternalId]).sort()).toEqual(
+    ACME.grants.map(({ email, clientId }) => [email, `google:${clientId}`]).sort(),
+  );
+  const figma = ACME.apps.find(({ name }) => name === "Figma")!;
+  const ana = accounts.find(
+    ({ sourceKey }) => sourceKey === `104857392018374650123:${figma.clientId}`,
+  )!;
+  expect(ana).toEqual({
+    sourceKey: `104857392018374650123:${figma.clientId}`,
+    raw: {
+      kind: "admin#directory#token",
+      clientId: figma.clientId,
+      displayText: "Figma",
+      scopes: ["openid", "email", "profile"],
+      userKey: "104857392018374650123",
+      anonymous: false,
+      nativeApp: false,
+    },
+    values: {
+      email: "ana@acme.example",
+      status: "active",
+      firstName: null,
+      lastName: null,
+      managerEmail: null,
+      appName: "Figma",
+      appExternalId: `google:${figma.clientId}`,
+      grantedAt: null,
+      grantedBefore: expect.any(String) as unknown,
+    },
+  });
+  const logStart = Date.parse(ana.values.grantedBefore!);
+  expect(logStart).toBeGreaterThanOrEqual(openedAt - 180 * 86_400_000);
+  expect(logStart).toBeLessThanOrEqual(Date.now() - 180 * 86_400_000);
 });

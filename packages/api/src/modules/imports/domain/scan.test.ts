@@ -3,10 +3,10 @@ import { expect, it } from "vitest";
 import type { ImportSource } from "./importSource";
 import { scanOf } from "./scan";
 
-it("shows people done with progress counts while the scan is still running", () => {
+it("shows all steps done with progress counts while the scan is still running", () => {
   const scan = scanOf(SOURCE, {
-    progress: { people: { count: 42, suspended: 2 } },
-    saved: { count: 40, suspended: 1 },
+    progress: { found: { people: 42, suspended: 2, apps: 37 } },
+    saved: { people: 40, suspended: 1, apps: 30 },
   });
 
   expect(scan).toEqual({
@@ -15,6 +15,8 @@ it("shows people done with progress counts while the scan is still running", () 
     failure: null,
     readAt: null,
     people: { state: "done", count: 42, suspended: 2 },
+    apps: { state: "done", count: 37 },
+    signInLogs: { state: "done" },
   });
 });
 
@@ -26,8 +28,8 @@ it("shows saved counts for a scanned source", () => {
   };
 
   const scan = scanOf(source, {
-    progress: { people: { count: 40, suspended: 1 } },
-    saved: { count: 42, suspended: 2 },
+    progress: { found: { people: 40, suspended: 1, apps: 30 } },
+    saved: { people: 42, suspended: 2, apps: 37 },
   });
 
   expect(scan).toEqual({
@@ -36,10 +38,12 @@ it("shows saved counts for a scanned source", () => {
     failure: null,
     readAt: source.readAt,
     people: { state: "done", count: 42, suspended: 2 },
+    apps: { state: "done", count: 37 },
+    signInLogs: { state: "done" },
   });
 });
 
-it("shows people failed without counts even when progress and saved counts exist", () => {
+it("shows all steps failed without counts even when progress and saved counts exist", () => {
   const source: ImportSource = {
     ...SOURCE,
     status: "scan_failed",
@@ -48,8 +52,8 @@ it("shows people failed without counts even when progress and saved counts exist
   };
 
   const scan = scanOf(source, {
-    progress: { people: { count: 42, suspended: 2 } },
-    saved: { count: 40, suspended: 1 },
+    progress: { found: { people: 42, suspended: 2, apps: 37 } },
+    saved: { people: 40, suspended: 1, apps: 30 },
   });
 
   expect(scan).toEqual({
@@ -58,8 +62,30 @@ it("shows people failed without counts even when progress and saved counts exist
     failure: "permission_missing",
     readAt: source.readAt,
     people: { state: "failed", count: null, suspended: null },
+    apps: { state: "failed", count: null },
+    signInLogs: { state: "failed" },
   });
 });
+
+it.each([null, { found: null }])(
+  "waits for apps and sign-in logs while reading accounts (%j)",
+  (progress) => {
+    const scan = scanOf(SOURCE, {
+      progress,
+      saved: { people: 42, suspended: 2, apps: 37 },
+    });
+
+    expect(scan).toEqual({
+      id: SOURCE.id,
+      status: "scanning",
+      failure: null,
+      readAt: null,
+      people: { state: "running", count: null, suspended: null },
+      apps: { state: "waiting", count: null },
+      signInLogs: { state: "waiting" },
+    });
+  },
+);
 
 const SOURCE: ImportSource = {
   id: "source-google",

@@ -19,6 +19,8 @@ test("a queued scan shows people running with no counts", async ({ orm, fakeGoog
     failure: null,
     readAt: null,
     people: { state: "running", count: null, suspended: null },
+    apps: { state: "waiting", count: null },
+    signInLogs: { state: "waiting" },
   });
 });
 
@@ -39,6 +41,8 @@ test("a failed first scan shows its failure and people failed", async ({ orm, fa
     failure: "permission_missing",
     readAt: null,
     people: { state: "failed", count: null, suspended: null },
+    apps: { state: "failed", count: null },
+    signInLogs: { state: "failed" },
   });
 });
 

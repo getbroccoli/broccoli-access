@@ -21,3 +21,27 @@ export async function suspendAtFakeGoogle(googleUrl: string, email: string): Pro
   });
   assert.equal(response.status, 204);
 }
+
+export async function grantAtFakeGoogle(
+  googleUrl: string,
+  grant: { email: string; clientId: string; appName: string; grantedAt?: string },
+): Promise<void> {
+  const response = await fetch(`${googleUrl}/_fake/grants`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(grant),
+  });
+  assert.equal(response.status, 204);
+}
+
+export async function revokeAtFakeGoogle(
+  googleUrl: string,
+  grant: { email: string; clientId: string },
+): Promise<void> {
+  const response = await fetch(`${googleUrl}/_fake/grants`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(grant),
+  });
+  assert.equal(response.status, 204);
+}
