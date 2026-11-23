@@ -44,7 +44,7 @@ test("orders approved apps by the people their scans found", async ({
 }) => {
   await googleScanWithLinearGrant(orm, fakeGoogle.url, "ben@acme.example");
   await scannedLinear(orm, fakeConnectors.url);
-  const service = apps(orm, { connectorsUrl: fakeConnectors.url });
+  const service = apps(orm);
   const chatGpt = (await storedApps(orm)).find(({ name }) => name === "ChatGPT")!;
   await service.approveApp(OWNER, chatGpt.id);
 

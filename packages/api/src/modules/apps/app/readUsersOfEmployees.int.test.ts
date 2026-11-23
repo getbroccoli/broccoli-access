@@ -45,10 +45,7 @@ test("omits a person's Google-only Linear account after Linear's first scan", as
   const ben = linear.account("ben@acme.example");
   const ana = linear.account("ana@acme.example");
 
-  const users = await appUsers(orm, { connectorsUrl: fakeConnectors.url }).readUsersOfEmployees(
-    OWNER,
-    [ben.employeeId!, ana.employeeId!],
-  );
+  const users = await appUsers(orm).readUsersOfEmployees(OWNER, [ben.employeeId!, ana.employeeId!]);
 
   expect(users.map(({ id }) => id)).toEqual([ana.id]);
 });

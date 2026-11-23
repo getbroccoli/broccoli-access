@@ -1,11 +1,15 @@
-import type { AccountStatus, ConnectorRegistry } from "../../../core/connectors";
+import type { AccountStatus } from "../../../core/connectors";
 import type { Orm } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { appAccountRepository, type AppUserAccount } from "../db";
 import { accountSince, type Since } from "../domain";
-import type { EmployeesByName } from "../ports";
-import { findDirectoryAppId, findEmployeesSuspendedInDirectory } from "./directory";
-import { findScannedConnections } from "./scannedConnections";
+import type { ConnectionMembers, EmployeesByName } from "../ports";
+import {
+  type DirectoryConnectors,
+  findDirectoryAppId,
+  findEmployeesSuspendedInDirectory,
+} from "./directory";
+import { findInAppFacts } from "./inAppFacts";
 
 /** An app's users: its accounts that belong to an employee. */
 export interface AppUserService {
@@ -49,26 +53,25 @@ export interface AppUser {
 
 interface AppUserDependencies {
   orm: Orm;
-  /** The connectors the scans read; the one whose `isDirectory` is set names the directory. */
-  connectors: ConnectorRegistry;
+  /** The imports module, which knows which connections have finished a scan. */
+  members: ConnectionMembers;
+  /** The core's own connectors; the one whose `isDirectory` is set names the directory. */
+  connectors: DirectoryConnectors;
   /** The employees module, which owns their names and so their order. */
   employees: EmployeesByName;
 }
 
-export function createAppUserService({
-  orm,
-  connectors,
-  employees,
-}: AppUserDependencies): AppUserService {
+export function createAppUserService(dependencies: AppUserDependencies): AppUserService {
+  const { orm, connectors, employees } = dependencies;
   return {
     // shortcut: reads every user of the apps unpaged, since their order needs the employees'
     // names, even when the app list keeps only its first four avatars per app; page them, or read
     // only the first few per app, once a directory can be very large (left out of circle 1).
     async readUsersOfApps(ctx, appIds) {
       ctx.require("MANAGE_WORKSPACE");
-      const scanned = await findScannedConnections(orm, connectors);
+      const inAppFacts = await findInAppFacts(orm, dependencies);
       const [accounts, suspended] = await Promise.all([
-        appAccountRepository(orm).findUsersOfApps(appIds, scanned),
+        appAccountRepository(orm).findUsersOfApps(appIds, inAppFacts),
         findEmployeesSuspendedInDirectory(orm, connectors),
       ]);
       const byName = await employees.readEmployees(ctx, [
@@ -89,9 +92,9 @@ export function createAppUserService({
     },
     async readUsersOfEmployees(ctx, employeeIds) {
       ctx.require("MANAGE_WORKSPACE");
-      const scanned = await findScannedConnections(orm, connectors);
+      const inAppFacts = await findInAppFacts(orm, dependencies);
       const [accounts, suspended, directoryAppId] = await Promise.all([
-        appAccountRepository(orm).findCurrentAccountsOfEmployees(employeeIds, scanned),
+        appAccountRepository(orm).findCurrentAccountsOfEmployees(employeeIds, inAppFacts),
         findEmployeesSuspendedInDirectory(orm, connectors),
         findDirectoryAppId(orm, connectors),
       ]);

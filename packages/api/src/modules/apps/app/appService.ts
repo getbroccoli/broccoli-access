@@ -1,5 +1,4 @@
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
-import type { ConnectorRegistry } from "../../../core/connectors";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import { createSetupStepService } from "../../../core/instance";
 import type { Logger } from "../../../core/logger";
@@ -27,9 +26,13 @@ import {
   planAppMatches,
   type Since,
 } from "../domain";
-
-import { findDirectoryAppId, findEmployeesSuspendedInDirectory } from "./directory";
-import { findScannedConnections } from "./scannedConnections";
+import type { ConnectionMembers } from "../ports";
+import {
+  type DirectoryConnectors,
+  findDirectoryAppId,
+  findEmployeesSuspendedInDirectory,
+} from "./directory";
+import { findInAppFacts } from "./inAppFacts";
 
 const recordHistory = createRecordHistoryService();
 const setupSteps = createSetupStepService();
@@ -120,8 +123,10 @@ interface AppDependencies {
   orm: Orm;
   transact: Transact;
   logger: Logger;
-  /** The connectors the scans read; the one whose `isDirectory` is set names the directory. */
-  connectors: ConnectorRegistry;
+  /** The core's own connectors; the one whose `isDirectory` is set names the directory. */
+  connectors: DirectoryConnectors;
+  /** The imports module, which knows which connections have finished a scan. */
+  members: ConnectionMembers;
 }
 
 export function createAppService(dependencies: AppDependencies): AppService {
@@ -140,11 +145,11 @@ export function createAppService(dependencies: AppDependencies): AppService {
     },
     async listApps(ctx, { status, ...pageArgs }) {
       ctx.require("MANAGE_WORKSPACE");
-      const scanned = await findScannedConnections(orm, connectors);
+      const inAppFacts = await findInAppFacts(orm, dependencies);
       const page = await paginate(pageArgs, {
         order: { field: "PEOPLE", direction: "DESC" },
         keysetValues: APP_SORT_VALUES,
-        fetch: (query) => appRepository(orm).findPage({ ...query, status, scanned }),
+        fetch: (query) => appRepository(orm).findPage({ ...query, status, inAppFacts }),
       });
       const summaries = await summarize(
         dependencies,
@@ -186,9 +191,9 @@ export function createAppService(dependencies: AppDependencies): AppService {
     directoryAppId: (db) => findDirectoryAppId(db, connectors),
     findEmployeesSuspendedInDirectory: (db) => findEmployeesSuspendedInDirectory(db, connectors),
     async findEmployeeAccounts(db) {
-      const scanned = await findScannedConnections(db, connectors);
+      const inAppFacts = await findInAppFacts(db, dependencies);
       const [accounts, directoryAppId] = await Promise.all([
-        appAccountRepository(db).findEmployeeAccounts(scanned),
+        appAccountRepository(db).findEmployeeAccounts(inAppFacts),
         findDirectoryAppId(db, connectors),
       ]);
       return accounts.map(({ appId, grantedAt, grantedBefore, firstSeenAt, ...account }) => ({
@@ -271,14 +276,15 @@ async function settleDiscoveredApps(
  * keeps access though suspended, and whether they are connected.
  */
 async function summarize(
-  { orm, connectors }: Pick<AppDependencies, "orm" | "connectors">,
+  dependencies: Pick<AppDependencies, "orm" | "connectors" | "members">,
   apps: readonly App[],
 ): Promise<AppSummary[]> {
+  const { orm, connectors } = dependencies;
   const accounts = appAccountRepository(orm);
   const appIds = apps.map(({ id }) => id);
-  const scanned = await findScannedConnections(orm, connectors);
+  const inAppFacts = await findInAppFacts(orm, dependencies);
   const [accountsOfUsers, directoryPeople, connections, suspended] = await Promise.all([
-    accounts.findUsersOfApps(appIds, scanned),
+    accounts.findUsersOfApps(appIds, inAppFacts),
     // Every employee holds a directory account, so they are the directory's people.
     accounts.countEmployeesWithAccounts(),
     appConnectionRepository(orm).findByApps(appIds),

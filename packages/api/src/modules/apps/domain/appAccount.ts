@@ -19,12 +19,15 @@ export interface AppAccount {
 }
 
 /**
- * A connection whose first scan has finished, with the finding kind of its own app's accounts: in
- * its app, only the accounts that kind found are access.
+ * What tells whether an account is in its app. In an app whose connection has finished a scan, an
+ * account only other-app finding kinds found, such as a Google sign-in, is not: that scan did not
+ * return it. Elsewhere it is undecided, and every account counts as access.
  */
-export interface ScannedConnection {
-  appId: string;
-  findingKind: string;
+export interface InAppFacts {
+  /** The apps whose connection has finished a scan. */
+  scannedAppIds: readonly string[];
+  /** The finding kinds that find accounts in apps other than their connection's, such as `google_sign_in`. */
+  otherAppKinds: readonly string[];
 }
 
 /** An account a finding kind saw in its last scan. */

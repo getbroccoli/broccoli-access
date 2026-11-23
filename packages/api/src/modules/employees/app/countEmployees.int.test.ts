@@ -44,9 +44,7 @@ test("excludes a suspended employee whose only approved access is a Google-only 
   await googleScanWithLinearGrant(orm, fakeGoogle.url, "ben@acme.example");
   await scannedLinear(orm, fakeConnectors.url);
 
-  const counts = await employeeServices(orm, { connectorsUrl: fakeConnectors.url }).countEmployees(
-    OWNER,
-  );
+  const counts = await employeeServices(orm).countEmployees(OWNER);
 
   expect(counts.suspendedWithAccess).toBe(1);
 });

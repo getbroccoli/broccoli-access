@@ -30,7 +30,7 @@ type AppUser {
   id: ID!
   "Whether the person may use the account in the app."
   status: AppAccountStatus!
-  "Whether its app's connection's last scan returned it; null when the app has no connection or before its first scan finished. An account not in its app, such as one only a Google sign-in found, is no access and offers no change."
+  "Whether its app's connection's last scan returned it; null when the app has no connection or before its first scan finished. An account not in its app, such as one only a Google sign-in found, is no access whatever its status, and offers no change."
   inApp: Boolean
   "The finding kinds that saw the account, sorted, such as `google_sign_in`; connector modules register them."
   foundVia: [String!]!

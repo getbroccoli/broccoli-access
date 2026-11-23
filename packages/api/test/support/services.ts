@@ -19,12 +19,15 @@ import {
   type AppService,
   type AppUserService,
 } from "../../src/modules/apps";
-import { createContainerConnectors } from "../../src/modules/connectors";
 import {
   createExtensionPairingService,
   type ExtensionPairingService,
 } from "../../src/modules/extension";
-import { createScanService, type ScanService } from "../../src/modules/imports";
+import {
+  createImportRecordService,
+  createScanService,
+  type ScanService,
+} from "../../src/modules/imports";
 import {
   createGoogleConnectionService,
   createGoogleSignInService,
@@ -42,15 +45,12 @@ export type EmployeeServices = EmployeeService & EmployeeReadService;
 /** Every employee service on `orm`, with silent logs. */
 export function employeeServices(
   orm: Orm,
-  {
-    transact = testTransactor(orm),
-    connectorsUrl,
-  }: { transact?: Transact; connectorsUrl?: string } = {},
+  { transact = testTransactor(orm) }: { transact?: Transact } = {},
 ): EmployeeServices {
   const dependencies = { orm, transact, logger: createLogger("silent") };
   return {
     ...createEmployeeService(dependencies),
-    ...createEmployeeReadService({ ...dependencies, accounts: apps(orm, { connectorsUrl }) }),
+    ...createEmployeeReadService({ ...dependencies, accounts: apps(orm) }),
   };
 }
 
@@ -110,51 +110,25 @@ export function googleSignIn(orm: Orm, { googleUrl }: { googleUrl: string }) {
   });
 }
 
-/**
- * App selection with real transactions and silent logs, with Google Workspace as the directory and
- * the connectors container at `connectorsUrl`, if any.
- */
-export function apps(
-  orm: Orm,
-  {
-    transact = testTransactor(orm),
-    connectorsUrl,
-  }: { transact?: Transact; connectorsUrl?: string } = {},
-): AppService {
+/** App selection with real transactions and silent logs, with Google Workspace as the directory. */
+export function apps(orm: Orm, transact: Transact = testTransactor(orm)): AppService {
   return createAppService({
     orm,
     transact,
     logger: createLogger("silent"),
-    connectors: connectorRegistry(connectorsUrl),
+    connectors: GOOGLE_DIRECTORY,
+    members: createImportRecordService(),
   });
 }
 
-/**
- * An app's users read with the real employees module, with Google Workspace as the directory and
- * the connectors container at `connectorsUrl`, if any.
- */
-export function appUsers(
-  orm: Orm,
-  { connectorsUrl }: { connectorsUrl?: string } = {},
-): AppUserService {
+/** An app's users read with the real employees module, with Google Workspace as the directory. */
+export function appUsers(orm: Orm): AppUserService {
   return createAppUserService({
     orm,
-    connectors: connectorRegistry(connectorsUrl),
+    connectors: GOOGLE_DIRECTORY,
+    members: createImportRecordService(),
     employees: createEmployeeReadService({ orm, accounts: apps(orm) }),
   });
-}
-
-/** Google Workspace, the directory, then the connectors container's at `connectorsUrl`, if any. */
-export function connectorRegistry(connectorsUrl?: string): ConnectorRegistry {
-  const google = createGoogleWorkspaceConnector({
-    openIdConfigurationUrl: "http://127.0.0.1:9/.well-known/openid-configuration",
-    adminApiUrl: "http://127.0.0.1:9",
-  });
-  const container = createContainerConnectors({
-    url: connectorsUrl,
-    logger: createLogger("silent"),
-  });
-  return { list: async () => [google, ...(await container.list())] };
 }
 
 /** Real scan dependencies with an instant retry wait and the local fake Google. */
@@ -195,3 +169,11 @@ export function scans(
     wait: () => Promise.resolve(),
   });
 }
+
+/** The Google Workspace connector as app reads see it, with no Google to call. */
+const GOOGLE_DIRECTORY = [
+  createGoogleWorkspaceConnector({
+    openIdConfigurationUrl: "http://127.0.0.1:9/.well-known/openid-configuration",
+    adminApiUrl: "http://127.0.0.1:9",
+  }),
+];

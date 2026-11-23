@@ -93,7 +93,7 @@ test.for(["discovered", "approved"] as const)(
     const linear = (await storedApps(orm)).find((app) => app.name === "Linear")!;
     if (status === "approved") await apps(orm).approveApp(OWNER, linear.id);
     const held = holdBeforeCommit(transact);
-    const ignore = apps(orm, { transact: held.transact }).ignoreApp(OWNER, linear.id);
+    const ignore = apps(orm, held.transact).ignoreApp(OWNER, linear.id);
     const pid = await held.ready;
     const connect = containerConnections(orm, fakeConnectors.url).service.connect(
       OWNER,
