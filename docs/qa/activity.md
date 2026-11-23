@@ -4,7 +4,7 @@ A manual check of the Activity page, which lists every Disable and Enable, again
 
 ## Setup
 
-1. Start the stack on a new database (`pnpm dev --drop-db`), connect Google Workspace and finish setup as in [QA setup](setup.md).
+1. Start the stack on a database without account changes, connect Google Workspace and finish setup as in [QA setup](setup.md). `pnpm dev --drop-db` gives a new one, deleting this checkout's development data.
 2. Connect Linear with `lin_api_acme_fake` on its page, and set `FAKE` as "Disable and Enable" in [App page](app-page.md) says, without making its changes.
 
 ## Changes that end

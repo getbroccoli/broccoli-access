@@ -77,9 +77,9 @@ enum AccountChangeFailure {
   PERMISSION_MISSING
   "The app kept limiting requests after the change tried again."
   RATE_LIMITED
-  "The app timed out or failed after the change tried again, or the change could not run in time."
+  "The app timed out or failed after the change tried again, the change could not run in time, or the connector no longer changes accounts."
   APP_UNAVAILABLE
-  "The app answered something the connector does not understand."
+  "The app answered something the connector does not understand, or the account did not read back with its new status."
   UNEXPECTED_RESPONSE
   "A CAPTCHA, bot check or MFA prompt stopped the connector."
   BLOCKED_BY_CHECK
