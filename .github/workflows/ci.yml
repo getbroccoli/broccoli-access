@@ -103,4 +103,6 @@ jobs:
           docker build --platform linux/amd64 --file packages/api/Dockerfile \
             --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
             --tag "$image:latest" --tag "$image:sha-${GITHUB_SHA::7}" .
-          docker push --all-tags "$image"
+          # The commit's tag first, so `latest` never points at an image that cannot be pinned.
+          docker push "$image:sha-${GITHUB_SHA::7}"
+          docker push "$image:latest"
