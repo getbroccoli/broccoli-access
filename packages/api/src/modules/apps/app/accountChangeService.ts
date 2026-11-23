@@ -18,10 +18,11 @@ import {
   appAccountRepository,
   appConnectionRepository,
 } from "../db";
-import { type AccountChange, type AppAccount, offeredChange } from "../domain";
+import { type AccountChange, type AppAccount, offeredChange, offersReconnect } from "../domain";
 import type { ConnectionMember, ConnectionMembers } from "../ports";
 import { createAppConnectionService } from "./appConnectionService";
 import { markChangeDoneByHand } from "./markChangeDoneByHand";
+import type { ReconnectReason } from "./connectionReconnects";
 import { failRunningChange, runAccountChange } from "./runAccountChange";
 
 /**
@@ -62,6 +63,14 @@ export interface AccountChangeService {
     appAccountIds: readonly string[],
   ) => Promise<Map<string, AccountChangeState>>;
   /**
+   * Each of the connections' app, status and, while it needs reconnecting, why, by connection id;
+   * an unknown id is left out. Needs MANAGE_WORKSPACE.
+   */
+  readConnectionStates: (
+    ctx: SecurityContext,
+    connectionIds: readonly string[],
+  ) => Promise<Map<string, ConnectionState>>;
+  /**
    * Those of `appIds` whose connection's connector suspends and reactivates accounts. Needs
    * MANAGE_WORKSPACE.
    */
@@ -90,8 +99,19 @@ export interface AccountChangeState {
   isConnectionUser: boolean;
   /** Disable or Enable when offered now; null otherwise. */
   offeredChange: AccountAction | null;
+  /** Whether Reconnect shows instead of Disable or Enable, while its app's connection needs it. */
+  offersReconnect: boolean;
   /** Its newest change; null before the first. */
   latestChange: LatestAccountChange | null;
+}
+
+/** Whether a connection works, and why not while it needs reconnecting. */
+export interface ConnectionState {
+  /** The app it connects. */
+  appId: string;
+  status: AppConnection["status"];
+  /** Null while connected. */
+  reconnectReason: ReconnectReason | null;
 }
 
 export interface LatestAccountChange extends AccountChange {
@@ -152,16 +172,31 @@ export function createAccountChangeService(
       const ahead = await accountChangeRepository(orm).countChangesAhead(running);
       return new Map(
         accounts.map(({ id }) => {
-          const { isConnectionUser, latest, offered } = facts.get(id)!;
+          const { isConnectionUser, latest, offered, reconnectOffered } = facts.get(id)!;
           return [
             id,
             {
               isConnectionUser,
               offeredChange: offered,
+              offersReconnect: reconnectOffered,
               latestChange: latest && withPlace(latest, ahead),
             },
           ];
         }),
+      );
+    },
+    async readConnectionStates(ctx, connectionIds) {
+      ctx.require("MANAGE_WORKSPACE");
+      // An instance has at most one connection per connector, so all of them are few.
+      const connections = (await appConnectionRepository(orm).findAll()).filter(({ id }) =>
+        connectionIds.includes(id),
+      );
+      const reasons = await run.connections.readReconnectReasons(orm, connectionIds);
+      return new Map(
+        connections.map(({ id, appId, status }) => [
+          id,
+          { appId, status, reconnectReason: reasons.get(id) ?? null },
+        ]),
       );
     },
     async findAppsWithChangeableAccounts(ctx, appIds) {
@@ -283,6 +318,8 @@ interface AccountFacts {
   member: ConnectionMember | null;
   latest: AccountChange | null;
   offered: AccountAction | null;
+  /** Whether Reconnect shows instead of Disable or Enable. */
+  reconnectOffered: boolean;
 }
 
 function gatherFacts(
@@ -306,7 +343,7 @@ function gatherFacts(
       const member = matches?.length === 1 ? matches[0]! : null;
       const isConnectionUser = matches?.some((match) => match.isConnectionUser) ?? false;
       const change = latestByAccount.get(account.id) ?? null;
-      const offered = offeredChange({
+      const offerFacts = {
         status: account.status,
         connection: connection && {
           status: connection.status,
@@ -314,8 +351,18 @@ function gatherFacts(
         },
         record: member && { isConnectionUser },
         changeRunning: change?.status === "running",
-      });
-      return [account.id, { connection, isConnectionUser, member, latest: change, offered }];
+      };
+      return [
+        account.id,
+        {
+          connection,
+          isConnectionUser,
+          member,
+          latest: change,
+          offered: offeredChange(offerFacts),
+          reconnectOffered: offersReconnect(offerFacts),
+        },
+      ];
     }),
   );
 }

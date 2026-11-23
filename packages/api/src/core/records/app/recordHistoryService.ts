@@ -26,6 +26,13 @@ export interface RecordHistoryService {
     recordId: string,
     args: HistoryPageArgs,
   ) => Promise<Connection<HistoryLine>>;
+  /** Each of the records' newest line with `causeKind`, by record id; a record without one is left out. */
+  readLatestWithCause: (
+    db: Orm | Tx,
+    recordType: RecordType,
+    recordIds: readonly string[],
+    causeKind: CauseKind,
+  ) => Promise<Map<string, HistoryLine>>;
 }
 
 /** A history page's arguments: the page, and which lines by the fields they change. */
@@ -90,6 +97,14 @@ export function createRecordHistoryService(): RecordHistoryService {
             changingNoneOf,
           }),
       }),
+    async readLatestWithCause(db, recordType, recordIds, causeKind) {
+      const lines = await recordHistoryRepository(db).findLatestWithCause(
+        recordType,
+        recordIds,
+        causeKind,
+      );
+      return new Map(lines.map((line) => [line.recordId, line]));
+    },
   };
 }
 

@@ -1,3 +1,5 @@
+import { eq } from "drizzle-orm";
+
 import type { Orm } from "../../src/core/db";
 import { files } from "../../src/core/files";
 import { instanceRepository } from "../../src/core/instance/db";
@@ -10,6 +12,7 @@ import {
   accountChanges,
   appAccountRepository,
   appConnectionRepository,
+  appConnections,
   appRepository,
   type App,
   type AppAccountRepository,
@@ -147,6 +150,13 @@ export class TestSeed {
       settings: {},
       encryptedSecrets: TEST_SECRET_BOX.encrypt("{}", id),
     });
+  }
+
+  async connectionNeedsReconnect(id: string) {
+    await this.orm
+      .update(appConnections)
+      .set({ status: "reconnect", reconnectCause: "authentication_failed" })
+      .where(eq(appConnections.id, id));
   }
 
   async accountChange({

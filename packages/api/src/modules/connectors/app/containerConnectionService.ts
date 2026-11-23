@@ -1,11 +1,7 @@
+import { isDeepStrictEqual } from "node:util";
+
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
-import {
-  canChangeAccounts,
-  type ConnectionDetails,
-  ConnectorError,
-  type ConnectorErrorCode,
-  withConnectorRetries,
-} from "../../../core/connectors";
+import { canChangeAccounts, type ConnectionDetails } from "../../../core/connectors";
 import type { Orm, Transact } from "../../../core/db";
 import type { Logger } from "../../../core/logger";
 import type { SecretBox } from "../../../core/secrets";
@@ -14,6 +10,7 @@ import { adminUrlOf, parseAppSession } from "../domain";
 import type { ConnectedApps, Scans } from "../ports";
 import { type AppSessionHandOver, createAppSessionHandOvers } from "./appSessionHandOvers";
 import { type Connection, connectionOf, isOtherWorkspace } from "./connectionOf";
+import { ownerInputField, testedConnection } from "./testedConnection";
 import {
   appSessionFieldOf,
   type ContainerConnector,
@@ -44,6 +41,24 @@ export interface ContainerConnectionService {
       values?: readonly { key: string; value: string }[];
       appSession?: string | null;
       noticeAccepted?: boolean;
+    },
+  ) => Promise<ConnectorWithConnection>;
+  /**
+   * Reconnects a connected container connector with new typed `values`, or the `appSession`
+   * sealed at a new hand-over: tests them with the app, trying a rate-limited or unavailable test
+   * again, then in one transaction replaces the connection's secrets (a session the test renewed
+   * wins), sets it connected and queues its scan; returns the connector with its connection. Needs
+   * MANAGE_WORKSPACE. Refuses an unknown or unconnected connector with NOT_FOUND; what `connect`
+   * refuses as given by the owner, and values or a session whose test finds other settings than
+   * the stored ones (another workspace), with INVALID_INPUT; and a failing test with UNAVAILABLE;
+   * a refusal changes nothing.
+   */
+  reconnect: (
+    ctx: SecurityContext,
+    input: {
+      connector: string;
+      values?: readonly { key: string; value: string }[];
+      appSession?: string | null;
     },
   ) => Promise<ConnectorWithConnection>;
   /**
@@ -177,6 +192,42 @@ export function createContainerConnectionService(
         noticeAcceptedAt,
       });
     },
+    async reconnect(ctx, input) {
+      ctx.require("MANAGE_WORKSPACE");
+      const connector = await containerConnectors.find(input.connector);
+      const stored = (await connectedApps.readConnections(orm)).find(
+        (candidate) => candidate.connector === connector.key,
+      );
+      if (!stored) {
+        throw new ApplicationError("NOT_FOUND", "This app is not connected.");
+      }
+      const connection = connectionOf(ctx, connector, input, { handOvers, logger });
+      const details = await testedConnection(dependencies, connector, connection);
+      const settings = { ...connection.settings, ...details.connection?.settings };
+      if (!isDeepStrictEqual(settings, stored.settings)) {
+        logger.warn(
+          { connector: connector.key, connectionId: stored.id },
+          "Reconnect refused: the test reaches another workspace",
+        );
+        throw invalidInput([{ field: ownerInputField(connector), code: "wrong_workspace" }]);
+      }
+      const secrets = details.connection?.secrets ?? connection.secrets;
+      const { sourceId } = await dependencies.transact(async (tx) => {
+        // The source first, then the connection, as a failing scan locks them, so they never deadlock.
+        // The source exists since the first scan, which named it.
+        const scan = await dependencies.scans.scanConnection(ctx, tx, {
+          connectionId: stored.id,
+          sourceName: connector.name,
+        });
+        await connectedApps.reconnect(ctx, tx, stored.id, secrets);
+        return scan;
+      });
+      logger.info(
+        { connector: connector.key, connectionId: stored.id, sourceId },
+        "App reconnected through the connectors container; its scan is queued",
+      );
+      return { connector, connection: summaryOf(connector, stored) };
+    },
     async describeAppSession(key) {
       const { connector, field } = await findAppSessionConnector(containerConnectors, key);
       const { domains, storageKeys } = field;
@@ -270,45 +321,6 @@ async function connectorsWithConnections({
     const connection = connections.find((candidate) => candidate.connector === connector.key);
     return { connector, connection: connection ? summaryOf(connector, connection) : null };
   });
-}
-
-/** The connector errors that mean the app refused the values, which the owner can correct. */
-const REFUSED_VALUES: readonly ConnectorErrorCode[] = [
-  "authentication_failed",
-  "permission_missing",
-  "wrong_workspace",
-];
-
-/**
- * The app's answer to the connection; a refusal is invalid input on what the owner gave (the
- * values or the app session), any other failure unavailable.
- */
-async function testedConnection(
-  { logger, wait }: ContainerConnectionDependencies,
-  connector: ContainerConnector,
-  connection: Connection,
-): Promise<ConnectionDetails> {
-  try {
-    const session = await connector.openSession(connection);
-    return await withConnectorRetries(() => session.testConnection(), {
-      wait,
-      onRetry: (failure, attempt) =>
-        logger.info(
-          { connector: connector.key, failure, attempt },
-          "Connection test failed; trying again",
-        ),
-    });
-  } catch (error) {
-    if (!(error instanceof ConnectorError)) {
-      throw error;
-    }
-    logger.warn({ connector: connector.key, failure: error.code }, "Connection test failed");
-    if (REFUSED_VALUES.includes(error.code)) {
-      const field = appSessionFieldOf(connector) ? "appSession" : "values";
-      throw invalidInput([{ field, code: error.code }]);
-    }
-    throw new ApplicationError("UNAVAILABLE", "The app did not answer the connection test.");
-  }
 }
 
 /** Writes the connection, its approved app and its first scan together, then logs the outcome. */

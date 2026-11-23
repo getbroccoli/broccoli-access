@@ -15,6 +15,8 @@ export {
   type ConnectedApp,
   connectedAppOf,
   RECONNECT_CAUSES,
+  type ReconnectCause,
+  reconnectCauseOf,
 } from "./appConnection";
 export {
   type AccountSyncPlan,
@@ -30,5 +32,6 @@ export {
   type AccountChange,
   type AccountChangeAttempt,
   offeredChange,
+  offersReconnect,
   statusAfter,
 } from "./accountChange";

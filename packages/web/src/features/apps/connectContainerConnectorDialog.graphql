@@ -7,6 +7,10 @@ fragment ConnectContainerConnectorDialog_connector on ContainerConnector {
     help
     secret
   }
+  # Once connected, the dialog takes a new key for the connection.
+  connection {
+    id
+  }
 }
 
 mutation ConnectContainerConnector($input: ContainerConnectorConnectInput!) {
@@ -16,6 +20,10 @@ mutation ConnectContainerConnector($input: ContainerConnectorConnectInput!) {
         id
         connection {
           id
+          status
+          reconnectReason {
+            cause
+          }
           connectionUserEmail
           noticeAcceptedAt
           scan {

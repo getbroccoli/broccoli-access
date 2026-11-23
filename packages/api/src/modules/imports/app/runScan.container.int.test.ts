@@ -252,7 +252,7 @@ test("keeps the first page's updated connection when the next page fails", async
     if ((request.body as { cursor: string | null }).cursor === null) {
       response.json({ accounts: [], nextCursor: "second", connection: { settings, secrets } });
     } else {
-      response.json({ error: { code: "permission_missing" } });
+      response.json({ error: { code: "unexpected_response" } });
     }
   });
   const scan = scans(orm, { connectors: containerConnectors(server.url) });
@@ -261,7 +261,7 @@ test("keeps the first page's updated connection when the next page fails", async
   await scan.runScan(SYSTEM, linear.sourceId);
 
   expect(await storedImportSources(orm)).toMatchObject([
-    { status: "scan_failed", failure: "permission_missing" },
+    { status: "scan_failed", failure: "unexpected_response" },
   ]);
   expect(await storedImportRecords(orm)).toEqual(before);
   const [connection] = await storedAppConnections(orm);

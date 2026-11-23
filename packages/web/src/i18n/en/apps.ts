@@ -164,6 +164,38 @@ export const appsEn = {
   "apps.byHand.confirm": "Yes, I did it",
   "apps.byHand.refused":
     "Couldn’t mark the change of {name} in {app} as done by hand. Reload the page to see the account’s status.",
+  "apps.reconnect.badge": "Reconnect",
+  "apps.reconnect.button": "Reconnect",
+  "apps.reconnect.appButton": "Reconnect {app}",
+  "apps.reconnect.pasteNewKey": "Paste a new key",
+  "apps.reconnect.sessionExpired": "Your {app} session expired or was signed out.",
+  "apps.reconnect.keyRefused": "{app} refused the {field}: it was revoked or expired.",
+  "apps.reconnect.notAdmin": "{email} is no longer an admin in {app}.",
+  "apps.reconnect.notAdminWithoutEmail": "The connection’s user is no longer an admin in {app}.",
+  "apps.reconnect.sessionOtherWorkspace":
+    "Your {app} session reaches another workspace, not {workspace}.",
+  "apps.reconnect.keyOtherWorkspace": "The {field} reaches another workspace, not {workspace}.",
+  "apps.reconnect.today": "today at {time}",
+  "apps.reconnect.onDay": "on {day} at {time}",
+  "apps.reconnect.foundByScan": "Found by a scan {when}.",
+  "apps.reconnect.foundByDisable": "Found when you disabled {name} {when}.",
+  "apps.reconnect.foundByEnable": "Found when you enabled {name} {when}.",
+  "apps.reconnect.failsUntilReconnect": "Changes in {app} fail until you reconnect.",
+  "apps.reconnect.failsUntilNewKey": "Changes in {app} fail until you paste a new key.",
+  "apps.reconnect.signInHint": "Sign in to {app} in Chrome, then Reconnect.",
+  "apps.reconnect.confirmInWindow": "Click Hand over in the extension’s window.",
+  "apps.reconnect.reconnecting": "Reconnecting…",
+  "apps.reconnect.notHandedOver": "Nothing was handed over. Reconnect {app} when you’re ready.",
+  "apps.reconnect.readFailed":
+    "Couldn’t check whether the extension handed over your session. Reconnect {app} again.",
+  "apps.reconnect.refused":
+    "{app} refused your session. Sign in to {app} in Chrome, then Reconnect again.",
+  "apps.reconnect.otherWorkspace":
+    "This {app} session is for another workspace. In Chrome, switch to the {app} workspace you connected, then Reconnect again.",
+  "apps.reconnect.expired": "This hand-over expired. Reconnect {app} again.",
+  "apps.reconnect.unavailable": "Couldn’t check the connection to {app}. Try again.",
+  "apps.reconnect.failed": "Couldn’t reconnect {app}. Try again.",
+  "apps.reconnect.done": "{app} is reconnected.",
   "apps.firstRun.title": "Last step: select the apps your company uses",
   "apps.firstRun.description":
     "We found {count} apps people signed in to with Google. Apps you don’t select are ignored; you can bring them back any time.",

@@ -8,6 +8,7 @@ import { inject, test as baseTest } from "vitest";
 
 import { connectDatabase, type Orm, type Transact } from "../../src/core/db";
 import { createLogger } from "../../src/core/logger";
+import { pendingDisable } from "./accountChanges";
 import { createTestDatabase } from "./testDatabases";
 import { TestEnv } from "./testEnv";
 import { TestSeed } from "./testSeed";
@@ -93,5 +94,13 @@ export const connectorTest = test.extend<{ env: TestEnv }>({
     } finally {
       await env.stop();
     }
+  },
+});
+
+export const pendingDisableTest = test.extend<{
+  pending: Awaited<ReturnType<typeof pendingDisable>>;
+}>({
+  pending: async ({ orm, seed, fakeConnectors }, use) => {
+    await use(await pendingDisable(orm, seed, fakeConnectors.url));
   },
 });

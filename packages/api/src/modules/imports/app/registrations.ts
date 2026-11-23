@@ -11,6 +11,8 @@ declare module "../../../core/jobs" {
   interface Jobs {
     /** Reads one import source's connection and syncs what it found. */
     "imports.scanConnection": { sourceId: string };
+    /** Queues a scan of every connection; runs once a day. */
+    "imports.scanEveryConnection": Record<string, never>;
   }
 }
 

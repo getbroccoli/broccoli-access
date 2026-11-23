@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 
 import { anyOf, type Orm, ormOf, type Tx } from "../../../core/db";
+import type { ReconnectCause } from "../domain";
 import { appConnections } from "./appConnectionsTable";
 
 /** A connection as stored, without its secrets. */
@@ -12,6 +13,8 @@ export interface AppConnection {
   connectedAt: Date;
   /** `reconnect` once its key or session stopped working. */
   status: "connected" | "reconnect";
+  /** The connector error that turned it to `reconnect`; null while connected. */
+  reconnectCause: ReconnectCause | null;
   /** When the owner accepted the connector's notice; null for a connector without one. */
   noticeAcceptedAt: Date | null;
 }
@@ -28,10 +31,12 @@ export interface AppConnectionRepository {
     encryptedSecrets: string;
     noticeAccepted?: { at: Date; by: string };
   }): Promise<AppConnection>;
-  /** Replaces the connection's settings or secrets, whichever is set; null for an unknown id. */
+  /** Replaces the connection's fields that are set; null for an unknown id. */
   update(
     id: string,
-    connection: { settings?: Record<string, unknown>; encryptedSecrets?: string },
+    connection: Partial<Pick<AppConnection, "settings" | "status" | "reconnectCause">> & {
+      encryptedSecrets?: string;
+    },
   ): Promise<AppConnection | null>;
   findByConnector(connector: string): Promise<AppConnection | null>;
   /** Every connection; an instance has at most one per connector. */
@@ -114,5 +119,6 @@ const columns = {
   settings: appConnections.settings,
   connectedAt: appConnections.connectedAt,
   status: appConnections.status,
+  reconnectCause: appConnections.reconnectCause,
   noticeAcceptedAt: appConnections.noticeAcceptedAt,
 };

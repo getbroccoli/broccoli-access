@@ -44,6 +44,8 @@ export function useAppSessionHandOver(connector: string) {
     start,
     handOver,
     isAwaiting: handOverWindow !== null,
+    // The window closed; the server is being asked for the session.
+    isReading: requestId !== null && handOverWindow === null && !hasRead,
     isWindowBlocked,
     // The window closed without a session, such as after Cancel.
     wasAbandoned: hasEnded && query.error === undefined,

@@ -47,6 +47,13 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
           }),
           ["INVALID_INPUT", "NOT_FOUND", "CONFLICT", "UNAVAILABLE"],
         ),
+      reconnect: (_parent, { input }, context) =>
+        mutationPayload<ResolversTypes["ContainerConnectorReconnectPayload"]>(
+          async () => ({
+            containerConnector: await connections.reconnect(context.getActor(), input),
+          }),
+          ["INVALID_INPUT", "NOT_FOUND", "UNAVAILABLE"],
+        ),
     },
     ContainerConnector: {
       id: ({ connector }) => connector.key,

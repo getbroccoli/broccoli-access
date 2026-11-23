@@ -5,9 +5,9 @@ import {
   type ConnectorErrorCode,
   withConnectorRetries,
 } from "../../../core/connectors";
-import type { Transact } from "../../../core/db";
+import type { Transact, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
-import { accountChangeRepository, appAccountRepository } from "../db";
+import { accountChangeRepository, appAccountRepository, appConnectionRepository } from "../db";
 import { type AccountChange, statusAfter } from "../domain";
 import type { AccountChangeDependencies } from "./accountChangeService";
 import type { AppConnectionService } from "./appConnectionService";
@@ -32,16 +32,40 @@ export async function runAccountChange(
     );
     return;
   }
-  const { error, calledServer } = await runAction(dependencies, ctx, change);
-  const finished = error
-    ? await finishFailed(transact, changeId, error, calledServer)
-    : await finishSucceeded(transact, ctx, change);
-  const outcome = { changeId, appAccountId: change.appAccountId, finished, failure: error };
-  if (error) {
-    logger.warn(outcome, "Account change failed");
-  } else {
-    logger.info(outcome, "Account change succeeded");
+  const { error, calledServer, secretsUsed } = await runAction(dependencies, ctx, change);
+  if (!error) {
+    const finished = await finishSucceeded(transact, ctx, change);
+    logger.info(
+      { changeId, appAccountId: change.appAccountId, finished },
+      "Account change succeeded",
+    );
+    return;
   }
+  const { finished, turnedToReconnect } = await transact(async (tx) => {
+    // The lock a scan turning the connection to Reconnect takes first, so the two never deadlock.
+    await appConnectionRepository(tx).lockById(change.connectionId);
+    return {
+      finished: await finishFailed(tx, changeId, error, calledServer),
+      // Whatever happened to the change, as the connector contract says.
+      turnedToReconnect: await dependencies.connections.turnToReconnect(ctx, tx, {
+        connectionId: change.connectionId,
+        error,
+        ref: changeId,
+        secretsUsed,
+      }),
+    };
+  });
+  logger.warn(
+    {
+      changeId,
+      appAccountId: change.appAccountId,
+      connectionId: change.connectionId,
+      finished,
+      failure: error,
+      turnedToReconnect,
+    },
+    "Account change failed",
+  );
 }
 
 /** Fails a change that is still running with `app_unavailable`, after its job's last attempt. */
@@ -51,7 +75,7 @@ export async function failRunningChange(
   changeId: string,
 ): Promise<void> {
   ctx.requireSystem();
-  const failed = await finishFailed(transact, changeId, "app_unavailable", false);
+  const failed = await transact((tx) => finishFailed(tx, changeId, "app_unavailable", false));
   logger.warn({ changeId, failed }, "Account change failed after its job's last attempt");
 }
 
@@ -59,6 +83,8 @@ export async function failRunningChange(
 interface ActionOutcome {
   error: ConnectorErrorCode | null;
   calledServer: boolean;
+  /** The secrets its call used; null when it made none. */
+  secretsUsed: Record<string, unknown> | null;
 }
 
 async function runAction(
@@ -71,11 +97,15 @@ async function runAction(
   const connector = (await connectors.list()).find(({ key }) => key === connection.connector);
   // A connector the container no longer lists, or one that no longer changes accounts, cannot act now.
   if (!connector || !canChangeAccounts(connector)) {
-    return { error: "app_unavailable", calledServer: false };
+    return { error: "app_unavailable", calledServer: false, secretsUsed: null };
+  }
+  // A change asked just before its connection turned to Reconnect fails with that cause.
+  if (connection.reconnectCause) {
+    return { error: connection.reconnectCause, calledServer: false, secretsUsed: null };
   }
   let calledServer = false;
+  const secrets = await connections.readSecrets(orm, change.connectionId);
   try {
-    const secrets = await connections.readSecrets(orm, change.connectionId);
     const session = await connector.openSession({ settings: connection.settings, secrets });
     const account = { sourceKey: change.sourceKey, email: change.email };
     const result = await withConnectorRetries(
@@ -92,60 +122,64 @@ async function runAction(
           ),
       },
     );
-    await saveConnectionUpdate(dependencies, ctx, change, result.connection);
+    await saveConnectionUpdate(dependencies, ctx, change, {
+      ...result.connection,
+      replacing: secrets!,
+    });
     // Success is the new status read back, never a call that went through.
     const read = result.status === statusAfter(change.action);
-    return { error: read ? null : "unexpected_response", calledServer };
+    return { error: read ? null : "unexpected_response", calledServer, secretsUsed: secrets };
   } catch (error) {
     if (error instanceof ConnectorError) {
-      return { error: error.code, calledServer };
+      return { error: error.code, calledServer, secretsUsed: secrets };
     }
     throw error;
   }
 }
 
+/** Saves what the answer renewed, unless a reconnect replaced the secrets its call used meanwhile. */
 async function saveConnectionUpdate(
   { transact, connections, logger }: RunDependencies,
   ctx: SecurityContext,
   change: AccountChange,
-  update: ConnectionUpdate | undefined,
+  update: ConnectionUpdate & { replacing: Record<string, unknown> },
 ): Promise<void> {
-  if (!update?.settings && !update?.secrets) {
+  if (!update.settings && !update.secrets) {
     return;
   }
-  await transact((tx) => connections.changeConnection(ctx, tx, change.connectionId, update));
+  const saved = await transact((tx) =>
+    connections.changeConnection(ctx, tx, change.connectionId, update),
+  );
   logger.info(
-    { changeId: change.id, connectionId: change.connectionId },
-    "Account change saved the connection's renewed settings or secrets",
+    { changeId: change.id, connectionId: change.connectionId, saved },
+    "Account change answered with renewed settings or secrets",
   );
 }
 
 /**
- * Fails a running change with `error`, adding the server's attempt when it was called; false when
- * another outcome came first.
+ * Fails a running change with `error`, adding the server's attempt when it was called, joining
+ * `tx`; false when another outcome came first.
  */
 async function finishFailed(
-  transact: Transact,
+  tx: Tx,
   changeId: string,
   error: ConnectorErrorCode,
   calledServer: boolean,
 ): Promise<boolean> {
-  return transact(async (tx) => {
-    const changes = accountChangeRepository(tx);
-    const change = await changes.lockById(changeId);
-    if (change?.status !== "running") {
-      return false;
-    }
-    const at = new Date();
-    const attempt = { runtime: "server" as const, error, at };
-    await changes.finish(changeId, {
-      status: "failed",
-      attempts: calledServer ? [...change.attempts, attempt] : change.attempts,
-      error,
-      finishedAt: at,
-    });
-    return true;
+  const changes = accountChangeRepository(tx);
+  const change = await changes.lockById(changeId);
+  if (change?.status !== "running") {
+    return false;
+  }
+  const at = new Date();
+  const attempt = { runtime: "server" as const, error, at };
+  await changes.finish(changeId, {
+    status: "failed",
+    attempts: calledServer ? [...change.attempts, attempt] : change.attempts,
+    error,
+    finishedAt: at,
   });
+  return true;
 }
 
 /**

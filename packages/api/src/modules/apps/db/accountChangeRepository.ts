@@ -12,6 +12,7 @@ import {
   ormOf,
   type Tx,
 } from "../../../core/db";
+import type { ConnectorErrorCode } from "../../../core/connectors";
 import type { KeysetQuery, KeysetRow } from "../../../core/pagination";
 import type { AccountChange } from "../domain";
 import { accountChanges, type StoredAttempt } from "./accountChangesTable";
@@ -26,6 +27,8 @@ export interface AccountChangeRepository {
     > & { appAccountId: string },
   ): Promise<AccountChange | null>;
   findById(id: string): Promise<AccountChange | null>;
+  /** The changes with these ids; an unknown id is left out. */
+  findByIds(ids: readonly string[]): Promise<AccountChange[]>;
   /** Like `findById`, locking the row until the transaction ends. */
   lockById(id: string): Promise<AccountChange | null>;
   /** Ends a running change with its outcome; a change no longer running stays as it is. */
@@ -38,6 +41,12 @@ export interface AccountChangeRepository {
   ): Promise<void>;
   /** Turns a failed change into `done_by_hand`, keeping its error, attempts and finish. */
   markDoneByHand(id: string): Promise<AccountChange>;
+  /** Fails every running change of the connection with `error`, as of `finishedAt`. */
+  failRunningOfConnection(
+    connectionId: string,
+    error: ConnectorErrorCode,
+    finishedAt: Date,
+  ): Promise<void>;
   /** Those of the accounts whose change is running, or succeeded at or after `since`. */
   findAccountsChangedSince(appAccountIds: readonly string[], since: Date): Promise<string[]>;
   /** Each account's newest change; an account without one is left out. */
@@ -83,6 +92,10 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
       const [row] = await orm().select().from(accountChanges).where(eq(accountChanges.id, id));
       return row ? toChange(row) : null;
     },
+    findByIds: async (ids) => {
+      const rows = await orm().select().from(accountChanges).where(anyOf(accountChanges.id, ids));
+      return rows.map(toChange);
+    },
     lockById: async (id) => {
       const [row] = await orm()
         .select()
@@ -104,6 +117,14 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .where(and(eq(accountChanges.id, id), eq(accountChanges.status, "failed")))
         .returning();
       return toChange(row!);
+    },
+    failRunningOfConnection: async (connectionId, error, finishedAt) => {
+      await orm()
+        .update(accountChanges)
+        .set({ status: "failed", error, finishedAt })
+        .where(
+          and(eq(accountChanges.connectionId, connectionId), eq(accountChanges.status, "running")),
+        );
     },
     findAccountsChangedSince: async (appAccountIds, since) => {
       const rows = await orm()

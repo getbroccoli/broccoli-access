@@ -62,6 +62,8 @@ On Linear's page, connected as above. Set `FAKE=http://127.0.0.1:<port>`, the po
 - [ ] With the fake slowed (`curl -s -H 'content-type: application/json' -d '{"milliseconds": 5000}' "$FAKE/_fake/delay"`), disable David, then confirm Gabriel's Disable while David's row still reads "Disabling in Linear…": Gabriel's row reads "Waiting for 1 change in Linear…" until David's change ends, then "Disabling in Linear…". Leaving the page and coming back shows each row where its change is.
 - [ ] "Enable" on Chloé opens "Enable Chloé Martin in Linear?" with "Chloé’s account in this workspace becomes active again. You can disable it again later." and "Enable in Linear"; it ends with "Active", "Enabled just now", "Disable" and the toast "Chloé Martin is enabled in Linear.".
 - [ ] Google Workspace's page has no Disable or Enable.
+- [ ] After `curl -s -X POST "$FAKE/_fake/linear/keys/revoke"`, disabling Chloé fails and the page, without a reload, shows "Reconnect" instead of "Connected" in the header, no "Scan now", an amber banner "Linear refused the personal API key: it was revoked or expired. Changes in Linear fail until you paste a new key." with "Reconnect Linear", and "Reconnect" at the end of every row that offered Disable or Enable; Mia's row still reads "Connected as you".
+- [ ] "Reconnect Linear", or a row's "Reconnect", opens "Paste a new key for Linear"; after `curl -s -X POST "$FAKE/_fake/reset"`, `lin_api_acme_fake` brings back "Connected", "Scan now" and each row's "Disable" or "Enable" without a reload.
 
 ## When a change fails
 

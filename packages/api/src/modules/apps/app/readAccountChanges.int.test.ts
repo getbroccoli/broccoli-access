@@ -35,11 +35,38 @@ test("offers Disable or Enable only for another member in the last Linear scan",
   const states = await service.readChangeStates(OWNER, ids);
 
   expect(ids.map((id) => states.get(id))).toEqual([
-    { isConnectionUser: false, offeredChange: "suspend", latestChange: null },
-    { isConnectionUser: false, offeredChange: "reactivate", latestChange: null },
-    { isConnectionUser: true, offeredChange: null, latestChange: null },
-    { isConnectionUser: false, offeredChange: null, latestChange: null },
+    {
+      isConnectionUser: false,
+      offeredChange: "suspend",
+      offersReconnect: false,
+      latestChange: null,
+    },
+    {
+      isConnectionUser: false,
+      offeredChange: "reactivate",
+      offersReconnect: false,
+      latestChange: null,
+    },
+    { isConnectionUser: true, offeredChange: null, offersReconnect: false, latestChange: null },
+    { isConnectionUser: false, offeredChange: null, offersReconnect: false, latestChange: null },
   ]);
+});
+
+test("offers Reconnect instead of Disable to a Linear member but not to the connection's user", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const linear = await scannedLinear(orm, fakeConnectors.url);
+  await seed.connectionNeedsReconnect(linear.connectionId);
+  const member = linear.account("chloe@acme.example").id;
+  const admin = linear.account("admin@acme.example").id;
+  const service = accountChanges(orm, { connectorsUrl: fakeConnectors.url });
+
+  const states = await service.readChangeStates(OWNER, [member, admin]);
+
+  expect(states.get(member)).toMatchObject({ offeredChange: null, offersReconnect: true });
+  expect(states.get(admin)).toMatchObject({ offeredChange: null, offersReconnect: false });
 });
 
 test("offers no change on Chloé when Linear lists only the owner's browser runtime", async ({

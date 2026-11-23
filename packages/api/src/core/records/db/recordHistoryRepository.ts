@@ -1,7 +1,7 @@
 import { and, desc, eq, lt, not, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { type Orm, ormOf, type Tx } from "../../db";
+import { anyOf, type Orm, ormOf, type Tx } from "../../db";
 import type { KeysetRow } from "../../pagination";
 import type {
   AuthorKind,
@@ -20,6 +20,12 @@ export interface RecordHistoryRepository {
   insert(lines: readonly NewHistoryLine[]): Promise<HistoryLine[]>;
   /** Up to `limit` of one record's lines that pass its field filter, newest first, older than the line `after`. */
   findPage(query: HistoryPageQuery): Promise<KeysetRow<HistoryLine, HistorySortValues>[]>;
+  /** Each record's newest line with this cause; a record without one is left out. */
+  findLatestWithCause(
+    recordType: RecordType,
+    recordIds: readonly string[],
+    causeKind: CauseKind,
+  ): Promise<HistoryLine[]>;
 }
 
 export type NewHistoryLine = Omit<HistoryLine, "id" | "occurredAt">;
@@ -83,6 +89,21 @@ export function recordHistoryRepository(db: Orm | Tx): RecordHistoryRepository {
         .orderBy(desc(recordHistory.id))
         .limit(limit);
       return rows.map((row) => ({ node: toHistoryLine(row), values: [String(row.id)] }));
+    },
+
+    findLatestWithCause: async (recordType, recordIds, causeKind) => {
+      const rows = await orm()
+        .selectDistinctOn([recordHistory.recordId])
+        .from(recordHistory)
+        .where(
+          and(
+            eq(recordHistory.recordType, recordType),
+            anyOf(recordHistory.recordId, recordIds),
+            eq(recordHistory.causeKind, lowercase(causeKind)),
+          ),
+        )
+        .orderBy(recordHistory.recordId, desc(recordHistory.id));
+      return rows.map(toHistoryLine);
     },
   };
 }

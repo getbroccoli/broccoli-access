@@ -11,12 +11,14 @@ import { ScanNowButton } from "@/shell";
 import { ApproveAppButton } from "../ApproveAppButton";
 import { ConnectAppButton } from "../ConnectAppButton";
 import { ConnectedBadge } from "../ConnectedBadge";
+import { ReconnectBadge } from "../ReconnectBadge";
 import { isConnected } from "../AppTable";
 import { useAppStatusChange } from "../useAppStatusChange";
 import { AppStatusBadge } from "./AppStatusBadge";
 import { AppSubtitle } from "./AppSubtitle";
 import { CanDisableBadge } from "./CanDisableBadge";
 import { IgnoreAppButton } from "./IgnoreAppButton";
+import { ReconnectBanner } from "./ReconnectBanner";
 
 type Props = {
   app: Pick<
@@ -37,12 +39,13 @@ type Props = {
 /**
  * The way back to Applications, the app with its status, whether a connector can manage it, its
  * domain and connection, and Approve or Ignore; Connect while that connector has no connection; a
- * connected app's admin page and Scan now.
+ * connected app's admin page and Scan now, or why it needs reconnecting with Reconnect <app>.
  */
 export function AppHeader({ app, onConnected }: Props) {
   const { approve, ignore, pending } = useAppStatusChange(app);
   const connection = app.containerConnection;
   const connector = isConnected(app) ? null : app.managingConnector;
+  const needsReconnect = connection?.status === "RECONNECT";
   return (
     <div className="flex flex-col gap-5">
       <Link
@@ -64,7 +67,8 @@ export function AppHeader({ app, onConnected }: Props) {
               <h1 className="truncate text-2xl font-semibold tracking-tight">{app.name}</h1>
               <AppStatusBadge status={app.status} />
               {app.managingConnector && <CanDisableBadge />}
-              {app.connected && <ConnectedBadge />}
+              {app.connected && !needsReconnect && <ConnectedBadge />}
+              {needsReconnect && <ReconnectBadge />}
             </div>
             <AppSubtitle app={app} />
           </div>
@@ -86,7 +90,7 @@ export function AppHeader({ app, onConnected }: Props) {
               <ArrowUpRight size={14} aria-hidden />
             </a>
           )}
-          {connection && (
+          {connection && !needsReconnect && (
             <ScanNowButton
               connectionId={connection.id}
               isScanning={connection.scan?.status === "SCANNING"}
@@ -100,6 +104,7 @@ export function AppHeader({ app, onConnected }: Props) {
           {t("apps.page.connectHint", { app: app.name })}
         </p>
       )}
+      {connection && needsReconnect && <ReconnectBanner connection={connection} />}
     </div>
   );
 }

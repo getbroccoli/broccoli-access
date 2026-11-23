@@ -103,9 +103,28 @@ union ContainerConnectorConnectError =
   | ConflictError
   | UnavailableError
 
+input ContainerConnectorReconnectInput {
+  "The connected connector's key, such as `linear`."
+  connector: ID!
+  "A value for each of its text connection fields."
+  values: [ConnectionFieldValue!]! = []
+  "For a connector with an app session field: the `appSession` of a new `AppSessionHandOver`."
+  appSession: String
+}
+
+"The reconnected connector, or why reconnecting was refused."
+type ContainerConnectorReconnectPayload {
+  containerConnector: ContainerConnector
+  error: ContainerConnectorReconnectError
+}
+
+union ContainerConnectorReconnectError = InvalidInputError | NotFoundError | UnavailableError
+
 type ConnectorsMutations {
   "Connects a container connector with typed values, or with the app session its extension handed over: tests them with the app, then saves the connection, approves its app and queues its first scan. Refused as invalid `noticeAccepted` without the connector's notice accepted, as invalid `values.<key>` for a missing or unknown value, as invalid `appSession` for a missing, changed, expired or another's session, and as invalid `values` or `appSession` with the error's code when the app refuses them; with a NotFoundError for a connector the container lacks, a ConflictError for one already connected, and an UnavailableError when the test fails otherwise. Admins only."
   connect(input: ContainerConnectorConnectInput!): ContainerConnectorConnectPayload!
+  "Replaces the credentials of a container connector's connection, whether it is connected or needs reconnecting, with new typed values or the app session a new hand-over gave: tests them with the app, which must reach the connection's workspace, then saves them, sets it connected and queues its scan. Refused as invalid `values.<key>` or `appSession` as `connect` refuses them, as invalid `values` or `appSession` with the error's code when the app refuses them, and with `wrong_workspace` when they reach another workspace than the connection's; with a NotFoundError for a connector the container lacks or one not connected, and an UnavailableError when the test fails otherwise. Admins only."
+  reconnect(input: ContainerConnectorReconnectInput!): ContainerConnectorReconnectPayload!
 }
 
 type Query {

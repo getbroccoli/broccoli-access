@@ -1,4 +1,4 @@
-import type { AccountStatus } from "../../../core/connectors";
+import type { AccountStatus, ConnectorErrorCode } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import type { HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
@@ -17,13 +17,34 @@ export interface ScannedApps {
   readSecrets(db: Orm | Tx, connectionId: string): Promise<Record<string, unknown> | null>;
   /** Holds off other account syncs and connects until `tx` ends; a scan's save takes it first. */
   holdAccountSyncs(ctx: SecurityContext, tx: Tx): Promise<void>;
-  /** Replaces the settings or secrets `update` carries, joining `tx`; new settings add history. */
+  /**
+   * Replaces the settings or secrets `update` carries, joining `tx`; new settings add history.
+   * Saves nothing once the stored secrets are no longer `replacing`; returns whether it saved.
+   */
   changeConnection(
     ctx: SecurityContext,
     tx: Tx,
     connectionId: string,
-    update: { settings?: Record<string, unknown>; secrets?: Record<string, unknown> },
-  ): Promise<void>;
+    update: {
+      settings?: Record<string, unknown>;
+      secrets?: Record<string, unknown>;
+      replacing?: Record<string, unknown>;
+    },
+  ): Promise<boolean>;
+  /**
+   * Turns the connection to Reconnect when `error` needs it and the connection still holds
+   * `secretsUsed`, joining `tx`, with a history line whose ref is `ref`; returns whether it turned.
+   */
+  turnToReconnect(
+    ctx: SecurityContext,
+    tx: Tx,
+    failure: {
+      connectionId: string;
+      error: ConnectorErrorCode;
+      ref: string;
+      secretsUsed: Record<string, unknown> | null;
+    },
+  ): Promise<boolean>;
   /**
    * Makes the accounts `findingKind` saw exactly `accounts`, with history, joining `tx`; an account
    * in an app that another connection than `connectionId` reads keeps its status.

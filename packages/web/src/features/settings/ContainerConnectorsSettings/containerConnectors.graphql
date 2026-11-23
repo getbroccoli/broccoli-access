@@ -9,8 +9,24 @@ query ContainerConnectorsSettings {
     }
     ...ConnectContainerConnectorDialog_connector
     ...ConnectAppSessionDialog_connector
+    ...ReconnectButton_connector
     connection {
       id
+      status
+      reconnectReason {
+        cause
+        foundAt
+        foundByChange {
+          id
+          action
+          email
+          employee {
+            id
+            firstName
+            lastName
+          }
+        }
+      }
       connectionUserEmail
       noticeAcceptedAt
       scan {

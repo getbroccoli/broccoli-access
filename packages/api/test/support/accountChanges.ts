@@ -81,7 +81,7 @@ export async function pendingDisable(orm: Orm, seed: TestSeed, url: string) {
   const change = await service.changeAccount(owner, { appAccountId: chloe.id, action: "suspend" });
   const latest = async () =>
     (await service.readChangeStates(owner, [chloe.id])).get(chloe.id)?.latestChange;
-  return { service, chloe, owner, change, latest };
+  return { linear, service, chloe, owner, change, latest };
 }
 
 export async function failedDisable(orm: Orm, seed: TestSeed, url: string) {
