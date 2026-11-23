@@ -1,9 +1,10 @@
 import { useQuery } from "@apollo/client/react";
 import { useParams } from "@tanstack/react-router";
 
-import { AppConnectionScanDocument, AppPageDocument } from "@/__generated__/graphql";
+import { AppPageDocument } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
+import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 
 import { AppTable } from "../AppTable";
 import { useRefreshAfterChanges } from "../useRefreshAfterChanges";
@@ -22,10 +23,7 @@ export function AppPage() {
   const { data, refetch } = pageQuery;
   const app = data?.app;
   // A connected app's scan moves its users: poll its status only, then read the users once.
-  const scanQuery = useQuery(AppConnectionScanDocument, { skip: !app?.containerConnection });
-  const isScanning = app?.containerConnection?.scan?.status === "SCANNING";
-  usePollWhileScanning(isScanning, scanQuery);
-  useRefreshAfterChanges(isScanning, refetch);
+  useRefetchAfterContainerConnectorScans(refetch);
   // A running change moves its row; the page reads its users again until every change ends.
   // shortcut: reads every user each second while a change runs; poll only the running rows once
   // apps with thousands of users connect.

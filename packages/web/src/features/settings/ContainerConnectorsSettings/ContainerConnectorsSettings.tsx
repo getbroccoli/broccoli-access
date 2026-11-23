@@ -2,7 +2,7 @@ import { useQuery } from "@apollo/client/react";
 
 import { ContainerConnectorsSettingsDocument } from "@/__generated__/graphql";
 import { t } from "@/i18n";
-import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
+import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 
 import { ContainerConnectorCard } from "./ContainerConnectorCard";
 
@@ -11,10 +11,8 @@ export function ContainerConnectorsSettings() {
   // A scan started elsewhere, such as on the app's page, changes the connection outside this cache.
   const query = useQuery(ContainerConnectorsSettingsDocument, { fetchPolicy: "cache-and-network" });
   const connectors = query.data?.containerConnectors ?? [];
-  usePollWhileScanning(
-    connectors.some(({ connection }) => connection?.scan?.status === "SCANNING"),
-    query,
-  );
+  // A scan's results, such as its people count, commit with its end: read them once it ends.
+  useRefetchAfterContainerConnectorScans(query.refetch);
   if (connectors.length === 0) {
     return null;
   }

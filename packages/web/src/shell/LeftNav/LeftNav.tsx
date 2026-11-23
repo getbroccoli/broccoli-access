@@ -6,6 +6,7 @@ import { NavCountsDocument } from "@/__generated__/graphql";
 
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
+import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 import { useRefetchAfterScan } from "@/lib/useRefetchAfterScan";
 
 import { ProfileMenu } from "../ProfileMenu";
@@ -69,6 +70,7 @@ function useAppItems(): NavItem[] {
   const canManage = me.operations.includes("MANAGE_WORKSPACE");
   const { data, refetch } = useQuery(NavCountsDocument, { skip: !canManage });
   useRefetchAfterScan(data?.setup.googleWorkspace?.scan?.status === "SCANNING", refetch);
+  useRefetchAfterContainerConnectorScans(refetch);
   const discovered = data?.appCounts.discovered ?? 0;
   const suspendedWithAccess = data?.employeeCounts.suspendedWithAccess ?? 0;
   const applications: NavItem = {

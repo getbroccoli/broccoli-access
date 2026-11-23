@@ -20,6 +20,7 @@
       "src/features/setup",
       "src/i18n",
       "src/lib/class-names",
+      "src/lib/useRefetchAfterContainerConnectorScans",
       "src/lib/useRefetchAfterScan",
       "src/lib/useSessionChange"
     ],
@@ -38,6 +39,7 @@
       "src/lib/lastScan",
       "src/lib/since",
       "src/lib/useChromeExtension",
+      "src/lib/useRefetchAfterContainerConnectorScans",
       "src/lib/usePollWhileScanning",
       "src/lib/useRefetchAfterScan",
       "src/lib/useRouteAction",
@@ -65,6 +67,7 @@
       "src/lib/initials",
       "src/lib/lastScan",
       "src/lib/since",
+      "src/lib/useRefetchAfterContainerConnectorScans",
       "src/lib/usePollWhileScanning",
       "src/lib/useRefetchAfterScan",
       "src/shell"
@@ -85,6 +88,7 @@
       "src/lib/since",
       "src/lib/useChromeExtension",
       "src/lib/usePollWhileScanning",
+      "src/lib/useRefetchAfterContainerConnectorScans",
       "src/shell"
     ],
     "src/features/setup": [
@@ -120,6 +124,10 @@
     "src/lib/calendarDay": [],
     "src/lib/lastScan": ["src/i18n", "src/lib/dayAndTime"],
     "src/lib/usePollWhileScanning": [],
+    "src/lib/useRefetchAfterContainerConnectorScans": [
+      "src/__generated__",
+      "src/lib/usePollWhileScanning"
+    ],
     "src/lib/useChromeExtension": ["src/__generated__", "src/apollo"],
     "src/lib/dayAndTime": ["src/lib/calendarDay", "src/lib/since"]
   },

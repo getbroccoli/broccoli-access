@@ -68,17 +68,3 @@ query AppPage($id: ID!) {
 }
 
 # Polled while a connected app's scan runs, reading scans only; the users reload once when it ends.
-query AppConnectionScan {
-  containerConnectors {
-    id
-    connection {
-      id
-      scan {
-        id
-        status
-        readAt
-        sourceName
-      }
-    }
-  }
-}

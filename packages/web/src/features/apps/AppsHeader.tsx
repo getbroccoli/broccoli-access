@@ -6,6 +6,7 @@ import { useCache } from "@/apollo";
 import { t } from "@/i18n";
 import { formatLastScan } from "@/lib/lastScan";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
+import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 import { PageHeader, ScanNowButton } from "@/shell";
 
 import { forgetAppLists } from "./cache";
@@ -23,6 +24,9 @@ export function AppsHeader({ canScan }: Props) {
   const isScanning = connection?.scan?.status === "SCANNING";
   usePollWhileScanning(isScanning, scanQuery);
   useReloadAppsAfterScan(isScanning);
+  const cache = useCache();
+  // A connected app's scan changes its accounts and counts too, wherever it was connected.
+  useRefetchAfterContainerConnectorScans(() => forgetAppLists(cache));
 
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-4">
