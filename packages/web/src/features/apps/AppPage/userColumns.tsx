@@ -17,12 +17,12 @@ type AppUserRow = NonNullable<AppPageQuery["app"]>["users"][number];
  * Enable where its connection can change accounts.
  */
 export function userColumns(
-  connectedApp: { name: string; findingKind: string; canChangeAccounts: boolean } | null,
+  connectedApp: { name: string; canChangeAccounts: boolean } | null,
 ): DataTableColumn<AppUserRow>[] {
   if (!connectedApp) {
     return [PERSON, STATUS, FOUND_VIA, SINCE];
   }
-  const columns = [PERSON, STATUS, inAppColumn(connectedApp), FOUND_VIA, SINCE];
+  const columns = [PERSON, STATUS, inAppColumn(connectedApp.name), FOUND_VIA, SINCE];
   return connectedApp.canChangeAccounts ? [...columns, ACTIONS] : columns;
 }
 
@@ -71,27 +71,25 @@ const SINCE: DataTableColumn<AppUserRow> = {
 
 /**
  * The account's status in the connected app, as its own scan read it; a suspended one shows as
- * Disabled, as in the app, and a failed change as "Couldn't disable". An account only another
- * source found was not read there.
+ * Disabled, as in the app, and a failed change as "Couldn't disable". An account the scan did not
+ * return is "Not in <App>", and every account is "Not listed" before the first scan finished.
  */
-function inAppColumn({
-  name,
-  findingKind,
-}: {
-  name: string;
-  findingKind: string;
-}): DataTableColumn<AppUserRow> {
+function inAppColumn(name: string): DataTableColumn<AppUserRow> {
   return {
     id: "inApp",
     header: t("apps.page.column.inApp", { app: name }),
     className: "w-[12%]",
     cell: (user) => {
-      if (!user.foundVia.includes(findingKind)) {
-        return (
-          <span className="text-sm text-muted-foreground">{t("apps.page.inApp.notListed")}</span>
-        );
+      if (user.inApp) {
+        return <AppAccountStatusCell appUser={user} />;
       }
-      return <AppAccountStatusCell appUser={user} />;
+      return (
+        <span className="text-sm text-muted-foreground">
+          {user.inApp === false
+            ? t("apps.page.inApp.notInApp", { app: name })
+            : t("apps.page.inApp.notListed")}
+        </span>
+      );
     },
   };
 }

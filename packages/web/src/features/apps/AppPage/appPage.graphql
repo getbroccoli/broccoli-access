@@ -27,7 +27,6 @@ query AppPage($id: ID!) {
       connector {
         id
         name
-        findingKind
         connectionFields {
           kind
         }
@@ -43,6 +42,7 @@ query AppPage($id: ID!) {
     users {
       id
       status
+      inApp
       isConnectionUser
       latestChange {
         id

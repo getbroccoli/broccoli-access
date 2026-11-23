@@ -62,7 +62,6 @@ export function AppPage() {
           columns={userColumns(
             app.containerConnection && {
               name: app.name,
-              findingKind: app.containerConnection.connector.findingKind,
               canChangeAccounts: app.canChangeAccounts,
             },
           )}

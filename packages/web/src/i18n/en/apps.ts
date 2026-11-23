@@ -47,6 +47,7 @@ export const appsEn = {
   "apps.page.inApp.active": "Active",
   "apps.page.inApp.disabled": "Disabled",
   "apps.page.inApp.notListed": "Not listed",
+  "apps.page.inApp.notInApp": "Not in {app}",
   "apps.page.lastScanFailed": "The last scan failed.",
   "apps.page.connectedSubtitle": "{domain} · the {workspace} workspace. {lastScan}",
   "apps.page.connectedSubtitleWithoutDomain": "The {workspace} workspace. {lastScan}",
