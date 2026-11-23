@@ -53,7 +53,7 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
           )
         }
       />
-      <DialogContent className="gap-5 p-6 sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto p-6 sm:max-w-lg">
         {/* Mounted while open, so each opening starts again from the first step not done. */}
         {open && (
           <ConnectAppSessionSteps

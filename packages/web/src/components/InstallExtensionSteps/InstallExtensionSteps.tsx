@@ -24,8 +24,8 @@ export function InstallExtensionSteps() {
       </a>
       <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground/80 marker:text-muted-foreground">
         <li>{t("settings.extension.stepUnzip")}</li>
-        <li className="flex flex-col gap-1.5">
-          {t("settings.extension.stepOpen")}
+        <li className="space-y-1.5">
+          <p>{t("settings.extension.stepOpen")}</p>
           <CopyableText text={EXTENSIONS_PAGE} name={EXTENSIONS_PAGE} />
         </li>
         <li>{t("settings.extension.stepDeveloperMode")}</li>
