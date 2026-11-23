@@ -8,6 +8,7 @@ import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { PageHeader } from "@/shell";
 
 import { AppTable } from "../AppTable";
+import { useRefreshAfterChanges } from "../useRefreshAfterChanges";
 import { ACTIVITY_COLUMNS } from "./activityColumns";
 
 /** How many changes show before "Show n more": the recent ones a first look needs. */
@@ -21,6 +22,8 @@ export function ActivityPage() {
   const changes = data?.accountChanges.edges.map(({ node }) => node);
   const isChanging = changes?.some(({ status }) => status === "RUNNING") ?? false;
   usePollWhileScanning(isChanging, query);
+  // A change that ends moves the counts the menu and the app lists show.
+  useRefreshAfterChanges(isChanging, refetch);
 
   return (
     <div className="flex flex-col">
