@@ -35,7 +35,7 @@ export function LeftNav() {
       >
         {/* `inert` keeps Tab and screen readers out of the menu slid off screen. */}
         <div inert={inSettings} className={cn(menuClass, inSettings && "max-md:hidden")}>
-          <div className="min-w-0 flex-1 md:flex-none md:pt-1 md:pb-4">
+          <div className="min-w-0 flex-1 max-md:shrink-0 max-md:basis-auto md:flex-none md:pt-1 md:pb-4">
             <WorkspaceMenu />
           </div>
           <NavList label={t("nav.label")} items={appItems} />

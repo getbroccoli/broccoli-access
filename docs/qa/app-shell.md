@@ -28,4 +28,4 @@ A manual check of the left menu, the workspace menu, Settings and the profile me
 
 ## Narrow screens
 
-- [ ] At 390 px wide, the menu sits above the page in one row with the profile button as an avatar only; Settings swaps the row to "Back to the app", "Connections" and "Email".
+- [ ] At 390 px wide, the menu sits above the page in one row, which scrolls sideways when its items do not fit, with the workspace menu whole and the profile button as an avatar only; Settings swaps the row to "Back to the app", "Connections" and "Email".
