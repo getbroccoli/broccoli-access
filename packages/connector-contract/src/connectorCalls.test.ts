@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 
 import {
+  APP_CALL,
   APP_SESSION,
   CONNECTION_TEST_ANSWER,
   ACCOUNTS_LIST_ANSWER,
@@ -41,6 +42,24 @@ it("parses the documented action answer", () => {
 
 it("parses the documented error answer", () => {
   expect(CONNECTOR_ERROR_ANSWER.parse(errorAnswer)).toEqual(errorAnswer);
+});
+
+it.for([
+  { name: "connection test", schema: CONNECTION_TEST_ANSWER },
+  { name: "accounts list", schema: ACCOUNTS_LIST_ANSWER },
+  { name: "action run", schema: ACTION_RUN_ANSWER },
+  { name: "connector error", schema: CONNECTOR_ERROR_ANSWER },
+] as const)("keeps the app calls in the $name answer", ({ name, schema }) => {
+  const withCalls = { ...documentedAnswers[name], appCalls: [appCall] };
+
+  expect(schema.parse(withCalls)).toEqual(withCalls);
+});
+
+it.for([
+  { reason: "a string status", fields: { status: "200" } },
+  { reason: "an empty call", fields: { call: "" } },
+])("rejects an app call with $reason", ({ fields }) => {
+  expect(APP_CALL.safeParse({ ...appCall, ...fields }).success).toBe(false);
 });
 
 it("parses a first page request with the documented connection", () => {
@@ -145,3 +164,17 @@ const actionAnswer = {
 };
 
 const errorAnswer = { error: { code: "blocked_by_check", screenshot: "<base64 PNG>" } };
+
+const appCall = {
+  call: "POST /api/auth.test",
+  sent: { token: "[redacted]" },
+  status: 200,
+  reply: { ok: true },
+};
+
+const documentedAnswers = {
+  "connection test": connectionTest,
+  "accounts list": list,
+  "action run": actionAnswer,
+  "connector error": errorAnswer,
+};

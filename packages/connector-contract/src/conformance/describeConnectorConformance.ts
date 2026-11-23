@@ -314,6 +314,8 @@ async function call(url: string, path: string, body: object): Promise<unknown> {
   expect(response.status, `HTTP status of ${path}`).toBe(200);
   const answer: unknown = await response.json();
   expect(ANY_ANSWER.safeParse(answer).error, `answer of ${path}`).toBeUndefined();
+  // The suite never sends APP_CALLS_HEADER, so the app's calls must stay out of every answer.
+  expect(answer, `app calls in the answer of ${path}`).not.toHaveProperty("appCalls");
   if (isError(answer)) {
     expect(Object.keys(answer), `error answer of ${path}`).toEqual(["error"]);
     expect(CONNECTOR_ERROR_CODES, `error code of ${path}`).toContain(answer.error.code);
