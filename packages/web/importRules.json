@@ -32,6 +32,7 @@
       "src/components/dataTable",
       "src/components/form",
       "src/components/FoundVia",
+      "src/components/InstallExtensionSteps",
       "src/components/ui",
       "src/i18n",
       "src/lib/class-names",
@@ -77,6 +78,7 @@
       "src/apollo",
       "src/components/AppMark",
       "src/components/form",
+      "src/components/InstallExtensionSteps",
       "src/components/ui",
       "src/features/apps",
       "src/features/employees",
@@ -103,6 +105,13 @@
       "src/lib/useSessionChange"
     ],
     "src/components/dataTable": ["src/components/ui"],
+    "src/components/InstallExtensionSteps": [
+      "src/components/ui",
+      "src/i18n",
+      "src/lib/class-names",
+      "src/lib/extensionDownload",
+      "src/lib/useCopyToClipboard"
+    ],
     "src/components/AppMark": ["src/lib/class-names"],
     "src/components/FoundVia": ["src/__generated__", "src/lib/foundVia"],
     "src/components/Avatar": ["src/lib/class-names", "src/lib/initials"],
@@ -111,6 +120,7 @@
     "src/lib/class-names": [],
     "src/lib/postJson": [],
     "src/lib/useCopyToClipboard": [],
+    "src/lib/extensionDownload": [],
     "src/apollo": ["src/__generated__"],
     "src/i18n": [],
     "src/__generated__": [],

@@ -1,10 +1,11 @@
 import { UnpairExtensionDocument } from "@/__generated__/graphql";
 import { usePayloadMutation } from "@/apollo";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { InstallExtensionSteps } from "@/components/InstallExtensionSteps";
+import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { formatSince } from "@/lib/since";
-import { CHROME_WEB_STORE_URL, useChromeExtension } from "@/lib/useChromeExtension";
+import { useChromeExtension } from "@/lib/useChromeExtension";
 
 /** The Chrome extension: install it, pair this Chrome with the instance, or unpair it. */
 export function ChromeExtensionCard() {
@@ -56,6 +57,11 @@ export function ChromeExtensionCard() {
           ) : (
             <p className="text-sm text-foreground/80">{t("settings.extension.description")}</p>
           )}
+          {status === "not_installed" && (
+            <div className="pt-3">
+              <InstallExtensionSteps />
+            </div>
+          )}
           {status === "not_paired" && !extension.canPair && (
             <p className="text-sm text-muted-foreground">{t("settings.extension.needsHttps")}</p>
           )}
@@ -88,16 +94,6 @@ export function ChromeExtensionCard() {
           )}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          {status === "not_installed" && (
-            <a
-              href={CHROME_WEB_STORE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className={cn(buttonVariants({ variant: "outline", size: "lg" }), "px-4")}
-            >
-              {t("settings.extension.webStore")}
-            </a>
-          )}
           {status === "not_paired" && (
             <Button
               type="button"

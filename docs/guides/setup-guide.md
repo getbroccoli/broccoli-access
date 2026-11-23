@@ -4,7 +4,13 @@ Start Broccoli Access with `docker compose up -d --wait` and, once it returns, o
 
 Set `SELF_HOSTED_PUBLIC_URL` in a `.env` file beside `docker-compose.yml`, such as `SELF_HOSTED_PUBLIC_URL=https://access.example.com`, when Broccoli Access has a domain: only that origin may sign in, and an https address gives Secure session cookies.
 
-The Chrome extension pairs only with an https address, because your Slack session travels to Broccoli Access through it. Plain http works only on the same computer (`localhost`, `127.0.0.1` or `[::1]`), such as `http://localhost:8080`.
+# The Chrome extension
+
+Connecting Slack needs the Broccoli Access extension in the owner's Chrome. Download it from your instance, in the first step of Connect Slack or in **Settings → Connections → Chrome extension**, and load it unpacked as the steps there say. A company-managed Chrome may block Developer mode, which loading it unpacked needs; then ask IT to allow the extension's ID, shown there too.
+
+An unpacked extension doesn't update itself. After updating Broccoli Access, download it again, unzip it over the same folder and press the extension's Reload in `chrome://extensions`; removing the extension instead unpairs this Chrome.
+
+The extension pairs only with an https address, because your Slack session travels to Broccoli Access through it. Plain http works only on the same computer (`localhost`, `127.0.0.1` or `[::1]`), such as `http://localhost:8080`.
 
 # Drop the database
 

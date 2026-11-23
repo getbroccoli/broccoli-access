@@ -1,11 +1,9 @@
 import { CircleNotch } from "@phosphor-icons/react";
 
-import { buttonVariants } from "@/components/ui/button";
+import { InstallExtensionSteps } from "@/components/InstallExtensionSteps";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { t } from "@/i18n";
-import { cn } from "@/lib/class-names";
-import { CHROME_WEB_STORE_URL } from "@/lib/useChromeExtension";
 
 type Props = {
   app: string;
@@ -24,14 +22,7 @@ export function ExtensionStep({ app }: Props) {
           {t("settings.appSession.sendsOnly", { app })}
         </p>
       </div>
-      <a
-        href={CHROME_WEB_STORE_URL}
-        target="_blank"
-        rel="noreferrer"
-        className={cn(buttonVariants({ size: "lg" }), "self-start px-4")}
-      >
-        {t("settings.appSession.webStore")}
-      </a>
+      <InstallExtensionSteps />
       <p
         aria-live="polite"
         className="flex items-center gap-2.5 rounded-lg bg-muted/50 px-3.5 py-3 text-sm text-foreground/80"

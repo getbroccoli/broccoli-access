@@ -20,7 +20,20 @@ export const settingsEn = {
   "settings.extension.pairedSummary": "{browser}, paired on {day}.",
   "settings.extension.pairedNote":
     "Hands over your Slack session when you connect or reconnect Slack.",
-  "settings.extension.webStore": "Chrome Web Store ↗",
+  "settings.extension.download": "Download the extension",
+  "settings.extension.stepUnzip":
+    "Unzip it into a folder you keep. Deleting the folder removes the extension.",
+  "settings.extension.stepOpen": "Open Chrome’s extensions page in a new tab:",
+  "settings.extension.stepDeveloperMode": "Turn on Developer mode.",
+  "settings.extension.stepLoadUnpacked": "Choose Load unpacked and pick the folder.",
+  "settings.extension.stepComeBack": "Come back here. This page finds the extension by itself.",
+  "settings.extension.managedChrome":
+    "A company-managed Chrome may block Developer mode. Then ask your IT team to allow the extension’s ID:",
+  "settings.extension.id": "the extension’s ID",
+  "settings.extension.copy": "Copy",
+  "settings.extension.copied": "Copied",
+  "settings.extension.copiedAnnouncement": "Copied {name}",
+  "settings.extension.copyFailed": "Couldn’t copy. Select the text and copy it manually.",
   "settings.extension.pair": "Pair this Chrome",
   "settings.extension.needsHttps":
     "Pairing needs HTTPS: open Broccoli Access at its https address to pair this Chrome.",
@@ -57,7 +70,6 @@ export const settingsEn = {
     "{app} has no API for this on your plan, so Broccoli Access makes the calls {app}’s own admin pages make, with your own {app} session. The extension hands that session over when you connect.",
   "settings.appSession.sendsOnly":
     "It sends only {app}’s cookies and the token {app}’s signed-in page keeps, and only when you connect or reconnect.",
-  "settings.appSession.webStore": "Get it from the Chrome Web Store ↗",
   "settings.appSession.waitingForExtension":
     "Waiting for the extension. This moves on by itself once it’s installed.",
   "settings.appSession.chromeOnly": "Works in Chrome only.",

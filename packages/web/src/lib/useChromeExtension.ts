@@ -63,9 +63,6 @@ export function useChromeExtension() {
   };
 }
 
-/** Where the owner installs the extension. */
-export const CHROME_WEB_STORE_URL = `https://chromewebstore.google.com/detail/${EXTENSION_ID}`;
-
 /** How often the page asks whether the extension has paired. */
 const PAIR_POLL_INTERVAL_MS = 1_000;
 
