@@ -123,6 +123,21 @@ it.for([null, "2026-11-22T09:00:00Z", "2026-11-22T10:00:00Z"])(
   },
 );
 
+it.for(["2026-11-22T09:00:00Z", "2026-11-22T11:00:00Z"])(
+  "offers only Reconnect after ACCOUNT_NOT_FOUND on a connection in Reconnect, with last scan at %s",
+  (readAt) => {
+    const facts = failedSuspend("ACCOUNT_NOT_FOUND", readAt);
+    const containerConnection = { ...facts.app.containerConnection, status: "RECONNECT" as const };
+
+    expect(failedChangeOptions({ ...facts, app: { containerConnection } })).toEqual({
+      tryAgain: false,
+      byHand: false,
+      scanNow: false,
+      reconnect: true,
+    });
+  },
+);
+
 it.for([
   "UNEXPECTED_RESPONSE",
   "BLOCKED_BY_CHECK",

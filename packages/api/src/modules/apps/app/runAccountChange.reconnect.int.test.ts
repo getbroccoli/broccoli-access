@@ -1,8 +1,10 @@
 import {
+  accountChanges,
   expect,
   linearMemberStatus,
   pendingDisableTest as test,
   postFakeControl,
+  serveManifest,
   storedAppConnections,
   storedRecordHistory,
   SYSTEM,
@@ -75,5 +77,26 @@ test("fails another waiting Linear change with the cause found by the first chan
     id: waiting.id,
     status: "failed",
     error: "authentication_failed",
+  });
+});
+
+test("fails a change with the stored reconnect cause even after Linear leaves the connector list", async ({
+  pending,
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  await seed.connectionNeedsReconnect(pending.change.connectionId);
+  const server = await serveManifest(fakeConnectors.url, (manifest) => {
+    manifest.connectors = manifest.connectors.filter(({ key }) => key !== "linear");
+  });
+  const service = accountChanges(orm, { connectorsUrl: server.url });
+
+  await service.runChange(SYSTEM, pending.change.id);
+
+  expect(await pending.latest()).toMatchObject({
+    status: "failed",
+    error: "authentication_failed",
+    attempts: [],
   });
 });

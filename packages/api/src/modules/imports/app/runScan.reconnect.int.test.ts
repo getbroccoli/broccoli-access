@@ -187,6 +187,29 @@ test("keeps the reconnected key when a scan using the replaced key returns renew
   expect(await connections.readSecrets(orm, connectionId)).toEqual({ apiKey: ACME_LINEAR.apiKey });
 });
 
+test("turns Linear to Reconnect when a later page loses permission after the scan renewed its key", async ({
+  orm,
+  fakeConnectors,
+}) => {
+  const linear = await connectLinear(orm, fakeConnectors.url);
+  const secrets = { apiKey: "renewed-test-key" };
+  const server = await serveAccountList(fakeConnectors.url, (request, response) => {
+    if ((request.body as { cursor: string | null }).cursor === null) {
+      response.json({ accounts: [], nextCursor: "second", connection: { secrets } });
+    } else {
+      response.json({ error: { code: "permission_missing" } });
+    }
+  });
+  const { scans } = containerConnections(orm, server.url);
+
+  await scans.runScan(SYSTEM, linear.sourceId);
+
+  expect(await connections.readSecrets(orm, linear.connectionId)).toEqual(secrets);
+  expect(await storedAppConnections(orm)).toMatchObject([
+    { id: linear.connectionId, status: "reconnect", reconnectCause: "permission_missing" },
+  ]);
+});
+
 async function reconnectDuringScan(
   orm: Orm,
   url: string,

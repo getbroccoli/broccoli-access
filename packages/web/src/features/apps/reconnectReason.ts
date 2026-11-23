@@ -3,7 +3,7 @@ import { t } from "@/i18n";
 import { dayAndTime } from "@/lib/dayAndTime";
 
 /** What a connection that needs reconnecting says about itself. */
-export type ReconnectingConnection = {
+type ReconnectingConnection = {
   app: string;
   /** Whether it connects with the owner's app session; otherwise with a typed key. */
   withSession: boolean;

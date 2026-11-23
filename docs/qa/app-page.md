@@ -64,7 +64,7 @@ On Linear's page, connected as above. Set `FAKE=http://127.0.0.1:<port>`, the po
 - [ ] Google Workspace's page has no Disable or Enable.
 - [ ] After `curl -s -X POST "$FAKE/_fake/linear/keys/revoke"`, disabling Chloé fails and the page, without a reload, shows "Reconnect" instead of "Connected" in the header, no "Scan now", an amber banner "Linear refused the API key: it was revoked or expired. Changes in Linear fail until you paste a new key." with "Reconnect Linear", and "Reconnect" at the end of every row that offered Disable or Enable; Mia's row still reads "Connected as you".
 - [ ] Chloé's "Couldn’t disable" opens "Couldn’t disable Chloé Martin in Linear" with "Linear refused the API key: it was revoked or expired. Reconnect Linear with a new key, then try again. Nothing changed in Linear.", "After you reconnect, this row shows Try again. Or deactivate Chloé in Linear’s admin yourself and tell Broccoli Access.", "I did it by hand", "Open Linear admin" and "Reconnect Linear"; after reconnecting from there (as below), the dialog offers "Try again" instead.
-- [ ] "Reconnect Linear", or a row's "Reconnect", opens "Paste a new key for Linear"; after `curl -s -X POST "$FAKE/_fake/reset"`, `lin_api_acme_fake` brings back "Connected", "Scan now" and each row's "Disable" or "Enable" without a reload.
+- [ ] "Reconnect Linear", or a row's "Reconnect", opens "Paste a new key for Linear"; after `curl -s -X POST "$FAKE/_fake/reset"`, `lin_api_acme_fake` brings back "Connected" and "Scan now" without a reload; Chloé's row offers "Try again", the others "Disable" or "Enable".
 
 ## When a change fails
 

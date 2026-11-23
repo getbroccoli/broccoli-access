@@ -141,7 +141,10 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
     },
     async scanEveryConnection(ctx) {
       ctx.requireSystem();
-      const sources = await importSourceRepository(orm).findAll();
+      // A source already scanning needs no other; it would only wait for that scan's save.
+      const sources = (await importSourceRepository(orm).findAll()).filter(
+        ({ status }) => status !== "scanning",
+      );
       // One transaction each, so a source a running save holds delays only its own scan.
       for (const { connectionId, name } of sources) {
         await transact((tx) => service.scanConnection(ctx, tx, { connectionId, sourceName: name }));

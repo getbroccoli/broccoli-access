@@ -8,7 +8,7 @@ import {
 import type { Transact, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { accountChangeRepository, appAccountRepository, appConnectionRepository } from "../db";
-import { type AccountChange, statusAfter } from "../domain";
+import { type AccountChange, reconnectCauseOf, statusAfter } from "../domain";
 import type { AccountChangeDependencies } from "./accountChangeService";
 import type { AppConnectionService } from "./appConnectionService";
 import { setAccountStatus } from "./setAccountStatus";
@@ -41,20 +41,9 @@ export async function runAccountChange(
     );
     return;
   }
-  const { finished, turnedToReconnect } = await transact(async (tx) => {
-    // The lock a scan turning the connection to Reconnect takes first, so the two never deadlock.
-    await appConnectionRepository(tx).lockById(change.connectionId);
-    return {
-      finished: await finishFailed(tx, changeId, error, calledServer),
-      // Whatever happened to the change, as the connector contract says.
-      turnedToReconnect: await dependencies.connections.turnToReconnect(ctx, tx, {
-        connectionId: change.connectionId,
-        error,
-        ref: changeId,
-        secretsUsed,
-      }),
-    };
-  });
+  const { finished, turnedToReconnect } = await transact((tx) =>
+    failChange(dependencies, ctx, tx, { change, error, calledServer, secretsUsed }),
+  );
   logger.warn(
     {
       changeId,
@@ -66,6 +55,39 @@ export async function runAccountChange(
     },
     "Account change failed",
   );
+}
+
+/**
+ * Fails the change with its error, joining `tx`, and turns its connection to Reconnect when the
+ * error needs it, whatever happened to the change, as the connector contract says.
+ */
+async function failChange(
+  { connections }: RunDependencies,
+  ctx: SecurityContext,
+  tx: Tx,
+  {
+    change,
+    error,
+    calledServer,
+    secretsUsed,
+  }: ActionOutcome & { change: AccountChange; error: ConnectorErrorCode },
+): Promise<{ finished: boolean; turnedToReconnect: boolean }> {
+  if (!reconnectCauseOf(error)) {
+    return {
+      finished: await finishFailed(tx, change.id, error, calledServer),
+      turnedToReconnect: false,
+    };
+  }
+  // The lock a scan turning the connection to Reconnect takes first, so the two never deadlock.
+  await appConnectionRepository(tx).lockById(change.connectionId);
+  const finished = await finishFailed(tx, change.id, error, calledServer);
+  const turnedToReconnect = await connections.turnToReconnect(ctx, tx, {
+    connectionId: change.connectionId,
+    error,
+    ref: change.id,
+    secretsUsed,
+  });
+  return { finished, turnedToReconnect };
 }
 
 /** Fails a change that is still running with `app_unavailable`, after its job's last attempt. */
@@ -94,14 +116,14 @@ async function runAction(
 ): Promise<ActionOutcome> {
   const { orm, connections, connectors, wait, logger } = dependencies;
   const connection = (await connections.readConnectionById(orm, change.connectionId))!;
+  // A change asked just before its connection turned to Reconnect fails with that cause.
+  if (connection.reconnectCause) {
+    return { error: connection.reconnectCause, calledServer: false, secretsUsed: null };
+  }
   const connector = (await connectors.list()).find(({ key }) => key === connection.connector);
   // A connector the container no longer lists, or one that no longer changes accounts, cannot act now.
   if (!connector || !canChangeAccounts(connector)) {
     return { error: "app_unavailable", calledServer: false, secretsUsed: null };
-  }
-  // A change asked just before its connection turned to Reconnect fails with that cause.
-  if (connection.reconnectCause) {
-    return { error: connection.reconnectCause, calledServer: false, secretsUsed: null };
   }
   let calledServer = false;
   const secrets = await connections.readSecrets(orm, change.connectionId);

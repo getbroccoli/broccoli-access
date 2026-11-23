@@ -147,6 +147,8 @@ export const appsEn = {
     "Trying again won’t help. If someone with more rights in {app} makes the change there, tell Broccoli Access.",
   "apps.couldnt.hintScan":
     "Trying again won’t help. Scan {app} to bring its member list up to date.",
+  "apps.couldnt.hintScanAfterReconnect":
+    "Reconnecting scans {app} again, which may bring its member list up to date.",
   "apps.couldnt.hintScanned": "{app} was scanned since, so trying again may help.",
   "apps.couldnt.reconnectKey": "Reconnect {app} with a new key, then try again.",
   "apps.couldnt.reconnectSession": "Reconnect {app}, then try again.",
@@ -191,6 +193,8 @@ export const appsEn = {
     "{app} refused your session. Sign in to {app} in Chrome, then Reconnect again.",
   "apps.reconnect.otherWorkspace":
     "This {app} session is for another workspace. In Chrome, switch to the {app} workspace you connected, then Reconnect again.",
+  "apps.reconnect.notAdmin":
+    "This {app} session isn’t an admin’s. In Chrome, sign in to {app} as an admin of the workspace you connected, then Reconnect again.",
   "apps.reconnect.expired": "This hand-over expired. Reconnect {app} again.",
   "apps.reconnect.unavailable": "Couldn’t check the connection to {app}. Try again.",
   "apps.reconnect.failed": "Couldn’t reconnect {app}. Try again.",

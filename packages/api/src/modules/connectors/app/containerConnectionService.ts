@@ -1,5 +1,3 @@
-import { isDeepStrictEqual } from "node:util";
-
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
 import { canChangeAccounts, type ConnectionDetails } from "../../../core/connectors";
 import type { Orm, Transact } from "../../../core/db";
@@ -9,8 +7,13 @@ import type { SecurityContext } from "../../../core/security";
 import { adminUrlOf, parseAppSession } from "../domain";
 import type { ConnectedApps, Scans } from "../ports";
 import { type AppSessionHandOver, createAppSessionHandOvers } from "./appSessionHandOvers";
-import { type Connection, connectionOf, isOtherWorkspace } from "./connectionOf";
-import { ownerInputField, testedConnection } from "./testedConnection";
+import {
+  type Connection,
+  connectionOf,
+  isOtherWorkspace,
+  refuseOtherWorkspace,
+} from "./connectionOf";
+import { testedConnection } from "./testedConnection";
 import {
   appSessionFieldOf,
   type ContainerConnector,
@@ -203,14 +206,7 @@ export function createContainerConnectionService(
       }
       const connection = connectionOf(ctx, connector, input, { handOvers, logger });
       const details = await testedConnection(dependencies, connector, connection);
-      const settings = { ...connection.settings, ...details.connection?.settings };
-      if (!isDeepStrictEqual(settings, stored.settings)) {
-        logger.warn(
-          { connector: connector.key, connectionId: stored.id },
-          "Reconnect refused: the test reaches another workspace",
-        );
-        throw invalidInput([{ field: ownerInputField(connector), code: "wrong_workspace" }]);
-      }
+      refuseOtherWorkspace({ connector, connection, details, stored }, logger);
       const secrets = details.connection?.secrets ?? connection.secrets;
       const { sourceId } = await dependencies.transact(async (tx) => {
         // The source first, then the connection, as a failing scan locks them, so they never deadlock.
@@ -224,7 +220,7 @@ export function createContainerConnectionService(
       });
       logger.info(
         { connector: connector.key, connectionId: stored.id, sourceId },
-        "App reconnected through the connectors container; its scan is queued",
+        "App reconnected through the connectors container; a scan is queued or running",
       );
       return { connector, connection: summaryOf(connector, stored) };
     },

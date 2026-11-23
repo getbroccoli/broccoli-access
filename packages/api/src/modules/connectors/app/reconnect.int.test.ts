@@ -1,6 +1,7 @@
 import { inspect } from "node:util";
 
-import { ACME_LINEAR } from "@broccoli-access/fake-apps";
+import type { ConnectionTestAnswer } from "@broccoli-access/connector-contract";
+import { ACME_LINEAR, ACME_SLACK } from "@broccoli-access/fake-apps";
 import express from "express";
 
 import {
@@ -11,6 +12,7 @@ import {
   expect,
   LINEAR_INPUT,
   OWNER,
+  ownerHandOver,
   postFakeControl,
   serveConnectorRoutes,
   signInToFakeSlack,
@@ -130,6 +132,35 @@ test("reconnects Slack with the owner's new hand-over", async ({ orm, seed, fake
   expect(
     JSON.parse(TEST_SECRET_BOX.decrypt(connection!.encryptedSecrets, slack.connectionId)),
   ).toEqual({ appSession: session });
+});
+
+test("refuses to reconnect Slack when the final test names another workspace without new settings", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const slack = await slackWithExpiredSession(orm, seed, fakeConnectors);
+  await slack.scans.runScan(SYSTEM, slack.sourceId);
+  const before = await storedAppConnections(orm);
+  let answer: ConnectionTestAnswer = {
+    details: { organizationName: ACME_SLACK.name, domain: "acme.slack.com" },
+    connection: { settings: ACME_SLACK.settings },
+  };
+  const app = express();
+  app.get("/slack/signin", (_req, res) => res.redirect(fakeConnectors.url + "/slack/signin"));
+  app.post("/v1/connections/test", (_req, res) => res.json(answer));
+  const server = await serveConnectorRoutes(fakeConnectors.url, app);
+  const { service, handOver } = await ownerHandOver(orm, server);
+  answer = { details: { organizationName: "Other", domain: "other.slack.com" } };
+
+  await expect(
+    service.reconnect(OWNER, { connector: "slack", appSession: handOver.appSession }),
+  ).rejects.toMatchObject({
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "appSession", code: "wrong_workspace" }],
+  });
+
+  expect(await storedAppConnections(orm)).toEqual(before);
 });
 
 test("refuses to reconnect Linear before it has a connection", async ({ orm, fakeConnectors }) => {

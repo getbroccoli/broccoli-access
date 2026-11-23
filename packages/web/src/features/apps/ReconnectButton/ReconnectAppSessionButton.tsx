@@ -75,6 +75,9 @@ function reconnectFailure(
     if (code === "wrong_workspace") {
       return t("apps.reconnect.otherWorkspace", { app });
     }
+    if (code === "permission_missing") {
+      return t("apps.reconnect.notAdmin", { app });
+    }
     return code === "invalid"
       ? t("apps.reconnect.expired", { app })
       : t("apps.reconnect.refused", { app });

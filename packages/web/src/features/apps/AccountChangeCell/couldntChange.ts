@@ -53,8 +53,8 @@ export function couldntChangeReason(
  * hand, scan the app, or reconnect it. Try again needs the account to offer that change, as the
  * server does (not while its connection needs reconnecting); after `ACCOUNT_NOT_FOUND` it also needs
  * a scan since the failure, which may have read the member's new id, and Scan now is offered until
- * it helps. Reconnect is offered after a failure that turned the connection to Reconnect, while it
- * still needs it.
+ * it helps. Reconnect is offered after a failure that turned the connection to Reconnect, or after
+ * `ACCOUNT_NOT_FOUND` in place of Scan now, while the connection needs it.
  */
 export function failedChangeOptions({
   offeredChange,
@@ -68,16 +68,19 @@ export function failedChangeOptions({
   if (latestChange.failure === "NOT_ALLOWED") {
     return { tryAgain: false, byHand: true, scanNow: false, reconnect: false };
   }
+  const needsReconnect = app.containerConnection?.status === "RECONNECT";
   if (latestChange.failure === "ACCOUNT_NOT_FOUND") {
+    // Reconnecting queues the scan that may find the member, so it replaces Scan now.
+    if (needsReconnect) {
+      return { tryAgain: false, byHand: false, scanNow: false, reconnect: true };
+    }
     const lastScanAt = app.containerConnection?.scan?.readAt ?? null;
     const scannedSince =
       lastScanAt !== null && Date.parse(lastScanAt) > Date.parse(latestChange.finishedAt);
     const tryAgain = scannedSince && offered;
     return { tryAgain, byHand: false, scanNow: !tryAgain, reconnect: false };
   }
-  const reconnect =
-    RECONNECT_FAILURES.includes(latestChange.failure) &&
-    app.containerConnection?.status === "RECONNECT";
+  const reconnect = RECONNECT_FAILURES.includes(latestChange.failure) && needsReconnect;
   return { tryAgain: offered && !reconnect, byHand: true, scanNow: false, reconnect };
 }
 
@@ -92,6 +95,9 @@ export function couldntChangeHint(
     return t("apps.couldnt.hintByHandOnly", { app });
   }
   if (failure === "ACCOUNT_NOT_FOUND") {
+    if (reconnect) {
+      return t("apps.couldnt.hintScanAfterReconnect", { app });
+    }
     return t(scanNow ? "apps.couldnt.hintScan" : "apps.couldnt.hintScanned", { app });
   }
   const hints = action === "SUSPEND" ? DISABLE_HINTS : ENABLE_HINTS;
