@@ -1,20 +1,29 @@
-import { Check, WarningCircle } from "@phosphor-icons/react";
+import { Check } from "@phosphor-icons/react";
 
-import type { AccountChangeFailure } from "@/__generated__/graphql";
+import type { FragmentType } from "@apollo/client";
+
+import type {
+  AccountChangeFailure,
+  CouldntChangeDialog_AccountChangeFragment,
+} from "@/__generated__/graphql";
 import { type MessageKey, t } from "@/i18n";
 import { dayAndTime } from "@/lib/dayAndTime";
 
-import { ChangeProgress } from "../AccountChangeCell";
+import { ChangeProgress, CouldntChangeDialog } from "../AccountChangeCell";
 import type { AccountChangeRow } from "./accountChangeRow";
 
 type Props = {
   change: Pick<
     AccountChangeRow,
     "action" | "status" | "changesAhead" | "failure" | "finishedAt" | "app"
-  >;
+  > &
+    FragmentType<CouldntChangeDialog_AccountChangeFragment>;
 };
 
-/** How a change ended: on the server, by hand after a failure, or not at all with its reason; or its progress. */
+/**
+ * How a change ended: on the server, by hand after a failure, or not at all with its reason, which
+ * opens why it failed; or its progress.
+ */
 export function ChangeOutcome({ change }: Props) {
   const { status, app } = change;
   if (status === "RUNNING") {
@@ -45,14 +54,7 @@ export function ChangeOutcome({ change }: Props) {
   }
   return (
     <span className="flex flex-col items-start gap-1 whitespace-nowrap">
-      <span className="inline-flex h-[30px] items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 text-[13px] font-semibold text-red-800">
-        <WarningCircle size={14} weight="bold" aria-hidden />
-        {t(
-          change.action === "SUSPEND"
-            ? "apps.activity.couldntDisable"
-            : "apps.activity.couldntEnable",
-        )}
-      </span>
+      <CouldntChangeDialog change={change} triggerClassName={FAILED} />
       {change.failure && (
         <span className="text-xs text-muted-foreground">
           {t(REASONS[change.failure], { app: app.name })}
@@ -61,6 +63,10 @@ export function ChangeOutcome({ change }: Props) {
     </span>
   );
 }
+
+/** The failed outcome, opening why. */
+const FAILED =
+  "inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 text-[13px] font-semibold text-red-800 transition-colors hover:bg-red-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
 
 /** What the owner can do about each failure, which the row names under "Couldn't …". */
 const REASONS: Record<AccountChangeFailure, MessageKey> = {

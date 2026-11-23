@@ -1,18 +1,15 @@
-fragment CouldntChangeDialog_appUser on AppUser {
+fragment CouldntChangeDialog_accountChange on AccountChange {
   id
-  offeredChange
-  latestChange {
+  action
+  status
+  failure
+  finishedAt
+  requestedAt
+  requestedBy {
     id
-    action
-    status
-    failure
-    finishedAt
-    requestedAt
-    requestedBy {
-      id
-      name
-    }
+    name
   }
+  email
   employee {
     id
     firstName

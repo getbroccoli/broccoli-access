@@ -27,8 +27,13 @@ export function AppAccountStatusCell({ appUser }: Props) {
     return null;
   }
   const user = fragment.data;
-  if (showsCouldntChange(user)) {
-    return <CouldntChangeDialog appUser={user} />;
+  if (user.latestChange && showsCouldntChange(user)) {
+    return (
+      <CouldntChangeDialog
+        change={user.latestChange}
+        account={{ id: user.id, offeredChange: user.offeredChange ?? null }}
+      />
+    );
   }
   return <AppAccountStatusBadge status={user.status} />;
 }

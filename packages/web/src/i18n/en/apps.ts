@@ -88,8 +88,6 @@ export const appsEn = {
   "apps.activity.byHand": "By hand",
   "apps.activity.byHandToday": "At {time}, after it couldn’t run",
   "apps.activity.byHandOn": "{day} at {time}, after it couldn’t run",
-  "apps.activity.couldntDisable": "Couldn’t disable",
-  "apps.activity.couldntEnable": "Couldn’t enable",
   "apps.activity.reason.reconnect": "Reconnect {app}",
   "apps.activity.reason.tryLater": "Try again in a while",
   "apps.activity.reason.scanNow": "Scan {app} now",
