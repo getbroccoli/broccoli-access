@@ -2,7 +2,7 @@ import { useQuery } from "@apollo/client/react";
 import { CaretLeft } from "@phosphor-icons/react";
 import { Link, useParams } from "@tanstack/react-router";
 
-import { PersonPageDocument } from "@/__generated__/graphql";
+import { AppConnectionScanDocument, PersonPageDocument } from "@/__generated__/graphql";
 import { Avatar } from "@/components/Avatar";
 import { useRefreshAfterChanges } from "@/features/apps";
 import { t } from "@/i18n";
@@ -16,6 +16,14 @@ export function PersonPage() {
   // The route's loader has just read the page into the cache.
   const pageQuery = useQuery(PersonPageDocument, { variables: { id: employeeId } });
   const person = pageQuery.data?.employee;
+  // A scan, such as one started from a failed change's dialog, moves its rows: poll the scans
+  // only, then read the person once.
+  const isScanning =
+    person?.appAccounts.some(({ app }) => app.containerConnection?.scan?.status === "SCANNING") ??
+    false;
+  const scanQuery = useQuery(AppConnectionScanDocument, { skip: !isScanning });
+  usePollWhileScanning(isScanning, scanQuery);
+  useRefreshAfterChanges(isScanning, pageQuery.refetch);
   // A running change moves its row; the page reads the person again until every change ends.
   const isChanging =
     person?.appAccounts.some((account) => account.latestChange?.status === "RUNNING") ?? false;

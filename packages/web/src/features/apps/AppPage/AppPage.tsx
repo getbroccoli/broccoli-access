@@ -4,7 +4,6 @@ import { useParams } from "@tanstack/react-router";
 import { AppConnectionScanDocument, AppPageDocument } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
-import { useRefetchAfterScan } from "@/lib/useRefetchAfterScan";
 
 import { AppTable } from "../AppTable";
 import { useRefreshAfterChanges } from "../useRefreshAfterChanges";
@@ -26,7 +25,7 @@ export function AppPage() {
   const scanQuery = useQuery(AppConnectionScanDocument, { skip: !app?.containerConnection });
   const isScanning = app?.containerConnection?.scan?.status === "SCANNING";
   usePollWhileScanning(isScanning, scanQuery);
-  useRefetchAfterScan(isScanning, refetch);
+  useRefreshAfterChanges(isScanning, refetch);
   // A running change moves its row; the page reads its users again until every change ends.
   // shortcut: reads every user each second while a change runs; poll only the running rows once
   // apps with thousands of users connect.

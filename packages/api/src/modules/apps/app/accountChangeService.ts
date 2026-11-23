@@ -21,6 +21,7 @@ import {
 import { type AccountChange, type AppAccount, offeredChange } from "../domain";
 import type { ConnectionMember, ConnectionMembers } from "../ports";
 import { createAppConnectionService } from "./appConnectionService";
+import { markChangeDoneByHand } from "./markChangeDoneByHand";
 import { failRunningChange, runAccountChange } from "./runAccountChange";
 
 /**
@@ -48,6 +49,13 @@ export interface AccountChangeService {
   runChange: (ctx: SecurityContext, changeId: string) => Promise<void>;
   /** The job's attempts are used up: a running change fails with `app_unavailable`. System only. */
   failChange: (ctx: SecurityContext, changeId: string) => Promise<void>;
+  /**
+   * "I did it by hand": the change, failed and its account's latest, becomes `done_by_hand` with its
+   * error kept, and the account takes the status the change asked for at once, with a history line
+   * by the signed-in user unless it already had it. Needs MANAGE_WORKSPACE; refuses an unknown change with NOT_FOUND, and
+   * any other with CONFLICT.
+   */
+  markChangeDoneByHand: (ctx: SecurityContext, changeId: string) => Promise<LatestAccountChange>;
   /** What each of the app accounts offers and its latest change, by account id. Needs MANAGE_WORKSPACE. */
   readChangeStates: (
     ctx: SecurityContext,
@@ -132,6 +140,7 @@ export function createAccountChangeService(
     },
     runChange: (ctx, changeId) => runAccountChange(run, ctx, changeId),
     failChange: (ctx, changeId) => failRunningChange(dependencies, ctx, changeId),
+    markChangeDoneByHand: (ctx, changeId) => markChangeDoneByHand(dependencies, ctx, changeId),
     async readChangeStates(ctx, appAccountIds) {
       ctx.require("MANAGE_WORKSPACE");
       const changing = await changingConnectors(dependencies.connectors);

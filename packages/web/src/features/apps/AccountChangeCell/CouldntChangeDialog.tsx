@@ -1,0 +1,218 @@
+import type { FragmentType } from "@apollo/client";
+import { useFragment } from "@apollo/client/react";
+import { ArrowUpRight, WarningCircle } from "@phosphor-icons/react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import {
+  type AccountChangeAction,
+  type CouldntChangeDialog_AccountChangeFragment,
+  CouldntChangeDialog_AccountChangeFragmentDoc,
+  ScanNowDocument,
+} from "@/__generated__/graphql";
+import { usePayloadMutation } from "@/apollo";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { t } from "@/i18n";
+import { cn } from "@/lib/class-names";
+import { dayAndTime } from "@/lib/dayAndTime";
+
+import { couldntChangeHint, couldntChangeReason, failedChangeOptions } from "./couldntChange";
+import { DoneByHandDialog } from "./DoneByHandDialog";
+import { useChangeAccount } from "./useChangeAccount";
+
+type Props = {
+  /** A failed account change. */
+  change: FragmentType<CouldntChangeDialog_AccountChangeFragment>;
+  /**
+   * The account whose latest change it is, which Try again and I did it by hand act on; absent where
+   * the change is history, as on Activity, which shows only why.
+   */
+  account?: { id: string; offeredChange: AccountChangeAction | null };
+  /** The trigger's look; the account row's chip by default. */
+  triggerClassName?: string;
+};
+
+/**
+ * "Couldn't disable" or "Couldn't enable", opening why: who asked and when, the reason, the app's
+ * admin page and, for an account, what helps now: Try again, I did it by hand (confirmed in its own
+ * dialog), or a scan.
+ */
+export function CouldntChangeDialog({
+  change: changeRef,
+  account,
+  triggerClassName = CHIP,
+}: Props) {
+  const fragment = useFragment({
+    fragment: CouldntChangeDialog_AccountChangeFragmentDoc,
+    from: changeRef,
+  });
+  const [shown, setShown] = useState<"reason" | "byHand" | null>(null);
+  const { changeAccount } = useChangeAccount();
+  const [scanNow] = usePayloadMutation(ScanNowDocument);
+  const change = fragment.complete ? fragment.data : null;
+  if (!change?.failure) {
+    return null;
+  }
+  const { employee, app } = change;
+  const connection = app.containerConnection;
+  const name = employee ? `${employee.firstName} ${employee.lastName}` : change.email;
+  const firstName = employee?.firstName ?? change.email;
+  const workspace = connection?.scan?.sourceName ?? app.name;
+  const options = account
+    ? failedChangeOptions({ offeredChange: account.offeredChange, latestChange: change, app })
+    : NO_OPTIONS;
+  const copy = COPY[change.action];
+  const reason = couldntChangeReason(change.failure, {
+    app: app.name,
+    workspace,
+    person: { name, email: change.email },
+    // Today's connection user says nothing about who it was when a change in history failed.
+    connectionUserEmail: account ? (connection?.connectionUserEmail ?? null) : null,
+    credential: connection?.connector.connectionFields.find(({ secret }) => secret)?.kind ?? "TEXT",
+  });
+  const tryAgain = (accountId: string) => {
+    setShown(null);
+    void changeAccount({ id: accountId, name, app: app.name }, change.action);
+  };
+  const scan = (connectionId: string) => {
+    setShown(null);
+    scanNow({ variables: { connectionId } }).catch(() => toast.error(t("scans.scanNowFailed")));
+  };
+
+  return (
+    <>
+      <Dialog open={shown === "reason"} onOpenChange={(open) => setShown(open ? "reason" : null)}>
+        <DialogTrigger
+          render={<button type="button" className={triggerClassName} />}
+          aria-label={t(copy.title, { name, app: app.name })}
+        >
+          <WarningCircle size={13} weight="bold" aria-hidden />
+          {t(copy.chip)}
+        </DialogTrigger>
+        <DialogContent className="gap-5 p-6 sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="pr-8 text-xl font-semibold">
+              {t(copy.title, { name, app: app.name })}
+            </DialogTitle>
+            <DialogDescription>
+              {askedBy(change)}
+              {account &&
+                stillHasAccess(change) &&
+                ` ${t("apps.couldnt.stillHasAccess", { firstName, workspace })}`}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+            {reason}
+          </p>
+          {account && (
+            <p className="text-sm text-muted-foreground">
+              {couldntChangeHint(change.failure, change.action, options, {
+                firstName,
+                app: app.name,
+              })}
+            </p>
+          )}
+          <DialogFooter className="m-0 gap-2 border-0 bg-transparent p-0 sm:justify-between">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              {options.byHand && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="px-4"
+                  onClick={() => setShown("byHand")}
+                >
+                  {t("apps.couldnt.byHand")}
+                </Button>
+              )}
+              {connection?.adminUrl && (
+                <a
+                  href={connection.adminUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(buttonVariants({ variant: "outline", size: "lg" }), "px-4")}
+                >
+                  {t("apps.page.openAdmin", { app: app.name })}
+                  <ArrowUpRight size={14} aria-hidden />
+                </a>
+              )}
+            </div>
+            {account && options.tryAgain && (
+              <Button type="button" size="lg" className="px-4" onClick={() => tryAgain(account.id)}>
+                {t("apps.couldnt.tryAgain")}
+              </Button>
+            )}
+            {options.scanNow && connection && (
+              <Button
+                type="button"
+                size="lg"
+                className="px-4"
+                disabled={connection.scan?.status === "SCANNING"}
+                onClick={() => scan(connection.id)}
+              >
+                {t("apps.couldnt.scanNow", { app: app.name })}
+              </Button>
+            )}
+            {!options.tryAgain && !options.scanNow && (
+              <DialogClose render={<Button type="button" size="lg" className="px-4" />}>
+                {t("apps.couldnt.close")}
+              </DialogClose>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <DoneByHandDialog
+        open={shown === "byHand"}
+        onClose={() => setShown(null)}
+        change={change}
+        person={{ name, firstName }}
+        app={app.name}
+      />
+    </>
+  );
+}
+
+const CHIP = cn(
+  "inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-red-800",
+  "cursor-pointer transition-colors hover:bg-red-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+);
+
+/** History offers no action: Try again and I did it by hand act on an account's latest change. */
+const NO_OPTIONS = { tryAgain: false, byHand: false, scanNow: false };
+
+/** The words of a failed Disable or Enable, which mirror each other. */
+const COPY = {
+  SUSPEND: {
+    chip: "apps.couldnt.disable",
+    title: "apps.couldnt.disableTitle",
+  },
+  REACTIVATE: {
+    chip: "apps.couldnt.enable",
+    title: "apps.couldnt.enableTitle",
+  },
+} as const;
+
+type FailedChange = CouldntChangeDialog_AccountChangeFragment;
+
+/** "Asked by Mia Novak today at 10:14.", or on an earlier day. */
+function askedBy({ requestedBy, requestedAt }: FailedChange): string {
+  const { day, time } = dayAndTime(requestedAt);
+  return day === null
+    ? t("apps.couldnt.askedToday", { name: requestedBy.name, time })
+    : t("apps.couldnt.askedOn", { name: requestedBy.name, day, time });
+}
+
+/** A failed Disable leaves the person their access; a member the app no longer lists says nothing either way. */
+function stillHasAccess({ action, failure }: FailedChange): boolean {
+  return action === "SUSPEND" && failure !== "ACCOUNT_NOT_FOUND";
+}

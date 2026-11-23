@@ -26,6 +26,7 @@ Approve Slack again on its page, connect Linear as in [Connections settings](con
 - [ ] The amber box reads "Ana is suspended in Google but still has accounts in 4 approved apps. Disable them here where the app is connected, and in the app itself where it isn’t.", and the table adds a Linear row, "Active" and ending with "Disable"; Figma, Notion and Slack still end with "No connection".
 - [ ] "Disable" on Linear asks "Disable Ana Ruiz in Linear?"; confirming runs as on Linear's page and ends with "Disabled", "Disabled just now", "Enable" and the toast; the row stays listed and the amber box reads "… accounts in 3 approved apps." without the second sentence, since none of those apps is connected.
 - [ ] "Enable" brings Linear back to "Active" with "Disable".
+- [ ] After `fail unexpected_response` (see [the app page](app-page.md#when-a-change-fails)) and a Disable of Linear here, the Linear row reads "Couldn’t disable" with "Try again" and opens the same dialog; "I did it by hand" turns it to "Disabled" with "Enable", and the amber box to "… accounts in 3 approved apps." at once.
 
 ## No delete
 

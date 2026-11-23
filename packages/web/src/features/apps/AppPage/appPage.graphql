@@ -39,6 +39,7 @@ query AppPage($id: ID!) {
         status
       }
       ...AccountChangeCell_appUser
+      ...AppAccountStatusCell_appUser
       foundVia
       since {
         at

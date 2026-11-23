@@ -1,12 +1,9 @@
 import { useState } from "react";
-import { toast } from "sonner";
 
-import {
-  type AccountChangeAction,
-  type AccountChangeCell_AppUserFragment,
-  ChangeAccountDocument,
+import type {
+  AccountChangeAction,
+  AccountChangeCell_AppUserFragment,
 } from "@/__generated__/graphql";
-import { usePayloadMutation } from "@/apollo";
 import { AppMark } from "@/components/AppMark";
 import { Avatar } from "@/components/Avatar";
 import {
@@ -24,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 
 import { connectingFieldName } from "../connectingFieldName";
+import { useChangeAccount } from "./useChangeAccount";
 
 type Props = {
   user: AccountChangeCell_AppUserFragment;
@@ -36,18 +34,14 @@ type Props = {
  */
 export function ConfirmAccountChangeDialog({ user, action }: Props) {
   const [open, setOpen] = useState(false);
-  const [changeAccount, { loading }] = usePayloadMutation(ChangeAccountDocument);
+  const { changeAccount, loading } = useChangeAccount();
   const { employee, app } = user;
   const connector = app.containerConnection?.connector;
   const name = `${employee.firstName} ${employee.lastName}`;
   const copy = COPY[action];
-  const confirm = async () => {
+  const confirm = () => {
     setOpen(false);
-    try {
-      await changeAccount({ variables: { input: { id: user.id, action } } });
-    } catch {
-      toast.error(t("apps.change.refused", { name, app: app.name }));
-    }
+    void changeAccount({ id: user.id, name, app: app.name }, action);
   };
 
   return (
@@ -99,7 +93,7 @@ export function ConfirmAccountChangeDialog({ user, action }: Props) {
         </AlertDialogDescription>
         <AlertDialogFooter>
           <AlertDialogCancel>{t("apps.change.cancel")}</AlertDialogCancel>
-          <AlertDialogAction type="button" onClick={() => void confirm()}>
+          <AlertDialogAction type="button" onClick={confirm}>
             {t(copy.confirm, { app: app.name })}
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -1,0 +1,39 @@
+import type { FragmentType } from "@apollo/client";
+import { useFragment } from "@apollo/client/react";
+
+import {
+  type AppAccountStatusCell_AppUserFragment,
+  AppAccountStatusCell_AppUserFragmentDoc,
+} from "@/__generated__/graphql";
+
+import { CouldntChangeDialog, showsCouldntChange } from "../AccountChangeCell";
+import { AppAccountStatusBadge } from "./AppAccountStatusBadge";
+
+type Props = {
+  appUser: FragmentType<AppAccountStatusCell_AppUserFragment>;
+};
+
+/**
+ * An account's status in its app, or "Couldn't disable" or "Couldn't enable" while its latest change
+ * failed and its status is not yet what that change asked for.
+ */
+export function AppAccountStatusCell({ appUser }: Props) {
+  const fragment = useFragment({
+    fragment: AppAccountStatusCell_AppUserFragmentDoc,
+    fragmentName: "AppAccountStatusCell_appUser",
+    from: appUser,
+  });
+  if (!fragment.complete) {
+    return null;
+  }
+  const user = fragment.data;
+  if (user.latestChange && showsCouldntChange(user)) {
+    return (
+      <CouldntChangeDialog
+        change={user.latestChange}
+        account={{ id: user.id, offeredChange: user.offeredChange ?? null }}
+      />
+    );
+  }
+  return <AppAccountStatusBadge status={user.status} />;
+}

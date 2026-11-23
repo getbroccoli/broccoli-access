@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AccountChangeCell, AppAccountStatusBadge } from "@/features/apps";
+import { AccountChangeCell, AppAccountStatusCell } from "@/features/apps";
 import { t } from "@/i18n";
 import { FoundVia } from "@/components/FoundVia";
 import { formatSince } from "@/lib/since";
@@ -61,7 +61,7 @@ export function CurrentAccessTable({ appAccounts }: Props) {
                 </span>
               </TableCell>
               <TableCell>
-                <AppAccountStatusBadge status={account.status} />
+                <AppAccountStatusCell appUser={account} />
               </TableCell>
               <TableCell>
                 <FoundVia findingKinds={account.foundVia} />

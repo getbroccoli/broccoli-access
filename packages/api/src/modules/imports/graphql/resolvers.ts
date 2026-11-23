@@ -23,6 +23,17 @@ export function createResolvers(
   );
   const scanOfConnection = (connectionId: string, context: GraphqlContext) =>
     scansOfConnections(context).load(connectionId);
+  // Cached for the request like the scans: every row of an app page reads its connection's user.
+  const connectionUserEmails = perRequest(
+    (context) =>
+      new DataLoader<string, string | null>((connectionIds) =>
+        Promise.all(
+          connectionIds.map((connectionId) =>
+            scans.readConnectionUserEmail(context.getActor(), connectionId),
+          ),
+        ),
+      ),
+  );
   return {
     Mutation: {
       imports: () => ({}),
@@ -38,7 +49,7 @@ export function createResolvers(
     ContainerConnection: {
       scan: (connection, _args, context) => scanOfConnection(connection.id, context),
       connectionUserEmail: (connection, _args, context) =>
-        scans.readConnectionUserEmail(context.getActor(), connection.id),
+        connectionUserEmails(context).load(connection.id),
     },
   };
 }

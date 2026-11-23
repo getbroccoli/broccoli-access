@@ -10,6 +10,8 @@ declare module "../../../core/records" {
   interface CauseKinds {
     /** An account change succeeded; its ref is the account change's id. */
     CHANGED_IN_APP: true;
+    /** The owner made a failed account change in the app themselves; its ref is the account change's id. */
+    DONE_BY_HAND: true;
   }
 }
 

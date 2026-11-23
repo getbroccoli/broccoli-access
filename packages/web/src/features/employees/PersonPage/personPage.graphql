@@ -21,12 +21,20 @@ query PersonPage($id: ID!) {
         name
         catalogKey
         canChangeAccounts
+        containerConnection {
+          id
+          scan {
+            id
+            status
+          }
+        }
       }
       latestChange {
         id
         status
       }
       ...AccountChangeCell_appUser
+      ...AppAccountStatusCell_appUser
     }
   }
 }

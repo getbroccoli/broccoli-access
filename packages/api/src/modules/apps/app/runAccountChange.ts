@@ -5,15 +5,13 @@ import {
   type ConnectorErrorCode,
   withConnectorRetries,
 } from "../../../core/connectors";
-import type { Transact, Tx } from "../../../core/db";
-import { createRecordHistoryService } from "../../../core/records";
+import type { Transact } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { accountChangeRepository, appAccountRepository } from "../db";
-import { type AccountChange, accountChanges, statusAfter } from "../domain";
+import { type AccountChange, statusAfter } from "../domain";
 import type { AccountChangeDependencies } from "./accountChangeService";
 import type { AppConnectionService } from "./appConnectionService";
-
-const recordHistory = createRecordHistoryService();
+import { setAccountStatus } from "./setAccountStatus";
 
 /** What a run needs: the service's dependencies and its connection service. */
 type RunDependencies = AccountChangeDependencies & { connections: AppConnectionService };
@@ -173,29 +171,10 @@ async function finishSucceeded(
       error: null,
       finishedAt: now,
     });
-    await setAccountStatus(ctx, tx, change);
+    await setAccountStatus(ctx, tx, change, {
+      cause: { kind: "CHANGED_IN_APP", ref: change.id },
+      requestedBy: change.requestedBy,
+    });
     return true;
-  });
-}
-
-async function setAccountStatus(
-  ctx: SecurityContext,
-  tx: Tx,
-  change: AccountChange,
-): Promise<void> {
-  const accounts = appAccountRepository(tx);
-  const [before] = change.appAccountId ? await accounts.findByIds([change.appAccountId]) : [];
-  const status = statusAfter(change.action);
-  if (!before || before.status === status) {
-    return;
-  }
-  const after = { ...before, status };
-  await accounts.update(after);
-  await recordHistory.append(ctx, tx, {
-    recordType: "app_account",
-    operation: "UPDATED",
-    cause: { kind: "CHANGED_IN_APP", ref: change.id },
-    requestedBy: change.requestedBy,
-    records: [{ recordId: before.id, changes: accountChanges(before, after) }],
   });
 }

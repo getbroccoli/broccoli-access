@@ -1,12 +1,13 @@
 import {
+  ACCOUNT_CHANGE_POLL,
+  CHANGE_ACCOUNT,
+  changeAccount,
+  connectedLinear,
+  connectorTest as test,
   expect,
   failLinearCall,
-  finishSetupWithPreselectedApps,
-  LINEAR_INPUT,
   linearMemberStatus,
-  connectorTest as test,
-  type TestEnv,
-  type Browser,
+  linearUsers,
 } from "#test/support";
 
 test("the owner disables Chloé in Linear and enables her again", async ({
@@ -32,7 +33,7 @@ test("the owner disables Chloé in Linear and enables her again", async ({
   await expect
     .poll(
       async () => (await linearUsers(browser, appId)).find((user) => user.id === chloe.id),
-      POLL,
+      ACCOUNT_CHANGE_POLL,
     )
     .toMatchObject({
       status: "SUSPENDED",
@@ -50,7 +51,7 @@ test("the owner disables Chloé in Linear and enables her again", async ({
   await expect
     .poll(
       async () => (await linearUsers(browser, appId)).find((user) => user.id === chloe.id),
-      POLL,
+      ACCOUNT_CHANGE_POLL,
     )
     .toMatchObject({
       status: "ACTIVE",
@@ -83,15 +84,17 @@ test("shows one change ahead of Chloé while Ana's Disable runs, then finishes t
     const users = await linearUsers(browser, appId);
     return [ana, chloe].map(({ id }) => users.find((user) => user.id === id)!.latestChange);
   };
-  await expect.poll(pair, POLL).toMatchObject([{ status: "SUCCEEDED" }, { status: "SUCCEEDED" }]);
+  await expect
+    .poll(pair, ACCOUNT_CHANGE_POLL)
+    .toMatchObject([{ status: "SUCCEEDED" }, { status: "SUCCEEDED" }]);
   const [first, second] = await pair();
   expect(Date.parse(second!.finishedAt!)).toBeGreaterThan(Date.parse(first!.finishedAt!));
 }, 90_000);
 
 test("changing an account requires a session", async ({ env }) => {
-  const response = await env
-    .browser()
-    .graphql(CHANGE, { input: { id: "00000000-0000-4000-8000-000000000001", action: "SUSPEND" } });
+  const response = await env.browser().graphql(CHANGE_ACCOUNT, {
+    input: { id: "00000000-0000-4000-8000-000000000001", action: "SUSPEND" },
+  });
 
   expect(await response.json()).toMatchObject({
     errors: [{ extensions: { code: "UNAUTHENTICATED" } }],
@@ -112,7 +115,7 @@ test("Activity lists a Disable that succeeded and one that failed, with the pers
       async () =>
         (await linearUsers(browser, appId)).find((user) => user.id === chloe.id)?.latestChange
           ?.status,
-      POLL,
+      ACCOUNT_CHANGE_POLL,
     )
     .toBe("SUCCEEDED");
   await failLinearCall(fakeConnectors.url, "actions/run", "not_allowed");
@@ -126,7 +129,7 @@ test("Activity lists a Disable that succeeded and one that failed, with the pers
     finishedAt: expect.any(String) as unknown,
   };
   await expect
-    .poll(async () => (await browser.graphql(ACTIVITY)).json(), POLL)
+    .poll(async () => (await browser.graphql(ACTIVITY)).json(), ACCOUNT_CHANGE_POLL)
     .toEqual({
       data: {
         accountChanges: {
@@ -165,81 +168,6 @@ test("reading account changes requires a session", async ({ env }) => {
   });
 });
 
-interface AppUser {
-  id: string;
-  employee: { email: string };
-  status: string;
-  isConnectionUser: boolean;
-  offeredChange: string | null;
-  latestChange: {
-    id: string;
-    action: string;
-    status: string;
-    changesAhead: number | null;
-    finishedAt: string | null;
-  } | null;
-}
-
-const POLL = { timeout: 30_000, interval: 250 };
 const ACTIVITY = `{ accountChanges { edges { node {
   id action status failure email employee { email } app { name } requestedBy { name } requestedAt finishedAt
 } } } }`;
-const USER_FIELDS = `id employee { email } status isConnectionUser offeredChange
-  latestChange { id action status changesAhead finishedAt }`;
-const CHANGE = `mutation ($input: AppUserChangeInput!) {
-  apps { changeAccount(input: $input) { appUser { ${USER_FIELDS} } error { __typename } } }
-}`;
-
-async function connectedLinear(env: TestEnv) {
-  const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
-  const response = await browser.graphql(
-    `mutation ($input: ContainerConnectorConnectInput!) {
-    connectors { connect(input: $input) { containerConnector { id } error { __typename } } }
-  }`,
-    { input: LINEAR_INPUT },
-  );
-  expect(await response.json()).toEqual({
-    data: { connectors: { connect: { containerConnector: { id: "linear" }, error: null } } },
-  });
-  const apps = await browser.graphql(
-    "{ apps(status: APPROVED) { edges { node { id catalogKey } } } }",
-  );
-  const body = (await apps.json()) as {
-    data: { apps: { edges: { node: { id: string; catalogKey: string | null } }[] } };
-  };
-  const appId = body.data.apps.edges.find(({ node }) => node.catalogKey === "linear")!.node.id;
-  await expect
-    .poll(async () => {
-      const result = await browser.graphql("query ($id: ID!) { app(id: $id) { users { id } } }", {
-        id: appId,
-      });
-      const read = (await result.json()) as { data: { app: { users: unknown[] } } };
-      return read.data.app.users.length;
-    }, POLL)
-    .toBe(7);
-  return { browser, appId };
-}
-
-async function linearUsers(browser: Browser, appId: string) {
-  const response = await browser.graphql(
-    `query ($id: ID!) { app(id: $id) { canChangeAccounts users { ${USER_FIELDS} } } }`,
-    { id: appId },
-  );
-  const body = (await response.json()) as {
-    data: { app: { canChangeAccounts: boolean; users: AppUser[] } };
-  };
-  expect(body).not.toHaveProperty("errors");
-  expect(body.data.app.canChangeAccounts).toBe(true);
-  return body.data.app.users;
-}
-
-async function changeAccount(browser: Browser, id: string, action: "SUSPEND" | "REACTIVATE") {
-  const response = await browser.graphql(CHANGE, { input: { id, action } });
-  const body = (await response.json()) as {
-    data: { apps: { changeAccount: { appUser: AppUser; error: unknown } } };
-  };
-  expect(body).not.toHaveProperty("errors");
-  expect(body.data.apps.changeAccount.error).toBeNull();
-  return body.data.apps.changeAccount.appUser;
-}

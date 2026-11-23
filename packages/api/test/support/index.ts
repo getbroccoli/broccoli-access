@@ -97,9 +97,18 @@ export {
 } from "./containerConnections";
 export {
   accountChanges,
+  pendingDisable,
+  failedDisable,
   scannedLinear,
   linearMemberStatus,
   listedLinearChloe,
 } from "./accountChanges";
 export { signInToFakeSlack } from "./signInToFakeSlack";
 export { pairChrome, redeemCode, START_PAIRING, BROWSER } from "./pairChrome";
+export {
+  ACCOUNT_CHANGE_POLL,
+  CHANGE_ACCOUNT,
+  changeAccount,
+  connectedLinear,
+  linearUsers,
+} from "./linearAccountChanges";
