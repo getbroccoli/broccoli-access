@@ -62,6 +62,8 @@ esac
 
 # The containers run on the checkout's node_modules.
 quiet pnpm install --frozen-lockfile
+# The web app's dev server zips this build for owners to download.
+quiet pnpm --filter @broccoli-access/extension build
 
 trap 'quiet compose down' EXIT
 # Ctrl-C is the normal way to stop. sh skips the EXIT trap when a signal kills it, so turn
