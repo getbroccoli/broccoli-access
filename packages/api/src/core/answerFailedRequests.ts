@@ -4,9 +4,10 @@ import { ApplicationError, invalidInput, sendApplicationError } from "./applicat
 import type { Logger } from "./logger";
 
 /**
- * Answers every request that failed with an error, the JSON parser's included: an expected refusal,
- * an unreadable body or another client error as its status; anything else as a bare 500. Logs the
- * class only, since a parser or database message can quote the body, such as a pasted key (RULE31).
+ * Answers a request that failed before its response started: an expected refusal, an unreadable
+ * body or another client error as its status, anything else as a bare 500. Logs only the error's
+ * class, the method and the route's template, since a message or path can quote what the caller
+ * sent, such as a pasted key (RULE31).
  */
 export function answerFailedRequests(logger: Logger): ErrorRequestHandler {
   return (error: unknown, request, response, next) => {
@@ -18,6 +19,8 @@ export function answerFailedRequests(logger: Logger): ErrorRequestHandler {
     sendFailure(error, request, response, logger);
   };
 }
+
+const BAD_REQUEST = 400;
 
 const INTERNAL_SERVER_ERROR = 500;
 
@@ -39,8 +42,8 @@ function sendFailure(error: unknown, request: Request, response: Response, logge
     {
       kind: error instanceof Error ? error.name : typeof error,
       method: request.method,
-      // The path holds ids at most; the query, which can carry a code, stays out.
-      path: request.path,
+      // The template from the code, such as `/files/:id`; absent when no route matched.
+      route: (request.route as { path?: string } | undefined)?.path,
     },
     "Request failed",
   );
@@ -52,10 +55,10 @@ function isUnreadableBody(error: unknown): boolean {
   return (error as { type?: unknown } | null)?.type === "entity.parse.failed";
 }
 
-/** The 4xx status of a client error the body parser raised, such as 413 for a body too large. */
+/** The 4xx status a client error carries, such as 413 for a large body or 400 for a bad escape. */
 function clientErrorStatusOf(error: unknown): number | undefined {
-  const { status, expose } = (error ?? {}) as { status?: unknown; expose?: unknown };
-  return expose === true && typeof status === "number" && status < INTERNAL_SERVER_ERROR
+  const { status } = (error ?? {}) as { status?: unknown };
+  return typeof status === "number" && status >= BAD_REQUEST && status < INTERNAL_SERVER_ERROR
     ? status
     : undefined;
 }
