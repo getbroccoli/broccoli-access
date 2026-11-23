@@ -7,10 +7,10 @@ The open-source SaaS access management app. Request, approve and remove access t
 ## Quick install
 
 ```sh
-docker compose up
+docker compose up -d --wait
 ```
 
-Open http://localhost:8080 and connect Google Workspace. More in the [setup guide](docs/guides/setup-guide.md).
+Once it returns, open http://localhost:8080 and connect Google Workspace. More in the [setup guide](docs/guides/setup-guide.md).
 
 ## Develop
 

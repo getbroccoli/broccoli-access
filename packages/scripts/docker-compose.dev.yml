@@ -14,9 +14,6 @@ services:
   broccoli-access:
     profiles: [self-host]
 
-  ready:
-    profiles: [self-host]
-
   postgres:
     volumes:
       - dev-postgres-data:/var/lib/postgresql
