@@ -27,6 +27,14 @@ fragment AccountChangeCell_appUser on AppUser {
         id
         sourceName
       }
+      connector {
+        id
+        connectionFields {
+          key
+          label
+          secret
+        }
+      }
     }
   }
 }

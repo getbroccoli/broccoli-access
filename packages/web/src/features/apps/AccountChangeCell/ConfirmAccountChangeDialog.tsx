@@ -23,6 +23,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 
+import { connectingFieldName } from "../connectingFieldName";
+
 type Props = {
   user: AccountChangeCell_AppUserFragment;
   action: AccountChangeAction;
@@ -36,6 +38,7 @@ export function ConfirmAccountChangeDialog({ user, action }: Props) {
   const [open, setOpen] = useState(false);
   const [changeAccount, { loading }] = usePayloadMutation(ChangeAccountDocument);
   const { employee, app } = user;
+  const connector = app.containerConnection?.connector;
   const name = `${employee.firstName} ${employee.lastName}`;
   const copy = COPY[action];
   const confirm = async () => {
@@ -85,7 +88,14 @@ export function ConfirmAccountChangeDialog({ user, action }: Props) {
         </dl>
         <AlertDialogDescription className="flex flex-col gap-3">
           <span>{t(copy.effect, { firstName: employee.firstName })}</span>
-          <span className="text-xs">{t("apps.change.howItWorks", { app: app.name })}</span>
+          {connector && (
+            <span className="text-xs">
+              {t("apps.change.howItWorks", {
+                field: connectingFieldName(connector.connectionFields),
+                app: app.name,
+              })}
+            </span>
+          )}
         </AlertDialogDescription>
         <AlertDialogFooter>
           <AlertDialogCancel>{t("apps.change.cancel")}</AlertDialogCancel>

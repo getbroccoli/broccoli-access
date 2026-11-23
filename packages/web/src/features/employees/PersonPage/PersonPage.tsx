@@ -26,6 +26,10 @@ export function PersonPage() {
     return null;
   }
   const appCount = person.approvedAppNames.length;
+  // Some of the apps they still have access to can be disabled from here.
+  const canDisableHere = person.appAccounts.some(
+    ({ status, app }) => status === "ACTIVE" && app.canChangeAccounts,
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -68,6 +72,8 @@ export function PersonPage() {
                 name: person.firstName,
                 count: String(appCount),
               })}
+          {canDisableHere &&
+            ` ${t(appCount === 1 ? "people.person.disableWhereConnectedOne" : "people.person.disableWhereConnected")}`}
         </p>
       )}
       <section className="flex flex-col gap-3">

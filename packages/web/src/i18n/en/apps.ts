@@ -86,7 +86,7 @@ export const appsEn = {
   "apps.change.enableEffect":
     "{firstName}’s account in this workspace becomes active again. You can disable it again later.",
   "apps.change.howItWorks":
-    "Broccoli Access makes the change in {app} with your connection, then reads the account back from {app}.",
+    "Broccoli Access makes the change with your {field}, then reads the account back from {app}.",
   "apps.change.cancel": "Cancel",
   "apps.change.confirmDisable": "Disable in {app}",
   "apps.change.confirmEnable": "Enable in {app}",
