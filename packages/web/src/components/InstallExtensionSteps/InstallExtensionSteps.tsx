@@ -1,4 +1,4 @@
-import { EXTENSION_ID } from "@broccoli-access/extension";
+import { EXTENSION_ID, isPairableOrigin } from "@broccoli-access/extension";
 import { DownloadSimple } from "@phosphor-icons/react";
 
 import { buttonVariants } from "@/components/ui/button";
@@ -10,9 +10,15 @@ import { CopyableText } from "./CopyableText";
 
 /**
  * How to install the extension unpacked: download it from this instance, then the steps in Chrome,
- * and what to ask IT when a company-managed Chrome blocks Developer mode.
+ * and what to ask IT when a company-managed Chrome blocks Developer mode. Only where it can pair:
+ * over plain http, someone on the network could swap the download for their own extension.
  */
 export function InstallExtensionSteps() {
+  if (!isPairableOrigin(window.location.origin)) {
+    return (
+      <p className="text-sm text-muted-foreground">{t("settings.extension.downloadNeedsHttps")}</p>
+    );
+  }
   return (
     <div className="flex flex-col gap-4">
       <a

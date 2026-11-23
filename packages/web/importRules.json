@@ -86,6 +86,7 @@
       "src/i18n",
       "src/lib/calendarDay",
       "src/lib/class-names",
+      "src/lib/extensionDownload",
       "src/lib/lastScan",
       "src/lib/since",
       "src/lib/useChromeExtension",

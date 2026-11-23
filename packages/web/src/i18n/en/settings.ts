@@ -25,14 +25,20 @@ export const settingsEn = {
     "Unzip it into a folder you keep. Deleting the folder removes the extension.",
   "settings.extension.stepOpen": "Open Chrome’s extensions page in a new tab:",
   "settings.extension.stepDeveloperMode": "Turn on Developer mode.",
-  "settings.extension.stepLoadUnpacked": "Choose Load unpacked and pick the folder.",
+  "settings.extension.stepLoadUnpacked":
+    "Choose Load unpacked and pick that folder, the one holding manifest.json.",
   "settings.extension.stepComeBack": "Come back here. This page finds the extension by itself.",
   "settings.extension.managedChrome":
-    "A company-managed Chrome may block Developer mode. Then ask your IT team to allow the extension’s ID:",
+    "A company-managed Chrome may block Developer mode or extensions it doesn’t know. Then ask your IT team to allow Developer mode and this extension’s ID:",
+  "settings.extension.downloadNeedsHttps":
+    "Open Broccoli Access at its https address to download the extension: over plain http, someone on the network could swap it.",
+  "settings.extension.updateNote":
+    "It doesn’t update itself. After updating Broccoli Access, download it again, unzip it over the same folder and press its Reload in chrome://extensions.",
   "settings.extension.id": "the extension’s ID",
   "settings.extension.copy": "Copy",
   "settings.extension.copied": "Copied",
-  "settings.extension.copiedAnnouncement": "Copied {name}",
+  "settings.extension.copyName": "Copy {name}",
+  "settings.extension.copiedName": "Copied {name}",
   "settings.extension.copyFailed": "Couldn’t copy. Select the text and copy it manually.",
   "settings.extension.pair": "Pair this Chrome",
   "settings.extension.needsHttps":

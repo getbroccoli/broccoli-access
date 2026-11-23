@@ -4,6 +4,7 @@ import { InstallExtensionSteps } from "@/components/InstallExtensionSteps";
 import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
+import { EXTENSION_DOWNLOAD_PATH } from "@/lib/extensionDownload";
 import { formatSince } from "@/lib/since";
 import { useChromeExtension } from "@/lib/useChromeExtension";
 
@@ -60,6 +61,19 @@ export function ChromeExtensionCard() {
           {status === "not_installed" && (
             <div className="pt-3">
               <InstallExtensionSteps />
+            </div>
+          )}
+          {extension.isInstalled && extension.canPair && (
+            <div className="flex flex-col items-start gap-1 pt-2">
+              <p className="text-[13px] text-muted-foreground">
+                {t("settings.extension.updateNote")}
+              </p>
+              <a
+                href={EXTENSION_DOWNLOAD_PATH}
+                className="text-sm font-medium underline underline-offset-4"
+              >
+                {t("settings.extension.download")}
+              </a>
             </div>
           )}
           {status === "not_paired" && !extension.canPair && (
