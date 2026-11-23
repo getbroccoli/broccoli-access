@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
@@ -31,8 +32,17 @@ export function useToastWhenChangeSucceeds(user: AccountChangeCell_AppUserFragme
           params,
         ),
         // The row's outcome, apart from the answers to clicks at the top.
-        { position: "bottom-right", invert: true },
+        { position: "bottom-right", invert: true, action: VIEW_IN_ACTIVITY },
       );
     }
   }, [user, change]);
 }
+
+const VIEW_IN_ACTIVITY = (
+  <Link
+    to="/activity"
+    className="ml-auto font-semibold whitespace-nowrap underline-offset-2 hover:underline"
+  >
+    {t("apps.change.viewInActivity")}
+  </Link>
+);

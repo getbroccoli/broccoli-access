@@ -1,4 +1,5 @@
 export { AccountChangeCell } from "./AccountChangeCell";
+export { ActivityPage } from "./ActivityPage";
 export { AppAccountStatusBadge, AppPage, loadAppPage } from "./AppPage";
 export { AppsPage } from "./AppsPage";
 export { appsSearch } from "./appsSearch";
