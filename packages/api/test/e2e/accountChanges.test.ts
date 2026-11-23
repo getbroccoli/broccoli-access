@@ -1,5 +1,6 @@
 import {
   expect,
+  failLinearCall,
   finishSetupWithPreselectedApps,
   LINEAR_INPUT,
   linearMemberStatus,
@@ -97,6 +98,73 @@ test("changing an account requires a session", async ({ env }) => {
   });
 });
 
+test("Activity lists a Disable that succeeded and one that failed, with the person, app and requester", async ({
+  env,
+  fakeConnectors,
+}) => {
+  const { browser, appId } = await connectedLinear(env);
+  const users = await linearUsers(browser, appId);
+  const chloe = users.find((user) => user.employee.email === "chloe@acme.example")!;
+  const ana = users.find((user) => user.employee.email === "ana@acme.example")!;
+  const succeeded = await changeAccount(browser, chloe.id, "SUSPEND");
+  await expect
+    .poll(
+      async () =>
+        (await linearUsers(browser, appId)).find((user) => user.id === chloe.id)?.latestChange
+          ?.status,
+      POLL,
+    )
+    .toBe("SUCCEEDED");
+  await failLinearCall(fakeConnectors.url, "actions/run", "not_allowed");
+  const failed = await changeAccount(browser, ana.id, "SUSPEND");
+
+  const disable = {
+    action: "SUSPEND",
+    app: { name: "Linear" },
+    requestedBy: { name: "Mia Novak" },
+    requestedAt: expect.any(String) as unknown,
+    finishedAt: expect.any(String) as unknown,
+  };
+  await expect
+    .poll(async () => (await browser.graphql(ACTIVITY)).json(), POLL)
+    .toEqual({
+      data: {
+        accountChanges: {
+          edges: [
+            {
+              node: {
+                ...disable,
+                id: failed.latestChange!.id,
+                status: "FAILED",
+                failure: "NOT_ALLOWED",
+                email: ana.employee.email,
+                employee: ana.employee,
+              },
+            },
+            {
+              node: {
+                ...disable,
+                id: succeeded.latestChange!.id,
+                status: "SUCCEEDED",
+                failure: null,
+                email: chloe.employee.email,
+                employee: chloe.employee,
+              },
+            },
+          ],
+        },
+      },
+    });
+}, 90_000);
+
+test("reading account changes requires a session", async ({ env }) => {
+  const response = await env.browser().graphql(ACTIVITY);
+
+  expect(await response.json()).toMatchObject({
+    errors: [{ extensions: { code: "UNAUTHENTICATED" } }],
+  });
+});
+
 interface AppUser {
   id: string;
   employee: { email: string };
@@ -113,6 +181,9 @@ interface AppUser {
 }
 
 const POLL = { timeout: 30_000, interval: 250 };
+const ACTIVITY = `{ accountChanges { edges { node {
+  id action status failure email employee { email } app { name } requestedBy { name } requestedAt finishedAt
+} } } }`;
 const USER_FIELDS = `id employee { email } status isConnectionUser offeredChange
   latestChange { id action status changesAhead finishedAt }`;
 const CHANGE = `mutation ($input: AppUserChangeInput!) {

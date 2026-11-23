@@ -34,6 +34,7 @@
       "src/components/ui",
       "src/i18n",
       "src/lib/class-names",
+      "src/lib/dayAndTime",
       "src/lib/lastScan",
       "src/lib/since",
       "src/lib/useChromeExtension",
@@ -117,9 +118,10 @@
     "src/lib/useRefetchAfterScan": [],
     "src/lib/useSessionChange": ["src/lib/useRouteAction"],
     "src/lib/calendarDay": [],
-    "src/lib/lastScan": ["src/i18n", "src/lib/calendarDay", "src/lib/since"],
+    "src/lib/lastScan": ["src/i18n", "src/lib/dayAndTime"],
     "src/lib/usePollWhileScanning": [],
-    "src/lib/useChromeExtension": ["src/__generated__", "src/apollo"]
+    "src/lib/useChromeExtension": ["src/__generated__", "src/apollo"],
+    "src/lib/dayAndTime": ["src/lib/calendarDay", "src/lib/since"]
   },
   "deepImports": ["src/components/ui", "src/__generated__"]
 }

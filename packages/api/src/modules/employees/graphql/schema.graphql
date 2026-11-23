@@ -117,6 +117,12 @@ type AppUser {
   employee: Employee!
 }
 
+# Adds the person to an account change; the server merges the types of the modules.
+type AccountChange {
+  "The employee whose email is now the change's email; null when nobody has it."
+  employee: Employee
+}
+
 # Adds the signed-in user's employee to `me`; the server merges the types.
 type User {
   "The signed-in user's own employee record; null for a user without one, such as the owner."

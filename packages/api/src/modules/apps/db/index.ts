@@ -14,4 +14,4 @@ export {
   type EmployeeAppAccount,
 } from "./appAccountRepository";
 export { accountChanges } from "./accountChangesTable";
-export { accountChangeRepository } from "./accountChangeRepository";
+export { ACCOUNT_CHANGE_SORT_VALUES, accountChangeRepository } from "./accountChangeRepository";

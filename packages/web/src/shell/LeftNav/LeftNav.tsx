@@ -1,5 +1,5 @@
 import { useQuery } from "@apollo/client/react";
-import { CaretLeft, SquaresFour, Users } from "@phosphor-icons/react";
+import { CaretLeft, Pulse, SquaresFour, Users } from "@phosphor-icons/react";
 import { Link, useRouteContext } from "@tanstack/react-router";
 
 import { NavCountsDocument } from "@/__generated__/graphql";
@@ -35,7 +35,7 @@ export function LeftNav() {
       >
         {/* `inert` keeps Tab and screen readers out of the menu slid off screen. */}
         <div inert={inSettings} className={cn(menuClass, inSettings && "max-md:hidden")}>
-          <div className="min-w-0 flex-1 md:flex-none md:pt-1 md:pb-4">
+          <div className="min-w-0 flex-1 max-md:shrink-0 max-md:basis-auto md:flex-none md:pt-1 md:pb-4">
             <WorkspaceMenu />
           </div>
           <NavList label={t("nav.label")} items={appItems} />
@@ -61,8 +61,8 @@ export function LeftNav() {
 }
 
 /**
- * The app's pages; for admins, Applications shows how many apps await their decision, and People
- * how many people are suspended with access.
+ * The app's pages, with Applications and Activity for admins only; Applications shows how many
+ * apps await their decision, and People how many people are suspended with access.
  */
 function useAppItems(): NavItem[] {
   const { me } = useRouteContext({ from: "/_authenticated" });
@@ -77,6 +77,7 @@ function useAppItems(): NavItem[] {
     icon: SquaresFour,
     badge: discovered > 0 ? discovered : undefined,
   };
+  const activity: NavItem = { to: "/activity", label: t("nav.activity"), icon: Pulse };
   return [
     ...(canManage ? [applications] : []),
     {
@@ -86,6 +87,7 @@ function useAppItems(): NavItem[] {
       badge: suspendedWithAccess > 0 ? suspendedWithAccess : undefined,
       badgeTone: "warning",
     },
+    ...(canManage ? [activity] : []),
   ];
 }
 

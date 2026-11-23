@@ -9,7 +9,7 @@ A manual check of the left menu, the workspace menu, Settings and the profile me
 
 ## App menu
 
-- [ ] The left menu shows the workspace menu at the top, "Applications" and "People", and the profile button at the bottom; while apps are discovered, Applications shows their number, and while people are suspended with access, People shows theirs in amber.
+- [ ] The left menu shows the workspace menu at the top, "Applications", "People" and "Activity", and the profile button at the bottom; while apps are discovered, Applications shows their number, and while people are suspended with access, People shows theirs in amber.
 - [ ] The open page's item is highlighted, and only that one.
 - [ ] The workspace menu shows the organisation's initial and name ("A", "Acme") and opens with them, then "Settings".
 
@@ -28,4 +28,4 @@ A manual check of the left menu, the workspace menu, Settings and the profile me
 
 ## Narrow screens
 
-- [ ] At 390 px wide, the menu sits above the page in one row with the profile button as an avatar only; Settings swaps the row to "Back to the app", "Connections" and "Email".
+- [ ] At 390 px wide, the menu sits above the page in one row, which scrolls sideways when its items do not fit, with the workspace menu whole and the profile button as an avatar only; Settings swaps the row to "Back to the app", "Connections" and "Email".

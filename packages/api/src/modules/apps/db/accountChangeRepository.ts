@@ -1,7 +1,18 @@
 import { and, count, desc, eq, gte, lt, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { z } from "zod";
 
-import { anyOf, type Orm, ormOf, type Tx } from "../../../core/db";
+import { user } from "../../../core/auth";
+import {
+  afterKeyset,
+  anyOf,
+  keysetOrder,
+  type Orm,
+  orderByKeyset,
+  ormOf,
+  type Tx,
+} from "../../../core/db";
+import type { KeysetQuery, KeysetRow } from "../../../core/pagination";
 import type { AccountChange } from "../domain";
 import { accountChanges, type StoredAttempt } from "./accountChangesTable";
 
@@ -31,7 +42,25 @@ export interface AccountChangeRepository {
   findLatestOfAccounts(appAccountIds: readonly string[]): Promise<AccountChange[]>;
   /** For each change of `changeIds`, how many running changes of its connection were asked before it. */
   countChangesAhead(changeIds: readonly string[]): Promise<Map<string, number>>;
+  /** Up to `limit` changes after the one with sort values `after`, newest first. */
+  findPage(query: AccountChangePageQuery): Promise<KeysetRow<AccountChange, unknown[]>[]>;
+  /** The names of these users, by id; an unknown id is left out. */
+  findUserNames(userIds: readonly string[]): Promise<Map<string, string>>;
 }
+
+/** The changes' one order, newest first: its sort values are when it was asked and the id. */
+export const ACCOUNT_CHANGE_SORT_VALUES: Record<"REQUESTED_AT", z.ZodType<unknown[]>> = {
+  REQUESTED_AT: z.tuple([
+    // Postgres has no year 0, so a cursor with it is no cursor this API issued.
+    z.iso.datetime().refine((at) => !at.startsWith("0000")),
+    z.uuid(),
+  ]),
+};
+
+export type AccountChangePageQuery = KeysetQuery<
+  keyof typeof ACCOUNT_CHANGE_SORT_VALUES,
+  unknown[]
+>;
 
 export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
   const orm = () => ormOf(db);
@@ -116,8 +145,33 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .groupBy(accountChanges.id);
       return new Map(rows.map(({ id, ahead: changesAhead }) => [id, changesAhead]));
     },
+    findPage: async ({ after, limit }) => {
+      const rows = await orm()
+        .select()
+        .from(accountChanges)
+        .where(after ? afterKeyset(PAGE_ORDER, after) : undefined)
+        .orderBy(...orderByKeyset(PAGE_ORDER))
+        .limit(limit);
+      return rows.map((row) => ({
+        node: toChange(row),
+        values: [row.requestedAt.toISOString(), row.id],
+      }));
+    },
+    findUserNames: async (userIds) => {
+      const rows = await orm()
+        .select({ id: user.id, name: user.name })
+        .from(user)
+        .where(anyOf(user.id, userIds));
+      return new Map(rows.map(({ id, name }) => [id, name]));
+    },
   };
 }
+
+const PAGE_ORDER = keysetOrder(
+  [{ expression: sql`${accountChanges.requestedAt}`, descending: true }],
+  sql`${accountChanges.id}`,
+  true,
+);
 
 function toChange(row: typeof accountChanges.$inferSelect): AccountChange {
   return {

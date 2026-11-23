@@ -7,7 +7,9 @@ import { PrincipalSecurityContext, type SecurityContext } from "../../src/core/s
 import { employeeDirectory, type Employee } from "../../src/modules/employees";
 import { employeeRepository } from "../../src/modules/employees/db";
 import {
+  accountChanges,
   appAccountRepository,
+  appConnectionRepository,
   appRepository,
   type App,
   type AppAccountRepository,
@@ -18,6 +20,7 @@ import { testTransactor } from "./testTransactor";
 
 type SeedEmployee = Partial<Omit<Employee, "id" | "createdAt">>;
 type SeedAppAccount = Parameters<AppAccountRepository["insertMany"]>[0][number];
+type SeedAccountChange = typeof accountChanges.$inferInsert;
 
 /**
  * Creates test data by inserting through each module's repository, skipping use
@@ -132,6 +135,43 @@ export class TestSeed {
       { appId, email, employeeId, status, foundVia, grantedAt, grantedBefore, firstSeenAt },
     ]);
     return account!;
+  }
+
+  async appConnection({ appId, connector }: { appId: string; connector: string }) {
+    const connections = appConnectionRepository(this.orm);
+    const id = await connections.newId();
+    return connections.insert({
+      id,
+      appId,
+      connector,
+      settings: {},
+      encryptedSecrets: TEST_SECRET_BOX.encrypt("{}", id),
+    });
+  }
+
+  async accountChange({
+    email = `account${++this.#count}@example.com`,
+    sourceKey = email,
+    status = "succeeded",
+    requestedAt,
+    finishedAt = status === "running" ? null : requestedAt,
+    ...fields
+  }: Pick<SeedAccountChange, "appId" | "connectionId" | "requestedBy" | "requestedAt"> &
+    Partial<SeedAccountChange>) {
+    const [change] = await this.orm
+      .insert(accountChanges)
+      .values({
+        action: "suspend",
+        attempts: [],
+        ...fields,
+        email,
+        sourceKey,
+        status,
+        requestedAt,
+        finishedAt,
+      })
+      .returning();
+    return change!;
   }
 
   #newEmployee() {
