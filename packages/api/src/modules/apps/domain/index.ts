@@ -24,6 +24,7 @@ export {
   type AppAccount,
   countSuspendedWithAccess,
   type FoundAccount,
+  type InAppFacts,
   planAccountSync,
 } from "./appAccount";
 export { type AccountDates, accountSince, appSince, type Since } from "./since";

@@ -1,6 +1,9 @@
 import type { Orm, Tx } from "../../../core/db";
 
-/** What account changes read from the imports module: the members connections' scans saw. */
+/**
+ * What the apps module reads from the imports module: the members connections' scans saw, and which
+ * connections have finished a scan.
+ */
 export interface ConnectionMembers {
   /**
    * The members with one of `emails` that the last saved scan of one of `connectionIds` saw. Trusted
@@ -10,6 +13,8 @@ export interface ConnectionMembers {
     db: Orm | Tx,
     members: { connectionIds: readonly string[]; emails: readonly string[] },
   ): Promise<ConnectionMember[]>;
+  /** The connections whose source has finished a scan. Trusted read: no `ctx`. */
+  findScannedConnectionIds(db: Orm | Tx): Promise<string[]>;
 }
 
 /** A member of a connected app as its connection's last scan saw it. */

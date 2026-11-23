@@ -1,4 +1,4 @@
-import { count, eq, sql } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -12,7 +12,8 @@ import {
   type Tx,
 } from "../../../core/db";
 import type { KeysetQuery, KeysetRow } from "../../../core/pagination";
-import { APP_STATUSES, type AppStatus, type NewApp } from "../domain";
+import { APP_STATUSES, type AppStatus, type NewApp, type InAppFacts } from "../domain";
+import { isAccess } from "./appAccountRepository";
 import { appAccounts } from "./appAccountsTable";
 import { apps } from "./appsTable";
 
@@ -56,6 +57,8 @@ export const APP_SORT_VALUES: Record<"PEOPLE", z.ZodType<unknown[]>> = {
 
 export interface AppPageQuery extends KeysetQuery<keyof typeof APP_SORT_VALUES, unknown[]> {
   status: AppStatus;
+  /** Which accounts are in their app, so count. */
+  inAppFacts: InAppFacts;
 }
 
 export function appRepository(db: Orm | Tx): AppRepository {
@@ -78,11 +81,11 @@ export function appRepository(db: Orm | Tx): AppRepository {
         .set({ externalIds: [...externalIds] })
         .where(eq(apps.id, id));
     },
-    findPage: async ({ status, after, limit }) => {
+    findPage: async ({ status, inAppFacts, after, limit }) => {
       const rows = await orm()
         .select({ app: apps, people: PEOPLE, name: LOWERCASE_NAME })
         .from(apps)
-        .leftJoin(appAccounts, eq(appAccounts.appId, apps.id))
+        .leftJoin(appAccounts, and(eq(appAccounts.appId, apps.id), isAccess(inAppFacts)))
         .where(eq(apps.status, status))
         .groupBy(apps.id)
         .having(after ? afterKeyset(PAGE_ORDER, after) : undefined)
@@ -121,7 +124,7 @@ export function appRepository(db: Orm | Tx): AppRepository {
   };
 }
 
-/** An app's people: its accounts with an employee. */
+/** An app's people: the joined accounts with an employee, which are access. */
 const PEOPLE = count(appAccounts.employeeId);
 
 const LOWERCASE_NAME = sql<string>`lower(${apps.name})`;

@@ -2,6 +2,8 @@ import {
   apps,
   approvedGoogleSetup,
   employeeServices,
+  googleScanWithLinearGrant,
+  scannedLinear,
   EMPLOYEE,
   expect,
   OWNER,
@@ -32,6 +34,19 @@ test("excludes a suspended employee whose only other accounts are in ignored app
   const counts = await employeeServices(orm).countEmployees(OWNER);
 
   expect(counts).toEqual({ all: 42, suspendedWithAccess: 1 });
+});
+
+test("excludes a suspended employee whose only approved access is a Google-only Linear account", async ({
+  orm,
+  fakeGoogle,
+  fakeConnectors,
+}) => {
+  await googleScanWithLinearGrant(orm, fakeGoogle.url, "ben@acme.example");
+  await scannedLinear(orm, fakeConnectors.url);
+
+  const counts = await employeeServices(orm).countEmployees(OWNER);
+
+  expect(counts.suspendedWithAccess).toBe(1);
 });
 
 test("refuses to count employees without MANAGE_WORKSPACE", async ({ orm }) => {

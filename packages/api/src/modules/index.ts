@@ -54,7 +54,12 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     settings.connectorsUrl,
   );
   const connectedApps = createAppConnectionService(core);
-  const apps = createAppService({ ...core, connectors: directoryConnectors });
+  const importRecords = createImportRecordService();
+  const apps = createAppService({
+    ...core,
+    connectors: directoryConnectors,
+    members: importRecords,
+  });
   // One scan service for the job, the page and the connect flows, which share its progress.
   const scans = createScanService({
     ...core,
@@ -89,9 +94,10 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       ...createAppUserService({
         ...core,
         connectors: directoryConnectors,
+        members: importRecords,
         employees: createEmployeeReadService({ ...core, accounts: apps }),
       }),
-      ...createAccountChangeService({ ...core, connectors, members: createImportRecordService() }),
+      ...createAccountChangeService({ ...core, connectors, members: importRecords }),
     }),
     extensionModule({ ...core, appSessions: containerConnections }),
   ];

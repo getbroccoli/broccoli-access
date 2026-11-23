@@ -26,12 +26,13 @@ import {
   planAppMatches,
   type Since,
 } from "../domain";
-
+import type { ConnectionMembers } from "../ports";
 import {
   type DirectoryConnectors,
   findDirectoryAppId,
   findEmployeesSuspendedInDirectory,
 } from "./directory";
+import { findInAppFacts } from "./inAppFacts";
 
 const recordHistory = createRecordHistoryService();
 const setupSteps = createSetupStepService();
@@ -87,8 +88,8 @@ export interface AppService {
   /** The employees whose account in the directory's app is suspended. Trusted read: no `ctx`. */
   findEmployeesSuspendedInDirectory: (db: Orm | Tx) => Promise<string[]>;
   /**
-   * Every account that belongs to an employee, with its app's name and status, whether the app is
-   * the directory's, how it was found and since when. Trusted read: no `ctx`.
+   * Every account that belongs to an employee and is in its app, with its app's name and status,
+   * whether the app is the directory's, how it was found and since when. Trusted read: no `ctx`.
    */
   findEmployeeAccounts: (db: Orm | Tx) => Promise<EmployeeAccountInApp[]>;
 }
@@ -103,7 +104,7 @@ export interface EmployeeAccountInApp extends Omit<
   since: Since;
 }
 
-/** An app with what the app list shows of it, computed from its users' accounts. */
+/** An app with what the app list shows of it, computed from its users' accounts that are in it. */
 export interface AppSummary extends App {
   /** How many people have an account in it. */
   peopleCount: number;
@@ -122,8 +123,10 @@ interface AppDependencies {
   orm: Orm;
   transact: Transact;
   logger: Logger;
-  /** The connectors the scans read; the one whose `isDirectory` is set names the directory. */
+  /** The core's own connectors; the one whose `isDirectory` is set names the directory. */
   connectors: DirectoryConnectors;
+  /** The imports module, which knows which connections have finished a scan. */
+  members: ConnectionMembers;
 }
 
 export function createAppService(dependencies: AppDependencies): AppService {
@@ -142,10 +145,11 @@ export function createAppService(dependencies: AppDependencies): AppService {
     },
     async listApps(ctx, { status, ...pageArgs }) {
       ctx.require("MANAGE_WORKSPACE");
+      const inAppFacts = await findInAppFacts(orm, dependencies);
       const page = await paginate(pageArgs, {
         order: { field: "PEOPLE", direction: "DESC" },
         keysetValues: APP_SORT_VALUES,
-        fetch: (query) => appRepository(orm).findPage({ ...query, status }),
+        fetch: (query) => appRepository(orm).findPage({ ...query, status, inAppFacts }),
       });
       const summaries = await summarize(
         dependencies,
@@ -187,8 +191,9 @@ export function createAppService(dependencies: AppDependencies): AppService {
     directoryAppId: (db) => findDirectoryAppId(db, connectors),
     findEmployeesSuspendedInDirectory: (db) => findEmployeesSuspendedInDirectory(db, connectors),
     async findEmployeeAccounts(db) {
+      const inAppFacts = await findInAppFacts(db, dependencies);
       const [accounts, directoryAppId] = await Promise.all([
-        appAccountRepository(db).findEmployeeAccounts(),
+        appAccountRepository(db).findEmployeeAccounts(inAppFacts),
         findDirectoryAppId(db, connectors),
       ]);
       return accounts.map(({ appId, grantedAt, grantedBefore, firstSeenAt, ...account }) => ({
@@ -271,18 +276,21 @@ async function settleDiscoveredApps(
  * keeps access though suspended, and whether they are connected.
  */
 async function summarize(
-  { orm, connectors }: Pick<AppDependencies, "orm" | "connectors">,
+  dependencies: Pick<AppDependencies, "orm" | "connectors" | "members">,
   apps: readonly App[],
 ): Promise<AppSummary[]> {
+  const { orm, connectors } = dependencies;
   const accounts = appAccountRepository(orm);
   const appIds = apps.map(({ id }) => id);
-  const [users, directoryPeople, connections, suspended] = await Promise.all([
-    accounts.findUsersOfApps(appIds),
+  const inAppFacts = await findInAppFacts(orm, dependencies);
+  const [accountsOfUsers, directoryPeople, connections, suspended] = await Promise.all([
+    accounts.findUsersOfApps(appIds, inAppFacts),
     // Every employee holds a directory account, so they are the directory's people.
     accounts.countEmployeesWithAccounts(),
     appConnectionRepository(orm).findByApps(appIds),
     findEmployeesSuspendedInDirectory(orm, connectors),
   ]);
+  const users = accountsOfUsers.filter(({ inApp }) => inApp !== false);
   const usersByApp = Map.groupBy(users, ({ appId }) => appId);
   const connectedAppIds = new Set(connections.map(({ appId }) => appId));
   const suspendedInDirectory = new Set(suspended);

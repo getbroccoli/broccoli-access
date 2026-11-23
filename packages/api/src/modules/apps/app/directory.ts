@@ -2,8 +2,14 @@ import type { Connector } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import { appAccountRepository, appConnectionRepository } from "../db";
 
-/** The connectors the scans read; the one whose `isDirectory` is set names the directory. */
-export type DirectoryConnectors = readonly Pick<Connector, "key" | "isDirectory">[];
+/**
+ * The core's own connectors: the one whose `isDirectory` is set names the directory, and only they
+ * find accounts in other apps.
+ */
+export type DirectoryConnectors = readonly Pick<
+  Connector,
+  "key" | "isDirectory" | "findingKinds"
+>[];
 
 /** The app of the connection whose connector is the directory; null before it is connected. */
 export async function findDirectoryAppId(

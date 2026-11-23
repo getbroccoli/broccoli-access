@@ -1,4 +1,15 @@
-import { expect, test, OWNER, EMPLOYEE, SYSTEM, apps, googleScanSetup } from "#test/support";
+import {
+  expect,
+  test,
+  OWNER,
+  EMPLOYEE,
+  SYSTEM,
+  apps,
+  googleScanSetup,
+  googleScanWithLinearGrant,
+  scannedLinear,
+  storedApps,
+} from "#test/support";
 
 test("shows how many suspended people still have access to each approved app", async ({
   orm,
@@ -23,6 +34,26 @@ test("shows how many suspended people still have access to each approved app", a
     { name: "Miro", peopleCount: 12, suspendedWithAccessCount: 0, connected: false },
     { name: "Loom", peopleCount: 11, suspendedWithAccessCount: 0, connected: false },
     { name: "Claude", peopleCount: 9, suspendedWithAccessCount: 0, connected: false },
+  ]);
+});
+
+test("orders approved apps by the people their scans found", async ({
+  orm,
+  fakeGoogle,
+  fakeConnectors,
+}) => {
+  await googleScanWithLinearGrant(orm, fakeGoogle.url, "ben@acme.example");
+  await scannedLinear(orm, fakeConnectors.url);
+  const service = apps(orm);
+  const chatGpt = (await storedApps(orm)).find(({ name }) => name === "ChatGPT")!;
+  await service.approveApp(OWNER, chatGpt.id);
+
+  const { edges } = await service.listApps(OWNER, { status: "approved" });
+
+  expect(edges.map(({ node }) => node)).toMatchObject([
+    { name: "Google Workspace", peopleCount: 42 },
+    { name: "ChatGPT", peopleCount: 7 },
+    { name: "Linear", peopleCount: 7 },
   ]);
 });
 

@@ -6,7 +6,11 @@ import {
   SYSTEM,
   apps,
   appUsers,
+  connectLinear,
   googleScanSetup,
+  googleScanWithLinearGrant,
+  scannedLinear,
+  serveAccountList,
   storedAppAccounts,
 } from "#test/support";
 
@@ -22,6 +26,76 @@ test("reads Figma with sixteen people and one suspended person who still has acc
 
   expect(app).toEqual(figma);
   expect(app).toMatchObject({ name: "Figma", peopleCount: 16, suspendedWithAccessCount: 1 });
+});
+
+test("counts only the people Linear lists after its first scan", async ({
+  orm,
+  fakeGoogle,
+  fakeConnectors,
+}) => {
+  await googleScanWithLinearGrant(orm, fakeGoogle.url, "ben@acme.example");
+  const linear = await scannedLinear(orm, fakeConnectors.url);
+
+  const app = await apps(orm).readApp(OWNER, linear.appId);
+
+  expect(app).toMatchObject({
+    peopleCount: 7,
+    suspendedWithAccessCount: 1,
+    foundVia: ["linear_members"],
+    since: { at: linear.account("ana@acme.example").firstSeenAt, before: false },
+  });
+});
+
+test("lists Linear members first and the suspended person found only by Google last", async ({
+  orm,
+  fakeGoogle,
+  fakeConnectors,
+}) => {
+  await googleScanWithLinearGrant(orm, fakeGoogle.url, "ben@acme.example");
+  const linear = await scannedLinear(orm, fakeConnectors.url);
+
+  const users = await appUsers(orm).readUsersOfApps(OWNER, [linear.appId]);
+
+  expect(users).toMatchObject([
+    ...["ana", "chloe", "david", "gabriel", "hannah", "jun", "admin"].map((name) => ({
+      email: `${name}@acme.example`,
+      inApp: true,
+    })),
+    { email: "ben@acme.example", inApp: false },
+  ]);
+});
+
+test("counts a Google sign-in while Linear's first scan is pending", async ({
+  orm,
+  fakeGoogle,
+  fakeConnectors,
+}) => {
+  await googleScanWithLinearGrant(orm, fakeGoogle.url, "ben@acme.example");
+  const linear = await connectLinear(orm, fakeConnectors.url);
+
+  const app = await apps(orm).readApp(OWNER, linear.appId);
+  const users = await appUsers(orm).readUsersOfApps(OWNER, [linear.appId]);
+
+  expect(app).toMatchObject({ peopleCount: 1, suspendedWithAccessCount: 1 });
+  expect(users).toMatchObject([{ email: "ben@acme.example", inApp: null }]);
+});
+
+test("excludes a Google-only account from access after Linear's first scan finds no members", async ({
+  orm,
+  fakeGoogle,
+  fakeConnectors,
+}) => {
+  await googleScanWithLinearGrant(orm, fakeGoogle.url, "ben@acme.example");
+  const server = await serveAccountList(fakeConnectors.url, (_request, response) => {
+    response.json({ accounts: [], nextCursor: null });
+  });
+  const linear = await scannedLinear(orm, server.url);
+
+  const app = await apps(orm).readApp(OWNER, linear.appId);
+  const users = await appUsers(orm).readUsersOfApps(OWNER, [linear.appId]);
+
+  expect(app).toMatchObject({ peopleCount: 0, suspendedWithAccessCount: 0 });
+  expect(users).toMatchObject([{ email: "ben@acme.example", inApp: false }]);
 });
 
 test("shows Ana's suspended directory status and access from before the sign-in log", async ({

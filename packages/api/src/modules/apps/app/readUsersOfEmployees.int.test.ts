@@ -2,6 +2,8 @@ import {
   appUsers,
   approvedGoogleSetup,
   connectLinear,
+  googleScanWithLinearGrant,
+  scannedLinear,
   EMPLOYEE,
   expect,
   OWNER,
@@ -31,6 +33,21 @@ test("lists active approved accounts and suspended connected accounts by app nam
   const users = await appUsers(orm).readUsersOfEmployees(OWNER, [employee.id]);
 
   expect(users.map((user) => user.id)).toEqual([figma.id, disabled.id, slack.id]);
+});
+
+test("omits a person's Google-only Linear account after Linear's first scan", async ({
+  orm,
+  fakeGoogle,
+  fakeConnectors,
+}) => {
+  await googleScanWithLinearGrant(orm, fakeGoogle.url, "ben@acme.example");
+  const linear = await scannedLinear(orm, fakeConnectors.url);
+  const ben = linear.account("ben@acme.example");
+  const ana = linear.account("ana@acme.example");
+
+  const users = await appUsers(orm).readUsersOfEmployees(OWNER, [ben.employeeId!, ana.employeeId!]);
+
+  expect(users.map(({ id }) => id)).toEqual([ana.id]);
 });
 
 test("refuses to list an employee's accounts without MANAGE_WORKSPACE", async ({ orm, seed }) => {

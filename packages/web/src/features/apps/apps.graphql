@@ -17,9 +17,10 @@ query AppsPage($status: AppStatus!, $first: Int!, $approved: Boolean!) {
         status
         connected
         peopleCount
-        # The avatars a row shows before "+N".
+        # The avatars a row shows before "+N"; accounts not in the app come last.
         users(first: 4) {
           id
+          inApp
           employee {
             id
             firstName

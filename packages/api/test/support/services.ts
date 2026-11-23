@@ -23,7 +23,11 @@ import {
   createExtensionPairingService,
   type ExtensionPairingService,
 } from "../../src/modules/extension";
-import { createScanService, type ScanService } from "../../src/modules/imports";
+import {
+  createImportRecordService,
+  createScanService,
+  type ScanService,
+} from "../../src/modules/imports";
 import {
   createGoogleConnectionService,
   createGoogleSignInService,
@@ -113,6 +117,7 @@ export function apps(orm: Orm, transact: Transact = testTransactor(orm)): AppSer
     transact,
     logger: createLogger("silent"),
     connectors: GOOGLE_DIRECTORY,
+    members: createImportRecordService(),
   });
 }
 
@@ -121,6 +126,7 @@ export function appUsers(orm: Orm): AppUserService {
   return createAppUserService({
     orm,
     connectors: GOOGLE_DIRECTORY,
+    members: createImportRecordService(),
     employees: createEmployeeReadService({ orm, accounts: apps(orm) }),
   });
 }
@@ -164,5 +170,10 @@ export function scans(
   });
 }
 
-/** The Google Workspace connector as app reads see it: only its key and directory flag. */
-const GOOGLE_DIRECTORY = [{ key: "google_workspace", isDirectory: true }];
+/** The Google Workspace connector as app reads see it, with no Google to call. */
+const GOOGLE_DIRECTORY = [
+  createGoogleWorkspaceConnector({
+    openIdConfigurationUrl: "http://127.0.0.1:9/.well-known/openid-configuration",
+    adminApiUrl: "http://127.0.0.1:9",
+  }),
+];

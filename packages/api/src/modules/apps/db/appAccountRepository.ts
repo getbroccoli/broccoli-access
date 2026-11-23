@@ -1,7 +1,7 @@
-import { and, arrayContains, countDistinct, eq, isNotNull, or, sql } from "drizzle-orm";
+import { and, arrayContains, countDistinct, eq, isNotNull, or, type SQL, sql } from "drizzle-orm";
 
 import { anyOf, insertBatches, type Orm, ormOf, type Tx } from "../../../core/db";
-import type { AppAccount, AppStatus } from "../domain";
+import type { AppAccount, AppStatus, InAppFacts } from "../domain";
 import { appAccounts } from "./appAccountsTable";
 import { appConnections } from "./appConnectionsTable";
 import { apps } from "./appsTable";
@@ -26,19 +26,25 @@ export interface AppAccountRepository {
   countPeople(appId: string): Promise<{ people: number; suspended: number }>;
   /** How many apps hold an account `findingKind` saw. */
   countAppsFoundVia(findingKind: string): Promise<number>;
-  /** The accounts with an employee in `appIds`: the apps' users. */
-  findUsersOfApps(appIds: readonly string[]): Promise<AppUserAccount[]>;
+  /** The accounts with an employee in `appIds`, each in its app or not as `facts` say. */
+  findUsersOfApps(appIds: readonly string[], facts: InAppFacts): Promise<AppUserAccount[]>;
   /**
-   * The employees' accounts in approved apps: the active ones, and the suspended ones in apps with
-   * a connection; by app name.
+   * The employees' accounts in approved apps that are access as `facts` say: the active ones, and
+   * the suspended ones in apps with a connection; by app name.
    */
-  findCurrentAccountsOfEmployees(employeeIds: readonly string[]): Promise<AppUserAccount[]>;
+  findCurrentAccountsOfEmployees(
+    employeeIds: readonly string[],
+    facts: InAppFacts,
+  ): Promise<AppUserAccount[]>;
   /** How many employees hold an account in any app. */
   countEmployeesWithAccounts(): Promise<number>;
   /** The employees whose account in the app is suspended. */
   findSuspendedEmployeeIds(appId: string): Promise<string[]>;
-  /** Every account with an employee, with its app's name and status and its dates. */
-  findEmployeeAccounts(): Promise<EmployeeAppAccount[]>;
+  /**
+   * Every account with an employee that is access as `facts` say, with its app's name and status
+   * and its dates.
+   */
+  findEmployeeAccounts(facts: InAppFacts): Promise<EmployeeAppAccount[]>;
 }
 
 /** What the app list and an app's page read of a user's account. */
@@ -47,6 +53,8 @@ export interface AppUserAccount extends Pick<
   "id" | "appId" | "email" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
 > {
   employeeId: string;
+  /** Whether it is in its app; null where its app's connection has not finished a scan (see `inApp`). */
+  inApp: boolean | null;
 }
 
 /** An employee's account with its app's name and status, as People and a person's page read it. */
@@ -114,14 +122,14 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .where(arrayContains(appAccounts.foundVia, [findingKind]));
       return row!.apps;
     },
-    findUsersOfApps: (appIds) =>
+    findUsersOfApps: (appIds, facts) =>
       orm()
-        .select(userColumns)
+        .select(userColumns(facts))
         .from(appAccounts)
         .where(and(anyOf(appAccounts.appId, appIds), isNotNull(appAccounts.employeeId))),
-    findCurrentAccountsOfEmployees: (employeeIds) =>
+    findCurrentAccountsOfEmployees: (employeeIds, facts) =>
       orm()
-        .select(userColumns)
+        .select(userColumns(facts))
         .from(appAccounts)
         .innerJoin(apps, eq(apps.id, appAccounts.appId))
         .leftJoin(appConnections, eq(appConnections.appId, appAccounts.appId))
@@ -130,6 +138,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
             anyOf(appAccounts.employeeId, employeeIds),
             eq(apps.status, "approved"),
             or(eq(appAccounts.status, "active"), isNotNull(appConnections.id)),
+            isAccess(facts),
           ),
         )
         .orderBy(apps.name, appAccounts.id),
@@ -152,7 +161,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         );
       return rows.map(({ employeeId }) => employeeId!);
     },
-    findEmployeeAccounts: () =>
+    findEmployeeAccounts: (facts) =>
       orm()
         .select({
           employeeId: sql<string>`${appAccounts.employeeId}`,
@@ -168,8 +177,24 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         })
         .from(appAccounts)
         .innerJoin(apps, eq(apps.id, appAccounts.appId))
-        .where(isNotNull(appAccounts.employeeId)),
+        .where(and(isNotNull(appAccounts.employeeId), isAccess(facts))),
   };
+}
+
+/** Whether the account is access: an account not in its app is not. */
+export function isAccess(facts: InAppFacts): SQL {
+  return sql`(${inApp(facts)}) is not false`;
+}
+
+/**
+ * Whether the account is in its app: in an app whose connection has finished a scan, whether a kind
+ * other than the other-app ones found it; null elsewhere, where every account counts.
+ */
+function inApp({ scannedAppIds, otherAppKinds }: InAppFacts): SQL<boolean | null> {
+  // The builder has no CASE, and its array operators refuse an empty list.
+  return sql<
+    boolean | null
+  >`case when ${anyOf(appAccounts.appId, scannedAppIds)} then not (${appAccounts.foundVia} <@ ${sql.param([...otherAppKinds])}::text[]) end`;
 }
 
 const columns = {
@@ -184,15 +209,18 @@ const columns = {
   firstSeenAt: appAccounts.firstSeenAt,
 };
 
-const userColumns = {
-  id: appAccounts.id,
-  appId: appAccounts.appId,
-  email: appAccounts.email,
-  // Never null: the queries keep only accounts with an employee.
-  employeeId: sql<string>`${appAccounts.employeeId}`,
-  status: appAccounts.status,
-  foundVia: appAccounts.foundVia,
-  grantedAt: appAccounts.grantedAt,
-  grantedBefore: appAccounts.grantedBefore,
-  firstSeenAt: appAccounts.firstSeenAt,
-};
+function userColumns(facts: InAppFacts) {
+  return {
+    id: appAccounts.id,
+    appId: appAccounts.appId,
+    email: appAccounts.email,
+    // Never null: the queries keep only accounts with an employee.
+    employeeId: sql<string>`${appAccounts.employeeId}`,
+    status: appAccounts.status,
+    foundVia: appAccounts.foundVia,
+    grantedAt: appAccounts.grantedAt,
+    grantedBefore: appAccounts.grantedBefore,
+    firstSeenAt: appAccounts.firstSeenAt,
+    inApp: inApp(facts),
+  };
+}
