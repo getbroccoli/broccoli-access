@@ -15,7 +15,7 @@ docker compose up -d --wait
 
 Once it returns, open http://localhost:8080 and connect Google Workspace. More in the [setup guide](docs/guides/setup-guide.md).
 
-It runs two images from GitHub's container registry: `ghcr.io/getbroccoli/broccoli-access` and the connectors, `ghcr.io/getbroccoli/broccoli-access-connectors`. Every merge to `main` publishes both, tagged `latest` and `sha-<7-character commit>`.
+It runs two images from GitHub's container registry: `ghcr.io/getbroccoli/broccoli-access` and the connectors, `ghcr.io/getbroccoli/broccoli-access-connectors`. When a merge to `main` passes CI, CI publishes both for `linux/amd64` only, tagged `latest` and `sha-<7-character commit>`.
 
 - **Update:** `docker compose pull && docker compose up -d --wait`.
 - **Pin a version:** in `docker-compose.yml`, replace `latest` in an `image:` line with a `sha-` tag from that image's [package page](https://github.com/orgs/getbroccoli/packages), such as `ghcr.io/getbroccoli/broccoli-access:sha-1a2b3c4`. Pin both, so the app and its connectors change together.
