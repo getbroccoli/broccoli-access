@@ -314,6 +314,8 @@ async function call(url: string, path: string, body: object): Promise<unknown> {
   expect(response.status, `HTTP status of ${path}`).toBe(200);
   const answer: unknown = await response.json();
   expect(ANY_ANSWER.safeParse(answer).error, `answer of ${path}`).toBeUndefined();
+  // The suite never sends APP_CALLS_HEADER, so the app's calls must stay out of every answer.
+  expect(answer, `app calls in the answer of ${path}`).not.toHaveProperty("appCalls");
   if (isError(answer)) {
     expect(Object.keys(answer), `error answer of ${path}`).toEqual(["error"]);
     expect(CONNECTOR_ERROR_CODES, `error code of ${path}`).toContain(answer.error.code);
@@ -352,7 +354,9 @@ async function getManifest(url: string): Promise<unknown> {
     signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
   });
   expect(response.status, "HTTP status of the manifest").toBe(200);
-  return response.json();
+  const manifest: unknown = await response.json();
+  expect(manifest, "app calls in the manifest").not.toHaveProperty("appCalls");
+  return manifest;
 }
 
 /** Never follows a redirect: it would leave the container, and the contract answers with 200. */

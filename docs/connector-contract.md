@@ -202,7 +202,7 @@ A connector error answers with HTTP 200 and:
 { "error": { "code": "blocked_by_check", "screenshot": "<base64 PNG>" } }
 ```
 
-- **`screenshot`:** optional, robots only, at most 1 MB. It shows what the robot saw when it stopped, and the core keeps it for the owner. Errors never carry the app's raw answer.
+- **`screenshot`:** optional, robots only, at most 1 MB. It shows what the robot saw when it stopped, and the core keeps it for the owner. The `error` object never carries the app's raw answer; a debug answer carries the app's redacted replies beside it, in `appCalls` (see "Debug: the app's calls").
 - **The codes:**
   - `authentication_failed`: the key was revoked, or the session expired or was signed out. The core shows Reconnect.
   - `permission_missing`: the connected user is no longer an admin. The core shows Reconnect.
@@ -228,6 +228,36 @@ When no runtime is left, the action fails with the last error. The owner sees wh
 - **Connecting and scans:** follow the same order, and end with the error shown to the owner.
 - **The screenshot:** kept on the action, so the owner sees what the robot saw.
 
+## Debug: the app's calls
+
+To check a connector against the real app, a caller can ask for every call the connector made to the app.
+
+- **Request:** the header `x-debug: app-calls` on `connections/test`, `accounts/list` or `actions/run`. Only the connectors repository's harness sends it; the core never does.
+- **Answer:** the answer, or the connector error, may carry `appCalls`, in call order:
+
+  ```json
+  {
+    "error": { "code": "authentication_failed" },
+    "appCalls": [
+      {
+        "call": "POST /api/auth.test",
+        "sent": { "token": "[redacted]" },
+        "status": 200,
+        "reply": { "ok": false, "error": "invalid_auth" }
+      }
+    ]
+  }
+  ```
+
+  - `call`: the HTTP method and the app's path, without host or query;
+  - `sent`: the arguments sent, as an object; `null` when none;
+  - `status`: the HTTP status; `null` when the app never answered;
+  - `reply`: the app's reply, parsed JSON, else text; `null` when the app never answered or the connector did not read it.
+
+- **Redaction:** the container never puts request headers in `sent`, and redacts cookies, tokens and keys in `sent` and `reply`: by key name, and by every secret value of 16 characters or more in the connection or in what was sent, wherever it reappears.
+- **Emails and names:** `appCalls` may hold them, and whatever else the app answered, beside the `error` object, never in it. The logs stay as "Logs" says.
+- **Without the header:** no answer carries `appCalls`. A container without debug support, such as the core's fake connectors container, conforms by ignoring the header.
+
 ## Conformance
 
 - `packages/connector-contract` exports a schema for every request and answer, and a suite that runs against any container's address.
@@ -235,6 +265,7 @@ When no runtime is left, the action fails with the last error. The owner sees wh
 - **What it checks:**
   - every answer matches its schema;
   - every error uses a listed code;
+  - a request without the debug header gets no `appCalls`;
   - an action repeated twice changes the member once;
   - an action reports the status read afterwards;
   - a runtime the connector does not list is answered with HTTP 400;

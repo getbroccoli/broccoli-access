@@ -84,7 +84,7 @@ Each journey ends with the check that proves it works.
   - whether Slack accepts its own web methods from a server with the handed-over session;
   - whether the free plans let an admin deactivate a member in Slack and suspend one in Linear.
 
-  The fakes are fixed wherever the real apps differ.
+  Their runs of the connectors repository's real checks use `--verbose`, which asks the connectors container for every call it made to the app. An agent compares those calls with the same run against that repository's fake Slack and Linear, and the fakes are fixed wherever the real apps differ.
 
 ## Left out of circle 2
 

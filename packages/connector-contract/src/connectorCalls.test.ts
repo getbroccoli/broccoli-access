@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 
 import {
+  APP_CALL,
   APP_SESSION,
   CONNECTION_TEST_ANSWER,
   ACCOUNTS_LIST_ANSWER,
@@ -41,6 +42,44 @@ it("parses the documented action answer", () => {
 
 it("parses the documented error answer", () => {
   expect(CONNECTOR_ERROR_ANSWER.parse(errorAnswer)).toEqual(errorAnswer);
+});
+
+it.for([
+  { name: "connection test", schema: CONNECTION_TEST_ANSWER },
+  { name: "accounts list", schema: ACCOUNTS_LIST_ANSWER },
+  { name: "action run", schema: ACTION_RUN_ANSWER },
+  { name: "connector error", schema: CONNECTOR_ERROR_ANSWER },
+] as const)("keeps the app calls in the $name answer", ({ name, schema }) => {
+  const withCalls = { ...documentedAnswers[name], appCalls: [appCall] };
+
+  expect(schema.parse(withCalls)).toEqual(withCalls);
+});
+
+it.for([
+  { reason: "a string status", fields: { status: "200" } },
+  { reason: "an empty call", fields: { call: "" } },
+  { reason: "a query in the path", fields: { call: "POST /api/auth.test?token=x" } },
+  { reason: "a host in the path", fields: { call: "POST https://slack.com/api/auth.test" } },
+  { reason: "a scheme-relative path", fields: { call: "POST //slack.com/api/auth.test" } },
+  { reason: "a backslash in the path", fields: { call: "POST /\\slack.com/api" } },
+  { reason: "a string for sent arguments", fields: { sent: "token=x" } },
+  { reason: "an array for sent arguments", fields: { sent: ["token=x"] } },
+  { reason: "a status of 900", fields: { status: 900 } },
+  { reason: "a reply without an HTTP status", fields: { status: null, reply: { ok: true } } },
+])("rejects an app call with $reason", ({ fields }) => {
+  expect(APP_CALL.safeParse({ ...appCall, ...fields }).success).toBe(false);
+});
+
+it("accepts an app call with no arguments when the app never answered", () => {
+  const unanswered = { call: "GET /status", sent: null, status: null, reply: null };
+
+  expect(APP_CALL.parse(unanswered)).toEqual(unanswered);
+});
+
+it("accepts an HTTP status with a null reply when the body went unread", () => {
+  const unread = { ...appCall, status: 200, reply: null };
+
+  expect(APP_CALL.parse(unread)).toEqual(unread);
 });
 
 it("parses a first page request with the documented connection", () => {
@@ -145,3 +184,17 @@ const actionAnswer = {
 };
 
 const errorAnswer = { error: { code: "blocked_by_check", screenshot: "<base64 PNG>" } };
+
+const appCall = {
+  call: "POST /api/auth.test",
+  sent: { token: "[redacted]" },
+  status: 200,
+  reply: { ok: true },
+};
+
+const documentedAnswers = {
+  "connection test": connectionTest,
+  "accounts list": list,
+  "action run": actionAnswer,
+  "connector error": errorAnswer,
+};

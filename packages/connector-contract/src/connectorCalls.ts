@@ -29,6 +29,31 @@ export const ACCOUNT_ACTIONS = ["suspend", "reactivate"] as const;
  */
 const MAX_SCREENSHOT_LENGTH = Math.ceil((1024 * 1024) / 3) * 4;
 
+/**
+ * The header that asks a container for the calls it made to the app (contract "Debug: the app's
+ * calls"); only the connectors' own harness sends it, never the core.
+ */
+export const APP_CALLS_HEADER = { name: "x-debug", value: "app-calls" } as const;
+
+/** One call the connector made to the app, with cookies, tokens and keys redacted. */
+export const APP_CALL = z
+  .object({
+    /** The HTTP method and the app's path, without host or query, such as `POST /api/auth.test`. */
+    call: z.string().regex(/^[A-Z]+ \/(?!\/)[^\s?#\\]*$/),
+    /** The arguments sent; null when none. */
+    sent: z.record(z.string(), z.unknown()).nullable(),
+    /** Null when the app never answered. */
+    status: z.number().int().min(100).max(599).nullable(),
+    /** The app's reply, parsed JSON, else text; null when it never answered or went unread. */
+    reply: z.unknown(),
+  })
+  .refine(({ status, reply }) => status !== null || reply === null, {
+    message: "An app call the app never answered has no reply",
+  });
+
+/** Present only on an answer to a request with `APP_CALLS_HEADER`, in call order. */
+const APP_CALLS = z.array(APP_CALL).optional();
+
 /** Opaque JSON that only the connector reads. */
 const OPAQUE_OBJECT = z.record(z.string(), z.unknown());
 
@@ -83,6 +108,7 @@ export const CONNECTION_TEST_REQUEST = CALL;
 export const CONNECTION_TEST_ANSWER = z.object({
   details: z.object({ organizationName: z.string(), domain: z.string().nullable() }),
   connection: CONNECTION_UPDATE.optional(),
+  appCalls: APP_CALLS,
 });
 
 export const ACCOUNTS_LIST_REQUEST = CALL.extend({ cursor: z.string().nullable() });
@@ -98,6 +124,7 @@ export const ACCOUNTS_LIST_ANSWER = z.object({
   ),
   nextCursor: z.string().nullable(),
   connection: CONNECTION_UPDATE.optional(),
+  appCalls: APP_CALLS,
 });
 
 export const ACTION_RUN_REQUEST = CALL.extend({
@@ -110,6 +137,7 @@ export const ACTION_RUN_ANSWER = z.object({
   changed: z.boolean(),
   account: z.object({ sourceKey: z.string().min(1), values: ACCOUNT_VALUES }),
   connection: CONNECTION_UPDATE.optional(),
+  appCalls: APP_CALLS,
 });
 
 /** A connector error, answered with HTTP 200. */
@@ -119,8 +147,10 @@ export const CONNECTOR_ERROR_ANSWER = z.object({
     /** What a robot saw when it stopped, as a base64 PNG. */
     screenshot: z.string().max(MAX_SCREENSHOT_LENGTH).optional(),
   }),
+  appCalls: APP_CALLS,
 });
 
+export type AppCall = z.infer<typeof APP_CALL>;
 export type ConnectorCall = (typeof CONNECTOR_CALLS)[number];
 export type ConnectorErrorCode = (typeof CONNECTOR_ERROR_CODES)[number];
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
