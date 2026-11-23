@@ -202,7 +202,7 @@ A connector error answers with HTTP 200 and:
 { "error": { "code": "blocked_by_check", "screenshot": "<base64 PNG>" } }
 ```
 
-- **`screenshot`:** optional, robots only, at most 1 MB. It shows what the robot saw when it stopped, and the core keeps it for the owner. Errors never carry the app's raw answer, except in `appCalls` (see "Debug: the app's calls").
+- **`screenshot`:** optional, robots only, at most 1 MB. It shows what the robot saw when it stopped, and the core keeps it for the owner. The `error` object never carries the app's raw answer; a debug answer carries the app's redacted replies beside it, in `appCalls` (see "Debug: the app's calls").
 - **The codes:**
   - `authentication_failed`: the key was revoked, or the session expired or was signed out. The core shows Reconnect.
   - `permission_missing`: the connected user is no longer an admin. The core shows Reconnect.
@@ -255,7 +255,7 @@ To check a connector against the real app, a caller can ask for every call the c
   - `reply`: the app's reply, parsed JSON, else text; `null` when the app never answered or the connector did not read it.
 
 - **Redaction:** the container never puts request headers in `sent`, and redacts cookies, tokens and keys in `sent` and `reply`: by key name, and by every secret value of 16 characters or more in the connection or in what was sent, wherever it reappears.
-- **Emails and names:** `appCalls` may hold them, and whatever else the app answered, the one exception to "Errors never carry the app's raw answer". The logs stay as "Logs" says.
+- **Emails and names:** `appCalls` may hold them, and whatever else the app answered, beside the `error` object, never in it. The logs stay as "Logs" says.
 - **Without the header:** no answer carries `appCalls`. A container without debug support, such as the core's fake connectors container, conforms by ignoring the header.
 
 ## Conformance

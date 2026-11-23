@@ -60,9 +60,12 @@ it.for([
   { reason: "an empty call", fields: { call: "" } },
   { reason: "a query in the path", fields: { call: "POST /api/auth.test?token=x" } },
   { reason: "a host in the path", fields: { call: "POST https://slack.com/api/auth.test" } },
+  { reason: "a scheme-relative path", fields: { call: "POST //slack.com/api/auth.test" } },
+  { reason: "a backslash in the path", fields: { call: "POST /\\slack.com/api" } },
   { reason: "a string for sent arguments", fields: { sent: "token=x" } },
   { reason: "an array for sent arguments", fields: { sent: ["token=x"] } },
   { reason: "a status of 900", fields: { status: 900 } },
+  { reason: "a reply without an HTTP status", fields: { status: null, reply: { ok: true } } },
 ])("rejects an app call with $reason", ({ fields }) => {
   expect(APP_CALL.safeParse({ ...appCall, ...fields }).success).toBe(false);
 });
@@ -71,6 +74,12 @@ it("accepts an app call with no arguments when the app never answered", () => {
   const unanswered = { call: "GET /status", sent: null, status: null, reply: null };
 
   expect(APP_CALL.parse(unanswered)).toEqual(unanswered);
+});
+
+it("accepts an HTTP status with a null reply when the body went unread", () => {
+  const unread = { ...appCall, status: 200, reply: null };
+
+  expect(APP_CALL.parse(unread)).toEqual(unread);
 });
 
 it("parses a first page request with the documented connection", () => {

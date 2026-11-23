@@ -354,7 +354,9 @@ async function getManifest(url: string): Promise<unknown> {
     signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
   });
   expect(response.status, "HTTP status of the manifest").toBe(200);
-  return response.json();
+  const manifest: unknown = await response.json();
+  expect(manifest, "app calls in the manifest").not.toHaveProperty("appCalls");
+  return manifest;
 }
 
 /** Never follows a redirect: it would leave the container, and the contract answers with 200. */
