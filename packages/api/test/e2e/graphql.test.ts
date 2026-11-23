@@ -24,3 +24,17 @@ test("rejects introspection with a validation error", async ({ env }) => {
     "GRAPHQL_VALIDATION_FAILED",
   );
 });
+
+test("refuses a malformed body as invalid input without echoing it", async ({ env }) => {
+  const response = await fetch(new URL("/api/graphql", env.url), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: '{"query": "{ ping }", "variables": {"apiKey": "lin_api_pasted_secret',
+  });
+
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "body", code: "invalid" }],
+  });
+});

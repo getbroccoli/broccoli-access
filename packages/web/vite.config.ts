@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 5173,
       strictPort: true,
+      // As the API serves the built app: no site may frame it and trick the owner into a click.
+      headers: { "Content-Security-Policy": "frame-ancestors 'none'", "X-Frame-Options": "DENY" },
       proxy: {
         "/healthz": apiTarget,
         "/readyz": apiTarget,

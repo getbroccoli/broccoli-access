@@ -84,6 +84,7 @@
     "src/core/db": ["src/core/applicationError", "src/core/events", "src/core/logger"],
     "src/core/events": ["src/core/logger"],
     "src/core/pagination": ["src/core/applicationError"],
+    "src/core/answerFailedRequests": ["src/core/applicationError", "src/core/logger"],
     "src/core/health": ["src/core/readiness"],
     "src/core/logger": ["src/core/env"],
     "src/core/applicationError": [],

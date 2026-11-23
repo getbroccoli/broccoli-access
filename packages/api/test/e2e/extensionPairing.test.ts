@@ -98,4 +98,12 @@ test("returns INVALID_INPUT when a pairing request contains malformed JSON", asy
   expect(await response.json()).toMatchObject({ code: "INVALID_INPUT" });
 });
 
+test("refuses an app-session request whose connector has an invalid percent escape", async ({
+  env,
+}) => {
+  const response = await fetch(new URL("/api/extension/app-sessions/%E0%A4%A", env.url));
+
+  expect(response.status).toBe(400);
+});
+
 const MY_PAIRING = "{ me { extensionPairing { browser pairedAt } } }";

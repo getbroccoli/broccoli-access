@@ -1,12 +1,6 @@
-import express, { type NextFunction, type Request, type Response, Router } from "express";
+import express, { type Request, Router } from "express";
 import { z } from "zod";
 
-import {
-  ApplicationError,
-  invalidInput,
-  sendApplicationError,
-} from "../../../core/applicationError";
-import type { Logger } from "../../../core/logger";
 import type { ExtensionHandOverService, ExtensionPairingService } from "../app";
 
 /**
@@ -17,19 +11,13 @@ import type { ExtensionHandOverService, ExtensionPairingService } from "../app";
  * and hand it over.
  */
 // eslint-disable-next-line broccoli-access/max-lines-per-function -- a table of routes.
-export function extensionRouter(
-  {
-    pairings,
-    handOvers,
-  }: {
-    pairings: Pick<
-      ExtensionPairingService,
-      "redeemCode" | "readPairingOfToken" | "unpairWithToken"
-    >;
-    handOvers: ExtensionHandOverService;
-  },
-  logger: Logger,
-): Router {
+export function extensionRouter({
+  pairings,
+  handOvers,
+}: {
+  pairings: Pick<ExtensionPairingService, "redeemCode" | "readPairingOfToken" | "unpairWithToken">;
+  handOvers: ExtensionHandOverService;
+}): Router {
   return Router()
     .post(
       "/extension/pairings",
@@ -79,13 +67,6 @@ export function extensionRouter(
         });
         response.sendStatus(handedOver ? NO_CONTENT : UNAUTHORIZED);
       },
-    )
-    .use(
-      "/extension",
-      // Express tells an error handler by its four parameters, so `next` stays though unused.
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      (error: unknown, _request: Request, response: Response, _next: NextFunction) =>
-        sendFailure(error, response, logger),
     );
 }
 
@@ -94,10 +75,6 @@ const CREATED = 201;
 const NO_CONTENT = 204;
 
 const UNAUTHORIZED = 401;
-
-const PAYLOAD_TOO_LARGE = 413;
-
-const INTERNAL_SERVER_ERROR = 500;
 
 /** Far above a pairing code and a browser label. */
 const MAX_BODY_BYTES = "10kb";
@@ -123,36 +100,4 @@ const REDEMPTION = z
 function bearerTokenOf(request: Request): string {
   const [scheme, token] = (request.headers.authorization ?? "").split(" ");
   return scheme?.toLowerCase() === "bearer" && token ? token : "";
-}
-
-/**
- * Answers any failure of these routes, the JSON parser's included: an expected refusal or an
- * unreadable body as its status; anything else as a bare 500. Logs the class only, since a parser
- * or database message can quote the body or the token's hash (RULE31).
- */
-function sendFailure(error: unknown, response: Response, logger: Logger): void {
-  if (error instanceof ApplicationError) {
-    sendApplicationError(error, response);
-    return;
-  }
-  const parserFailure = bodyParserFailureOf(error);
-  if (parserFailure === "entity.parse.failed") {
-    sendApplicationError(invalidInput([{ field: "body", code: "invalid" }]), response);
-    return;
-  }
-  if (parserFailure === "entity.too.large") {
-    response.sendStatus(PAYLOAD_TOO_LARGE);
-    return;
-  }
-  logger.error(
-    { kind: error instanceof Error ? error.name : typeof error },
-    "Extension call failed",
-  );
-  response.sendStatus(INTERNAL_SERVER_ERROR);
-}
-
-/** The `type` Express's JSON parser gives its failures, such as `entity.parse.failed`. */
-function bodyParserFailureOf(error: unknown): string | undefined {
-  const { type } = (error ?? {}) as { type?: unknown };
-  return typeof type === "string" ? type : undefined;
 }

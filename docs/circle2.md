@@ -58,7 +58,7 @@ Each journey ends with the check that proves it works.
 
 - Every connection is scanned every day. For Slack, the scan also renews the stored session.
 - When a key or session stops working, the connection shows Reconnect in Settings and on the app's page, and its accounts show Reconnect instead of Disable and Enable. A change already running fails with Reconnect as the reason.
-- Reconnecting Slack is one click while the owner is signed in to Slack in Chrome.
+- Reconnecting Slack takes two clicks while the owner is signed in to Slack in Chrome: Reconnect, then Hand over in the extension's window.
 - **Done when:** an expired session in the fake Slack turns the connection to Reconnect, Slack's accounts show Reconnect instead of Disable, and reconnecting brings Disable back.
 
 ## Rules for app sessions
