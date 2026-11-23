@@ -16,9 +16,13 @@ export function PersonPage() {
   // The route's loader has just read the page into the cache.
   const pageQuery = useQuery(PersonPageDocument, { variables: { id: employeeId } });
   const person = pageQuery.data?.employee;
-  // A running change moves its row; the page reads the person again until every change ends.
+  // A running change, or a scan started from a failed change's dialog, moves its row; the page
+  // reads the person again until each ends.
   const isChanging =
-    person?.appAccounts.some((account) => account.latestChange?.status === "RUNNING") ?? false;
+    person?.appAccounts.some(
+      ({ latestChange, app }) =>
+        latestChange?.status === "RUNNING" || app.containerConnection?.scan?.status === "SCANNING",
+    ) ?? false;
   usePollWhileScanning(isChanging, pageQuery);
   useRefreshAfterChanges(isChanging, pageQuery.refetch);
   // The route's loader found the person, so they are missing only while a reload replaces them.

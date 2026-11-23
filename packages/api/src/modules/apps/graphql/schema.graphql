@@ -184,6 +184,11 @@ input AppUserChangeInput {
   action: AccountChangeAction!
 }
 
+input AccountChangeMarkDoneByHandInput {
+  "The account change's id."
+  id: ID!
+}
+
 input SetupFinishInput {
   "The discovered apps the company uses; every other discovered app is ignored."
   approvedAppIds: [ID!]!
@@ -198,6 +203,10 @@ type AppsMutations {
   finishSetup(input: SetupFinishInput!): SetupFinishPayload!
   "Disables or enables an app account in its app: queues the change, which runs on the server one per connection at a time, in the order asked, and returns the account with it as its latest change. Refused with a NotFoundError for an unknown account, and a ConflictError when the account does not offer this action now (`offeredChange`). Admins only."
   changeAccount(input: AppUserChangeInput!): AppUserChangePayload!
+  "I did it by hand: the owner made a failed change in the app themselves. The change becomes DONE_BY_HAND and the account takes its new status at once, with a history line unless it already had that status. Refused with a NotFoundError for an unknown change, and a ConflictError unless it failed and is its account's latest. Admins only."
+  markAccountChangeDoneByHand(
+    input: AccountChangeMarkDoneByHandInput!
+  ): AccountChangeMarkDoneByHandPayload!
 }
 
 "The approved app, or why it was refused."
@@ -223,6 +232,14 @@ type AppUserChangePayload {
 }
 
 union AppUserChangeError = NotFoundError | ConflictError
+
+"The account with its change done by hand, or why it was refused; the account is null for one that belongs to no employee."
+type AccountChangeMarkDoneByHandPayload {
+  appUser: AppUser
+  error: AccountChangeMarkDoneByHandError
+}
+
+union AccountChangeMarkDoneByHandError = NotFoundError | ConflictError
 
 "Setup once finished, or why it was refused."
 type SetupFinishPayload {

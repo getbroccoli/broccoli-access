@@ -8,6 +8,7 @@ import {
   type ResolversTypes,
   toEnum,
 } from "../../../core/graphql";
+import type { SecurityContext } from "../../../core/security";
 import type {
   AccountChangeService,
   AccountChangeState,
@@ -16,6 +17,7 @@ import type {
   AppUser,
   AppUserService,
 } from "../app";
+import type { AccountChange } from "../domain";
 
 export function createResolvers(
   services: Pick<
@@ -34,6 +36,7 @@ export function createResolvers(
     | "findAppsWithChangeableAccounts"
     | "listAccountChanges"
     | "readRequesterNames"
+    | "markChangeDoneByHand"
   >,
 ): Resolvers {
   const loaders = createLoaders(services);
@@ -53,40 +56,7 @@ export function createResolvers(
     Mutation: {
       apps: () => ({}),
     },
-    AppsMutations: {
-      approve: (_parent, { input }, context) =>
-        mutationPayload<ResolversTypes["AppApprovePayload"]>(
-          async () => ({ app: await services.approveApp(context.getActor(), input.id) }),
-          ["NOT_FOUND"],
-        ),
-      ignore: (_parent, { input }, context) =>
-        mutationPayload<ResolversTypes["AppIgnorePayload"]>(
-          async () => ({ app: await services.ignoreApp(context.getActor(), input.id) }),
-          ["NOT_FOUND", "CONFLICT"],
-        ),
-      finishSetup: (_parent, { input }, context) =>
-        mutationPayload<ResolversTypes["SetupFinishPayload"]>(async () => {
-          await services.finishSetup(context.getActor(), input);
-          // Finished setup is the same for everyone: done, and nobody holds it since the owner exists.
-          return { setup: { id: "instance", step: "DONE", holder: "NOBODY" } };
-        }, ["INVALID_INPUT", "CONFLICT"]),
-      changeAccount: (_parent, { input }, context) =>
-        mutationPayload<ResolversTypes["AppUserChangePayload"]>(async () => {
-          const ctx = context.getActor();
-          const change = await services.changeAccount(ctx, {
-            appAccountId: input.id,
-            action: ACTIONS[input.action],
-          });
-          // The answer shows the change as asked, even when it already ended on the server.
-          loaders.changeStates(context).prime(change.appAccountId!, {
-            isConnectionUser: false,
-            offeredChange: null,
-            latestChange: change,
-          });
-          const users = await services.readUsersOfApps(ctx, [change.appId]);
-          return { appUser: users.find(({ id }) => id === change.appAccountId) ?? null };
-        }, ["NOT_FOUND", "CONFLICT"]),
-    },
+    AppsMutations: appsMutations(services, loaders),
     AppUser: {
       status: ({ status }) => toEnum(status),
       app: (user, _args, context) => loaders.appsById(context).load(user.appId),
@@ -126,9 +96,65 @@ export function createResolvers(
   };
 }
 
+/** The module's mutations: approving and ignoring apps, finishing setup, and account changes. */
+function appsMutations(
+  services: Parameters<typeof createResolvers>[0],
+  loaders: ReturnType<typeof createLoaders>,
+): Resolvers["AppsMutations"] {
+  return {
+    approve: (_parent, { input }, context) =>
+      mutationPayload<ResolversTypes["AppApprovePayload"]>(
+        async () => ({ app: await services.approveApp(context.getActor(), input.id) }),
+        ["NOT_FOUND"],
+      ),
+    ignore: (_parent, { input }, context) =>
+      mutationPayload<ResolversTypes["AppIgnorePayload"]>(
+        async () => ({ app: await services.ignoreApp(context.getActor(), input.id) }),
+        ["NOT_FOUND", "CONFLICT"],
+      ),
+    finishSetup: (_parent, { input }, context) =>
+      mutationPayload<ResolversTypes["SetupFinishPayload"]>(async () => {
+        await services.finishSetup(context.getActor(), input);
+        // Finished setup is the same for everyone: done, and nobody holds it since the owner exists.
+        return { setup: { id: "instance", step: "DONE", holder: "NOBODY" } };
+      }, ["INVALID_INPUT", "CONFLICT"]),
+    changeAccount: (_parent, { input }, context) =>
+      mutationPayload<ResolversTypes["AppUserChangePayload"]>(async () => {
+        const ctx = context.getActor();
+        const change = await services.changeAccount(ctx, {
+          appAccountId: input.id,
+          action: ACTIONS[input.action],
+        });
+        // The answer shows the change as asked, even when it already ended on the server.
+        loaders.changeStates(context).prime(change.appAccountId!, {
+          isConnectionUser: false,
+          offeredChange: null,
+          latestChange: change,
+        });
+        return { appUser: await appUserOf(services, ctx, change) };
+      }, ["NOT_FOUND", "CONFLICT"]),
+    markAccountChangeDoneByHand: (_parent, { input }, context) =>
+      mutationPayload<ResolversTypes["AccountChangeMarkDoneByHandPayload"]>(async () => {
+        const ctx = context.getActor();
+        const change = await services.markChangeDoneByHand(ctx, input.id);
+        return { appUser: await appUserOf(services, ctx, change) };
+      }, ["NOT_FOUND", "CONFLICT"]),
+  };
+}
+
 const STATUSES = { DISCOVERED: "discovered", APPROVED: "approved", IGNORED: "ignored" } as const;
 
 const ACTIONS = { SUSPEND: "suspend", REACTIVATE: "reactivate" } as const;
+
+/** The change's account as its app's users list it; null once it belongs to no employee. */
+async function appUserOf(
+  services: Parameters<typeof createResolvers>[0],
+  ctx: SecurityContext,
+  change: AccountChange,
+): Promise<AppUser | null> {
+  const users = await services.readUsersOfApps(ctx, [change.appId]);
+  return users.find(({ id }) => id === change.appAccountId) ?? null;
+}
 
 /** The request-scoped batches the fields read through, so a list costs one query per kind. */
 function createLoaders(services: Parameters<typeof createResolvers>[0]) {

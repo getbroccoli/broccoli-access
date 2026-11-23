@@ -60,6 +60,87 @@ test("the owner disables Chloé in Linear and enables her again", async ({
   expect(await linearMemberStatus(fakeConnectors.url, chloe.employee.email)).toBe("active");
 }, 90_000);
 
+test("the owner sees why Ana's Linear Disable failed and marks it done by hand", async ({
+  env,
+  fakeConnectors,
+}) => {
+  const { browser, appId, owner } = await connectedLinear(env);
+  const ana = (await linearUsers(browser, appId)).find(
+    (user) => user.employee.email === "ana@acme.example",
+  )!;
+  await failLinearCall(fakeConnectors.url, "actions/run", "unexpected_response");
+
+  const disable = await changeAccount(browser, ana.id, "SUSPEND");
+  const changeId = disable.latestChange!.id;
+  await expect
+    .poll(async () => {
+      const response = await browser.graphql(
+        `query ($id: ID!) {
+          app(id: $id) {
+            suspendedWithAccessCount
+            containerConnection { adminUrl }
+            users {
+              id status employee { status }
+              latestChange { id status failure requestedAt requestedBy { id name } }
+            }
+          }
+        }`,
+        { id: appId },
+      );
+      return response.json();
+    }, POLL)
+    .toMatchObject({
+      data: {
+        app: {
+          suspendedWithAccessCount: 1,
+          containerConnection: { adminUrl: "https://linear.app/acme/settings/members" },
+          users: expect.arrayContaining([
+            {
+              id: ana.id,
+              status: "ACTIVE",
+              employee: { status: "SUSPENDED" },
+              latestChange: {
+                id: changeId,
+                status: "FAILED",
+                failure: "UNEXPECTED_RESPONSE",
+                requestedAt: expect.any(String) as unknown,
+                requestedBy: { id: owner.id, name: "Mia Novak" },
+              },
+            },
+          ]) as unknown,
+        },
+      },
+    });
+
+  const done = await browser.graphql(
+    `mutation ($id: ID!) {
+      apps {
+        markAccountChangeDoneByHand(input: { id: $id }) {
+          appUser { id status latestChange { id status failure } app { suspendedWithAccessCount } }
+          error { __typename }
+        }
+      }
+    }`,
+    { id: changeId },
+  );
+
+  expect(await done.json()).toEqual({
+    data: {
+      apps: {
+        markAccountChangeDoneByHand: {
+          error: null,
+          appUser: {
+            id: ana.id,
+            status: "SUSPENDED",
+            latestChange: { id: changeId, status: "DONE_BY_HAND", failure: "UNEXPECTED_RESPONSE" },
+            app: { suspendedWithAccessCount: 0 },
+          },
+        },
+      },
+    },
+  });
+}, 90_000);
+
 test("shows one change ahead of Chloé while Ana's Disable runs, then finishes them in order", async ({
   env,
   fakeConnectors,
@@ -191,7 +272,7 @@ const CHANGE = `mutation ($input: AppUserChangeInput!) {
 }`;
 
 async function connectedLinear(env: TestEnv) {
-  const { browser } = await env.signInAsOwner();
+  const { browser, user: owner } = await env.signInAsOwner();
   await finishSetupWithPreselectedApps(browser);
   const response = await browser.graphql(
     `mutation ($input: ContainerConnectorConnectInput!) {
@@ -218,7 +299,7 @@ async function connectedLinear(env: TestEnv) {
       return read.data.app.users.length;
     }, POLL)
     .toBe(7);
-  return { browser, appId };
+  return { browser, appId, owner };
 }
 
 async function linearUsers(browser: Browser, appId: string) {

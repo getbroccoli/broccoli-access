@@ -9,11 +9,12 @@ import { createLogger } from "../../src/core/logger";
 import { createAccountChangeService } from "../../src/modules/apps";
 import { createGoogleWorkspaceConnector } from "../../src/modules/google";
 import { createImportRecordService } from "../../src/modules/imports";
-import { connectLinear, containerConnectors } from "./containerConnections";
+import { connectLinear, containerConnectors, failLinearCall } from "./containerConnections";
 import { recordingJobQueue } from "./recordingJobQueue";
 import { storedAppAccounts } from "./storedScan";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { SYSTEM } from "./testSecurityContext";
+import type { TestSeed } from "./testSeed";
 import { testTransactor } from "./testTransactor";
 
 export function accountChanges(
@@ -70,4 +71,22 @@ export function listedLinearChloe(status: AccountStatus): ListedAccount {
     (member) => member.email === "chloe@acme.example",
   )!;
   return { sourceKey, raw: {}, values: { email, displayName, isConnectionUser, status } };
+}
+
+export async function pendingDisable(orm: Orm, seed: TestSeed, url: string) {
+  const linear = await scannedLinear(orm, url);
+  const chloe = linear.account("chloe@acme.example");
+  const owner = await seed.owner();
+  const service = accountChanges(orm, { connectorsUrl: url });
+  const change = await service.changeAccount(owner, { appAccountId: chloe.id, action: "suspend" });
+  const latest = async () =>
+    (await service.readChangeStates(owner, [chloe.id])).get(chloe.id)?.latestChange;
+  return { service, chloe, owner, change, latest };
+}
+
+export async function failedDisable(orm: Orm, seed: TestSeed, url: string) {
+  const pending = await pendingDisable(orm, seed, url);
+  await failLinearCall(url, "actions/run", "unexpected_response");
+  await pending.service.runChange(SYSTEM, pending.change.id);
+  return pending;
 }

@@ -114,6 +114,54 @@ export const appsEn = {
   "apps.change.cancel": "Cancel",
   "apps.change.confirmDisable": "Disable in {app}",
   "apps.change.confirmEnable": "Enable in {app}",
+  "apps.couldnt.disable": "Couldn’t disable",
+  "apps.couldnt.enable": "Couldn’t enable",
+  "apps.couldnt.disableTitle": "Couldn’t disable {name} in {app}",
+  "apps.couldnt.enableTitle": "Couldn’t enable {name} in {app}",
+  "apps.couldnt.askedToday": "Asked by {name} today at {time}.",
+  "apps.couldnt.askedOn": "Asked by {name} on {day} at {time}.",
+  "apps.couldnt.stillHasAccess": "{firstName} still has access to the {workspace} workspace.",
+  "apps.couldnt.nothingChanged": "Nothing changed in {app}.",
+  "apps.couldnt.unexpectedResponse":
+    "{app} gave an answer Broccoli Access doesn’t recognise. {app} may have changed how its admin pages work.",
+  "apps.couldnt.blockedByCheck": "{app} asked for a check that Broccoli Access never gets past.",
+  "apps.couldnt.noAnswer": "{app} didn’t answer after three tries.",
+  "apps.couldnt.keyRefused": "{app} refused the API key: it was revoked or expired.",
+  "apps.couldnt.sessionExpired": "Your {app} session expired or was signed out.",
+  "apps.couldnt.noLongerAdmin": "{email} is no longer an admin in {app}.",
+  "apps.couldnt.connectionNoLongerAdmin": "The connected account is no longer an admin in {app}.",
+  "apps.couldnt.sessionElsewhere": "Your {app} session reaches another workspace, not {workspace}.",
+  "apps.couldnt.keyElsewhere": "Your {app} API key reaches another workspace, not {workspace}.",
+  "apps.couldnt.accountNotFound":
+    "{app} has no member matching {name} ({email}). The account may have been removed, or its email changed in {app}.",
+  "apps.couldnt.notAllowed":
+    "{app} doesn’t allow this change. {app} refuses it for some members, such as the workspace’s owner.",
+  "apps.couldnt.browserLost": "The Chrome window making the change closed before {app} answered.",
+  "apps.couldnt.hintDisable":
+    "Try again in a while, or deactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
+  "apps.couldnt.hintEnable":
+    "Try again in a while, or reactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
+  "apps.couldnt.hintByHandOnly":
+    "Trying again won’t help. If someone with more rights in {app} makes the change there, tell Broccoli Access.",
+  "apps.couldnt.hintScan":
+    "Trying again won’t help. Scan {app} to bring its member list up to date.",
+  "apps.couldnt.hintScanned": "{app} was scanned since, so trying again may help.",
+  "apps.couldnt.byHand": "I did it by hand",
+  "apps.couldnt.tryAgain": "Try again",
+  "apps.couldnt.tryAgainDisable": "Try again to disable {name} in {app}",
+  "apps.couldnt.tryAgainEnable": "Try again to enable {name} in {app}",
+  "apps.couldnt.scanNow": "Scan {app} now",
+  "apps.couldnt.close": "Close",
+  "apps.byHand.disableTitle": "Did you deactivate {name} in {app} yourself?",
+  "apps.byHand.enableTitle": "Did you reactivate {name} in {app} yourself?",
+  "apps.byHand.disableEffect":
+    "Broccoli Access marks {firstName}’s {app} account as disabled, done by hand by you. The next scan checks it.",
+  "apps.byHand.enableEffect":
+    "Broccoli Access marks {firstName}’s {app} account as enabled, done by hand by you. The next scan checks it.",
+  "apps.byHand.notYet": "Not yet",
+  "apps.byHand.confirm": "Yes, I did it",
+  "apps.byHand.refused":
+    "Couldn’t mark the change of {name} in {app} as done by hand. Reload the page to see the account’s status.",
   "apps.firstRun.title": "Last step: select the apps your company uses",
   "apps.firstRun.description":
     "We found {count} apps people signed in to with Google. Apps you don’t select are ignored; you can bring them back any time.",

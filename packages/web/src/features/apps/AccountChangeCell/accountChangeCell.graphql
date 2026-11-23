@@ -1,5 +1,6 @@
 fragment AccountChangeCell_appUser on AppUser {
   id
+  status
   isConnectionUser
   offeredChange
   latestChange {
@@ -8,6 +9,7 @@ fragment AccountChangeCell_appUser on AppUser {
     status
     changesAhead
     finishedAt
+    failure
   }
   employee {
     id
@@ -26,6 +28,7 @@ fragment AccountChangeCell_appUser on AppUser {
       scan {
         id
         sourceName
+        readAt
       }
       connector {
         id
@@ -45,6 +48,7 @@ mutation ChangeAccount($input: AppUserChangeInput!) {
       appUser {
         id
         ...AccountChangeCell_appUser
+        ...AppAccountStatusCell_appUser
       }
       error {
         __typename

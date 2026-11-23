@@ -1,0 +1,10 @@
+fragment AppAccountStatusCell_appUser on AppUser {
+  id
+  status
+  latestChange {
+    id
+    action
+    status
+  }
+  ...CouldntChangeDialog_appUser
+}

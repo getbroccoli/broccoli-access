@@ -9,6 +9,8 @@ import { t } from "@/i18n";
 
 import { ChangeProgress } from "./ChangeProgress";
 import { ConfirmAccountChangeDialog } from "./ConfirmAccountChangeDialog";
+import { failedChangeOptions, showsCouldntChange } from "./couldntChange";
+import { TryAgainButton } from "./TryAgainButton";
 import { useJustNow } from "./useJustNow";
 import { useToastWhenChangeSucceeds } from "./useToastWhenChangeSucceeds";
 
@@ -19,7 +21,7 @@ type Props = {
 
 /**
  * The row's Disable or Enable, asked in a dialog; then the change's progress, and "Disabled just
- * now" once it succeeds. "Connected as you" on the connection's own user, "No connection" where
+ * now" once it succeeds, or Try again once it fails, where trying again can help. "Connected as you" on the connection's own user, "No connection" where
  * the app's connection cannot change accounts.
  */
 export function AccountChangeCell({ appUser }: Props) {
@@ -41,6 +43,18 @@ export function AccountChangeCell({ appUser }: Props) {
   const change = user.latestChange;
   if (change?.status === "RUNNING") {
     return <ChangeProgress app={user.app.name} change={change} />;
+  }
+  if (change && showsCouldntChange(user)) {
+    const target = {
+      id: user.id,
+      name: `${user.employee.firstName} ${user.employee.lastName}`,
+      app: user.app.name,
+    };
+    return failedChangeOptions(user).tryAgain ? (
+      <span className="flex justify-end">
+        <TryAgainButton target={target} action={change.action} />
+      </span>
+    ) : null;
   }
   return (
     <span className="flex items-center justify-end gap-3">

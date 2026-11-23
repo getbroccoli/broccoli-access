@@ -5,7 +5,7 @@ import { FoundVia } from "@/components/FoundVia";
 import { formatSince } from "@/lib/since";
 
 import { AccountChangeCell } from "../AccountChangeCell";
-import { AppAccountStatusBadge } from "./AppAccountStatusBadge";
+import { AppAccountStatusCell } from "./AppAccountStatusCell";
 import { PersonCell } from "./PersonCell";
 import { StatusBadge } from "./StatusBadge";
 
@@ -71,7 +71,8 @@ const SINCE: DataTableColumn<AppUserRow> = {
 
 /**
  * The account's status in the connected app, as its own scan read it; a suspended one shows as
- * Disabled, as in the app. An account only another source found was not read there.
+ * Disabled, as in the app, and a failed change as "Couldn't disable". An account only another
+ * source found was not read there.
  */
 function inAppColumn({
   name,
@@ -84,13 +85,13 @@ function inAppColumn({
     id: "inApp",
     header: t("apps.page.column.inApp", { app: name }),
     className: "w-[12%]",
-    cell: ({ status, foundVia }) => {
-      if (!foundVia.includes(findingKind)) {
+    cell: (user) => {
+      if (!user.foundVia.includes(findingKind)) {
         return (
           <span className="text-sm text-muted-foreground">{t("apps.page.inApp.notListed")}</span>
         );
       }
-      return <AppAccountStatusBadge status={status} />;
+      return <AppAccountStatusCell appUser={user} />;
     },
   };
 }

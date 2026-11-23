@@ -36,6 +36,8 @@ export interface AccountChangeRepository {
       finishedAt: Date;
     },
   ): Promise<void>;
+  /** Turns a failed change into `done_by_hand`, keeping its error, attempts and finish. */
+  markDoneByHand(id: string): Promise<AccountChange>;
   /** Those of the accounts whose change is running, or succeeded at or after `since`. */
   findAccountsChangedSince(appAccountIds: readonly string[], since: Date): Promise<string[]>;
   /** Each account's newest change; an account without one is left out. */
@@ -94,6 +96,14 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .update(accountChanges)
         .set({ status, attempts: attempts.map(storedAttempt), error, finishedAt })
         .where(and(eq(accountChanges.id, id), eq(accountChanges.status, "running")));
+    },
+    markDoneByHand: async (id) => {
+      const [row] = await orm()
+        .update(accountChanges)
+        .set({ status: "done_by_hand" })
+        .where(and(eq(accountChanges.id, id), eq(accountChanges.status, "failed")))
+        .returning();
+      return toChange(row!);
     },
     findAccountsChangedSince: async (appAccountIds, since) => {
       const rows = await orm()

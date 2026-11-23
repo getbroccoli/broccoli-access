@@ -6,6 +6,7 @@ import {
   EMPLOYEE,
   expect,
   expectBlockedBy,
+  failedDisable,
   googleScanWithLinearGrant,
   holdBeforeCommit,
   OWNER,
@@ -56,6 +57,32 @@ test("stores Chloé's running Disable with her Linear source key and queues it b
       payload: { changeId: change.id },
       options: { group: linear.connectionId },
     },
+  ]);
+});
+
+test("trying a failed Disable again stores a new running change and preserves the failed one", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const { service, change, chloe, owner, latest } = await failedDisable(
+    orm,
+    seed,
+    fakeConnectors.url,
+  );
+  const [failed] = await orm.select().from(changesTable);
+  expect(failed).toMatchObject({ id: change.id, status: "failed" });
+
+  const retry = await service.changeAccount(owner, {
+    appAccountId: chloe.id,
+    action: change.action,
+  });
+
+  expect(retry.id).not.toBe(change.id);
+  expect(retry).toMatchObject({ appAccountId: chloe.id, action: "suspend", status: "running" });
+  expect(await latest()).toEqual(retry);
+  expect(await orm.select().from(changesTable).where(eq(changesTable.id, change.id))).toEqual([
+    failed,
   ]);
 });
 

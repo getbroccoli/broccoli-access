@@ -1,0 +1,73 @@
+fragment CouldntChangeDialog_appUser on AppUser {
+  id
+  offeredChange
+  latestChange {
+    id
+    action
+    status
+    failure
+    finishedAt
+    requestedAt
+    requestedBy {
+      id
+      name
+    }
+  }
+  employee {
+    id
+    firstName
+    lastName
+    email
+  }
+  app {
+    id
+    name
+    containerConnection {
+      id
+      adminUrl
+      connectionUserEmail
+      scan {
+        id
+        status
+        sourceName
+        readAt
+      }
+      connector {
+        id
+        connectionFields {
+          key
+          kind
+          secret
+        }
+      }
+    }
+  }
+}
+
+mutation MarkAccountChangeDoneByHand($input: AccountChangeMarkDoneByHandInput!) {
+  apps {
+    markAccountChangeDoneByHand(input: $input) {
+      appUser {
+        id
+        ...AccountChangeCell_appUser
+        ...AppAccountStatusCell_appUser
+        # What the person page and the app page count of the access left.
+        employee {
+          id
+          suspendedWithAccess
+          approvedAppNames
+        }
+        app {
+          id
+          suspendedWithAccessCount
+        }
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}

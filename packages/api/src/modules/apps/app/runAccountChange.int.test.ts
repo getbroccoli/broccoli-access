@@ -7,7 +7,7 @@ import {
   expect,
   failLinearCall,
   linearMemberStatus,
-  scannedLinear,
+  pendingDisable,
   serveConnectorRoutes,
   listedLinearChloe,
   storedAppAccounts,
@@ -15,7 +15,6 @@ import {
   storedRecordHistory,
   SYSTEM,
   test as baseTest,
-  type TestSeed,
 } from "#test/support";
 
 import type { Orm } from "../../../core/db";
@@ -251,17 +250,6 @@ test.for(["runChange", "failChange"] as const)(
     });
   },
 );
-
-async function pendingDisable(orm: Orm, seed: TestSeed, url: string) {
-  const linear = await scannedLinear(orm, url);
-  const chloe = linear.account("chloe@acme.example");
-  const owner = await seed.owner();
-  const service = accountChanges(orm, { connectorsUrl: url });
-  const change = await service.changeAccount(owner, { appAccountId: chloe.id, action: "suspend" });
-  const latest = async () =>
-    (await service.readChangeStates(owner, [chloe.id])).get(chloe.id)?.latestChange;
-  return { service, chloe, owner, change, latest };
-}
 
 async function savedStatus(orm: Orm, id: string) {
   return (await storedAppAccounts(orm)).find((account) => account.id === id)?.status;

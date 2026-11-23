@@ -97,6 +97,8 @@ export {
 } from "./containerConnections";
 export {
   accountChanges,
+  pendingDisable,
+  failedDisable,
   scannedLinear,
   linearMemberStatus,
   listedLinearChloe,
