@@ -7,12 +7,13 @@ import { ContainerConnectorScansDocument } from "@/__generated__/graphql";
 import { usePollWhileScanning } from "./usePollWhileScanning";
 
 /**
- * Calls `refetch` each time a container connector's scan ends, wherever it started, and polls their
- * status while one runs. Its own query, so a slow connectors container holds no other read back.
+ * Calls `refetch` each time a container connector's scan the page sees running ends, polling their
+ * status meanwhile: one started in this tab, or running when the page loads. Its own query, so a
+ * slow connectors container holds no other read back.
  */
 export function useRefetchAfterContainerConnectorScans(refetch: () => unknown): void {
   const { me } = useRouteContext({ from: "/_authenticated" });
-  // A scan started elsewhere, such as from another tab, changes the connections outside this cache.
+  // Read on each load: a scan started elsewhere, such as in another tab, shows only then.
   const query = useQuery(ContainerConnectorScansDocument, {
     skip: !me.operations.includes("MANAGE_WORKSPACE"),
     fetchPolicy: "cache-and-network",
