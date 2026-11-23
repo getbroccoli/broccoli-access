@@ -103,6 +103,11 @@ jobs:
           docker build --platform linux/amd64 --file packages/api/Dockerfile \
             --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
             --tag "$image:latest" --tag "$image:sha-${GITHUB_SHA::7}" .
+          # No push unless docker-compose.yml's service becomes ready on this image. Postgres only:
+          # readiness waits for the migrations, not for the connectors, another repository's image.
+          docker compose up --detach --wait postgres
+          docker compose up --detach --wait --no-deps broccoli-access || { docker compose logs broccoli-access; exit 1; }
+          docker compose down --volumes
           # The commit's tag first, so `latest` never points at an image that cannot be pinned.
           docker push "$image:sha-${GITHUB_SHA::7}"
           docker push "$image:latest"
