@@ -123,9 +123,6 @@ export const settingsEn = {
   "settings.apps.dialog.description":
     "Broccoli Access reads your {app} members and disables or enables them when you ask, through {app}’s API.",
   "settings.apps.dialog.secretHint": "{help} Broccoli Access stores it encrypted on your server.",
-  "settings.apps.dialog.nextTitle": "What happens next",
-  "settings.apps.dialog.next":
-    "Broccoli Access checks the key, shows the workspace’s name, approves {app} and scans its members.",
   "settings.apps.dialog.cancel": "Cancel",
   "settings.apps.dialog.connecting": "Connecting…",
   "settings.apps.dialog.required": "Enter the {field}.",
@@ -137,8 +134,6 @@ export const settingsEn = {
   "settings.apps.dialog.newKeyTitle": "Paste a new key for {app}",
   "settings.apps.dialog.newKeyDescription":
     "Broccoli Access checks the new key with {app}, then uses it instead of the old one.",
-  "settings.apps.dialog.newKeyNext":
-    "Broccoli Access checks the key, reconnects {app} if it needs it and scans its members.",
   "settings.apps.dialog.checkAndSave": "Check and save",
   "settings.apps.dialog.checking": "Checking…",
   "settings.apps.dialog.otherWorkspace":

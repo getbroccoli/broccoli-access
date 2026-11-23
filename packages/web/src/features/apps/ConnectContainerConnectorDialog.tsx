@@ -157,16 +157,6 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
               </div>
             );
           })}
-          <div className="flex flex-col gap-1 rounded-lg bg-muted/50 px-3.5 py-3 text-sm text-foreground/80">
-            <span className="font-semibold text-foreground">
-              {t("settings.apps.dialog.nextTitle")}
-            </span>
-            <span>
-              {t(isNewKey ? "settings.apps.dialog.newKeyNext" : "settings.apps.dialog.next", {
-                app,
-              })}
-            </span>
-          </div>
           {formError && (
             <p role="alert" className="text-sm text-destructive">
               {formError}
