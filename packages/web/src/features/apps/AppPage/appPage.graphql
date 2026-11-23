@@ -30,8 +30,6 @@ query AppPage($id: ID!) {
         findingKind
         connectionFields {
           kind
-          label
-          secret
         }
         ...ReconnectButton_connector
       }

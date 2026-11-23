@@ -1,7 +1,6 @@
 import type { AppPageQuery } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 
-import { connectingFieldName } from "../connectingFieldName";
 import { connectsWithText } from "../connectsWithText";
 import { ReconnectButton } from "../ReconnectButton";
 import { failsUntilLine, reconnectCauseLine } from "../reconnectReason";
@@ -15,9 +14,9 @@ export function ReconnectBanner({ connection }: Props) {
   const { connector, reconnectReason } = connection;
   const reconnecting = {
     app: connector.name,
-    keyName: connectsWithText(connector) ? connectingFieldName(connector.connectionFields) : null,
+    withSession: !connectsWithText(connector),
     email: connection.connectionUserEmail ?? null,
-    workspace: connection.scan?.sourceName ?? null,
+    workspace: connection.scan?.sourceName ?? connector.name,
   };
   const lines = [
     reconnectReason && reconnectCauseLine(reconnectReason.cause, reconnecting),

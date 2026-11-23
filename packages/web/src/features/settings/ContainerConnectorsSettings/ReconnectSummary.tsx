@@ -1,10 +1,4 @@
-import {
-  connectingFieldName,
-  connectsWithText,
-  failsUntilLine,
-  foundLine,
-  reconnectCauseLine,
-} from "@/features/apps";
+import { connectsWithText, failsUntilLine, foundLine, reconnectCauseLine } from "@/features/apps";
 import { t } from "@/i18n";
 
 import type { ContainerConnector } from "./ContainerConnectorCard";
@@ -20,9 +14,9 @@ export function ReconnectSummary({ connector, connection }: Props) {
   const withKey = connectsWithText(connector);
   const reconnecting = {
     app: connector.name,
-    keyName: withKey ? connectingFieldName(connector.connectionFields) : null,
+    withSession: !withKey,
     email: connection.connectionUserEmail ?? null,
-    workspace: connection.scan?.sourceName ?? null,
+    workspace: connection.scan?.sourceName ?? connector.name,
   };
 
   return (

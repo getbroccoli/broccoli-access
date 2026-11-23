@@ -26,6 +26,7 @@ import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { dayAndTime } from "@/lib/dayAndTime";
 
+import { ReconnectButton } from "../ReconnectButton";
 import { couldntChangeHint, couldntChangeReason, failedChangeOptions } from "./couldntChange";
 import { DoneByHandDialog } from "./DoneByHandDialog";
 import { useChangeAccount } from "./useChangeAccount";
@@ -54,6 +55,8 @@ export function CouldntChangeDialog({
 }: Props) {
   const fragment = useFragment({
     fragment: CouldntChangeDialog_AccountChangeFragmentDoc,
+    // The document also holds the fragments of the Reconnect button, which this one spreads.
+    fragmentName: "CouldntChangeDialog_accountChange",
     from: changeRef,
   });
   const [shown, setShown] = useState<"reason" | "byHand" | null>(null);
@@ -79,6 +82,7 @@ export function CouldntChangeDialog({
     // Today's connection user says nothing about who it was when a change in history failed.
     connectionUserEmail: account ? (connection?.connectionUserEmail ?? null) : null,
     credential: connection?.connector.connectionFields.find(({ secret }) => secret)?.kind ?? "TEXT",
+    toReconnect: options.reconnect,
   });
   const tryAgain = (accountId: string) => {
     setShown(null);
@@ -152,6 +156,12 @@ export function CouldntChangeDialog({
                 {t("apps.couldnt.tryAgain")}
               </Button>
             )}
+            {options.reconnect && connection && (
+              <ReconnectButton
+                connector={connection.connector}
+                label={t("apps.reconnect.appButton", { app: app.name })}
+              />
+            )}
             {options.scanNow && connection && (
               <Button
                 type="button"
@@ -163,7 +173,7 @@ export function CouldntChangeDialog({
                 {t("apps.couldnt.scanNow", { app: app.name })}
               </Button>
             )}
-            {!options.tryAgain && !options.scanNow && (
+            {!options.tryAgain && !options.scanNow && !options.reconnect && (
               <DialogClose render={<Button type="button" size="lg" className="px-4" />}>
                 {t("apps.couldnt.close")}
               </DialogClose>
@@ -188,7 +198,7 @@ const CHIP = cn(
 );
 
 /** History offers no action: Try again and I did it by hand act on an account's latest change. */
-const NO_OPTIONS = { tryAgain: false, byHand: false, scanNow: false };
+const NO_OPTIONS = { tryAgain: false, byHand: false, scanNow: false, reconnect: false };
 
 /** The words of a failed Disable or Enable, which mirror each other. */
 const COPY = {

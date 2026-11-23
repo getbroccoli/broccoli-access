@@ -148,6 +148,12 @@ export const appsEn = {
   "apps.couldnt.hintScan":
     "Trying again won’t help. Scan {app} to bring its member list up to date.",
   "apps.couldnt.hintScanned": "{app} was scanned since, so trying again may help.",
+  "apps.couldnt.reconnectKey": "Reconnect {app} with a new key, then try again.",
+  "apps.couldnt.reconnectSession": "Reconnect {app}, then try again.",
+  "apps.couldnt.hintDisableAfterReconnect":
+    "After you reconnect, this row shows Try again. Or deactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
+  "apps.couldnt.hintEnableAfterReconnect":
+    "After you reconnect, this row shows Try again. Or reactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
   "apps.couldnt.byHand": "I did it by hand",
   "apps.couldnt.tryAgain": "Try again",
   "apps.couldnt.tryAgainDisable": "Try again to disable {name} in {app}",
@@ -168,13 +174,6 @@ export const appsEn = {
   "apps.reconnect.button": "Reconnect",
   "apps.reconnect.appButton": "Reconnect {app}",
   "apps.reconnect.pasteNewKey": "Paste a new key",
-  "apps.reconnect.sessionExpired": "Your {app} session expired or was signed out.",
-  "apps.reconnect.keyRefused": "{app} refused the {field}: it was revoked or expired.",
-  "apps.reconnect.notAdmin": "{email} is no longer an admin in {app}.",
-  "apps.reconnect.notAdminWithoutEmail": "The connection’s user is no longer an admin in {app}.",
-  "apps.reconnect.sessionOtherWorkspace":
-    "Your {app} session reaches another workspace, not {workspace}.",
-  "apps.reconnect.keyOtherWorkspace": "The {field} reaches another workspace, not {workspace}.",
   "apps.reconnect.today": "today at {time}",
   "apps.reconnect.onDay": "on {day} at {time}",
   "apps.reconnect.foundByScan": "Found by a scan {when}.",

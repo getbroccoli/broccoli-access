@@ -5,37 +5,42 @@ import { dayAndTime } from "@/lib/dayAndTime";
 /** What a connection that needs reconnecting says about itself. */
 export type ReconnectingConnection = {
   app: string;
-  /** The typed key's name mid-sentence, such as "personal API key"; null for an app session. */
-  keyName: string | null;
-  /** The connection's user, from its last scan. */
+  /** Whether it connects with the owner's app session; otherwise with a typed key. */
+  withSession: boolean;
+  /** The connection's user, from its last scan; null before one. */
   email: string | null;
-  workspace: string | null;
+  workspace: string;
 };
 
-/** Why the connection needs reconnecting, such as "Your Slack session expired or was signed out." */
+/**
+ * Why a connection needs reconnecting, such as "Your Slack session expired or was signed out.";
+ * a change that failed for that cause says the same.
+ */
 export function reconnectCauseLine(
   cause: ReconnectCause,
-  { app, keyName, email, workspace }: ReconnectingConnection,
+  { app, withSession, email, workspace }: ReconnectingConnection,
 ): string {
   switch (cause) {
     case "AUTHENTICATION_FAILED":
-      return keyName
-        ? t("apps.reconnect.keyRefused", { app, field: keyName })
-        : t("apps.reconnect.sessionExpired", { app });
+      return t(withSession ? "apps.couldnt.sessionExpired" : "apps.couldnt.keyRefused", { app });
     case "PERMISSION_MISSING":
       return email
-        ? t("apps.reconnect.notAdmin", { app, email })
-        : t("apps.reconnect.notAdminWithoutEmail", { app });
+        ? t("apps.couldnt.noLongerAdmin", { email, app })
+        : t("apps.couldnt.connectionNoLongerAdmin", { app });
     case "WRONG_WORKSPACE":
-      return keyName
-        ? t("apps.reconnect.keyOtherWorkspace", { field: keyName, workspace: workspace ?? app })
-        : t("apps.reconnect.sessionOtherWorkspace", { app, workspace: workspace ?? app });
+      return t(withSession ? "apps.couldnt.sessionElsewhere" : "apps.couldnt.keyElsewhere", {
+        app,
+        workspace,
+      });
   }
 }
 
 /** "Changes in Linear fail until you paste a new key." */
-export function failsUntilLine({ app, keyName }: ReconnectingConnection): string {
-  return t(keyName ? "apps.reconnect.failsUntilNewKey" : "apps.reconnect.failsUntilReconnect", {
+export function failsUntilLine({
+  app,
+  withSession,
+}: Pick<ReconnectingConnection, "app" | "withSession">): string {
+  return t(withSession ? "apps.reconnect.failsUntilReconnect" : "apps.reconnect.failsUntilNewKey", {
     app,
   });
 }

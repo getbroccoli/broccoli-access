@@ -7,6 +7,8 @@ import type {
 } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 
+import { reconnectCauseLine } from "../reconnectReason";
+
 /**
  * Whether an account shows "Couldn't disable" or "Couldn't enable": its latest change failed, and
  * its status is not yet what that change asked for, which a scan since may have read.
@@ -35,16 +37,24 @@ export function couldntChangeReason(
     connectionUserEmail: string | null;
     /** The kind of the connector's secret field: an API key (`TEXT`) or the owner's app session. */
     credential: ConnectionFieldKind;
+    /** Whether the connection needs reconnecting before the change can run again. */
+    toReconnect: boolean;
   },
 ): string {
-  return `${reasonOf(failure, about)} ${t("apps.couldnt.nothingChanged", { app: about.app })}`;
+  const { app, credential, toReconnect } = about;
+  const reconnect = toReconnect
+    ? ` ${t(credential === "APP_SESSION" ? "apps.couldnt.reconnectSession" : "apps.couldnt.reconnectKey", { app })}`
+    : "";
+  return `${reasonOf(failure, about)}${reconnect} ${t("apps.couldnt.nothingChanged", { app })}`;
 }
 
 /**
  * What the owner may do about an account's failed latest change: try it again, say they made it by
- * hand, or scan the app. Try again needs the account to offer that change, as the server does (not
- * while its connection needs reconnecting); after `ACCOUNT_NOT_FOUND` it also needs a scan since the
- * failure, which may have read the member's new id, and Scan now is offered until it helps.
+ * hand, scan the app, or reconnect it. Try again needs the account to offer that change, as the
+ * server does (not while its connection needs reconnecting); after `ACCOUNT_NOT_FOUND` it also needs
+ * a scan since the failure, which may have read the member's new id, and Scan now is offered until
+ * it helps. Reconnect is offered after a failure that turned the connection to Reconnect, while it
+ * still needs it.
  */
 export function failedChangeOptions({
   offeredChange,
@@ -52,27 +62,30 @@ export function failedChangeOptions({
   app,
 }: FailedChangeFacts): FailedChangeOptions {
   if (!latestChange?.failure || !latestChange.finishedAt) {
-    return { tryAgain: false, byHand: false, scanNow: false };
+    return { tryAgain: false, byHand: false, scanNow: false, reconnect: false };
   }
   const offered = offeredChange === latestChange.action;
   if (latestChange.failure === "NOT_ALLOWED") {
-    return { tryAgain: false, byHand: true, scanNow: false };
+    return { tryAgain: false, byHand: true, scanNow: false, reconnect: false };
   }
   if (latestChange.failure === "ACCOUNT_NOT_FOUND") {
     const lastScanAt = app.containerConnection?.scan?.readAt ?? null;
     const scannedSince =
       lastScanAt !== null && Date.parse(lastScanAt) > Date.parse(latestChange.finishedAt);
     const tryAgain = scannedSince && offered;
-    return { tryAgain, byHand: false, scanNow: !tryAgain };
+    return { tryAgain, byHand: false, scanNow: !tryAgain, reconnect: false };
   }
-  return { tryAgain: offered, byHand: true, scanNow: false };
+  const reconnect =
+    RECONNECT_FAILURES.includes(latestChange.failure) &&
+    app.containerConnection?.status === "RECONNECT";
+  return { tryAgain: offered && !reconnect, byHand: true, scanNow: false, reconnect };
 }
 
 /** What helps now, matching the options the dialog offers. */
 export function couldntChangeHint(
   failure: AccountChangeFailure,
   action: AccountChangeAction,
-  { tryAgain, scanNow }: FailedChangeOptions,
+  { tryAgain, scanNow, reconnect }: FailedChangeOptions,
   { firstName, app }: { firstName: string; app: string },
 ): string {
   if (failure === "NOT_ALLOWED") {
@@ -82,20 +95,37 @@ export function couldntChangeHint(
     return t(scanNow ? "apps.couldnt.hintScan" : "apps.couldnt.hintScanned", { app });
   }
   const hints = action === "SUSPEND" ? DISABLE_HINTS : ENABLE_HINTS;
+  if (reconnect) {
+    return t(hints.reconnect, { firstName, app });
+  }
   return t(tryAgain ? hints.tryAgain : hints.byHand, { firstName, app });
 }
 
-/** Try again, say it was done by hand, or scan the app. */
-export type FailedChangeOptions = { tryAgain: boolean; byHand: boolean; scanNow: boolean };
+/** Try again, say it was done by hand, scan the app, or reconnect it. */
+export type FailedChangeOptions = {
+  tryAgain: boolean;
+  byHand: boolean;
+  scanNow: boolean;
+  reconnect: boolean;
+};
+
+/** The failures that turn a connection to Reconnect. */
+const RECONNECT_FAILURES: readonly AccountChangeFailure[] = [
+  "AUTHENTICATION_FAILED",
+  "PERMISSION_MISSING",
+  "WRONG_WORKSPACE",
+];
 
 const DISABLE_HINTS = {
   tryAgain: "apps.couldnt.hintDisable",
   byHand: "apps.couldnt.hintDisableByHand",
+  reconnect: "apps.couldnt.hintDisableAfterReconnect",
 } as const;
 
 const ENABLE_HINTS = {
   tryAgain: "apps.couldnt.hintEnable",
   byHand: "apps.couldnt.hintEnableByHand",
+  reconnect: "apps.couldnt.hintEnableAfterReconnect",
 } as const;
 
 /** The parts of an app account its failed change's options are decided from. */
@@ -106,7 +136,12 @@ type FailedChangeFacts = {
     failure?: AccountChangeFailure | null;
     finishedAt?: string | null;
   } | null;
-  app: { containerConnection?: { scan?: { readAt?: string | null } | null } | null };
+  app: {
+    containerConnection?: {
+      status?: "CONNECTED" | "RECONNECT";
+      scan?: { readAt?: string | null } | null;
+    } | null;
+  };
 };
 
 function reasonOf(
@@ -129,14 +164,12 @@ function reasonOf(
     case "APP_UNAVAILABLE":
       return t("apps.couldnt.noAnswer", { app });
     case "AUTHENTICATION_FAILED":
-      return t(withSession ? "apps.couldnt.sessionExpired" : "apps.couldnt.keyRefused", { app });
     case "PERMISSION_MISSING":
-      return connectionUserEmail
-        ? t("apps.couldnt.noLongerAdmin", { email: connectionUserEmail, app })
-        : t("apps.couldnt.connectionNoLongerAdmin", { app });
     case "WRONG_WORKSPACE":
-      return t(withSession ? "apps.couldnt.sessionElsewhere" : "apps.couldnt.keyElsewhere", {
+      return reconnectCauseLine(failure, {
         app,
+        withSession,
+        email: connectionUserEmail,
         workspace,
       });
     case "ACCOUNT_NOT_FOUND":
