@@ -58,7 +58,8 @@ export function ChromeExtensionCard() {
           ) : (
             <p className="text-sm text-foreground/80">{t("settings.extension.description")}</p>
           )}
-          {status === "not_installed" && (
+          {/* This Chrome's own extension: a pairing made in another Chrome does not install it here. */}
+          {extension.isInstalled === false && (
             <div className="pt-3">
               <InstallExtensionSteps />
             </div>

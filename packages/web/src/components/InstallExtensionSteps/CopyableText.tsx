@@ -31,6 +31,8 @@ export function CopyableText({ text, name }: Props) {
           type="button"
           variant="outline"
           size="sm"
+          // Fits "Copied" too, so the button never wraps away from the pointer after a copy.
+          className="min-w-20"
           aria-label={t(copied ? "settings.extension.copiedName" : "settings.extension.copyName", {
             name,
           })}
