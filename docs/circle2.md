@@ -116,7 +116,7 @@ These are the input for circle 3:
 Everything that needs a person comes last, once every journey passes against the fakes:
 
 - the check against real Slack and Linear test workspaces;
-- publishing the extension to the Chrome Web Store, and the connectors image where `docker-compose.yml` can pull it.
+- publishing the extension to the Chrome Web Store, and making the images CI publishes public.
 
 Until then, tests load the extension unpacked and build the connectors image locally.
 

@@ -6,17 +6,13 @@ Set `SELF_HOSTED_PUBLIC_URL` (see `.env.example`) when Broccoli Access has a dom
 
 The Chrome extension pairs only with an https address, because your Slack session travels to Broccoli Access through it. Plain http works only on the same computer (`localhost`, `127.0.0.1` or `[::1]`), such as `http://localhost:8080`.
 
-# Rebuild
-
-After pulling changes, run `docker compose up --build -d --wait` to rebuild the image.
-
 # Drop the database
 
 To restart setup with an empty database, run:
 
 ```sh
 docker compose down --volumes
-docker compose up --build -d --wait
+docker compose up -d --wait
 ```
 
 # Email
