@@ -4,9 +4,9 @@ import { ApplicationError, invalidInput, sendApplicationError } from "./applicat
 import type { Logger } from "./logger";
 
 /**
- * Answers a request that failed before its response started: an expected refusal, an unreadable
- * body or another client error as its status, anything else as a bare 500. Logs only the error's
- * class, the method and the route's template, since a message or path can quote what the caller
+ * Answers a request that failed before its response started: an expected refusal or another client
+ * error as its status, an unreadable body as invalid input, anything else as a bare 500. Logs only
+ * a 500's error class, method and route template, since a message or path can quote what the caller
  * sent, such as a pasted key (RULE31).
  */
 export function answerFailedRequests(logger: Logger): ErrorRequestHandler {
