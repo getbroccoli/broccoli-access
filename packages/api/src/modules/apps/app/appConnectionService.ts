@@ -22,8 +22,8 @@ export interface AppConnectionService {
   /**
    * Approves the connector's app (the app with the connector's key as catalog key, else its name,
    * else a new one) and saves its connection with `secrets` encrypted under the connection's id,
-   * joining `tx`; appends the history of both. Connects and scan saves run one at a time. Admins
-   * only; refuses
+   * and the caller as who accepted the connector's notice at `noticeAcceptedAt`, joining `tx`;
+   * appends the history of both. Connects and scan saves run one at a time. Admins only; refuses
    * with CONFLICT a connector already connected, or an app another connector reads.
    */
   connectApp: (
@@ -35,6 +35,8 @@ export interface AppConnectionService {
       app: { name: string; domain: string | null };
       settings: Record<string, unknown>;
       secrets: Record<string, unknown>;
+      /** Set exactly for a connector with a notice, which a signed-in user accepted. */
+      noticeAcceptedAt?: Date;
     },
   ) => Promise<{ appId: string; connectionId: string }>;
   /**
@@ -75,8 +77,9 @@ export function createAppConnectionService({
   secretBox: SecretBox;
 }): AppConnectionService {
   return {
-    async connectApp(ctx, tx, { connector, app: appFields, settings, secrets }) {
+    async connectApp(ctx, tx, { connector, app: appFields, settings, secrets, noticeAcceptedAt }) {
       ctx.require("MANAGE_WORKSPACE");
+      const noticeAccepted = noticeAcceptedAt && { at: noticeAcceptedAt, by: signedInUserOf(ctx) };
       // The lock scans take before they add apps, so a connect and a scan never both add one.
       await appAccountRepository(tx).lockForSync();
       const connections = appConnectionRepository(tx);
@@ -88,12 +91,21 @@ export function createAppConnectionService({
       }
       const id = await connections.newId();
       const encryptedSecrets = secretBox.encrypt(JSON.stringify(secrets), id);
-      await connections.insert({ id, connector, appId: app.id, settings, encryptedSecrets });
+      await connections.insert({
+        id,
+        connector,
+        appId: app.id,
+        settings,
+        encryptedSecrets,
+        noticeAccepted,
+      });
       await recordHistory.append(ctx, tx, {
         recordType: "app_connection",
         operation: "CREATED",
         cause: { kind: "EDITED_DIRECTLY" },
-        records: [{ recordId: id, changes: connectionChanges(connector, app, settings) }],
+        records: [
+          { recordId: id, changes: connectionChanges(connector, app, settings, noticeAcceptedAt) },
+        ],
       });
       return { appId: app.id, connectionId: id };
     },
@@ -190,10 +202,22 @@ function connectionChanges(
   connector: string,
   app: App,
   settings: Record<string, unknown>,
+  noticeAcceptedAt: Date | undefined,
 ): FieldChange[] {
   return [
     { field: "connector", oldValue: null, newValue: connector },
     { field: "app", oldValue: null, newValue: app.id, oldLabel: null, newLabel: app.name },
     { field: "settings", oldValue: null, newValue: JSON.stringify(settings) },
+    ...(noticeAcceptedAt
+      ? [{ field: "noticeAcceptedAt", oldValue: null, newValue: noticeAcceptedAt.toISOString() }]
+      : []),
   ];
+}
+
+/** The user accepting a notice; only a signed-in user can, so the stored acceptance names them. */
+function signedInUserOf(ctx: SecurityContext): string {
+  if (!ctx.user) {
+    throw new ApplicationError("FORBIDDEN", "Only a signed-in admin accepts a notice.");
+  }
+  return ctx.user.userId;
 }

@@ -77,6 +77,16 @@ test("connects the approved catalog app, protects its key and queues its first s
   expect(inspect(state.history, { depth: null })).not.toContain(ACME_LINEAR.apiKey);
 });
 
+test("Linear leaves the notice empty", async ({ orm, fakeConnectors }) => {
+  const { service } = containerConnections(orm, fakeConnectors.url);
+  const { connection } = await service.connect(OWNER, LINEAR_INPUT);
+
+  expect(connection!.noticeAcceptedAt).toBeNull();
+  expect(await storedAppConnections(orm)).toMatchObject([
+    { noticeAcceptedAt: null, noticeAcceptedBy: null },
+  ]);
+});
+
 test("approves the same Linear app Google discovered", async ({
   orm,
   fakeGoogle,
@@ -163,27 +173,39 @@ test.for([
   },
 );
 
-test.for([
-  {
-    connector: "slack",
-    code: "CONFLICT",
-    message: "This connector connects with an app session, not typed values.",
-  },
-  {
-    connector: "absent",
+test("refuses typed values for an unknown connector and saves nothing", async ({
+  orm,
+  fakeConnectors,
+}) => {
+  const { service, sent } = containerConnections(orm, fakeConnectors.url);
+
+  await expect(
+    service.connect(OWNER, { ...LINEAR_INPUT, connector: "absent" }),
+  ).rejects.toMatchObject({
     code: "NOT_FOUND",
     message: "The connectors container has no connector with this key.",
+  });
+
+  expect(await storedConnectionState(orm)).toEqual(EMPTY);
+  expect(sent).toEqual([]);
+});
+
+test.for([
+  {
+    reason: "accepting the notice",
+    input: { values: LINEAR_INPUT.values },
+    field: "noticeAccepted",
   },
+  { reason: "an app session", input: { noticeAccepted: true }, field: "appSession" },
 ])(
-  "refuses typed values for $connector and saves nothing",
-  async ({ connector, code, message }, { orm, fakeConnectors }) => {
+  "refuses to connect Slack without $reason and saves nothing",
+  async ({ input, field }, { orm, fakeConnectors }) => {
     const { service, sent } = containerConnections(orm, fakeConnectors.url);
 
-    await expect(service.connect(OWNER, { ...LINEAR_INPUT, connector })).rejects.toMatchObject({
-      code,
-      message,
+    await expect(service.connect(OWNER, { connector: "slack", ...input })).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      fieldErrors: [{ field, code: "required" }],
     });
-
     expect(await storedConnectionState(orm)).toEqual(EMPTY);
     expect(sent).toEqual([]);
   },

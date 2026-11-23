@@ -47,6 +47,8 @@ export function useChromeExtension() {
 
   return {
     status: query.data ? statusOf(pairing !== null, isInstalled) : "checking",
+    // This Chrome's own extension, which `status` hides behind a pairing made in another Chrome.
+    isInstalled,
     pairing,
     canPair: isPairableOrigin(window.location.origin),
     startPairing,
@@ -60,6 +62,9 @@ export function useChromeExtension() {
     retry: () => void query.refetch().catch(() => undefined),
   };
 }
+
+/** Where the owner installs the extension. */
+export const CHROME_WEB_STORE_URL = `https://chromewebstore.google.com/detail/${EXTENSION_ID}`;
 
 /** How often the page asks whether the extension has paired. */
 const PAIR_POLL_INTERVAL_MS = 1_000;

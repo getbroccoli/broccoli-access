@@ -10,6 +10,8 @@ export interface FakeConnector {
   workspace: SeedWorkspace;
   /** The setting that names the workspace, which list and action calls check. */
   workspaceIdSetting: string;
+  /** The workspace's address a connection test answers, such as `acme.slack.com`; null for an app without one. */
+  workspaceDomain: string | null;
   /** Whether the connection's secrets still reach the workspace. */
   authenticates: (state: ConnectorsState, secrets: Record<string, unknown>) => boolean;
   /** The member as the app's own API shows it. */

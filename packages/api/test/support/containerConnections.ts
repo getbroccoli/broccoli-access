@@ -5,7 +5,7 @@ import type {
   ConnectorErrorCode,
   ConnectorManifest,
 } from "@broccoli-access/connector-contract";
-import { ACME_LINEAR } from "@broccoli-access/fake-apps";
+import { ACME_LINEAR, type RunningFakeConnectors } from "@broccoli-access/fake-apps";
 import express, { type RequestHandler } from "express";
 import { onTestFinished } from "vitest";
 
@@ -17,6 +17,7 @@ import {
   createContainerConnectors,
 } from "../../src/modules/connectors";
 import { recordingJobQueue } from "./recordingJobQueue";
+import { signInToFakeSlack } from "./signInToFakeSlack";
 import { startSimpleHttpServer } from "./simpleHttpServer";
 import { scans } from "./services";
 import { storedAppConnections } from "./storedGoogleConnection";
@@ -39,6 +40,7 @@ export function containerConnections(
   orm: Orm,
   url: string,
   transact: Transact = testTransactor(orm),
+  now?: () => Date,
 ) {
   const { jobs, sent } = recordingJobQueue();
   const connectors = containerConnectors(url);
@@ -46,6 +48,8 @@ export function containerConnections(
   const service = createContainerConnectionService({
     orm,
     transact,
+    secretBox: TEST_SECRET_BOX,
+    now,
     wait: () => Promise.resolve(),
     logger: createLogger("silent"),
     containerConnectors: connectors,
@@ -120,4 +124,20 @@ export async function serveConnectorRoutes(fakeUrl: string, app: express.Express
   const server = await startSimpleHttpServer(app);
   onTestFinished(() => server.stop());
   return server;
+}
+
+/** The owner's session issued by this test's fake, handed over to the real service. */
+export async function ownerHandOver(orm: Orm, fake: RunningFakeConnectors, now?: () => Date) {
+  const services = containerConnections(orm, fake.url, undefined, now);
+  const appSession = await signInToFakeSlack(fake);
+  const requestId = "owner-request";
+  await services.service.handOverAppSession({
+    requestId,
+    userId: OWNER.user!.userId,
+    connector: "slack",
+    appSession,
+  });
+  const handOver = await services.service.readAppSessionHandOver(OWNER, requestId);
+  assert.ok(handOver);
+  return { ...services, handOver, requestId, appSession };
 }

@@ -1,3 +1,5 @@
+import { describeAppSession, handOverAppSession } from "./appSessionHandOver";
+import { callInstance, type StoredPairing } from "./instanceCall";
 import { hostPermissionOf, isPairableOrigin } from "./instanceOrigin";
 import type { PairingView, WorkerAnswers, WorkerRequest } from "./workerRequests";
 
@@ -21,15 +23,12 @@ const PAIRING_KEY = "pairing";
 /** How long a call to the instance may take before the extension stops waiting for it. */
 const INSTANCE_TIMEOUT_MS = 10_000;
 
+/** Where the extension reads and unpairs its pairing. */
+const PAIRING_PATH = "/api/extension/pairing";
+
 const CREATED = 201;
 
 const UNAUTHORIZED = 401;
-
-/** The paired instance and the token it gave, shown to the extension once. */
-interface StoredPairing {
-  origin: string;
-  token: string;
-}
 
 /** The last change to the stored pairing; each change waits for it, so none undoes another. */
 let pairingChanges: Promise<unknown> = Promise.resolve();
@@ -46,6 +45,14 @@ function answer(request: WorkerRequest): Promise<WorkerAnswers[WorkerRequest["ty
       return checkPairing();
     case "unpair":
       return unpair();
+    case "describeAppSession":
+      return storedPairing().then(
+        (pairing) => pairing && describeAppSession(pairing, request.connector),
+      );
+    case "handOverAppSession":
+      return storedPairing().then(async (pairing) => ({
+        outcome: pairing ? await handOverAppSession(pairing, request) : "failed",
+      }));
   }
 }
 
@@ -84,7 +91,7 @@ async function checkPairing(): Promise<PairingView | null> {
   if (!pairing) {
     return null;
   }
-  const response = await callInstance(pairing, "GET");
+  const response = await callInstance(pairing, PAIRING_PATH, { method: "GET" });
   if (response?.status === UNAUTHORIZED) {
     await changePairing(() => forgetIfCurrent(pairing));
     return null;
@@ -101,7 +108,7 @@ async function unpair(): Promise<WorkerAnswers["unpair"]> {
   if (!pairing) {
     return { unpaired: true };
   }
-  const response = await callInstance(pairing, "DELETE");
+  const response = await callInstance(pairing, PAIRING_PATH, { method: "DELETE" });
   // 401: the instance had already dropped this pairing.
   const isGone = response !== null && (response.ok || response.status === UNAUTHORIZED);
   if (isGone) {
@@ -131,28 +138,12 @@ async function redeem(origin: string, code: string): Promise<string | null> {
 
 /** Unpairs a replaced instance, then drops its host access unless the current pairing needs it. */
 async function retire(previous: StoredPairing): Promise<void> {
-  await callInstance(previous, "DELETE");
+  await callInstance(previous, PAIRING_PATH, { method: "DELETE" });
   await changePairing(async () => {
     if ((await storedPairing())?.origin !== previous.origin) {
       await chrome.permissions.remove(hostPermissionOf(previous.origin));
     }
   });
-}
-
-/** The instance's answer to a call with the pairing's token; null when it did not answer in time. */
-async function callInstance(
-  pairing: StoredPairing,
-  method: "GET" | "DELETE",
-): Promise<Response | null> {
-  try {
-    return await fetch(`${pairing.origin}/api/extension/pairing`, {
-      method,
-      headers: { authorization: `Bearer ${pairing.token}` },
-      signal: AbortSignal.timeout(INSTANCE_TIMEOUT_MS),
-    });
-  } catch {
-    return null;
-  }
 }
 
 /** Forgets `pairing` unless pairing again replaced it meanwhile, such as while a call was on its way. */

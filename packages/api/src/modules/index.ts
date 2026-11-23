@@ -9,7 +9,11 @@ import {
   createAppService,
   createAppUserService,
 } from "./apps";
-import { connectorsModule, createContainerConnectors } from "./connectors";
+import {
+  connectorsModule,
+  createContainerConnectionService,
+  createContainerConnectors,
+} from "./connectors";
 import {
   createDirectorySyncService,
   createEmployeeReadService,
@@ -58,6 +62,13 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     apps: { ...connectedApps, ...createAppAccountService(), ...apps },
     directory: createDirectorySyncService(),
   });
+  // One service for Settings and the extension, which share the app sessions handed over.
+  const containerConnections = createContainerConnectionService({
+    ...core,
+    containerConnectors,
+    connectedApps,
+    scans,
+  });
   const manifests = [
     systemModule({
       ...core,
@@ -72,7 +83,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       employeeDirectory: directory,
     }),
     importsModule(scans),
-    connectorsModule({ ...core, containerConnectors, connectedApps, scans }),
+    connectorsModule(containerConnections),
     appsModule({
       ...apps,
       ...createAppUserService({
@@ -82,7 +93,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       }),
       ...createAccountChangeService({ ...core, connectors, members: createImportRecordService() }),
     }),
-    extensionModule(core),
+    extensionModule({ ...core, appSessions: containerConnections }),
   ];
   return {
     manifests: [...manifests, recordsManifest(core, manifests)],

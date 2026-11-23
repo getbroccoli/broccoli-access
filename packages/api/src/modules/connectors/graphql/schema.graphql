@@ -9,6 +9,8 @@ type ContainerConnector {
   findingKind: String!
   "What connecting asks for, in order."
   connectionFields: [ConnectionField!]!
+  "Shown before the first connection, which the owner accepts; null for an API connector."
+  notice: String
   "Its connection; null until connected."
   connection: ContainerConnection
 }
@@ -36,8 +38,22 @@ type ContainerConnection {
   id: ID!
   "Where the owner manages the app's members, with the connection's settings filled in; null when they lack a value it names."
   adminUrl: String
+  "When the owner accepted the connector's notice; null for a connector without one."
+  noticeAcceptedAt: DateTime
   "The connector it connects through."
   connector: ContainerConnector!
+}
+
+"An app session the paired extension handed over, tested with the app, waiting for the owner to connect within five minutes."
+type AppSessionHandOver {
+  "The id the page gave the hand-over."
+  id: ID!
+  "The workspace the session opens, such as `Acme`."
+  organizationName: String!
+  "The workspace's address, such as `acme.slack.com`; null for an app without one."
+  domain: String
+  "The session, sealed so only this instance reads it; `connectors.connect` takes it back."
+  appSession: String!
 }
 
 # Adds the connection to the apps module's App; the server merges the types of the modules.
@@ -62,8 +78,12 @@ type AppToConnect {
 input ContainerConnectorConnectInput {
   "The connector's key, such as `linear`."
   connector: ID!
-  "A value for each of its connection fields."
-  values: [ConnectionFieldValue!]!
+  "A value for each of its text connection fields."
+  values: [ConnectionFieldValue!]! = []
+  "For a connector with an app session field: the `appSession` of its `AppSessionHandOver`."
+  appSession: String
+  "Whether the owner accepted the connector's notice; a connector with a notice needs it."
+  noticeAccepted: Boolean! = false
 }
 
 input ConnectionFieldValue {
@@ -84,7 +104,7 @@ union ContainerConnectorConnectError =
   | UnavailableError
 
 type ConnectorsMutations {
-  "Connects a container connector whose fields are all text: tests the values with the app, then saves the connection, approves its app and queues its first scan. Refused as invalid `values.<key>` for a missing or unknown value and as invalid `values` with the error's code when the app refuses them, with a NotFoundError for a connector the container lacks, a ConflictError for one already connected or asking for an app session, and an UnavailableError when the test fails otherwise. Admins only."
+  "Connects a container connector with typed values, or with the app session its extension handed over: tests them with the app, then saves the connection, approves its app and queues its first scan. Refused as invalid `noticeAccepted` without the connector's notice accepted, as invalid `values.<key>` for a missing or unknown value, as invalid `appSession` for a missing, changed, expired or another's session, and as invalid `values` or `appSession` with the error's code when the app refuses them; with a NotFoundError for a connector the container lacks, a ConflictError for one already connected, and an UnavailableError when the test fails otherwise. Admins only."
   connect(input: ContainerConnectorConnectInput!): ContainerConnectorConnectPayload!
 }
 
@@ -93,6 +113,8 @@ type Query {
   containerConnectors: [ContainerConnector!]!
   "The apps a container connector can manage that have no app yet, in the container's order; empty without a container, and while it has not listed its connectors since the API started. Admins only."
   appsToConnect: [AppToConnect!]!
+  "The caller's app session hand-over with this id, which their page gave the extension; null until the extension hands the session over, and after five minutes. Admins only."
+  appSessionHandOver(id: ID!): AppSessionHandOver
 }
 
 type Mutation {

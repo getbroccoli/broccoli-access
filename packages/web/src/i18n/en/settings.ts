@@ -42,6 +42,64 @@ export const settingsEn = {
   "settings.apps.connect": "Connect {app}",
   "settings.apps.summary": "The {workspace} workspace, connected with a {field} of {email}.",
   "settings.apps.summaryBeforeScan": "The {workspace} workspace, connected with a {field}.",
+  "settings.apps.summaryAppSession":
+    "The {workspace} workspace, connected with the {app} session of {email}.",
+  "settings.apps.summaryAppSessionBeforeScan":
+    "The {workspace} workspace, connected with your {app} session.",
+  "settings.apps.noticeAccepted": "You accepted {app}’s notice on {day}.",
+  "settings.appSession.stepExtension": "Extension",
+  "settings.appSession.stepPair": "Pair",
+  "settings.appSession.stepNotice": "Notice",
+  "settings.appSession.stepSignIn": "Sign in",
+  "settings.appSession.done": "Done",
+  "settings.appSession.extensionTitle": "Add the Broccoli Access extension to Chrome",
+  "settings.appSession.extensionBody":
+    "{app} has no API for this on your plan, so Broccoli Access makes the calls {app}’s own admin pages make, with your own {app} session. The extension hands that session over when you connect.",
+  "settings.appSession.sendsOnly":
+    "It sends only {app}’s cookies and the token {app}’s signed-in page keeps, and only when you connect or reconnect.",
+  "settings.appSession.webStore": "Get it from the Chrome Web Store ↗",
+  "settings.appSession.waitingForExtension":
+    "Waiting for the extension. This moves on by itself once it’s installed.",
+  "settings.appSession.chromeOnly": "Works in Chrome only.",
+  "settings.appSession.pairTitle": "Pair the extension with Broccoli Access",
+  "settings.appSession.pairBody":
+    "Pairing lets this Broccoli Access, at {host}, and no other site talk to the extension. Chrome shows the extension’s popup for you to confirm.",
+  "settings.appSession.installed": "Installed in {browser}. Not paired yet.",
+  "settings.appSession.noticeTitle": "Before you connect {app}",
+  "settings.appSession.noticeChoice":
+    "This is your choice for your company. Broccoli Access records who accepted it and when. You can disconnect {app} at any time.",
+  "settings.appSession.noticeAccept": "I’ve read this and choose to connect {app}.",
+  "settings.appSession.acceptAndContinue": "Accept and continue",
+  "settings.appSession.signInTitle": "Sign in to {app} in Chrome, then Connect",
+  "settings.appSession.signInBody":
+    "Sign in to {app} in this Chrome as you always do, with SSO and two-step verification, as a {app} admin. Then come back here.",
+  "settings.appSession.sendsNothingElse":
+    "The extension sends Broccoli Access only {app}’s cookies and the token {app}’s signed-in page keeps, nothing from other sites.",
+  "settings.appSession.storedEncrypted":
+    "Your server stores them encrypted. It never sees your password or a two-step code.",
+  "settings.appSession.openApp": "Open {app} in a new tab ↗",
+  "settings.appSession.confirmInWindow": "Confirm in the extension’s window.",
+  "settings.appSession.windowBlocked":
+    "Chrome blocked the extension’s window. Allow pop-ups for this site, then try again.",
+  "settings.appSession.notHandedOver":
+    "Nothing was handed over. Connect {app} again when you’re ready.",
+  "settings.appSession.readFailed":
+    "Couldn’t check whether the extension handed over your session. Connect {app} again.",
+  "settings.appSession.confirmTitle": "Connect the {workspace} workspace?",
+  "settings.appSession.confirmBody": "Your {app} session in this Chrome opens this workspace.",
+  "settings.appSession.approvesNow": "Broccoli Access approves {app} and reads its members now.",
+  "settings.appSession.readsDaily":
+    "Each day it reads them again, which also keeps the session fresh.",
+  "settings.appSession.notThisWorkspace":
+    "Not this workspace? Switch to the right one in {app}, then Connect {app} again.",
+  "settings.appSession.back": "Back",
+  "settings.appSession.connectWorkspace": "Connect {workspace}",
+  "settings.appSession.expired": "This hand-over expired. Connect {app} again.",
+  "settings.appSession.otherWorkspace":
+    "Your {app} session now opens another workspace. Go back, switch to the right one in {app}, then Connect {app} again.",
+  "settings.appSession.pairAgainHint": "Did the extension say this Chrome isn’t paired?",
+  "settings.appSession.refused":
+    "{app} refused your session. Sign in to {app} again, then Connect {app} again.",
   "settings.apps.oneMember": "1 member.",
   "settings.apps.members": "{count} members.",
   "settings.apps.dialog.description":

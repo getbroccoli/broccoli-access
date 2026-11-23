@@ -30,7 +30,7 @@ A manual check of an app's page, `/apps/<id>`, against a development stack.
 Open Slack from Applications.
 
 - [ ] After "Approved", an outlined "Can disable" pill with a person-minus icon reads "Broccoli Access can disable and enable accounts in this app" on hover.
-- [ ] Next to "Ignore", "Connect Slack" opens Settings → Connections.
+- [ ] Next to "Ignore", "Connect Slack" opens the Connect Slack dialog of Settings → Connections (see "Connect Slack" in [Connections settings](connections-settings.md)); once connected, the page shows Slack's members without a reload.
 - [ ] Under the header, a grey note reads "Connect Slack to see every member and disable or enable their accounts from here. Until then, Broccoli Access sees only who signs in to Slack with Google."
 - [ ] Figma's and Google Workspace's pages have none of the three.
 

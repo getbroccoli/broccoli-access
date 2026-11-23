@@ -25,6 +25,7 @@ export const LINEAR: FakeConnector = {
   },
   workspace: ACME_LINEAR,
   workspaceIdSetting: "organizationId",
+  workspaceDomain: null,
   authenticates: (state, secrets) =>
     !state.linearKeyRevoked && secrets.apiKey === ACME_LINEAR.apiKey,
   raw: (member) => ({

@@ -1,0 +1,15 @@
+fragment ConnectAppSessionDialog_connector on ContainerConnector {
+  id
+  name
+  appDomain
+  notice
+}
+
+query AppSessionHandOver($id: ID!) {
+  appSessionHandOver(id: $id) {
+    id
+    organizationName
+    domain
+    appSession
+  }
+}

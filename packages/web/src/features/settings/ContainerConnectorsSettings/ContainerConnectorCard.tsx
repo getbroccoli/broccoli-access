@@ -1,6 +1,7 @@
 import type { ContainerConnectorsSettingsQuery } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
 import {
+  ConnectAppSessionDialog,
   ConnectContainerConnectorDialog,
   connectingFieldName,
   connectsWithText,
@@ -60,11 +61,13 @@ export function ContainerConnectorCard({ connector }: Props) {
           className="shrink-0 items-start pb-0"
         />
       ) : (
-        connectsWithText(connector) && (
-          <div className="shrink-0">
+        <div className="shrink-0">
+          {connectsWithText(connector) ? (
             <ConnectContainerConnectorDialog connector={connector} />
-          </div>
-        )
+          ) : (
+            <ConnectAppSessionDialog connector={connector} />
+          )}
+        </div>
       )}
     </article>
   );

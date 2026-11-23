@@ -12,6 +12,8 @@ export interface AppConnection {
   connectedAt: Date;
   /** `reconnect` once its key or session stopped working. */
   status: "connected" | "reconnect";
+  /** When the owner accepted the connector's notice; null for a connector without one. */
+  noticeAcceptedAt: Date | null;
 }
 
 /** App connections in Postgres, through the pool or inside a transaction. */
@@ -24,6 +26,7 @@ export interface AppConnectionRepository {
     appId: string;
     settings: Record<string, unknown>;
     encryptedSecrets: string;
+    noticeAccepted?: { at: Date; by: string };
   }): Promise<AppConnection>;
   /** Replaces the connection's settings or secrets, whichever is set; null for an unknown id. */
   update(
@@ -50,8 +53,15 @@ export function appConnectionRepository(db: Orm | Tx): AppConnectionRepository {
       const { rows } = await orm().execute<{ id: string }>(sql`select uuidv7() as id`);
       return rows[0]!.id;
     },
-    insert: async (connection) => {
-      const [stored] = await orm().insert(appConnections).values(connection).returning(columns);
+    insert: async ({ noticeAccepted, ...connection }) => {
+      const [stored] = await orm()
+        .insert(appConnections)
+        .values({
+          ...connection,
+          noticeAcceptedAt: noticeAccepted?.at,
+          noticeAcceptedBy: noticeAccepted?.by,
+        })
+        .returning(columns);
       return stored!;
     },
     update: async (id, connection) => {
@@ -104,4 +114,5 @@ const columns = {
   settings: appConnections.settings,
   connectedAt: appConnections.connectedAt,
   status: appConnections.status,
+  noticeAcceptedAt: appConnections.noticeAcceptedAt,
 };

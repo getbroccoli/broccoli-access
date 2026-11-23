@@ -17,6 +17,7 @@ mutation ConnectContainerConnector($input: ContainerConnectorConnectInput!) {
         connection {
           id
           connectionUserEmail
+          noticeAcceptedAt
           scan {
             id
             status

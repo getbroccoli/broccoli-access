@@ -41,6 +41,7 @@ export const SLACK: FakeConnector = {
   },
   workspace: ACME_SLACK,
   workspaceIdSetting: "teamId",
+  workspaceDomain: `${ACME_SLACK.settings.teamDomain}.slack.com`,
   authenticates: (state, secrets) => {
     const session = sessionOf(secrets);
     return session !== undefined && state.slackSessions.get(session.d) === session.token;

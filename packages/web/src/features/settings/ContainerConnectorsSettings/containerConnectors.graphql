@@ -8,9 +8,11 @@ query ContainerConnectorsSettings {
       secret
     }
     ...ConnectContainerConnectorDialog_connector
+    ...ConnectAppSessionDialog_connector
     connection {
       id
       connectionUserEmail
+      noticeAcceptedAt
       scan {
         id
         status
