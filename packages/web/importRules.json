@@ -20,6 +20,7 @@
       "src/features/setup",
       "src/i18n",
       "src/lib/class-names",
+      "src/lib/isAnyAppScanning",
       "src/lib/useRefetchAfterScan",
       "src/lib/useSessionChange"
     ],
@@ -35,6 +36,7 @@
       "src/i18n",
       "src/lib/class-names",
       "src/lib/dayAndTime",
+      "src/lib/isAnyAppScanning",
       "src/lib/lastScan",
       "src/lib/since",
       "src/lib/useChromeExtension",
@@ -81,6 +83,7 @@
       "src/i18n",
       "src/lib/calendarDay",
       "src/lib/class-names",
+      "src/lib/isAnyAppScanning",
       "src/lib/lastScan",
       "src/lib/since",
       "src/lib/useChromeExtension",
@@ -120,6 +123,7 @@
     "src/lib/calendarDay": [],
     "src/lib/lastScan": ["src/i18n", "src/lib/dayAndTime"],
     "src/lib/usePollWhileScanning": [],
+    "src/lib/isAnyAppScanning": [],
     "src/lib/useChromeExtension": ["src/__generated__", "src/apollo"],
     "src/lib/dayAndTime": ["src/lib/calendarDay", "src/lib/since"]
   },

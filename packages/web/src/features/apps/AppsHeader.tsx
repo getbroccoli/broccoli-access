@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { AppsScanDocument, type AppsScanQuery } from "@/__generated__/graphql";
 import { useCache } from "@/apollo";
 import { t } from "@/i18n";
+import { isAnyAppScanning } from "@/lib/isAnyAppScanning";
 import { formatLastScan } from "@/lib/lastScan";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { PageHeader, ScanNowButton } from "@/shell";
@@ -21,8 +22,9 @@ export function AppsHeader({ canScan }: Props) {
   const scanQuery = useQuery(AppsScanDocument, { fetchPolicy: "cache-and-network" });
   const connection = scanQuery.data?.setup.googleWorkspace;
   const isScanning = connection?.scan?.status === "SCANNING";
-  usePollWhileScanning(isScanning, scanQuery);
-  useReloadAppsAfterScan(isScanning);
+  const isAnyScanning = isScanning || isAnyAppScanning(scanQuery.data?.containerConnectors ?? []);
+  usePollWhileScanning(isAnyScanning, scanQuery);
+  useReloadAppsAfterScan(isAnyScanning);
 
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-4">

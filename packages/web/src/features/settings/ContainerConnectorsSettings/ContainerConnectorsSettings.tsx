@@ -2,6 +2,7 @@ import { useQuery } from "@apollo/client/react";
 
 import { ContainerConnectorsSettingsDocument } from "@/__generated__/graphql";
 import { t } from "@/i18n";
+import { isAnyAppScanning } from "@/lib/isAnyAppScanning";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 
 import { ContainerConnectorCard } from "./ContainerConnectorCard";
@@ -11,10 +12,7 @@ export function ContainerConnectorsSettings() {
   // A scan started elsewhere, such as on the app's page, changes the connection outside this cache.
   const query = useQuery(ContainerConnectorsSettingsDocument, { fetchPolicy: "cache-and-network" });
   const connectors = query.data?.containerConnectors ?? [];
-  usePollWhileScanning(
-    connectors.some(({ connection }) => connection?.scan?.status === "SCANNING"),
-    query,
-  );
+  usePollWhileScanning(isAnyAppScanning(connectors), query);
   if (connectors.length === 0) {
     return null;
   }
