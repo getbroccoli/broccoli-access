@@ -170,6 +170,7 @@ async function scanSource(
   progressBySource: Map<string, ScanProgress>,
 ): Promise<void> {
   const { orm, logger, apps } = dependencies;
+  const readStartedAt = new Date();
   const connection = (await apps.readConnectionById(orm, connectionId))!;
   const connector = await connectorOf(dependencies, connection.connector);
   const secrets = await apps.readSecrets(orm, connectionId);
@@ -184,14 +185,14 @@ async function scanSource(
   });
   const found = foundCounts(accounts);
   progressBySource.set(sourceId, { found });
-  const { photos, accounts: savedAccounts } = await readChangedPhotos(ctx, dependencies, {
+  const read = await readChangedPhotos(ctx, dependencies, {
     sourceId,
     connector,
     session,
     accounts,
     retrying,
   });
-  const findings = { sourceId, connection, connector, accounts: savedAccounts, photos };
+  const findings = { sourceId, connection, connector, readStartedAt, ...read };
   const { saved, finishedSetupScan } = await saveScan(ctx, dependencies, findings);
   logger.info(
     {
@@ -199,7 +200,7 @@ async function scanSource(
       accounts: accounts.length,
       people: found.people,
       apps: found.apps,
-      photoChanges: photos.size,
+      photoChanges: read.photos.size,
       saved,
       finishedSetupScan,
     },

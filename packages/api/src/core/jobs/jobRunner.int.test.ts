@@ -171,3 +171,47 @@ test("stopping during startup waits for startup and leaves no worker running", a
   }
   expect(stoppedRunnerJobs).toEqual([]);
 });
+
+test("runs jobs in order within a group while another group can run alongside", async ({
+  runner,
+  transact,
+}) => {
+  const releaseFirst = Promise.withResolvers<void>();
+  const started: string[] = [];
+  await runner.start([
+    {
+      "example.ran": {
+        groupConcurrency: 1,
+        run: async ({ id }) => {
+          started.push(id);
+          if (id === "first") await releaseFirst.promise;
+        },
+        onFailed: () => {
+          throw new Error("The job should succeed");
+        },
+      },
+    },
+  ]);
+
+  try {
+    await transact((tx) =>
+      runner.queue.send(tx, "example.ran", { id: "first" }, { group: "linear" }),
+    );
+    await expect.poll(() => started, { timeout: 8_000 }).toEqual(["first"]);
+    for (const [id, group] of [
+      ["second", "linear"],
+      ["third", "linear"],
+      ["other", "slack"],
+    ] as const) {
+      await transact((tx) => runner.queue.send(tx, "example.ran", { id }, { group }));
+    }
+    await expect.poll(() => started, { timeout: 8_000 }).toContain("other");
+    expect(started).toEqual(["first", "other"]);
+  } finally {
+    releaseFirst.resolve();
+  }
+
+  await expect
+    .poll(() => started, { timeout: 10_000 })
+    .toEqual(["first", "other", "second", "third"]);
+});

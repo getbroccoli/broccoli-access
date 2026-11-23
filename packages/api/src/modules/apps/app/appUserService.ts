@@ -4,7 +4,11 @@ import type { SecurityContext } from "../../../core/security";
 import { appAccountRepository, type AppUserAccount } from "../db";
 import { accountSince, type Since } from "../domain";
 import type { EmployeesByName } from "../ports";
-import { type DirectoryConnectors, findEmployeesSuspendedInDirectory } from "./directory";
+import {
+  type DirectoryConnectors,
+  findDirectoryAppId,
+  findEmployeesSuspendedInDirectory,
+} from "./directory";
 
 /** An app's users: its accounts that belong to an employee. */
 export interface AppUserService {
@@ -13,6 +17,14 @@ export interface AppUserService {
    * directory first, then by name. Needs MANAGE_WORKSPACE.
    */
   readUsersOfApps: (ctx: SecurityContext, appIds: readonly string[]) => Promise<AppUser[]>;
+  /**
+   * The employees' accounts in approved apps other than the directory: the active ones, and the
+   * suspended ones in apps with a connection; by app name. Needs MANAGE_WORKSPACE.
+   */
+  readUsersOfEmployees: (
+    ctx: SecurityContext,
+    employeeIds: readonly string[],
+  ) => Promise<AppUser[]>;
 }
 
 /** An account in an app that belongs to an employee. */
@@ -68,6 +80,18 @@ export function createAppUserService({
             Number(other.suspendedInDirectory) - Number(one.suspendedInDirectory) ||
             nameRank(one) - nameRank(other),
         );
+    },
+    async readUsersOfEmployees(ctx, employeeIds) {
+      ctx.require("MANAGE_WORKSPACE");
+      const [accounts, suspended, directoryAppId] = await Promise.all([
+        appAccountRepository(orm).findCurrentAccountsOfEmployees(employeeIds),
+        findEmployeesSuspendedInDirectory(orm, connectors),
+        findDirectoryAppId(orm, connectors),
+      ]);
+      const suspendedInDirectory = new Set(suspended);
+      return accounts
+        .filter(({ appId }) => appId !== directoryAppId)
+        .map((account) => toAppUser(account, suspendedInDirectory));
     },
   };
 }

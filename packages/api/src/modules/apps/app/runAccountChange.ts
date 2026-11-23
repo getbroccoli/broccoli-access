@@ -1,0 +1,201 @@
+import {
+  canChangeAccounts,
+  type ConnectionUpdate,
+  ConnectorError,
+  type ConnectorErrorCode,
+  withConnectorRetries,
+} from "../../../core/connectors";
+import type { Transact, Tx } from "../../../core/db";
+import { createRecordHistoryService } from "../../../core/records";
+import type { SecurityContext } from "../../../core/security";
+import { accountChangeRepository, appAccountRepository } from "../db";
+import { type AccountChange, accountChanges, statusAfter } from "../domain";
+import type { AccountChangeDependencies } from "./accountChangeService";
+import type { AppConnectionService } from "./appConnectionService";
+
+const recordHistory = createRecordHistoryService();
+
+/** What a run needs: the service's dependencies and its connection service. */
+type RunDependencies = AccountChangeDependencies & { connections: AppConnectionService };
+
+/** Runs a running change through its connector and saves how it ended; skips any other. */
+export async function runAccountChange(
+  dependencies: RunDependencies,
+  ctx: SecurityContext,
+  changeId: string,
+): Promise<void> {
+  ctx.requireSystem();
+  const { orm, transact, logger } = dependencies;
+  const change = await accountChangeRepository(orm).findById(changeId);
+  if (change?.status !== "running") {
+    logger.info(
+      { changeId, status: change?.status ?? null },
+      "Account change skipped: not running",
+    );
+    return;
+  }
+  const { error, calledServer } = await runAction(dependencies, ctx, change);
+  const finished = error
+    ? await finishFailed(transact, changeId, error, calledServer)
+    : await finishSucceeded(transact, ctx, change);
+  const outcome = { changeId, appAccountId: change.appAccountId, finished, failure: error };
+  if (error) {
+    logger.warn(outcome, "Account change failed");
+  } else {
+    logger.info(outcome, "Account change succeeded");
+  }
+}
+
+/** Fails a change that is still running with `app_unavailable`, after its job's last attempt. */
+export async function failRunningChange(
+  { transact, logger }: AccountChangeDependencies,
+  ctx: SecurityContext,
+  changeId: string,
+): Promise<void> {
+  ctx.requireSystem();
+  const failed = await finishFailed(transact, changeId, "app_unavailable", false);
+  logger.warn({ changeId, failed }, "Account change failed after its job's last attempt");
+}
+
+/** How the action ended: its error, null once the member read back changed; and whether the server was called. */
+interface ActionOutcome {
+  error: ConnectorErrorCode | null;
+  calledServer: boolean;
+}
+
+async function runAction(
+  dependencies: RunDependencies,
+  ctx: SecurityContext,
+  change: AccountChange,
+): Promise<ActionOutcome> {
+  const { orm, connections, connectors, wait, logger } = dependencies;
+  const connection = (await connections.readConnectionById(orm, change.connectionId))!;
+  const connector = (await connectors.list()).find(({ key }) => key === connection.connector);
+  // A connector the container no longer lists, or one that no longer changes accounts, cannot act now.
+  if (!connector || !canChangeAccounts(connector)) {
+    return { error: "app_unavailable", calledServer: false };
+  }
+  let calledServer = false;
+  try {
+    const secrets = await connections.readSecrets(orm, change.connectionId);
+    const session = await connector.openSession({ settings: connection.settings, secrets });
+    const account = { sourceKey: change.sourceKey, email: change.email };
+    const result = await withConnectorRetries(
+      () => {
+        calledServer = true;
+        return session.runAction!(change.action, account);
+      },
+      {
+        wait,
+        onRetry: (failure, attempt) =>
+          logger.info(
+            { changeId: change.id, failure, attempt },
+            "Account change call failed; trying again",
+          ),
+      },
+    );
+    await saveConnectionUpdate(dependencies, ctx, change, result.connection);
+    // Success is the new status read back, never a call that went through.
+    const read = result.status === statusAfter(change.action);
+    return { error: read ? null : "unexpected_response", calledServer };
+  } catch (error) {
+    if (error instanceof ConnectorError) {
+      return { error: error.code, calledServer };
+    }
+    throw error;
+  }
+}
+
+async function saveConnectionUpdate(
+  { transact, connections, logger }: RunDependencies,
+  ctx: SecurityContext,
+  change: AccountChange,
+  update: ConnectionUpdate | undefined,
+): Promise<void> {
+  if (!update?.settings && !update?.secrets) {
+    return;
+  }
+  await transact((tx) => connections.changeConnection(ctx, tx, change.connectionId, update));
+  logger.info(
+    { changeId: change.id, connectionId: change.connectionId },
+    "Account change saved the connection's renewed settings or secrets",
+  );
+}
+
+/**
+ * Fails a running change with `error`, adding the server's attempt when it was called; false when
+ * another outcome came first.
+ */
+async function finishFailed(
+  transact: Transact,
+  changeId: string,
+  error: ConnectorErrorCode,
+  calledServer: boolean,
+): Promise<boolean> {
+  return transact(async (tx) => {
+    const changes = accountChangeRepository(tx);
+    const change = await changes.lockById(changeId);
+    if (change?.status !== "running") {
+      return false;
+    }
+    const at = new Date();
+    const attempt = { runtime: "server" as const, error, at };
+    await changes.finish(changeId, {
+      status: "failed",
+      attempts: calledServer ? [...change.attempts, attempt] : change.attempts,
+      error,
+      finishedAt: at,
+    });
+    return true;
+  });
+}
+
+/**
+ * Ends the change as succeeded and sets its account's status, with a history line by the user who
+ * asked; false when another outcome came first.
+ */
+async function finishSucceeded(
+  transact: Transact,
+  ctx: SecurityContext,
+  change: AccountChange,
+): Promise<boolean> {
+  return transact(async (tx) => {
+    // The lock scans take first: a scan deleting the account also locks this change.
+    await appAccountRepository(tx).lockForSync();
+    const changes = accountChangeRepository(tx);
+    if ((await changes.lockById(change.id))?.status !== "running") {
+      return false;
+    }
+    const now = new Date();
+    await changes.finish(change.id, {
+      status: "succeeded",
+      attempts: [{ runtime: "server", error: null, at: now }],
+      error: null,
+      finishedAt: now,
+    });
+    await setAccountStatus(ctx, tx, change);
+    return true;
+  });
+}
+
+async function setAccountStatus(
+  ctx: SecurityContext,
+  tx: Tx,
+  change: AccountChange,
+): Promise<void> {
+  const accounts = appAccountRepository(tx);
+  const [before] = change.appAccountId ? await accounts.findByIds([change.appAccountId]) : [];
+  const status = statusAfter(change.action);
+  if (!before || before.status === status) {
+    return;
+  }
+  const after = { ...before, status };
+  await accounts.update(after);
+  await recordHistory.append(ctx, tx, {
+    recordType: "app_account",
+    operation: "UPDATED",
+    cause: { kind: "CHANGED_IN_APP", ref: change.id },
+    requestedBy: change.requestedBy,
+    records: [{ recordId: before.id, changes: accountChanges(before, after) }],
+  });
+}

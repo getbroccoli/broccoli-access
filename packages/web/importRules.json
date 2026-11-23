@@ -50,6 +50,7 @@
     "src/features/employees": [
       "src/__generated__",
       "src/apollo",
+      "src/features/apps",
       "src/components/AppMark",
       "src/components/Avatar",
       "src/components/dataTable",

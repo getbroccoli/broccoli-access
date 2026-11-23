@@ -2,7 +2,7 @@ import { ACME } from "@broccoli-access/fake-apps";
 
 import { expect, finishSetupWithPreselectedApps, test, type Browser } from "#test/support";
 
-test("reads a suspended person's current access through the API", async ({ env }) => {
+test("reads a suspended person's app accounts through the API", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
   await finishSetupWithPreselectedApps(browser);
   const people = await browser.graphql(`{
@@ -17,7 +17,7 @@ test("reads a suspended person's current access through the API", async ({ env }
     `query ($id: ID!) {
       employee(id: $id) {
         id status suspendedWithAccess
-        currentAccess { appName catalogKey foundVia since { at before } }
+        appAccounts { app { name catalogKey } foundVia since { at before } }
       }
     }`,
     { id },
@@ -29,9 +29,8 @@ test("reads a suspended person's current access through the API", async ({ env }
         id,
         status: "SUSPENDED",
         suspendedWithAccess: true,
-        currentAccess: ["Figma", "Notion", "Slack"].map((appName) => ({
-          appName,
-          catalogKey: appName.toLowerCase(),
+        appAccounts: ["Figma", "Notion", "Slack"].map((appName) => ({
+          app: { name: appName, catalogKey: appName.toLowerCase() },
           foundVia: ["google_sign_in"],
           since: {
             at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/) as unknown,
@@ -43,13 +42,13 @@ test("reads a suspended person's current access through the API", async ({ env }
   });
 });
 
-test("refuses a person's current access without a session", async ({ env }) => {
+test("refuses a person's app accounts without a session", async ({ env }) => {
   await env.signInAsOwner();
   const employee = await env.seed.employee();
 
   const response = await env
     .browser()
-    .graphql(`query ($id: ID!) { employee(id: $id) { currentAccess { appName } } }`, {
+    .graphql(`query ($id: ID!) { employee(id: $id) { appAccounts { app { name } } } }`, {
       id: employee.id,
     });
 

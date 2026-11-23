@@ -4,6 +4,8 @@ import { t } from "@/i18n";
 import { FoundVia } from "@/components/FoundVia";
 import { formatSince } from "@/lib/since";
 
+import { AccountChangeCell } from "../AccountChangeCell";
+import { AppAccountStatusBadge } from "./AppAccountStatusBadge";
 import { PersonCell } from "./PersonCell";
 import { StatusBadge } from "./StatusBadge";
 
@@ -11,21 +13,26 @@ type AppUserRow = NonNullable<AppPageQuery["app"]>["users"][number];
 
 /**
  * An app's users: who, their status in Google, their status in the app when it is connected
- * through the connectors container, how each account was found and since when.
+ * through the connectors container, how each account was found and since when, and Disable or
+ * Enable where its connection can change accounts.
  */
 export function userColumns(
-  connectedApp: { name: string; findingKind: string } | null,
+  connectedApp: { name: string; findingKind: string; canChangeAccounts: boolean } | null,
 ): DataTableColumn<AppUserRow>[] {
-  return connectedApp
-    ? [PERSON, STATUS, inAppColumn(connectedApp), FOUND_VIA, SINCE]
-    : [PERSON, STATUS, FOUND_VIA, SINCE];
+  if (!connectedApp) {
+    return [PERSON, STATUS, FOUND_VIA, SINCE];
+  }
+  const columns = [PERSON, STATUS, inAppColumn(connectedApp), FOUND_VIA, SINCE];
+  return connectedApp.canChangeAccounts ? [...columns, ACTIONS] : columns;
 }
 
 const PERSON: DataTableColumn<AppUserRow> = {
   id: "person",
   header: t("apps.page.column.person"),
   className: "w-[38%] min-w-56",
-  cell: ({ employee }) => <PersonCell employee={employee} />,
+  cell: ({ employee, isConnectionUser }) => (
+    <PersonCell employee={employee} isConnectionUser={isConnectionUser} />
+  ),
 };
 
 const STATUS: DataTableColumn<AppUserRow> = {
@@ -47,6 +54,13 @@ const FOUND_VIA: DataTableColumn<AppUserRow> = {
   header: t("apps.column.foundVia"),
   className: "w-[18%]",
   cell: ({ foundVia }) => <FoundVia findingKinds={foundVia} />,
+};
+
+const ACTIONS: DataTableColumn<AppUserRow> = {
+  id: "actions",
+  header: <span className="sr-only">{t("apps.page.column.actions")}</span>,
+  className: "text-right",
+  cell: (user) => <AccountChangeCell appUser={user} />,
 };
 
 const SINCE: DataTableColumn<AppUserRow> = {
@@ -76,11 +90,7 @@ function inAppColumn({
           <span className="text-sm text-muted-foreground">{t("apps.page.inApp.notListed")}</span>
         );
       }
-      return (
-        <StatusBadge tone={status === "SUSPENDED" ? "muted" : "active"}>
-          {t(status === "SUSPENDED" ? "apps.page.inApp.disabled" : "apps.page.inApp.active")}
-        </StatusBadge>
-      );
+      return <AppAccountStatusBadge status={status} />;
     },
   };
 }

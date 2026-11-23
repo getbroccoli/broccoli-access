@@ -97,14 +97,26 @@ export async function serveManifest(
   return server;
 }
 
-/** Serves the fake manifest and a test-specific accounts/list answer. */
-export async function serveAccountList(fakeUrl: string, list: RequestHandler) {
-  const manifest = await (await fetch(`${fakeUrl}/v1/connectors`)).text();
+/** Replaces the fake container's accounts/list answer. */
+export function serveAccountList(fakeUrl: string, list: RequestHandler) {
   const app = express();
-  app.get("/v1/connectors", (_request, response) => {
-    response.type("json").send(manifest);
-  });
   app.post("/v1/accounts/list", express.json(), list);
+  return serveConnectorRoutes(fakeUrl, app);
+}
+
+/** Forwards calls the test routes did not handle to the real fake container. */
+export async function serveConnectorRoutes(fakeUrl: string, app: express.Express) {
+  app.use(express.json(), async (request, response) => {
+    const upstream = await fetch(`${fakeUrl}${request.path}`, {
+      method: request.method,
+      headers: { "content-type": "application/json" },
+      body: request.method === "POST" ? JSON.stringify(request.body) : undefined,
+    });
+    response
+      .status(upstream.status)
+      .type("json")
+      .send(await upstream.text());
+  });
   const server = await startSimpleHttpServer(app);
   onTestFinished(() => server.stop());
   return server;

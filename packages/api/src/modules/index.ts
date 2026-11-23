@@ -3,6 +3,7 @@ import type { ModuleDependencies, Modules } from "../core/moduleManifest";
 import { recordsManifest } from "../core/records";
 import {
   appsModule,
+  createAccountChangeService,
   createAppAccountService,
   createAppConnectionService,
   createAppService,
@@ -17,7 +18,7 @@ import {
 } from "./employees";
 import { extensionModule } from "./extension";
 import { createGoogleWorkspaceConnector, googleModule } from "./google";
-import { createScanService, importsModule } from "./imports";
+import { createImportRecordService, createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
 
 /** Settings that only some modules need, read from the environment by `main.ts`. */
@@ -35,6 +36,7 @@ export interface ModuleSettings {
 }
 
 /** Every module of the API, each given only the dependencies it uses. */
+// eslint-disable-next-line broccoli-access/max-lines-per-function -- the composition root: one entry per module it wires, in order.
 export function createModules(core: ModuleDependencies, settings: ModuleSettings): Modules {
   const { publicUrl, resendApiUrl } = settings;
   const directory = employeeDirectory(core.orm);
@@ -78,6 +80,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
         connectors: directoryConnectors,
         employees: createEmployeeReadService({ ...core, accounts: apps }),
       }),
+      ...createAccountChangeService({ ...core, connectors, members: createImportRecordService() }),
     }),
     extensionModule(core),
   ];

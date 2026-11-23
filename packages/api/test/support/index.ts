@@ -5,7 +5,7 @@ export { createGoogleWorkspaceConnector } from "../../src/modules/google";
 export { ADMIN, EMPLOYEE, OWNER, SETUP_HOLDER, SYSTEM } from "./testSecurityContext";
 export { createBrowser, type Browser } from "./browser";
 export { startDisconnectingProxy, type DisconnectingProxy } from "./disconnectingProxy";
-export { test } from "./fixture";
+export { test, connectorTest } from "./fixture";
 export { startSimpleHttpServer } from "./simpleHttpServer";
 export { startCountingGoogleProxy } from "./countingGoogleProxy";
 export { PNG, JPEG, WEBP } from "./images";
@@ -91,5 +91,12 @@ export {
   failLinearCall,
   serveAccountList,
   serveManifest,
+  serveConnectorRoutes,
   LINEAR_INPUT,
 } from "./containerConnections";
+export {
+  accountChanges,
+  scannedLinear,
+  linearMemberStatus,
+  listedLinearChloe,
+} from "./accountChanges";

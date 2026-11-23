@@ -68,6 +68,11 @@ export interface HistoryAppend {
   operation: RecordOperation;
   cause: { kind: CauseKind; ref?: string | null };
   reason?: string | null;
+  /**
+   * The user who asked for a change Broccoli Access makes later on its own, such as an account
+   * change: the lines name them as author. Only the system context passes it.
+   */
+  requestedBy?: string;
   /** A record's own `cause` replaces the append's, such as records changed for different reasons in one batch. */
   records: { recordId: string; changes: FieldChange[]; cause?: HistoryAppend["cause"] }[];
 }

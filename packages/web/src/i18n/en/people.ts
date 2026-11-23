@@ -27,6 +27,10 @@ export const peopleEn = {
     "{name} is suspended in Google but still has accounts in {count} approved apps.",
   "people.person.suspendedWithAccessOne":
     "{name} is suspended in Google but still has accounts in 1 approved app.",
+  "people.person.disableWhereConnected":
+    "Disable them here where the app is connected, and in the app itself where it isn’t.",
+  "people.person.disableWhereConnectedOne": "Disable it here.",
   "people.person.currentAccess": "Current access",
+  "people.person.column.inApp": "In the app",
   "people.person.noAccess": "No accounts in approved apps.",
 } as const;

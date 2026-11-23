@@ -13,3 +13,5 @@ export {
   type AppUserAccount,
   type EmployeeAppAccount,
 } from "./appAccountRepository";
+export { accountChanges } from "./accountChangesTable";
+export { accountChangeRepository } from "./accountChangeRepository";

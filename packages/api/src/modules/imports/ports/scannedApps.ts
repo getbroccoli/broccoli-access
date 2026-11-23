@@ -44,6 +44,8 @@ export interface ScannedApps {
         grantedBefore: Date | null;
       }[];
       cause: HistoryAppend["cause"];
+      /** When the scan began reading; an account changed since keeps its status. */
+      readStartedAt: Date;
     },
   ): Promise<void>;
   /** Matches found apps to apps, creating the missing ones; returns app ids by external id. */

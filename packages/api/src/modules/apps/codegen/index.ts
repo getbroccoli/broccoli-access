@@ -4,4 +4,5 @@ export const codegenMappers = {
   AppsMutations: "Record<PropertyKey, never>",
   App: "../../modules/apps/app#AppSummary as AppModel",
   AppUser: "../../modules/apps/app#AppUser as AppUserModel",
+  AccountChange: "../../modules/apps/app#LatestAccountChange as AccountChangeModel",
 };

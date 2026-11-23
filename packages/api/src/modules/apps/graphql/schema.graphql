@@ -21,6 +21,8 @@ type App {
   connected: Boolean!
   "Its users: the accounts in it that belong to an employee, those whose employee the directory suspended first, then by name."
   users("Keeps only the first this many, at least 1; all when null." first: Int): [AppUser!]!
+  "Whether it is connected through a connector that can disable and enable its accounts (`managingConnector` names one, connected or not); whether an account offers Disable or Enable now is its `offeredChange`."
+  canChangeAccounts: Boolean!
 }
 
 "An account in an app that belongs to an employee."
@@ -31,6 +33,51 @@ type AppUser {
   "The finding kinds that saw the account, sorted, such as `google_sign_in`; connector modules register them."
   foundVia: [String!]!
   since: Since!
+  "The app the account is in."
+  app: App!
+  "Whether it is the member whose key or session its app's connection uses, as the connection's last scan saw; Disable and Enable are never offered on it."
+  isConnectionUser: Boolean!
+  "SUSPEND (Disable) on an active account or REACTIVATE (Enable) on a suspended one, when the owner may ask for it now; null when the app's connection cannot change accounts or needs reconnecting, its last scan did not list the account, the account is the connection's user, or a change of it is running."
+  offeredChange: AccountChangeAction
+  "Its latest Disable or Enable; null before the first."
+  latestChange: AccountChange
+}
+
+"One Disable or Enable of one app account, from the owner's click to its result."
+type AccountChange {
+  id: ID!
+  action: AccountChangeAction!
+  status: AccountChangeStatus!
+  "While it runs: how many changes of its connection asked before it still run, which it waits for; null once it has finished."
+  changesAhead: Int
+  "When it stopped running; null while it runs."
+  finishedAt: DateTime
+}
+
+"What an account change does in the app; the UI says Disable and Enable."
+enum AccountChangeAction {
+  "Disable: suspend the account."
+  SUSPEND
+  "Enable: make the account active again."
+  REACTIVATE
+}
+
+"Where an account change is."
+enum AccountChangeStatus {
+  "Waiting for its turn, or running."
+  RUNNING
+  "The connector read the account's new status back."
+  SUCCEEDED
+  "Broccoli Access could not confirm the new status in the app; the saved account status did not change."
+  FAILED
+  "It had failed, and the owner made the change in the app themselves."
+  DONE_BY_HAND
+}
+
+# Adds the person's app accounts to the employees module's Employee; the server merges the types.
+type Employee {
+  "Their accounts in approved apps other than the directory: the active ones, and the suspended ones in connected apps, by app name. Admins only."
+  appAccounts: [AppUser!]!
 }
 
 "Since when someone has had an account, as far as the sources know: when they granted access; before the log began, for a grant older than the log; otherwise when a scan first saw the account."
@@ -82,6 +129,12 @@ input AppIgnoreInput {
   id: ID!
 }
 
+input AppUserChangeInput {
+  "The app account's id, as its AppUser has it."
+  id: ID!
+  action: AccountChangeAction!
+}
+
 input SetupFinishInput {
   "The discovered apps the company uses; every other discovered app is ignored."
   approvedAppIds: [ID!]!
@@ -94,6 +147,8 @@ type AppsMutations {
   ignore(input: AppIgnoreInput!): AppIgnorePayload!
   "Setup's last step: approves the selected discovered apps, ignores the others and finishes setup. Refused with a ConflictError at another step, and as invalid `approvedAppIds` for an id that is no discovered app. Admins only."
   finishSetup(input: SetupFinishInput!): SetupFinishPayload!
+  "Disables or enables an app account in its app: queues the change, which runs on the server one per connection at a time, in the order asked, and returns the account with it as its latest change. Refused with a NotFoundError for an unknown account, and a ConflictError when the account does not offer this action now (`offeredChange`). Admins only."
+  changeAccount(input: AppUserChangeInput!): AppUserChangePayload!
 }
 
 "The approved app, or why it was refused."
@@ -111,6 +166,14 @@ type AppIgnorePayload {
 }
 
 union AppIgnoreError = NotFoundError | ConflictError
+
+"The account with its change queued, or why the change was refused; the account is null for one that belongs to no employee."
+type AppUserChangePayload {
+  appUser: AppUser
+  error: AppUserChangeError
+}
+
+union AppUserChangeError = NotFoundError | ConflictError
 
 "Setup once finished, or why it was refused."
 type SetupFinishPayload {

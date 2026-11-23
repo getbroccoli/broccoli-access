@@ -2,6 +2,9 @@ import {
   ACCOUNTS_LIST_ANSWER,
   type AccountsListAnswer,
   type AccountsListRequest,
+  ACTION_RUN_ANSWER,
+  type ActionRunAnswer,
+  type ActionRunRequest,
   CONNECTION_TEST_ANSWER,
   type ConnectionTestAnswer,
   type ConnectionTestRequest,
@@ -20,6 +23,7 @@ export interface ConnectorsContainerClient {
   readConnectors(): Promise<ConnectorDescription[]>;
   testConnection(request: ConnectionTestRequest): Promise<ContainerAnswer<ConnectionTestAnswer>>;
   listAccounts(request: AccountsListRequest): Promise<ContainerAnswer<AccountsListAnswer>>;
+  runAction(request: ActionRunRequest): Promise<ContainerAnswer<ActionRunAnswer>>;
 }
 
 /**
@@ -44,6 +48,7 @@ export function createConnectorsContainerClient(url: string): ConnectorsContaine
       call(urlUnder(url, "v1/connections/test"), request, CONNECTION_TEST_ANSWER),
     listAccounts: (request) =>
       call(urlUnder(url, "v1/accounts/list"), request, ACCOUNTS_LIST_ANSWER),
+    runAction: (request) => call(urlUnder(url, "v1/actions/run"), request, ACTION_RUN_ANSWER),
   };
 }
 

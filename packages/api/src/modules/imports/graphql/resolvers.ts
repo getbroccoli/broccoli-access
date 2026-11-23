@@ -1,15 +1,28 @@
+import DataLoader from "dataloader";
+
 import type { GraphqlContext, Resolvers } from "../../../core/graphql";
-import { toEnum } from "../../../core/graphql";
+import { perRequest, toEnum } from "../../../core/graphql";
 import type { ScanService } from "../app";
 import type { Scan } from "../domain";
 
 export function createResolvers(
   scans: Pick<ScanService, "readScan" | "scanNow" | "readConnectionUserEmail">,
 ): Resolvers {
-  const scanOfConnection = async (connectionId: string, context: GraphqlContext) => {
-    const scan = await scans.readScan(context.getActor(), connectionId);
-    return scan && toScanGraphql(scan);
-  };
+  // shortcut: one read per connection, cached for the request since every row of an app page reads
+  // its app's scan; batch the reads if a page ever lists many connections.
+  const scansOfConnections = perRequest(
+    (context) =>
+      new DataLoader<string, ReturnType<typeof toScanGraphql> | null>((connectionIds) =>
+        Promise.all(
+          connectionIds.map(async (connectionId) => {
+            const scan = await scans.readScan(context.getActor(), connectionId);
+            return scan && toScanGraphql(scan);
+          }),
+        ),
+      ),
+  );
+  const scanOfConnection = (connectionId: string, context: GraphqlContext) =>
+    scansOfConnections(context).load(connectionId);
   return {
     Mutation: {
       imports: () => ({}),
