@@ -1,4 +1,5 @@
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
+import type { ConnectorRegistry } from "../../../core/connectors";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import { createSetupStepService } from "../../../core/instance";
 import type { Logger } from "../../../core/logger";
@@ -27,11 +28,7 @@ import {
   type Since,
 } from "../domain";
 
-import {
-  type DirectoryConnectors,
-  findDirectoryAppId,
-  findEmployeesSuspendedInDirectory,
-} from "./directory";
+import { findDirectoryAppId, findEmployeesSuspendedInDirectory } from "./directory";
 
 const recordHistory = createRecordHistoryService();
 const setupSteps = createSetupStepService();
@@ -123,7 +120,7 @@ interface AppDependencies {
   transact: Transact;
   logger: Logger;
   /** The connectors the scans read; the one whose `isDirectory` is set names the directory. */
-  connectors: DirectoryConnectors;
+  connectors: ConnectorRegistry;
 }
 
 export function createAppService(dependencies: AppDependencies): AppService {

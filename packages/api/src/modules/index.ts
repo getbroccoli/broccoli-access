@@ -48,13 +48,13 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     openIdConfigurationUrl: settings.googleOpenIdConfigurationUrl,
     adminApiUrl: settings.googleAdminApiUrl,
   };
-  const { directoryConnectors, containerConnectors, connectors } = createConnectors(
+  const { containerConnectors, connectors } = createConnectors(
     core,
     googleAddresses,
     settings.connectorsUrl,
   );
   const connectedApps = createAppConnectionService(core);
-  const apps = createAppService({ ...core, connectors: directoryConnectors });
+  const apps = createAppService({ ...core, connectors });
   // One scan service for the job, the page and the connect flows, which share its progress.
   const scans = createScanService({
     ...core,
@@ -88,7 +88,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       ...apps,
       ...createAppUserService({
         ...core,
-        connectors: directoryConnectors,
+        connectors,
         employees: createEmployeeReadService({ ...core, accounts: apps }),
       }),
       ...createAccountChangeService({ ...core, connectors, members: createImportRecordService() }),
@@ -114,5 +114,5 @@ function createConnectors(
   const connectors = {
     list: async () => [...directoryConnectors, ...(await containerConnectors.list())],
   };
-  return { directoryConnectors, containerConnectors, connectors };
+  return { containerConnectors, connectors };
 }

@@ -1,14 +1,10 @@
-import type { AccountStatus } from "../../../core/connectors";
+import type { AccountStatus, ConnectorRegistry } from "../../../core/connectors";
 import type { Orm } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { appAccountRepository, type AppUserAccount } from "../db";
 import { accountSince, type Since } from "../domain";
 import type { EmployeesByName } from "../ports";
-import {
-  type DirectoryConnectors,
-  findDirectoryAppId,
-  findEmployeesSuspendedInDirectory,
-} from "./directory";
+import { findDirectoryAppId, findEmployeesSuspendedInDirectory } from "./directory";
 
 /** An app's users: its accounts that belong to an employee. */
 export interface AppUserService {
@@ -46,7 +42,8 @@ export interface AppUser {
 
 interface AppUserDependencies {
   orm: Orm;
-  connectors: DirectoryConnectors;
+  /** The connectors the scans read; the one whose `isDirectory` is set names the directory. */
+  connectors: ConnectorRegistry;
   /** The employees module, which owns their names and so their order. */
   employees: EmployeesByName;
 }

@@ -7,10 +7,10 @@ import type { Orm, Transact } from "../../src/core/db";
 import type { JobQueue } from "../../src/core/jobs";
 import { createLogger } from "../../src/core/logger";
 import { createAccountChangeService } from "../../src/modules/apps";
-import { createGoogleWorkspaceConnector } from "../../src/modules/google";
 import { createImportRecordService } from "../../src/modules/imports";
-import { connectLinear, containerConnectors, failLinearCall } from "./containerConnections";
+import { connectLinear, failLinearCall } from "./containerConnections";
 import { recordingJobQueue } from "./recordingJobQueue";
+import { connectorRegistry } from "./services";
 import { storedAppAccounts } from "./storedScan";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { SYSTEM } from "./testSecurityContext";
@@ -25,17 +25,11 @@ export function accountChanges(
     transact = testTransactor(orm),
   }: { connectorsUrl?: string; jobs?: JobQueue; transact?: Transact } = {},
 ) {
-  const container = containerConnectors(connectorsUrl);
-  const google = createGoogleWorkspaceConnector({
-    openIdConfigurationUrl: "http://127.0.0.1:9/.well-known/openid-configuration",
-    adminApiUrl: "http://127.0.0.1:9",
-  });
-  const connectors = { list: async () => [google, ...(await container.list())] };
   return createAccountChangeService({
     orm,
     transact,
     jobs,
-    connectors,
+    connectors: connectorRegistry(connectorsUrl),
     members: createImportRecordService(),
     secretBox: TEST_SECRET_BOX,
     logger: createLogger("silent"),
