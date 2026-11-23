@@ -6,8 +6,8 @@ import { TableSearchField } from "@/components/dataTable";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
-import { useIsAppScanning } from "@/lib/useIsAppScanning";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
+import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 import { useRefetchAfterScan } from "@/lib/useRefetchAfterScan";
 
 import { SEARCH_MAX_LENGTH } from "../peopleSearch";
@@ -32,7 +32,7 @@ export function PeoplePage() {
   // The read that saw the scan end may have read the people before the scan saved them.
   useRefetchAfterScan(isScanning, refetch);
   // A connected app's scan changes people's apps, such as the first one after it is connected.
-  useRefetchAfterScan(useIsAppScanning(), refetch);
+  useRefetchAfterContainerConnectorScans(refetch);
   const people = data?.employees.edges.map(({ node }) => node);
 
   return (

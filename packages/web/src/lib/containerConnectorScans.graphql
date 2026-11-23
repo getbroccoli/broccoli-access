@@ -1,5 +1,5 @@
 # Admins only: nobody else sees the connectors.
-query AppScans {
+query ContainerConnectorScans {
   containerConnectors {
     id
     connection {

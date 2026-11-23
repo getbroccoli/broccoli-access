@@ -6,8 +6,8 @@ import { PersonPageDocument } from "@/__generated__/graphql";
 import { Avatar } from "@/components/Avatar";
 import { useRefreshAfterChanges } from "@/features/apps";
 import { t } from "@/i18n";
-import { useIsAppScanning } from "@/lib/useIsAppScanning";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
+import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 
 import { CurrentAccessTable } from "./CurrentAccessTable";
 
@@ -19,7 +19,7 @@ export function PersonPage() {
   const person = pageQuery.data?.employee;
   // A connected app's scan, such as one started from a failed change's dialog or its first one,
   // moves their rows: poll the scans only, then read the person once.
-  useRefreshAfterChanges(useIsAppScanning(), pageQuery.refetch);
+  useRefetchAfterContainerConnectorScans(pageQuery.refetch);
   // A running change moves its row; the page reads the person again until every change ends.
   const isChanging =
     person?.appAccounts.some((account) => account.latestChange?.status === "RUNNING") ?? false;
