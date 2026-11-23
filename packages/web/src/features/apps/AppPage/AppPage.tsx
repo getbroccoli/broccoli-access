@@ -35,6 +35,9 @@ export function AppPage() {
     return null;
   }
   const workspace = app.containerConnection?.scan?.sourceName;
+  // The saved scan still names who is not in the app while the connectors container is down.
+  const showsInApp =
+    app.containerConnection !== null || app.users.some(({ inApp }) => inApp === false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,10 +63,7 @@ export function AppPage() {
         <AppTable
           rows={app.users}
           columns={userColumns(
-            app.containerConnection && {
-              name: app.name,
-              canChangeAccounts: app.canChangeAccounts,
-            },
+            showsInApp ? { name: app.name, canChangeAccounts: app.canChangeAccounts } : null,
           )}
           firstRows={FIRST_USERS}
           showMoreLabel={(count) => t("apps.page.showMore", { count: String(count) })}

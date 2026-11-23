@@ -60,7 +60,8 @@ const ACTIONS: DataTableColumn<AppUserRow> = {
   id: "actions",
   header: <span className="sr-only">{t("apps.page.column.actions")}</span>,
   className: "text-right",
-  cell: (user) => <AccountChangeCell appUser={user} />,
+  // An account not in its app takes no change, nor shows one's progress.
+  cell: (user) => (user.inApp === false ? null : <AccountChangeCell appUser={user} />),
 };
 
 const SINCE: DataTableColumn<AppUserRow> = {
