@@ -50,7 +50,11 @@ export interface AccountChangeRepository {
 
 /** The changes' one order, newest first: its sort values are when it was asked and the id. */
 export const ACCOUNT_CHANGE_SORT_VALUES: Record<"REQUESTED_AT", z.ZodType<unknown[]>> = {
-  REQUESTED_AT: z.tuple([z.iso.datetime(), z.uuid()]),
+  REQUESTED_AT: z.tuple([
+    // Postgres has no year 0, so a cursor with it is no cursor this API issued.
+    z.iso.datetime().refine((at) => !at.startsWith("0000")),
+    z.uuid(),
+  ]),
 };
 
 export type AccountChangePageQuery = KeysetQuery<

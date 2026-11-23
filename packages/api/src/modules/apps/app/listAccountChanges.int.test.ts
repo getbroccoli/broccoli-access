@@ -1,10 +1,8 @@
 import { accountChanges, EMPLOYEE, expect, OWNER, test, type TestSeed } from "#test/support";
 
-test("lists every Disable and Enable newest first with its outcome", async ({
-  orm,
-  seed,
-  fakeConnectors,
-}) => {
+import { ApplicationError } from "../../../core/applicationError";
+
+test("lists every Disable and Enable newest first with its outcome", async ({ orm, seed }) => {
   const source = await changeSource(seed);
   const account = await seed.appAccount({ appId: source.appId });
   const target = { ...source, appAccountId: account.id, email: account.email };
@@ -30,7 +28,7 @@ test("lists every Disable and Enable newest first with its outcome", async ({
     status: "done_by_hand",
     error: "authentication_failed",
   });
-  const service = accountChanges(orm, { connectorsUrl: fakeConnectors.url });
+  const service = accountChanges(orm);
 
   const { edges } = await service.listAccountChanges(OWNER, {});
 
@@ -42,11 +40,7 @@ test("lists every Disable and Enable newest first with its outcome", async ({
   ]);
 });
 
-test("keeps the app and email of a change whose app account was deleted", async ({
-  orm,
-  seed,
-  fakeConnectors,
-}) => {
+test("keeps the app and email of a change whose app account was deleted", async ({ orm, seed }) => {
   const source = await changeSource(seed);
   const change = await seed.accountChange({
     ...source,
@@ -54,7 +48,7 @@ test("keeps the app and email of a change whose app account was deleted", async 
     email: "former@example.com",
     requestedAt: new Date("2026-03-01"),
   });
-  const service = accountChanges(orm, { connectorsUrl: fakeConnectors.url });
+  const service = accountChanges(orm);
 
   const { edges } = await service.listAccountChanges(OWNER, {});
 
@@ -68,7 +62,6 @@ test("keeps the app and email of a change whose app account was deleted", async 
 test("pages through changes asked at the same time without repeats or gaps", async ({
   orm,
   seed,
-  fakeConnectors,
 }) => {
   const source = await changeSource(seed);
   const tied = { ...source, requestedAt: new Date("2026-03-01") };
@@ -76,7 +69,7 @@ test("pages through changes asked at the same time without repeats or gaps", asy
   const b = await seed.accountChange(tied);
   const [higherId, lowerId] = [a.id, b.id].sort().reverse();
   const newest = await seed.accountChange({ ...source, requestedAt: new Date("2026-03-02") });
-  const service = accountChanges(orm, { connectorsUrl: fakeConnectors.url });
+  const service = accountChanges(orm);
 
   const first = await service.listAccountChanges(OWNER, { first: 2 });
   const rest = await service.listAccountChanges(OWNER, {
@@ -90,11 +83,24 @@ test("pages through changes asked at the same time without repeats or gaps", asy
   expect(rest.pageInfo.hasNextPage).toBe(false);
 });
 
-test("counts only earlier running changes on the same connection", async ({
-  orm,
-  seed,
-  fakeConnectors,
-}) => {
+test("rejects an Activity cursor with year zero as invalid input", async ({ orm, seed }) => {
+  const source = await changeSource(seed);
+  await seed.accountChange({ ...source, requestedAt: new Date("2026-03-01") });
+  const values = [
+    "REQUESTED_AT",
+    "DESC",
+    "0000-01-01T00:00:00.000Z",
+    "00000000-0000-4000-8000-000000000001",
+  ];
+  const after = Buffer.from(JSON.stringify(values)).toString("base64url");
+
+  const page = accountChanges(orm).listAccountChanges(OWNER, { after });
+
+  await expect(page).rejects.toBeInstanceOf(ApplicationError);
+  await expect(page).rejects.toMatchObject({ code: "INVALID_INPUT" });
+});
+
+test("counts only earlier running changes on the same connection", async ({ orm, seed }) => {
   const source = await changeSource(seed);
   const otherApp = await seed.app({
     name: "Linear",
@@ -121,7 +127,7 @@ test("counts only earlier running changes on the same connection", async ({
     requestedAt: new Date("2026-03-04"),
     status: "running",
   });
-  const service = accountChanges(orm, { connectorsUrl: fakeConnectors.url });
+  const service = accountChanges(orm);
 
   const { edges } = await service.listAccountChanges(OWNER, {});
 
@@ -133,22 +139,19 @@ test("counts only earlier running changes on the same connection", async ({
   ]);
 });
 
-test("refuses to list account changes without MANAGE_WORKSPACE", async ({
-  orm,
-  fakeConnectors,
-}) => {
-  const service = accountChanges(orm, { connectorsUrl: fakeConnectors.url });
+test("refuses to list account changes without MANAGE_WORKSPACE", async ({ orm }) => {
+  const service = accountChanges(orm);
 
   await expect(service.listAccountChanges(EMPLOYEE, {})).rejects.toMatchObject({
     code: "FORBIDDEN",
   });
 });
 
-test("reads the requesters' names by user id", async ({ orm, seed, fakeConnectors }) => {
+test("reads the requesters' names by user id", async ({ orm, seed }) => {
   const ana = await seed.user({ email: "ana@example.com", name: "Ana" });
   const mia = await seed.user({ email: "mia@example.com", name: "Mia" });
   await seed.user({ email: "chloe@example.com", name: "Chloé" });
-  const service = accountChanges(orm, { connectorsUrl: fakeConnectors.url });
+  const service = accountChanges(orm);
 
   const names = await service.readRequesterNames(OWNER, [mia.id, ana.id]);
 

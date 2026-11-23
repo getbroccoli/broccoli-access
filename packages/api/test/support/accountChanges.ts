@@ -22,7 +22,7 @@ export function accountChanges(
     connectorsUrl,
     jobs = recordingJobQueue().jobs,
     transact = testTransactor(orm),
-  }: { connectorsUrl: string; jobs?: JobQueue; transact?: Transact },
+  }: { connectorsUrl?: string; jobs?: JobQueue; transact?: Transact } = {},
 ) {
   const container = containerConnectors(connectorsUrl);
   const google = createGoogleWorkspaceConnector({
