@@ -58,8 +58,19 @@ it.for([
 it.for([
   { reason: "a string status", fields: { status: "200" } },
   { reason: "an empty call", fields: { call: "" } },
+  { reason: "a query in the path", fields: { call: "POST /api/auth.test?token=x" } },
+  { reason: "a host in the path", fields: { call: "POST https://slack.com/api/auth.test" } },
+  { reason: "a string for sent arguments", fields: { sent: "token=x" } },
+  { reason: "an array for sent arguments", fields: { sent: ["token=x"] } },
+  { reason: "a status of 900", fields: { status: 900 } },
 ])("rejects an app call with $reason", ({ fields }) => {
   expect(APP_CALL.safeParse({ ...appCall, ...fields }).success).toBe(false);
+});
+
+it("accepts an app call with no arguments when the app never answered", () => {
+  const unanswered = { call: "GET /status", sent: null, status: null, reply: null };
+
+  expect(APP_CALL.parse(unanswered)).toEqual(unanswered);
 });
 
 it("parses a first page request with the documented connection", () => {

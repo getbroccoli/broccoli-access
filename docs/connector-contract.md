@@ -233,7 +233,7 @@ When no runtime is left, the action fails with the last error. The owner sees wh
 To check a connector against the real app, a caller can ask for every call the connector made to the app.
 
 - **Request:** the header `x-debug: app-calls` on `connections/test`, `accounts/list` or `actions/run`. Only the connectors repository's harness sends it; the core never does.
-- **Answer:** the answer, or the connector error, carries `appCalls`, in call order:
+- **Answer:** the answer, or the connector error, may carry `appCalls`, in call order:
 
   ```json
   {
@@ -252,10 +252,10 @@ To check a connector against the real app, a caller can ask for every call the c
   - `call`: the HTTP method and the app's path, without host or query;
   - `sent`: the arguments sent, as an object; `null` when none;
   - `status`: the HTTP status; `null` when the app never answered;
-  - `reply`: the app's reply, parsed JSON, else text.
+  - `reply`: the app's reply, parsed JSON, else text; `null` when the app never answered or the connector did not read it.
 
-- **Redaction:** the container never puts request headers in `sent`, and redacts cookies, tokens and keys in `sent` and `reply`: by key name, and by every secret value in the connection or in what was sent.
-- **Emails and names:** `appCalls` may hold them, the one exception to "Errors never carry the app's raw answer". The logs stay as "Logs" says. The caller already holds the connection's secrets, so it learns nothing it could not fetch itself.
+- **Redaction:** the container never puts request headers in `sent`, and redacts cookies, tokens and keys in `sent` and `reply`: by key name, and by every secret value of 16 characters or more in the connection or in what was sent, wherever it reappears.
+- **Emails and names:** `appCalls` may hold them, and whatever else the app answered, the one exception to "Errors never carry the app's raw answer". The logs stay as "Logs" says.
 - **Without the header:** no answer carries `appCalls`. A container without debug support, such as the core's fake connectors container, conforms by ignoring the header.
 
 ## Conformance

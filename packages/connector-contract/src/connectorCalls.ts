@@ -38,12 +38,12 @@ export const APP_CALLS_HEADER = { name: "x-debug", value: "app-calls" } as const
 /** One call the connector made to the app, with cookies, tokens and keys redacted. */
 export const APP_CALL = z.object({
   /** The HTTP method and the app's path, without host or query, such as `POST /api/auth.test`. */
-  call: z.string().min(1),
-  /** The arguments sent, as an object; null when none. */
-  sent: z.unknown(),
+  call: z.string().regex(/^[A-Z]+ \/[^\s?#]*$/),
+  /** The arguments sent; null when none. */
+  sent: z.record(z.string(), z.unknown()).nullable(),
   /** Null when the app never answered. */
-  status: z.number().int().nullable(),
-  /** The app's reply, parsed JSON, else text. */
+  status: z.number().int().min(100).max(599).nullable(),
+  /** The app's reply, parsed JSON, else text; null when it never answered or went unread. */
   reply: z.unknown(),
 });
 
