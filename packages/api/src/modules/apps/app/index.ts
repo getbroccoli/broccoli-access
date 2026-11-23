@@ -1,6 +1,7 @@
 export {
   type AccountChangeService,
   type AccountChangeState,
+  type ConnectionState,
   createAccountChangeService,
   type LatestAccountChange,
 } from "./accountChangeService";

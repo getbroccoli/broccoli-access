@@ -7,6 +7,7 @@ import {
 } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 
+import { ReconnectButton } from "../ReconnectButton";
 import { ChangeProgress } from "./ChangeProgress";
 import { ConfirmAccountChangeDialog } from "./ConfirmAccountChangeDialog";
 import { failedChangeOptions, showsCouldntChange } from "./couldntChange";
@@ -21,11 +22,17 @@ type Props = {
 
 /**
  * The row's Disable or Enable, asked in a dialog; then the change's progress, and "Disabled just
- * now" once it succeeds, or Try again once it fails, where trying again can help. "Connected as you" on the connection's own user, "No connection" where
- * the app's connection cannot change accounts.
+ * now" once it succeeds, or Try again once it fails, where trying again can help. "Connected as
+ * you" on the connection's own user, "No connection" where the app's connection cannot change
+ * accounts, and Reconnect while the connection needs it.
  */
 export function AccountChangeCell({ appUser }: Props) {
-  const fragment = useFragment({ fragment: AccountChangeCell_AppUserFragmentDoc, from: appUser });
+  const fragment = useFragment({
+    fragment: AccountChangeCell_AppUserFragmentDoc,
+    // The document also holds the fragments of the Reconnect button, which this one spreads.
+    fragmentName: "AccountChangeCell_appUser",
+    from: appUser,
+  });
   const user = fragment.complete ? fragment.data : null;
   useToastWhenChangeSucceeds(user);
   const succeeded = user?.latestChange?.status === "SUCCEEDED" ? user.latestChange : null;
@@ -37,6 +44,14 @@ export function AccountChangeCell({ appUser }: Props) {
     return (
       <span className={MUTED}>
         {t(user.isConnectionUser ? "apps.change.connectionUser" : "apps.change.noConnection")}
+      </span>
+    );
+  }
+  const connector = user.app.containerConnection?.connector;
+  if (user.offersReconnect && connector) {
+    return (
+      <span className="flex justify-end">
+        <ReconnectButton connector={connector} size="sm" variant="outline" />
       </span>
     );
   }

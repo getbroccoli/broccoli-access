@@ -72,16 +72,42 @@ it.for([
         person: { name: "Ana Ruiz", email: "ana@acme.example" },
         connectionUserEmail,
         credential,
+        toReconnect: false,
       }),
     ).toBe(`${reason} Nothing changed in Linear.`);
   },
 );
+
+it.for([
+  [
+    "Linear",
+    "TEXT",
+    "Linear refused the API key: it was revoked or expired. Reconnect Linear with a new key, then try again. Nothing changed in Linear.",
+  ],
+  [
+    "Slack",
+    "APP_SESSION",
+    "Your Slack session expired or was signed out. Reconnect Slack, then try again. Nothing changed in Slack.",
+  ],
+] as const)("explains how to reconnect %s with %s", ([app, credential, reason]) => {
+  expect(
+    couldntChangeReason("AUTHENTICATION_FAILED", {
+      app,
+      workspace: "Acme",
+      person: { name: "Ana Ruiz", email: "ana@acme.example" },
+      credential,
+      connectionUserEmail: null,
+      toReconnect: true,
+    }),
+  ).toBe(reason);
+});
 
 it("offers only by hand after NOT_ALLOWED", () => {
   expect(failedChangeOptions(failedSuspend("NOT_ALLOWED", null))).toEqual({
     tryAgain: false,
     byHand: true,
     scanNow: false,
+    reconnect: false,
   });
 });
 
@@ -92,6 +118,22 @@ it.for([null, "2026-11-22T09:00:00Z", "2026-11-22T10:00:00Z"])(
       tryAgain: false,
       byHand: false,
       scanNow: true,
+      reconnect: false,
+    });
+  },
+);
+
+it.for(["2026-11-22T09:00:00Z", "2026-11-22T11:00:00Z"])(
+  "offers only Reconnect after ACCOUNT_NOT_FOUND on a connection in Reconnect, with last scan at %s",
+  (readAt) => {
+    const facts = failedSuspend("ACCOUNT_NOT_FOUND", readAt);
+    const containerConnection = { ...facts.app.containerConnection, status: "RECONNECT" as const };
+
+    expect(failedChangeOptions({ ...facts, app: { containerConnection } })).toEqual({
+      tryAgain: false,
+      byHand: false,
+      scanNow: false,
+      reconnect: true,
     });
   },
 );
@@ -110,8 +152,28 @@ it.for([
     tryAgain: true,
     byHand: true,
     scanNow: false,
+    reconnect: false,
   });
 });
+
+it.for([
+  ["AUTHENTICATION_FAILED", "RECONNECT", "SUSPEND", false, true],
+  ["PERMISSION_MISSING", "RECONNECT", "SUSPEND", false, true],
+  ["WRONG_WORKSPACE", "RECONNECT", "SUSPEND", false, true],
+  ["AUTHENTICATION_FAILED", "CONNECTED", "SUSPEND", true, false],
+  ["UNEXPECTED_RESPONSE", "RECONNECT", null, false, false],
+] as const)(
+  "offers recovery for %s on a %s connection",
+  ([failure, status, offeredChange, tryAgain, reconnect]) => {
+    const facts = failedSuspend(failure, null, offeredChange);
+    expect(failedChangeOptions({ ...facts, app: { containerConnection: { status } } })).toEqual({
+      tryAgain,
+      byHand: true,
+      scanNow: false,
+      reconnect,
+    });
+  },
+);
 
 it.for([
   ["ACTIVE", { status: "FAILED", action: "SUSPEND" }, true],
@@ -134,9 +196,17 @@ it.for([
 );
 
 it.for([
-  ["ACCOUNT_NOT_FOUND", "SUSPEND", { tryAgain: true, byHand: false, scanNow: false }],
-  ["ACCOUNT_NOT_FOUND", null, { tryAgain: false, byHand: false, scanNow: true }],
-  ["UNEXPECTED_RESPONSE", null, { tryAgain: false, byHand: true, scanNow: false }],
+  [
+    "ACCOUNT_NOT_FOUND",
+    "SUSPEND",
+    { tryAgain: true, byHand: false, scanNow: false, reconnect: false },
+  ],
+  ["ACCOUNT_NOT_FOUND", null, { tryAgain: false, byHand: false, scanNow: true, reconnect: false }],
+  [
+    "UNEXPECTED_RESPONSE",
+    null,
+    { tryAgain: false, byHand: true, scanNow: false, reconnect: false },
+  ],
 ] satisfies [
   AccountChangeFailure,
   AccountChangeAction | null,
@@ -152,45 +222,57 @@ it.for([
 
 it.for([
   [
+    "AUTHENTICATION_FAILED",
+    "SUSPEND",
+    { tryAgain: false, byHand: true, scanNow: false, reconnect: true },
+    "After you reconnect, this row shows Try again. Or deactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
+  ],
+  [
+    "AUTHENTICATION_FAILED",
+    "REACTIVATE",
+    { tryAgain: false, byHand: true, scanNow: false, reconnect: true },
+    "After you reconnect, this row shows Try again. Or reactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
+  ],
+  [
     "NOT_ALLOWED",
     "SUSPEND",
-    { tryAgain: false, byHand: true, scanNow: false },
+    { tryAgain: false, byHand: true, scanNow: false, reconnect: false },
     "Trying again won’t help. If someone with more rights in Linear makes the change there, tell Broccoli Access.",
   ],
   [
     "ACCOUNT_NOT_FOUND",
     "SUSPEND",
-    { tryAgain: false, byHand: false, scanNow: true },
+    { tryAgain: false, byHand: false, scanNow: true, reconnect: false },
     "Trying again won’t help. Scan Linear to bring its member list up to date.",
   ],
   [
     "ACCOUNT_NOT_FOUND",
     "SUSPEND",
-    { tryAgain: true, byHand: false, scanNow: false },
+    { tryAgain: true, byHand: false, scanNow: false, reconnect: false },
     "Linear was scanned since, so trying again may help.",
   ],
   [
     "UNEXPECTED_RESPONSE",
     "SUSPEND",
-    { tryAgain: true, byHand: true, scanNow: false },
+    { tryAgain: true, byHand: true, scanNow: false, reconnect: false },
     "Try again in a while, or deactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
   ],
   [
     "UNEXPECTED_RESPONSE",
     "REACTIVATE",
-    { tryAgain: true, byHand: true, scanNow: false },
+    { tryAgain: true, byHand: true, scanNow: false, reconnect: false },
     "Try again in a while, or reactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
   ],
   [
     "APP_UNAVAILABLE",
     "SUSPEND",
-    { tryAgain: false, byHand: true, scanNow: false },
+    { tryAgain: false, byHand: true, scanNow: false, reconnect: false },
     "Deactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
   ],
   [
     "APP_UNAVAILABLE",
     "REACTIVATE",
-    { tryAgain: false, byHand: true, scanNow: false },
+    { tryAgain: false, byHand: true, scanNow: false, reconnect: false },
     "Reactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
   ],
 ] as const)(

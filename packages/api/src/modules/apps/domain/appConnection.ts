@@ -1,3 +1,4 @@
+import type { ConnectorErrorCode } from "../../../core/connectors";
 import type { KnownApp, NewApp } from "./app";
 import { CATALOG_KEYS, catalogApp } from "./catalog";
 
@@ -10,6 +11,17 @@ export const RECONNECT_CAUSES = [
   "permission_missing",
   "wrong_workspace",
 ] as const;
+
+export type ReconnectCause = (typeof RECONNECT_CAUSES)[number];
+
+/**
+ * The cause a connector error turns a connection to `reconnect` with; null for an error that
+ * leaves it connected. The core calls connectors on the server only, so `authentication_failed`
+ * always counts.
+ */
+export function reconnectCauseOf(error: ConnectorErrorCode): ReconnectCause | null {
+  return RECONNECT_CAUSES.find((cause) => cause === error) ?? null;
+}
 
 /** The app a new connection reads: a known app, or one to create. */
 export type ConnectedApp<T extends KnownApp> = { known: T } | { created: NewApp };

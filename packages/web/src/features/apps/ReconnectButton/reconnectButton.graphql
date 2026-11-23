@@ -1,0 +1,52 @@
+fragment ReconnectButton_connector on ContainerConnector {
+  id
+  name
+  connectionFields {
+    kind
+  }
+  ...ConnectContainerConnectorDialog_connector
+}
+
+# Returns what reconnecting changes: the connection's status and scan, and its app's users' offers.
+mutation ReconnectContainerConnector($input: ContainerConnectorReconnectInput!) {
+  connectors {
+    reconnect(input: $input) {
+      containerConnector {
+        id
+        connection {
+          id
+          status
+          reconnectReason {
+            cause
+          }
+          scan {
+            id
+            status
+            readAt
+            sourceName
+          }
+          app {
+            id
+            users {
+              id
+              offeredChange
+              offersReconnect
+            }
+          }
+        }
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+        ... on InvalidInputError {
+          fields {
+            field
+            code
+          }
+        }
+      }
+    }
+  }
+}

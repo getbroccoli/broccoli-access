@@ -1,25 +1,17 @@
 import { ApplicationError } from "../../../core/applicationError";
 import {
-  type ConnectionUpdate,
   type Connector,
-  ConnectorError,
   type ConnectorErrorCode,
   type ConnectorRegistry,
-  type ImportedAccount,
-  withConnectorRetries,
 } from "../../../core/connectors";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import type { JobQueue } from "../../../core/jobs";
-import { createSetupStepService } from "../../../core/instance";
 import type { Logger } from "../../../core/logger";
 import type { SecurityContext } from "../../../core/security";
 import { importSourceRepository } from "../db";
 import { type Scan, type ScanCounts, type ScanProgress, scanOf } from "../domain";
 import type { DirectoryPeople, ScannedApps } from "../ports";
-import { readChangedPhotos } from "./readChangedPhotos";
-import { type ScanFindings, syncAccounts } from "./syncAccounts";
-
-const setupSteps = createSetupStepService();
+import { type ScanFailure, scanSource } from "./scanSource";
 
 /** Scans of connected apps: queued in the caller's transaction, run as a job, read by the scan page. */
 export interface ScanService {
@@ -44,10 +36,16 @@ export interface ScanService {
    * photos, trying a rate-limited or unavailable call again, then in one transaction replaces the
    * source's records, syncs them, marks it scanned and moves setup from the scan to selecting the
    * apps. Settings or secrets a page renews are saved before its accounts are used. A connector
-   * error reading the accounts marks it failed and changes nothing else; one reading a photo only
-   * keeps that person's photo as it is. System only.
+   * error reading the accounts marks it failed and, in the same transaction, turns a connection of
+   * the connectors container to Reconnect when the error needs it; one reading a photo only keeps
+   * that person's photo as it is. System only.
    */
   runScan: (ctx: SecurityContext, sourceId: string) => Promise<void>;
+  /**
+   * The daily scan's job: queues a scan of every connection, Google Workspace included, each as
+   * `scanConnection` does, so one already queued or running gets no second. System only.
+   */
+  scanEveryConnection: (ctx: SecurityContext) => Promise<void>;
   /** The job's attempts are used up: the scan failed with `app_unavailable`. System only. */
   failScan: (ctx: SecurityContext, sourceId: string) => Promise<void>;
   /** The connection's scan as the scan page shows it; null before the first. Needs MANAGE_WORKSPACE. */
@@ -118,26 +116,44 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
         return;
       }
       progressBySource.set(sourceId, { found: null });
+      const { connectionId } = source;
       try {
-        await scanSource(
+        const failed = await scanSource(
           ctx,
           dependencies,
-          { sourceId, connectionId: source.connectionId },
+          { sourceId, connectionId },
           progressBySource,
         );
-      } catch (error) {
-        if (!(error instanceof ConnectorError)) {
-          throw error;
+        if (failed) {
+          const turnedToReconnect = await failScanOfConnection(ctx, dependencies, {
+            sourceId,
+            connectionId,
+            ...failed,
+          });
+          logger.warn(
+            { sourceId, connectionId, failure: failed.failure, turnedToReconnect },
+            "Scan failed",
+          );
         }
-        await markFailed(transact, sourceId, error.code);
-        logger.warn({ sourceId, failure: error.code }, "Scan failed");
       } finally {
         progressBySource.delete(sourceId);
       }
     },
+    async scanEveryConnection(ctx) {
+      ctx.requireSystem();
+      // A source already scanning needs no other; it would only wait for that scan's save.
+      const sources = (await importSourceRepository(orm).findAll()).filter(
+        ({ status }) => status !== "scanning",
+      );
+      // One transaction each, so a source a running save holds delays only its own scan.
+      for (const { connectionId, name } of sources) {
+        await transact((tx) => service.scanConnection(ctx, tx, { connectionId, sourceName: name }));
+      }
+      logger.info({ connections: sources.length }, "Daily scans queued");
+    },
     async failScan(ctx, sourceId) {
       ctx.requireSystem();
-      await markFailed(transact, sourceId, "app_unavailable");
+      await transact((tx) => markFailed(tx, sourceId, "app_unavailable"));
       logger.warn({ sourceId, failure: "app_unavailable" }, "Scan failed after its last attempt");
     },
     async readScan(ctx, connectionId) {
@@ -162,166 +178,42 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
 
 const SCAN_JOB = "imports.scanConnection";
 
-/** Reads the connection's accounts, then saves them, their sync and setup's next step in one transaction. */
-async function scanSource(
-  ctx: SecurityContext,
-  dependencies: ScanDependencies,
-  { sourceId, connectionId }: { sourceId: string; connectionId: string },
-  progressBySource: Map<string, ScanProgress>,
-): Promise<void> {
-  const { orm, logger, apps } = dependencies;
-  const readStartedAt = new Date();
-  const connection = (await apps.readConnectionById(orm, connectionId))!;
-  const connector = await connectorOf(dependencies, connection.connector);
-  const secrets = await apps.readSecrets(orm, connectionId);
-  const retrying = <T>(call: () => Promise<T>) => withRetries(dependencies, sourceId, call);
-  const session = await retrying(() =>
-    connector.openSession({ settings: connection.settings, secrets }),
-  );
-  const accounts = await readAllAccounts(async (cursor) => {
-    const page = await retrying(() => session.listAccounts(cursor));
-    await saveConnectionUpdate(ctx, dependencies, connectionId, page.connection);
-    return page;
-  });
-  const found = foundCounts(accounts);
-  progressBySource.set(sourceId, { found });
-  const read = await readChangedPhotos(ctx, dependencies, {
-    sourceId,
-    connector,
-    session,
-    accounts,
-    retrying,
-  });
-  const findings = { sourceId, connection, connector, readStartedAt, ...read };
-  const { saved, finishedSetupScan } = await saveScan(ctx, dependencies, findings);
-  logger.info(
-    {
-      sourceId,
-      accounts: accounts.length,
-      people: found.people,
-      apps: found.apps,
-      photoChanges: read.photos.size,
-      saved,
-      finishedSetupScan,
-    },
-    "Scan finished",
-  );
-}
-
 /**
- * Replaces the source's records with what the scan found, syncs them and moves setup on, in one
- * transaction; saves nothing when the scan is no longer queued.
+ * Marks a queued scan failed and, when the failure needs it, turns the connection to Reconnect in
+ * the same transaction, unless another outcome came first; returns whether it turned.
  */
-async function saveScan(
+async function failScanOfConnection(
   ctx: SecurityContext,
-  dependencies: ScanDependencies,
-  findings: ScanFindings,
-): Promise<{ saved: boolean; finishedSetupScan: boolean }> {
-  const { sourceId, accounts } = findings;
-  return dependencies.transact(async (tx) => {
-    const sources = importSourceRepository(tx);
-    if ((await sources.lockById(sourceId))?.status !== "scanning") {
-      return { saved: false, finishedSetupScan: false };
+  { transact, apps }: ScanDependencies,
+  {
+    sourceId,
+    connectionId,
+    failure,
+    secretsUsed,
+    reconnects,
+  }: ScanFailure & { sourceId: string; connectionId: string },
+): Promise<boolean> {
+  return transact(async (tx) => {
+    if (!(await markFailed(tx, sourceId, failure)) || !reconnects) {
+      return false;
     }
-    // Before the directory locks any employee, so two saves wait for each other, never deadlock.
-    await dependencies.apps.holdAccountSyncs(ctx, tx);
-    await sources.replaceRecords(sourceId, accounts);
-    await syncAccounts(ctx, tx, findings, dependencies);
-    await sources.markScanned(sourceId, new Date());
-    // Setup waits for the directory's people; another app's scan never ends its scan step.
-    const finishedSetupScan =
-      findings.connector.isDirectory && (await setupSteps.finishScanStep(ctx, tx));
-    return { saved: true, finishedSetupScan };
-  });
-}
-
-async function readAllAccounts(
-  listAccounts: (
-    cursor: string | null,
-  ) => Promise<{ accounts: ImportedAccount[]; nextCursor: string | null }>,
-): Promise<ImportedAccount[]> {
-  const accounts: ImportedAccount[] = [];
-  const seenCursors = new Set<string>();
-  let cursor: string | null = null;
-  do {
-    const page = await listAccounts(cursor);
-    accounts.push(...page.accounts);
-    cursor = page.nextCursor;
-    if (cursor !== null) {
-      // A connector that pages in a circle would never end the scan.
-      if (seenCursors.has(cursor)) {
-        throw new ConnectorError("unexpected_response");
-      }
-      seenCursors.add(cursor);
-    }
-  } while (cursor !== null);
-  // Each account is one record; a key seen twice is an answer the connector got wrong.
-  if (new Set(accounts.map(({ sourceKey }) => sourceKey)).size !== accounts.length) {
-    throw new ConnectorError("unexpected_response");
-  }
-  return accounts;
-}
-
-/** Runs `call`, trying it again after a rate-limited or unavailable answer until the attempts run out. */
-function withRetries<T>(
-  { logger, wait }: ScanDependencies,
-  sourceId: string,
-  call: () => Promise<T>,
-): Promise<T> {
-  return withConnectorRetries(call, {
-    wait,
-    onRetry: (failure, attempt) =>
-      logger.info({ sourceId, failure, attempt }, "Scan call failed; trying again"),
-  });
-}
-
-/** The directory's people among the accounts read (its own accounts), and the other apps they name. */
-function foundCounts(accounts: readonly ImportedAccount[]): ScanCounts {
-  // Counts the apps as the source names them; once the sync commits, the page shows the matched
-  // apps, fewer when two names go to one catalog app.
-  const people = accounts.filter(({ values }) => values.appExternalId === null);
-  const otherApps = new Set(accounts.map(({ values }) => values.appExternalId));
-  otherApps.delete(null);
-  return {
-    people: people.length,
-    suspended: people.filter(({ values }) => values.status === "suspended").length,
-    apps: otherApps.size,
-  };
-}
-
-/** Saves the settings or secrets an answer renewed, in their own transaction, before the rest is used. */
-async function saveConnectionUpdate(
-  ctx: SecurityContext,
-  { transact, apps, logger }: ScanDependencies,
-  connectionId: string,
-  update: ConnectionUpdate | undefined,
-): Promise<void> {
-  if (!update?.settings && !update?.secrets) {
-    return;
-  }
-  await transact((tx) => apps.changeConnection(ctx, tx, connectionId, update));
-  logger.info(
-    {
+    return apps.turnToReconnect(ctx, tx, {
       connectionId,
-      settings: update.settings !== undefined,
-      secrets: update.secrets !== undefined,
-    },
-    "Scan saved the connection's renewed settings or secrets",
-  );
+      error: failure,
+      ref: sourceId,
+      secretsUsed,
+    });
+  });
 }
 
-/** Marks a queued scan failed, unless another outcome came first. */
-async function markFailed(
-  transact: Transact,
-  sourceId: string,
-  failure: ConnectorErrorCode,
-): Promise<void> {
-  await transact(async (tx) => {
-    const sources = importSourceRepository(tx);
-    if ((await sources.lockById(sourceId))?.status === "scanning") {
-      await sources.markFailed(sourceId, failure);
-    }
-  });
+/** Marks a queued scan failed, joining `tx`; false when another outcome came first. */
+async function markFailed(tx: Tx, sourceId: string, failure: ConnectorErrorCode): Promise<boolean> {
+  const sources = importSourceRepository(tx);
+  if ((await sources.lockById(sourceId))?.status !== "scanning") {
+    return false;
+  }
+  await sources.markFailed(sourceId, failure);
+  return true;
 }
 
 /** What the last scan's sync saved: the connection's app's people, and the other apps they use. */
@@ -343,15 +235,6 @@ async function savedCounts(
     otherAppAccounts ? apps.countAppsFoundVia(orm, otherAppAccounts) : 0,
   ]);
   return { people, suspended, apps: otherApps };
-}
-
-/** The connection's connector; one the connectors container does not list now is unavailable. */
-async function connectorOf(dependencies: ScanDependencies, key: string): Promise<Connector> {
-  const connector = await findConnector(dependencies, key);
-  if (!connector) {
-    throw new ConnectorError("app_unavailable");
-  }
-  return connector;
 }
 
 async function findConnector(

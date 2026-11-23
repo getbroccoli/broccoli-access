@@ -22,11 +22,20 @@ export function importsModule(scans: ScanService): ModuleManifest {
         onFailed: ({ sourceId }) => scans.failScan(SYSTEM, sourceId),
         expireInSeconds: SCAN_EXPIRE_SECONDS,
       },
+      "imports.scanEveryConnection": {
+        run: () => scans.scanEveryConnection(SYSTEM),
+        // Each connection's own scan job handles its failures; queuing them has nothing to undo.
+        onFailed: () => Promise.resolve(),
+        schedule: { cron: DAILY_SCAN_CRON, timeZone: "UTC", payload: {} },
+      },
     },
   };
 }
 
 /** Longer than a large directory's pages with every retry, so a slow scan never runs twice at once. */
 const SCAN_EXPIRE_SECONDS = 15 * 60;
+
+/** Every day at 06:00 UTC: before the working day in Europe, where most owners are. */
+const DAILY_SCAN_CRON = "0 6 * * *";
 
 const SYSTEM = PrincipalSecurityContext.system();

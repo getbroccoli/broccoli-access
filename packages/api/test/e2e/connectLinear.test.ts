@@ -82,6 +82,39 @@ test("the owner connects Linear and reads its seven members with their status", 
     });
 }, 90_000);
 
+test("reconnects Linear over GraphQL and returns the connected status", async ({ env }) => {
+  const { browser } = await env.signInAsOwner();
+  await finishSetupWithPreselectedApps(browser);
+  const response = await browser.graphql(CONNECT, { input: LINEAR_INPUT });
+  const connected = (await response.json()) as {
+    data: { connectors: { connect: { containerConnector: { connection: { id: string } } } } };
+  };
+  await env.seed.connectionNeedsReconnect(
+    connected.data.connectors.connect.containerConnector.connection.id,
+  );
+
+  const result = await browser.graphql(
+    `mutation ($input: ContainerConnectorReconnectInput!) {
+      connectors { reconnect(input: $input) {
+        containerConnector { id connection { status } }
+        error { __typename }
+      } }
+    }`,
+    { input: LINEAR_INPUT },
+  );
+
+  expect(await result.json()).toEqual({
+    data: {
+      connectors: {
+        reconnect: {
+          containerConnector: { id: "linear", connection: { status: "CONNECTED" } },
+          error: null,
+        },
+      },
+    },
+  });
+}, 90_000);
+
 test("Applications offers Linear to connect, then shows it connected", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
   await finishSetupWithPreselectedApps(browser);

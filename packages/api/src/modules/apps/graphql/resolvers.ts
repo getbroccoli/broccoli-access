@@ -12,6 +12,7 @@ import type { SecurityContext } from "../../../core/security";
 import type {
   AccountChangeService,
   AccountChangeState,
+  ConnectionState,
   AppService,
   AppSummary,
   AppUser,
@@ -34,6 +35,7 @@ export function createResolvers(
     | "changeAccount"
     | "readChangeStates"
     | "findAppsWithChangeableAccounts"
+    | "readConnectionStates"
     | "listAccountChanges"
     | "readRequesterNames"
     | "markChangeDoneByHand"
@@ -66,8 +68,27 @@ export function createResolvers(
         const { offeredChange } = await loaders.changeStates(context).load(id);
         return offeredChange && toEnum(offeredChange);
       },
+      offersReconnect: async ({ id }, _args, context) =>
+        (await loaders.changeStates(context).load(id)).offersReconnect,
       latestChange: async ({ id }, _args, context) =>
         (await loaders.changeStates(context).load(id)).latestChange,
+    },
+    ContainerConnection: {
+      app: async ({ id }, _args, context) =>
+        loaders.appsById(context).load((await loaders.connectionStates(context).load(id)).appId),
+      status: async ({ id }, _args, context) =>
+        toEnum((await loaders.connectionStates(context).load(id)).status),
+      reconnectReason: async ({ id }, _args, context) => {
+        const reason = (await loaders.connectionStates(context).load(id)).reconnectReason;
+        return (
+          reason && {
+            cause: toEnum(reason.cause),
+            foundAt: reason.foundAt,
+            // A change that found a Reconnect has failed, so it waits in no queue.
+            foundByChange: reason.foundByChange && { ...reason.foundByChange, changesAhead: null },
+          }
+        );
+      },
     },
     AccountChange: {
       action: ({ action }) => toEnum(action),
@@ -129,6 +150,7 @@ function appsMutations(
         loaders.changeStates(context).prime(change.appAccountId!, {
           isConnectionUser: false,
           offeredChange: null,
+          offersReconnect: false,
           latestChange: change,
         });
         return { appUser: await appUserOf(services, ctx, change) };
@@ -203,6 +225,15 @@ function createChangeLoaders(services: Parameters<typeof createResolvers>[0]) {
         new DataLoader<string, string>(async (userIds) => {
           const names = await services.readRequesterNames(context.getActor(), userIds);
           return userIds.map((id) => names.get(id) ?? new Error("No user has this id."));
+        }),
+    ),
+    connectionStates: perRequest(
+      (context) =>
+        new DataLoader<string, ConnectionState>(async (connectionIds) => {
+          const states = await services.readConnectionStates(context.getActor(), connectionIds);
+          return connectionIds.map(
+            (id) => states.get(id) ?? new Error("No app connection has this id."),
+          );
         }),
     ),
     changeableApps: perRequest(

@@ -3,6 +3,7 @@ fragment AccountChangeCell_appUser on AppUser {
   status
   isConnectionUser
   offeredChange
+  offersReconnect
   latestChange {
     id
     action
@@ -37,6 +38,7 @@ fragment AccountChangeCell_appUser on AppUser {
           label
           secret
         }
+        ...ReconnectButton_connector
       }
     }
   }

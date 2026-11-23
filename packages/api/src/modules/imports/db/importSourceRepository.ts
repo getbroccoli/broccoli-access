@@ -20,6 +20,8 @@ import { importSources } from "./importSourcesTable";
 /** Import sources and their records in Postgres, through the pool or inside a transaction. */
 export interface ImportSourceRepository {
   findById(id: string): Promise<ImportSource | null>;
+  /** Every source; an instance has one per connection. */
+  findAll(): Promise<ImportSource[]>;
   findByConnection(connectionId: string): Promise<ImportSource | null>;
   /** The connection's source, locked until the transaction ends; null when it has none. */
   lockByConnection(connectionId: string): Promise<ImportSource | null>;
@@ -65,6 +67,7 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
   const orm = () => ormOf(db);
   return {
     findById: (id) => findSource(orm(), eq(importSources.id, id), { lock: false }),
+    findAll: () => orm().select().from(importSources),
     findByConnection: (connectionId) =>
       findSource(orm(), eq(importSources.connectionId, connectionId), { lock: false }),
     lockByConnection: (connectionId) =>

@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 
 import { ApplicationError } from "../../../core/applicationError";
+import type { ConnectorErrorCode } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import type { FieldChange } from "../../../core/records";
 import { createRecordHistoryService } from "../../../core/records";
@@ -14,6 +15,13 @@ import {
   appRepository,
 } from "../db";
 import { appChanges, CATALOG_KEYS, catalogApp, type CatalogApp, connectedAppOf } from "../domain";
+import {
+  holdsSecrets,
+  readReconnectReasons,
+  reconnect,
+  type ReconnectReason,
+  turnToReconnect,
+} from "./connectionReconnects";
 
 const recordHistory = createRecordHistoryService();
 
@@ -41,15 +49,57 @@ export interface AppConnectionService {
   ) => Promise<{ appId: string; connectionId: string }>;
   /**
    * Replaces the connection's settings or secrets, whichever `update` carries, joining `tx`; new
-   * settings add a line to its history, secrets never. Admins only; refuses an unknown connection
-   * with NOT_FOUND.
+   * settings add a line to its history, secrets never. With `replacing`, the secrets of the call
+   * whose answer renewed them, it saves nothing once the stored secrets differ, such as after a
+   * reconnect; returns whether it saved. Admins only; refuses an unknown connection with NOT_FOUND.
    */
   changeConnection: (
     ctx: SecurityContext,
     tx: Tx,
     connectionId: string,
-    update: { settings?: Record<string, unknown>; secrets?: Record<string, unknown> },
+    update: {
+      settings?: Record<string, unknown>;
+      secrets?: Record<string, unknown>;
+      replacing?: Record<string, unknown>;
+    },
+  ) => Promise<boolean>;
+  /**
+   * Turns the connection to `reconnect` when `error` is a reconnect cause, joining `tx`: stores the
+   * cause, appends a `CONNECTOR_ERROR` line whose ref is `ref` (the scan's source or the account
+   * change) and fails the connection's running changes with the cause. Does nothing for another
+   * error, a connection already in `reconnect`, or one whose secrets are no longer the ones the
+   * failing call used (`secretsUsed`, null without a call), such as after a reconnect. Returns
+   * whether it turned. System only.
+   */
+  turnToReconnect: (
+    ctx: SecurityContext,
+    tx: Tx,
+    failure: {
+      connectionId: string;
+      error: ConnectorErrorCode;
+      ref: string;
+      secretsUsed: Record<string, unknown> | null;
+    },
+  ) => Promise<boolean>;
+  /**
+   * Replaces the connection's secrets and sets it `connected` without a cause, joining `tx`;
+   * appends an `EDITED_DIRECTLY` line when its status changed, never with a secret. Admins only;
+   * refuses an unknown connection with NOT_FOUND.
+   */
+  reconnect: (
+    ctx: SecurityContext,
+    tx: Tx,
+    connectionId: string,
+    secrets: Record<string, unknown>,
   ) => Promise<void>;
+  /**
+   * Why each of the connections in `reconnect` needs it, by connection id; a connected one is left
+   * out. Trusted read: no `ctx`.
+   */
+  readReconnectReasons: (
+    db: Orm | Tx,
+    connectionIds: readonly string[],
+  ) => Promise<Map<string, ReconnectReason>>;
   /** The connection of `connector` without its secrets, or null. Trusted read: no `ctx`. */
   readConnection: (db: Orm | Tx, connector: string) => Promise<AppConnection | null>;
   /** Every connection without its secrets. Trusted read: no `ctx`. */
@@ -109,17 +159,20 @@ export function createAppConnectionService({
       });
       return { appId: app.id, connectionId: id };
     },
-    async changeConnection(ctx, tx, connectionId, { settings, secrets }) {
+    async changeConnection(ctx, tx, connectionId, { settings, secrets, replacing }) {
       ctx.require("MANAGE_WORKSPACE");
       const connections = appConnectionRepository(tx);
       const old = await connections.lockById(connectionId);
       if (!old) {
         throw new ApplicationError("NOT_FOUND", "No app connection has this id.");
       }
+      if (replacing && !(await holdsSecrets(secretBox, tx, connectionId, replacing))) {
+        return false;
+      }
       const encryptedSecrets = secrets && secretBox.encrypt(JSON.stringify(secrets), connectionId);
       await connections.update(connectionId, { settings, encryptedSecrets });
       if (!settings || isDeepStrictEqual(settings, old.settings)) {
-        return;
+        return true;
       }
       await recordHistory.append(ctx, tx, {
         recordType: "app_connection",
@@ -138,7 +191,12 @@ export function createAppConnectionService({
           },
         ],
       });
+      return true;
     },
+    turnToReconnect: (ctx, tx, failure) => turnToReconnect(secretBox, ctx, tx, failure),
+    reconnect: (ctx, tx, connectionId, secrets) =>
+      reconnect(secretBox, ctx, tx, { connectionId, secrets }),
+    readReconnectReasons: (db, connectionIds) => readReconnectReasons(db, connectionIds),
     readConnection: (db, connector) => appConnectionRepository(db).findByConnector(connector),
     readConnections: (db) => appConnectionRepository(db).findAll(),
     async readCatalogAppsWithoutApp(db, catalogKeys) {

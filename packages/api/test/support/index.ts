@@ -5,7 +5,7 @@ export { createGoogleWorkspaceConnector } from "../../src/modules/google";
 export { ADMIN, EMPLOYEE, OWNER, SETUP_HOLDER, SYSTEM } from "./testSecurityContext";
 export { createBrowser, type Browser } from "./browser";
 export { startDisconnectingProxy, type DisconnectingProxy } from "./disconnectingProxy";
-export { test, connectorTest } from "./fixture";
+export { test, connectorTest, pendingDisableTest } from "./fixture";
 export { startSimpleHttpServer } from "./simpleHttpServer";
 export { startCountingGoogleProxy } from "./countingGoogleProxy";
 export { PNG, JPEG, WEBP } from "./images";
@@ -103,6 +103,7 @@ export {
   linearMemberStatus,
   listedLinearChloe,
 } from "./accountChanges";
+export { slackWithExpiredSession, postFakeControl } from "./reconnect";
 export { signInToFakeSlack } from "./signInToFakeSlack";
 export { pairChrome, redeemCode, START_PAIRING, BROWSER } from "./pairChrome";
 export {

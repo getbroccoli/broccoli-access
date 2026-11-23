@@ -115,6 +115,16 @@ export const settingsEn = {
   "settings.apps.dialog.notAdmin": "{app} accepts only a key made by a {app} admin.",
   "settings.apps.dialog.unavailable": "Couldn’t check the connection to {app}. Try again.",
   "settings.apps.dialog.failed": "Couldn’t connect {app}. Try again.",
+  "settings.apps.changeKey": "Change key",
+  "settings.apps.dialog.newKeyTitle": "Paste a new key for {app}",
+  "settings.apps.dialog.newKeyDescription":
+    "Broccoli Access checks the new key with {app}, then uses it instead of the old one.",
+  "settings.apps.dialog.newKeyNext":
+    "Broccoli Access checks the key, reconnects {app} if it needs it and scans its members.",
+  "settings.apps.dialog.checkAndSave": "Check and save",
+  "settings.apps.dialog.checking": "Checking…",
+  "settings.apps.dialog.otherWorkspace":
+    "This key reaches another {app} workspace than the connected one.",
   "settings.googleApp.title": "Change Google app",
   "settings.googleApp.description":
     "Connect Google Workspace with another Google app of your own. Your people, apps and decisions stay as they are.",

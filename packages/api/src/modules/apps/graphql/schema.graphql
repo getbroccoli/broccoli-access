@@ -39,6 +39,8 @@ type AppUser {
   isConnectionUser: Boolean!
   "SUSPEND (Disable) on an active account or REACTIVATE (Enable) on a suspended one, when the owner may ask for it now; null when the app's connection cannot change accounts or needs reconnecting, its last scan did not list the account, the account is the connection's user, or a change of it is running."
   offeredChange: AccountChangeAction
+  "Whether its row shows Reconnect instead of Disable or Enable: it would offer one, but its app's connection needs reconnecting."
+  offersReconnect: Boolean!
   "Its latest Disable or Enable; null before the first."
   latestChange: AccountChange
 }
@@ -121,6 +123,41 @@ enum AccountChangeStatus {
   FAILED
   "It had failed, and the owner made the change in the app themselves."
   DONE_BY_HAND
+}
+
+# Adds the app and the status to the connectors module's connections; the server merges the types.
+type ContainerConnection {
+  "The app it connects."
+  app: App!
+  status: AppConnectionStatus!
+  "Why it needs reconnecting and what found it; null while connected."
+  reconnectReason: ReconnectReason
+}
+
+"Whether a connection works."
+enum AppConnectionStatus {
+  CONNECTED
+  "Its key or session stopped working; changes in its app fail until the owner reconnects it."
+  RECONNECT
+}
+
+"Why a connection needs reconnecting, and what found it."
+type ReconnectReason {
+  cause: ReconnectCause!
+  "When a scan or an account change found it."
+  foundAt: DateTime!
+  "The Disable or Enable that found it; null when a scan did."
+  foundByChange: AccountChange
+}
+
+"The connector error that turned a connection to Reconnect."
+enum ReconnectCause {
+  "The app refused the key or session: revoked, expired or signed out."
+  AUTHENTICATION_FAILED
+  "The connection's user is no longer an admin in the app."
+  PERMISSION_MISSING
+  "The key or session reaches another workspace than the connection's."
+  WRONG_WORKSPACE
 }
 
 # Adds the person's app accounts to the employees module's Employee; the server merges the types.

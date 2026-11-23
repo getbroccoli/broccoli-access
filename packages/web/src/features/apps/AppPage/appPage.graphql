@@ -19,9 +19,19 @@ query AppPage($id: ID!) {
     containerConnection {
       id
       adminUrl
+      status
+      reconnectReason {
+        cause
+      }
+      connectionUserEmail
       connector {
         id
+        name
         findingKind
+        connectionFields {
+          kind
+        }
+        ...ReconnectButton_connector
       }
       scan {
         id

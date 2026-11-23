@@ -6,6 +6,7 @@ import {
   type ConnectContainerConnectorDialog_ConnectorFragment,
   ConnectContainerConnectorDialog_ConnectorFragmentDoc,
   ConnectContainerConnectorDocument,
+  ReconnectContainerConnectorDocument,
 } from "@/__generated__/graphql";
 import { useCache, usePayloadMutation } from "@/apollo";
 import { AppMark } from "@/components/AppMark";
@@ -36,7 +37,10 @@ type Props = {
   onConnected?: () => void;
 };
 
-/** Connect <app>: a dialog asking for each value the connector needs, which the app then checks. */
+/**
+ * Connect <app>: a dialog asking for each value the connector needs, which the app then checks.
+ * Once connected, it takes a new key instead, which also reconnects a connection that needs it.
+ */
 export function ConnectContainerConnectorDialog({ connector: from, trigger, onConnected }: Props) {
   const { data: connector, complete } = useFragment({
     fragment: ConnectContainerConnectorDialog_ConnectorFragmentDoc,
@@ -45,7 +49,7 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const cache = useCache();
-  const [connect, { loading, error, payloadError, reset }] = usePayloadMutation(
+  const [connect, connecting] = usePayloadMutation(
     ConnectContainerConnectorDocument,
     // Connecting approves the app, which moves the app lists, their counts and the apps to connect.
     {
@@ -56,10 +60,14 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
       },
     },
   );
+  // The payload carries the connection's new status and its app's users' offers.
+  const [reconnect, reconnecting] = usePayloadMutation(ReconnectContainerConnectorDocument);
   if (!complete) {
     return null;
   }
   const app = connector.name;
+  const isNewKey = connector.connection !== null;
+  const { loading, error, payloadError, reset } = isNewKey ? reconnecting : connecting;
   const changeOpen = (next: boolean) => {
     // Closed only once the check ends, so a pending connect never runs behind another try.
     if (loading) {
@@ -75,8 +83,11 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
       connector: connector.id,
       values: connector.connectionFields.map(({ key }) => ({ key, value: values[key] ?? "" })),
     };
+    const saved = isNewKey
+      ? reconnect({ variables: { input } })
+      : connect({ variables: { input } });
     // `usePayloadMutation` keeps a failure for display, so the rejection needs no handling here.
-    connect({ variables: { input } }).then(
+    saved.then(
       () => {
         setOpen(false);
         onConnected?.();
@@ -107,11 +118,16 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
           <div className="flex items-center gap-3 pr-8">
             <AppMark name={app} catalogKey={connector.id} className="size-9 rounded-lg text-base" />
             <DialogTitle className="text-xl font-semibold">
-              {t("settings.apps.connect", { app })}
+              {t(isNewKey ? "settings.apps.dialog.newKeyTitle" : "settings.apps.connect", { app })}
             </DialogTitle>
           </div>
           <DialogDescription className="text-sm text-foreground/80">
-            {t("settings.apps.dialog.description", { app })}
+            {t(
+              isNewKey
+                ? "settings.apps.dialog.newKeyDescription"
+                : "settings.apps.dialog.description",
+              { app },
+            )}
           </DialogDescription>
         </DialogHeader>
         <form id={`connect-${connector.id}`} onSubmit={submit} className="flex flex-col gap-5">
@@ -145,7 +161,11 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
             <span className="font-semibold text-foreground">
               {t("settings.apps.dialog.nextTitle")}
             </span>
-            <span>{t("settings.apps.dialog.next", { app })}</span>
+            <span>
+              {t(isNewKey ? "settings.apps.dialog.newKeyNext" : "settings.apps.dialog.next", {
+                app,
+              })}
+            </span>
           </div>
           {formError && (
             <p role="alert" className="text-sm text-destructive">
@@ -160,7 +180,7 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
             {t("settings.apps.dialog.cancel")}
           </DialogClose>
           <Button type="submit" form={`connect-${connector.id}`} size="lg" disabled={loading}>
-            {loading ? t("settings.apps.dialog.connecting") : t("settings.apps.connect", { app })}
+            {submitLabel(app, { isNewKey, loading })}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -179,6 +199,9 @@ function connectFailure(
     if (!refusal) {
       return undefined;
     }
+    if (refusal.code === "wrong_workspace") {
+      return t("settings.apps.dialog.otherWorkspace", { app });
+    }
     return refusal.code === "permission_missing"
       ? t("settings.apps.dialog.notAdmin", { app })
       : t("settings.apps.dialog.refused", { app });
@@ -187,4 +210,12 @@ function connectFailure(
     return t("settings.apps.dialog.unavailable", { app });
   }
   return payloadError || failedOtherwise ? t("settings.apps.dialog.failed", { app }) : undefined;
+}
+
+/** The submit button's label: Connect <app>, or Check and save for a new key, while it runs too. */
+function submitLabel(app: string, { isNewKey, loading }: { isNewKey: boolean; loading: boolean }) {
+  if (isNewKey) {
+    return t(loading ? "settings.apps.dialog.checking" : "settings.apps.dialog.checkAndSave");
+  }
+  return loading ? t("settings.apps.dialog.connecting") : t("settings.apps.connect", { app });
 }

@@ -8,4 +8,6 @@ export { ConnectAppSessionDialog } from "./ConnectAppSessionDialog";
 export { ConnectContainerConnectorDialog } from "./ConnectContainerConnectorDialog";
 export { connectingFieldName } from "./connectingFieldName";
 export { connectsWithText } from "./connectsWithText";
+export { ReconnectButton } from "./ReconnectButton";
+export { failsUntilLine, foundLine, reconnectCauseLine } from "./reconnectReason";
 export { useRefreshAfterChanges } from "./useRefreshAfterChanges";

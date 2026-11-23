@@ -19,6 +19,13 @@ export interface ConnectedApps {
       noticeAcceptedAt?: Date;
     },
   ): Promise<{ appId: string; connectionId: string }>;
+  /** Replaces the connection's secrets and sets it connected, joining `tx`, with its history. */
+  reconnect(
+    ctx: SecurityContext,
+    tx: Tx,
+    connectionId: string,
+    secrets: Record<string, unknown>,
+  ): Promise<void>;
   /** The catalog apps among `catalogKeys` that have no app yet, whatever its status. */
   readCatalogAppsWithoutApp(
     db: Orm | Tx,

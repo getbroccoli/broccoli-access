@@ -35,7 +35,7 @@ A manual check of Settings → Connections against a development stack: the Goog
 - [ ] "Connect Linear" opens a dialog "Connect Linear" reading "Broccoli Access reads your Linear members and disables or enables them when you ask, through Linear’s API.", a "Personal API key" field with "Make it in Linear’s settings while signed in as a Linear admin. Broccoli Access stores it encrypted on your server.", "What happens next" with "Broccoli Access checks the key, shows the workspace’s name, approves Linear and scans its members.", "Cancel" and "Connect Linear"; Escape and "Cancel" close it.
 - [ ] Connecting with an empty field shows "Enter the personal API key." under it; any key other than `lin_api_acme_fake` shows "Linear refused it. Check it and try again." and Linear stays not connected.
 - [ ] With the fake failing the test (`POST <fake connectors>/_fake/failures` for `linear`, `connections/test`, `app_unavailable`, count 3), connecting with `lin_api_acme_fake` shows "Couldn’t check the connection to Linear. Try again." and Linear stays not connected; with count 1, connecting succeeds on the next attempt.
-- [ ] `lin_api_acme_fake` closes the dialog; the card reads "Connected", "The Acme workspace, connected with a personal API key of admin@acme.example." and, once its scan ends, "7 members. Scanned today at HH:MM.", with "Scan now".
+- [ ] `lin_api_acme_fake` closes the dialog; the card reads "Connected", "The Acme workspace, connected with a personal API key of admin@acme.example." and, once its scan ends, "7 members. Scanned today at HH:MM.", with "Scan now" and "Change key".
 - [ ] Linear shows in Applications under Approved with 7 users, found via "Linear members", "1 still has access".
 - [ ] With the fake failing the list (`accounts/list`, `app_unavailable`, count 3), Linear's "Scan now" ends with "The last scan failed. Try Scan now again."
 - [ ] Without `CONNECTORS_URL` (the self-hosted image as built), Connections shows no "Apps" section.
@@ -56,3 +56,15 @@ Load the built extension in its own profile as "The Chrome extension" in `docs/t
 - [ ] "Connect Acme" closes the dialog; the card reads "Connected", "The Acme workspace, connected with the Slack session of admin@acme.example." and, once scanned, "41 members. Scanned today at HH:MM. You accepted Slack’s notice on <today>."
 - [ ] Slack's app page lists 41 users with their "In Slack" status, Elif "Disabled".
 - [ ] At 390 px wide, every step fits without horizontal scrolling.
+
+## Reconnect
+
+With Slack and Linear connected as above, and `FAKE` set to the fake connectors' address.
+
+- [ ] After `curl -s -X POST "$FAKE/_fake/slack/sessions/expire"`, Slack's "Scan now" turns its card amber with "Reconnect", "Your Slack session expired or was signed out. Found by a scan today at HH:MM.", "Changes in Slack fail until you reconnect.", "Sign in to Slack in Chrome, then Reconnect." and "Reconnect" in place of "Scan now".
+- [ ] "Reconnect" opens the extension's window and reads "Click Hand over in the extension’s window."; Cancel there ends with "Nothing was handed over. Reconnect Slack when you’re ready." and Slack stays in Reconnect.
+- [ ] Signed in again at the fake Slack in a tab, "Reconnect" then "Hand over" closes the window, a toast says "Slack is reconnected.", and the card is "Connected" again with "Scan now".
+- [ ] After `curl -s -X POST "$FAKE/_fake/linear/keys/revoke"`, disabling Chloé on Linear's page turns Linear's card to "Reconnect" with "Linear refused the API key: it was revoked or expired. Found when you disabled Chloé Martin today at HH:MM.", "Changes in Linear fail until you paste a new key." and "Paste a new key".
+- [ ] "Paste a new key" opens "Paste a new key for Linear" with "Check and save"; another key shows "Linear refused it. Check it and try again." and Linear stays in Reconnect. After `curl -s -X POST "$FAKE/_fake/reset"`, `lin_api_acme_fake` closes the dialog and the card is "Connected" with "Scan now" and "Change key".
+- [ ] A Google Workspace scan that fails (fake Google `POST /_fake/tokens/revoke`, then "Scan now") shows "The last scan failed. Try Scan now again." and keeps "Connected".
+- [ ] At 390 px wide, a card in Reconnect wraps its button under the text without horizontal scrolling.

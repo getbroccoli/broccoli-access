@@ -76,6 +76,18 @@ export function offeredChange({
   return status === "active" ? "suspend" : "reactivate";
 }
 
+/**
+ * Whether the account's row shows Reconnect instead of Disable or Enable: it would offer one if
+ * its app's connection were connected, but the connection is in `reconnect`.
+ */
+export function offersReconnect(facts: AccountChangeFacts): boolean {
+  const { connection } = facts;
+  return (
+    connection?.status === "reconnect" &&
+    offeredChange({ ...facts, connection: { ...connection, status: "connected" } }) !== null
+  );
+}
+
 /** The status an action leaves the account in. */
 export function statusAfter(action: AccountAction): AccountStatus {
   return action === "suspend" ? "suspended" : "active";

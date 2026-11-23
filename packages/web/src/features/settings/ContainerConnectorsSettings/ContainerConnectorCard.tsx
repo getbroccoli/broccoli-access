@@ -1,16 +1,20 @@
 import type { ContainerConnectorsSettingsQuery } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
+import { Button } from "@/components/ui/button";
 import {
   ConnectAppSessionDialog,
   ConnectContainerConnectorDialog,
   connectingFieldName,
   connectsWithText,
+  ReconnectButton,
 } from "@/features/apps";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { ScanNowButton } from "@/shell";
 
 import { ConnectionSummary } from "./ConnectionSummary";
+import { ConnectorStatusBadge } from "./ConnectorStatusBadge";
+import { ReconnectSummary } from "./ReconnectSummary";
 
 export type ContainerConnector = ContainerConnectorsSettingsQuery["containerConnectors"][number];
 
@@ -18,15 +22,22 @@ type Props = {
   connector: ContainerConnector;
 };
 
-/** One app the connectors container connects: how it connects, or its connection and last scan. */
+/**
+ * One app the connectors container connects: how it connects, its connection and last scan, or
+ * why it needs reconnecting.
+ */
 export function ContainerConnectorCard({ connector }: Props) {
   const { connection } = connector;
   const titleId = `connector-${connector.id}-title`;
+  const needsReconnect = connection?.status === "RECONNECT";
 
   return (
     <article
       aria-labelledby={titleId}
-      className="flex flex-col gap-4 rounded-xl border border-border p-6 sm:flex-row sm:items-start"
+      className={cn(
+        "flex flex-col gap-4 rounded-xl border p-6 sm:flex-row sm:items-start",
+        needsReconnect ? "border-amber-200 bg-amber-50/60" : "border-border",
+      )}
     >
       {/* A container connector's key is its app's catalog key, which picks the logo. */}
       <AppMark
@@ -39,28 +50,46 @@ export function ContainerConnectorCard({ connector }: Props) {
           <h3 id={titleId} className="text-base font-semibold">
             {connector.name}
           </h3>
-          <span
-            className={cn(
-              "rounded-full px-2 py-0.5 text-xs font-medium",
-              connection ? "bg-brand-soft text-brand-deep" : "bg-muted text-foreground/70",
-            )}
-          >
-            {t(connection ? "settings.connections.connected" : "settings.apps.notConnected")}
-          </span>
+          <ConnectorStatusBadge connection={connection} />
         </div>
-        {connection ? (
-          <ConnectionSummary connector={connector} connection={connection} />
-        ) : (
-          <p className="text-sm text-foreground/80">{howItConnects(connector)}</p>
+        {connection && needsReconnect && (
+          <ReconnectSummary connector={connector} connection={connection} />
         )}
+        {connection && !needsReconnect && (
+          <ConnectionSummary connector={connector} connection={connection} />
+        )}
+        {!connection && <p className="text-sm text-foreground/80">{howItConnects(connector)}</p>}
       </div>
-      {connection ? (
-        <ScanNowButton
-          connectionId={connection.id}
-          isScanning={connection.scan?.status === "SCANNING"}
-          className="shrink-0 items-start pb-0"
-        />
-      ) : (
+      {connection && (
+        <div className="flex shrink-0 flex-wrap items-start gap-2">
+          {!needsReconnect && (
+            <ScanNowButton
+              connectionId={connection.id}
+              isScanning={connection.scan?.status === "SCANNING"}
+              className="items-start pb-0"
+            />
+          )}
+          {/* One dialog in both states, so a status change during a scan keeps a key being typed. */}
+          {connectsWithText(connector) ? (
+            <ConnectContainerConnectorDialog
+              connector={connector}
+              trigger={
+                <Button
+                  type="button"
+                  variant={needsReconnect ? "default" : "outline"}
+                  size="lg"
+                  className="px-4"
+                >
+                  {t(needsReconnect ? "apps.reconnect.pasteNewKey" : "settings.apps.changeKey")}
+                </Button>
+              }
+            />
+          ) : (
+            needsReconnect && <ReconnectButton connector={connector} />
+          )}
+        </div>
+      )}
+      {!connection && (
         <div className="shrink-0">
           {connectsWithText(connector) ? (
             <ConnectContainerConnectorDialog connector={connector} />

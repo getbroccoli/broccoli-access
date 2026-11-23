@@ -7,23 +7,17 @@ import {
   expect,
   failLinearCall,
   linearMemberStatus,
-  pendingDisable,
   serveConnectorRoutes,
   listedLinearChloe,
   storedAppAccounts,
   storedAppConnections,
   storedRecordHistory,
   SYSTEM,
-  test as baseTest,
+  pendingDisableTest as test,
+  pendingDisable,
 } from "#test/support";
 
 import type { Orm } from "../../../core/db";
-
-const test = baseTest.extend<{ pending: Awaited<ReturnType<typeof pendingDisable>> }>({
-  pending: async ({ orm, seed, fakeConnectors }, use) => {
-    await use(await pendingDisable(orm, seed, fakeConnectors.url));
-  },
-});
 
 test("disables Chloé in Linear and records her suspension under the owner's name", async ({
   orm,

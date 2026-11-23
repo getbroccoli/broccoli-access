@@ -7,6 +7,7 @@ import type { SecurityContext } from "../../../core/security";
 import { parseAppSession } from "../domain";
 import type { AppSessionHandOvers, ConfirmedWorkspace } from "./appSessionHandOvers";
 import { appSessionFieldOf, type ContainerConnector } from "./containerConnectors";
+import { ownerInputField } from "./testedConnection";
 
 /** Settings and secrets as the connector reads them. */
 export interface Connection {
@@ -62,6 +63,37 @@ export function isOtherWorkspace(
     details.domain !== workspace.domain ||
     (found !== undefined && !isDeepStrictEqual(found, settings))
   );
+}
+
+/**
+ * Refuses reconnecting with a connection whose test reaches another workspace than the stored
+ * one: other settings, or, for a hand-over, another workspace than the hand-over found.
+ */
+export function refuseOtherWorkspace(
+  {
+    connector,
+    connection,
+    details,
+    stored,
+  }: {
+    connector: ContainerConnector;
+    connection: Connection;
+    details: ConnectionDetails;
+    stored: { id: string; settings: Record<string, unknown> };
+  },
+  logger: Logger,
+): void {
+  const settings = { ...connection.settings, ...details.connection?.settings };
+  const handedOverElsewhere =
+    appSessionFieldOf(connector) !== undefined && isOtherWorkspace(connection, details);
+  if (!handedOverElsewhere && isDeepStrictEqual(settings, stored.settings)) {
+    return;
+  }
+  logger.warn(
+    { connector: connector.key, connectionId: stored.id },
+    "Reconnect refused: the test reaches another workspace",
+  );
+  throw invalidInput([{ field: ownerInputField(connector), code: "wrong_workspace" }]);
 }
 
 /** The trimmed values as the connection's settings and secrets, refusing a missing or unknown one. */
