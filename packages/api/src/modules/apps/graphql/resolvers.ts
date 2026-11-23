@@ -32,6 +32,8 @@ export function createResolvers(
     | "changeAccount"
     | "readChangeStates"
     | "findAppsWithChangeableAccounts"
+    | "listAccountChanges"
+    | "readRequesterNames"
   >,
 ): Resolvers {
   const loaders = createLoaders(services);
@@ -45,6 +47,8 @@ export function createResolvers(
           after,
         }),
       appCounts: (_parent, _args, context) => services.countApps(context.getActor()),
+      accountChanges: (_parent, { first, after }, context) =>
+        services.listAccountChanges(context.getActor(), { first: first ?? undefined, after }),
     },
     Mutation: {
       apps: () => ({}),
@@ -98,6 +102,12 @@ export function createResolvers(
     AccountChange: {
       action: ({ action }) => toEnum(action),
       status: ({ status }) => toEnum(status),
+      app: (change, _args, context) => loaders.appsById(context).load(change.appId),
+      requestedBy: async ({ requestedBy }, _args, context) => ({
+        id: requestedBy,
+        name: await loaders.requesterNames(context).load(requestedBy),
+      }),
+      failure: ({ error }) => error && toEnum(error),
     },
     App: {
       status: ({ status }) => toEnum(status),
@@ -148,11 +158,25 @@ function createLoaders(services: Parameters<typeof createResolvers>[0]) {
           );
         }),
     ),
+    ...createChangeLoaders(services),
+  };
+}
+
+/** The batches of Disable and Enable: the accounts' states, who asked, and the apps that offer them. */
+function createChangeLoaders(services: Parameters<typeof createResolvers>[0]) {
+  return {
     changeStates: perRequest(
       (context) =>
         new DataLoader<string, AccountChangeState>(async (accountIds) => {
           const states = await services.readChangeStates(context.getActor(), accountIds);
           return accountIds.map((id) => states.get(id) ?? new Error("No app account has this id."));
+        }),
+    ),
+    requesterNames: perRequest(
+      (context) =>
+        new DataLoader<string, string>(async (userIds) => {
+          const names = await services.readRequesterNames(context.getActor(), userIds);
+          return userIds.map((id) => names.get(id) ?? new Error("No user has this id."));
         }),
     ),
     changeableApps: perRequest(

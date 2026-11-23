@@ -28,6 +28,14 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
         );
       }),
   );
+  const employeesByEmail = perRequest(
+    (context) =>
+      new DataLoader<string, Employee | null>(async (emails) => {
+        const found = await services.readEmployeesByEmails(context.getActor(), emails);
+        const byEmail = new Map(found.map((employee) => [employee.email, employee]));
+        return emails.map((email) => byEmail.get(email) ?? null);
+      }),
+  );
   return {
     Query: {
       employee: (_parent, { id }, context) => services.readEmployee(context.getActor(), id),
@@ -57,6 +65,9 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
     },
     AppUser: {
       employee: (user, _args, context) => employeesById(context).load(user.employeeId),
+    },
+    AccountChange: {
+      employee: (change, _args, context) => employeesByEmail(context).load(change.email),
     },
     User: {
       employee: (_user, _args, context) => services.readMyEmployee(context.getActor()),

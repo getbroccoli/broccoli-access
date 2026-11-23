@@ -7,10 +7,12 @@ import {
 import type { Orm, Transact, Tx } from "../../../core/db";
 import type { JobQueue } from "../../../core/jobs";
 import type { Logger } from "../../../core/logger";
+import { type Connection, type PageArgs, paginate } from "../../../core/pagination";
 import type { SecretBox } from "../../../core/secrets";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
 import {
+  ACCOUNT_CHANGE_SORT_VALUES,
   accountChangeRepository,
   type AppConnection,
   appAccountRepository,
@@ -21,7 +23,7 @@ import type { ConnectionMember, ConnectionMembers } from "../ports";
 import { createAppConnectionService } from "./appConnectionService";
 import { failRunningChange, runAccountChange } from "./runAccountChange";
 
-/** Disable and Enable of app accounts: asked by the owner, run as a job, read by the account rows. */
+/** Disable and Enable of app accounts: asked by the owner, run as a job, read by the account rows and Activity. */
 export interface AccountChangeService {
   /**
    * Asks for a Disable (`suspend`) or Enable (`reactivate`) of the app account: in one transaction
@@ -56,6 +58,19 @@ export interface AccountChangeService {
     ctx: SecurityContext,
     appIds: readonly string[],
   ) => Promise<Set<string>>;
+  /**
+   * Every account change, newest first by when it was asked (then by id), one page at a time; a
+   * running one with its place in its connection's queue. Needs MANAGE_WORKSPACE.
+   */
+  listAccountChanges: (
+    ctx: SecurityContext,
+    args: PageArgs,
+  ) => Promise<Connection<LatestAccountChange>>;
+  /** The names of these users, by user id; for who asked for account changes. Needs MANAGE_WORKSPACE. */
+  readRequesterNames: (
+    ctx: SecurityContext,
+    userIds: readonly string[],
+  ) => Promise<Map<string, string>>;
 }
 
 /** What an app account's row shows of Disable and Enable. */
@@ -146,6 +161,27 @@ export function createAccountChangeService(
       return new Set(
         connections.filter(({ connector }) => changing.has(connector)).map(({ appId }) => appId),
       );
+    },
+    async listAccountChanges(ctx, pageArgs) {
+      ctx.require("MANAGE_WORKSPACE");
+      const changes = accountChangeRepository(orm);
+      const page = await paginate(pageArgs, {
+        order: { field: "REQUESTED_AT", direction: "DESC" },
+        keysetValues: ACCOUNT_CHANGE_SORT_VALUES,
+        fetch: (query) => changes.findPage(query),
+      });
+      const running = page.edges.flatMap(({ node }) =>
+        node.status === "running" ? [node.id] : [],
+      );
+      const ahead = await changes.countChangesAhead(running);
+      return {
+        ...page,
+        edges: page.edges.map((edge) => ({ ...edge, node: withPlace(edge.node, ahead) })),
+      };
+    },
+    async readRequesterNames(ctx, userIds) {
+      ctx.require("MANAGE_WORKSPACE");
+      return accountChangeRepository(orm).findUserNames(userIds);
     },
   };
 }
