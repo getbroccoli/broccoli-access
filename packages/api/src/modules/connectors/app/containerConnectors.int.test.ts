@@ -22,7 +22,7 @@ test("lists the container's connectors with their manifest fields", async ({ fak
         key: "apiKey",
         kind: "text",
         label: "Personal API key",
-        help: "Make it in Linear’s settings while signed in as a Linear admin.",
+        help: "In Linear, signed in as an admin, open Settings → Account → Security & access, create a personal API key with full access and paste it here.",
         secret: true,
       },
     ],
