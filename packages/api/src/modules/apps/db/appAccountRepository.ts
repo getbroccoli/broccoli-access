@@ -27,7 +27,7 @@ export interface AppAccountRepository {
   /** How many apps hold an account `findingKind` saw. */
   countAppsFoundVia(findingKind: string): Promise<number>;
   /** The apps among `kinds` that hold an account their finding kind found. */
-  findAppIdsFoundVia(kinds: readonly ScannedConnection[]): Promise<string[]>;
+  findAppIdsFoundVia(kinds: readonly { appId: string; findingKind: string }[]): Promise<string[]>;
   /** The accounts with an employee in `appIds`, each in its app or not as `scanned` say. */
   findUsersOfApps(
     appIds: readonly string[],
@@ -58,7 +58,7 @@ export interface AppUserAccount extends Pick<
   "id" | "appId" | "email" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
 > {
   employeeId: string;
-  /** Whether its app's scanned connection found it; null in an app without one (see `inApp`). */
+  /** Whether its app's scanned connection found it; null in an app without one. */
   inApp: boolean | null;
 }
 
