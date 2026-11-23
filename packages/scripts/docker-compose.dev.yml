@@ -10,8 +10,11 @@ x-dev-service: &dev-service
     - .:/repo
 
 services:
-  # The production image does not run in development.
+  # The production images do not run in development.
   broccoli-access:
+    profiles: [self-host]
+
+  connectors:
     profiles: [self-host]
 
   postgres:

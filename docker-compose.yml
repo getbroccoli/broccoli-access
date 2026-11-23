@@ -1,11 +1,14 @@
 services:
   # Broccoli Access for self-hosting: `docker compose up` needs no .env.
   broccoli-access:
+    # `docker compose up` pulls the published image; `--build` builds this checkout instead.
+    image: ghcr.io/getbroccoli/broccoli-access:latest
     build:
       context: .
       dockerfile: packages/api/Dockerfile
     environment:
       DATABASE_URL: postgres://broccoli_access@postgres:5432/broccoli_access
+      CONNECTORS_URL: http://connectors:4000
       LOG_LEVEL: ${LOG_LEVEL:-}
       # Set it when Broccoli Access has a domain; unset trusts the address each request uses.
       SELF_HOSTED_PUBLIC_URL: ${SELF_HOSTED_PUBLIC_URL:-}
@@ -16,9 +19,24 @@ services:
       # HOST_WEB_PORT=0 picks a free port, so worktrees run side by side;
       # `docker compose port broccoli-access 3000` prints it.
       - ${HOST_WEB_PORT:-8080}:3000
+    networks: [default, connectors]
     depends_on:
       postgres:
         condition: service_healthy
+      connectors:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # The connectors for other apps, such as Slack and Linear; the image has its own healthcheck.
+  connectors:
+    image: ghcr.io/getbroccoli/broccoli-access-connectors:latest
+    # It writes nothing outside /tmp.
+    read_only: true
+    tmpfs:
+      - /tmp
+    # No published port. Its own network with Broccoli Access keeps it away from Postgres, whose
+    # trust auth lets anyone on the default network in.
+    networks: [connectors]
     restart: unless-stopped
 
   postgres:
@@ -63,6 +81,9 @@ services:
       interval: 1s
       timeout: 3s
       retries: 30
+
+networks:
+  connectors:
 
 volumes:
   broccoli-access-data:

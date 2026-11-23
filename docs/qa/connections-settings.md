@@ -38,7 +38,7 @@ A manual check of Settings → Connections against a development stack: the Goog
 - [ ] `lin_api_acme_fake` closes the dialog; the card reads "Connected", "The Acme workspace, connected with a personal API key of admin@acme.example." and, once its scan ends, "7 members. Scanned today at HH:MM.", with "Scan now" and "Change key".
 - [ ] Linear shows in Applications under Approved with 7 users, found via "Linear members", "1 still has access".
 - [ ] With the fake failing the list (`accounts/list`, `app_unavailable`, count 3), Linear's "Scan now" ends with "The last scan failed. Try Scan now again."
-- [ ] Without `CONNECTORS_URL` (the self-hosted image as built), Connections shows no "Apps" section.
+- [ ] With `CONNECTORS_URL: ""` on `broccoli-access` in `docker-compose.yml` (blank counts as unset), Connections shows no "Apps" section.
 
 ## Connect Slack
 
