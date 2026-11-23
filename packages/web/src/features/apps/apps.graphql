@@ -73,17 +73,6 @@ query AppsScan {
       }
     }
   }
-  # A connected app's scan moves its users and counts too, wherever it was connected.
-  containerConnectors {
-    id
-    connection {
-      id
-      scan {
-        id
-        status
-      }
-    }
-  }
 }
 
 mutation ApproveApp($input: AppApproveInput!) {

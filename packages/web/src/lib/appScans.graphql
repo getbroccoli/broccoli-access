@@ -1,0 +1,13 @@
+# Admins only: nobody else sees the connectors.
+query AppScans {
+  containerConnectors {
+    id
+    connection {
+      id
+      scan {
+        id
+        status
+      }
+    }
+  }
+}

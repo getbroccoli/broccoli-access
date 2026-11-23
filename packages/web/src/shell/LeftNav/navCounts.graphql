@@ -16,14 +16,4 @@ query NavCounts {
       }
     }
   }
-  containerConnectors {
-    id
-    connection {
-      id
-      scan {
-        id
-        status
-      }
-    }
-  }
 }

@@ -6,7 +6,7 @@ import { NavCountsDocument } from "@/__generated__/graphql";
 
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
-import { isAnyAppScanning } from "@/lib/isAnyAppScanning";
+import { useIsAppScanning } from "@/lib/useIsAppScanning";
 import { useRefetchAfterScan } from "@/lib/useRefetchAfterScan";
 
 import { ProfileMenu } from "../ProfileMenu";
@@ -69,11 +69,8 @@ function useAppItems(): NavItem[] {
   const { me } = useRouteContext({ from: "/_authenticated" });
   const canManage = me.operations.includes("MANAGE_WORKSPACE");
   const { data, refetch } = useQuery(NavCountsDocument, { skip: !canManage });
-  useRefetchAfterScan(
-    data?.setup.googleWorkspace?.scan?.status === "SCANNING" ||
-      isAnyAppScanning(data?.containerConnectors ?? []),
-    refetch,
-  );
+  useRefetchAfterScan(data?.setup.googleWorkspace?.scan?.status === "SCANNING", refetch);
+  useRefetchAfterScan(useIsAppScanning(), refetch);
   const discovered = data?.appCounts.discovered ?? 0;
   const suspendedWithAccess = data?.employeeCounts.suspendedWithAccess ?? 0;
   const applications: NavItem = {
