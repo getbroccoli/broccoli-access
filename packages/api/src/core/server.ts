@@ -6,6 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import express from "express";
 
+import { answerFailedRequests } from "./answerFailedRequests";
 import { authHandler, type DeploymentServer } from "./auth";
 import { connectDatabase, createBeforeCommitBus, type Database, transactor } from "./db";
 import type { Env } from "./env";
@@ -56,6 +57,7 @@ export async function startServer(
   const readiness = new Readiness(() => database.checkConnection());
   const app = express();
   app.disable("x-powered-by");
+  app.use(refuseFraming);
   const httpServer = createServer(app);
   let modules: readonly ModuleManifest[];
   let deployment: DeploymentServer;
@@ -115,6 +117,7 @@ export async function startServer(
     if (webApp) {
       app.use(webApp);
     }
+    app.use(answerFailedRequests(logger));
     await listen(httpServer, env.port);
   } catch (error) {
     await closeAfterFailedStart(graphql, database);
@@ -177,6 +180,19 @@ async function migrate(
     }
     await delay(MIGRATION_RETRY_MS, undefined, { signal: stopped }).catch(() => {});
   }
+}
+
+/**
+ * Tells browsers never to show Broccoli Access inside another site's frame, where that site could
+ * trick a signed-in owner into clicking Disable; `X-Frame-Options` for browsers without CSP.
+ */
+function refuseFraming(
+  _request: express.Request,
+  response: express.Response,
+  next: express.NextFunction,
+): void {
+  response.set({ "Content-Security-Policy": "frame-ancestors 'none'", "X-Frame-Options": "DENY" });
+  next();
 }
 
 /** Serves the built web app; other GET paths outside `/api` get `index.html` so router links load. */

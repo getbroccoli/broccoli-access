@@ -36,6 +36,13 @@ describe("with a web app folder", () => {
     expect(await response.text()).toBe(INDEX_HTML);
   });
 
+  it("tells browsers never to show the web app inside a frame", async () => {
+    const response = await fetch(`${server.url}/`);
+
+    expect(response.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+  });
+
   it("serves the web app for a page link, so the router can show it", async () => {
     const response = await fetch(`${server.url}/people/123`);
 
