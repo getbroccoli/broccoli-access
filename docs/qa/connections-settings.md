@@ -42,9 +42,13 @@ A manual check of Settings → Connections against a development stack: the Goog
 
 ## Connect Slack
 
-Load the built extension in its own profile as "The Chrome extension" in `docs/testing.md` describes; it also says how to answer Chrome's prompts.
+Start with the owner unpaired (Unpair in Settings) and a Chrome profile without the extension: the first checks download it and load it unpacked. "The Chrome extension" in `docs/testing.md` says how to run Chrome with an extension and answer its prompts.
 
-- [ ] Without the extension, "Connect Slack" opens on step 1, "Add the Broccoli Access extension to Chrome", with "Get it from the Chrome Web Store ↗", "Waiting for the extension. This moves on by itself once it’s installed." and "Works in Chrome only."
+- [ ] Without the extension, "Connect Slack" opens on step 1, "Add the Broccoli Access extension to Chrome", with "Download the extension", five numbered steps, the note for a company-managed Chrome with the extension's ID, "Waiting for the extension. This moves on by itself once it’s installed." and "Works in Chrome only."
+- [ ] Before installing, the Chrome extension card reads "Not installed" with the same download and steps. At a plain http address other than this computer's (such as `http://app.localhost:<port>`, signed in again there), both places say to open Broccoli Access at its https address instead of offering the download.
+- [ ] By keyboard alone, each Copy button (`chrome://extensions` and the ID) copies its text and reads "Copied" for a moment; Tab also reaches each value, which selects itself.
+- [ ] "Download the extension" downloads `broccoli-access-extension.zip`; unzipped and loaded unpacked as the steps say, the dialog moves on to step 2 without a reload.
+- [ ] With the extension installed, the card offers "Download the extension" again under "It doesn’t update itself…".
 - [ ] With the extension not paired, it opens on step 2 "Pair the extension with Broccoli Access", Extension ticked, naming this address and "Installed in Chrome on <platform>. Not paired yet."; "Pair this Chrome" pairs as the Chrome extension card does, and the dialog moves on by itself.
 - [ ] Paired, it opens on step 3 "Before you connect Slack" with Slack's notice; "Accept and continue" stays disabled until "I’ve read this and choose to connect Slack." is ticked.
 - [ ] Step 4 "Sign in to Slack in Chrome, then Connect" lists what the extension sends, with "Open Slack in a new tab ↗" to `https://slack.com`.

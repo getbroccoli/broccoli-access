@@ -29,14 +29,6 @@ body {
   width: 24px;
   height: 24px;
   flex: none;
-  border-radius: 6px;
-  background: #4f8a62;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .name {

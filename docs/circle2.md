@@ -17,7 +17,7 @@ At the end of circle 2, the owner connects Slack and Linear, sees their members,
   - each connector's capabilities: `suspend` and `reactivate` in circle 2;
   - each action reads the member again afterwards and returns the status it saw, or an error;
   - where each connector can run: on the server for both in circle 2. The contract already names the owner's browser as a second runtime, for a later app that needs a robot.
-- **The extension** for Chrome is public and installed from the Chrome Web Store. It pairs with the instance and hands over the owner's app session. It holds no steps for any app: what to collect comes from the connector's manifest, so a new app needs no new extension.
+- **The extension** for Chrome is public: owners download it from their instance and load it unpacked. It pairs with the instance and hands over the owner's app session. It holds no steps for any app: what to collect comes from the connector's manifest, so a new app needs no new extension.
 
 ## Journeys
 
@@ -31,7 +31,7 @@ Each journey ends with the check that proves it works.
 
 ### 2. Connect Slack
 
-- Connect Slack first asks for the extension: a link to the Chrome Web Store, then pairing with this instance.
+- Connect Slack first asks for the extension: a download from the instance with the steps to load it unpacked, then pairing with this instance.
 - Before the first connection, a notice says Slack's terms may not allow automation. The owner accepts it for Slack.
 - The owner signs in to Slack in their own Chrome as usual, with SSO and MFA, and presses Connect Slack in broccoli-access.
 - The extension sends only Slack's cookies and the token Slack's signed-in page keeps to the instance, which stores them encrypted like every connection secret. broccoli-access never sees or stores a password or an MFA secret.
@@ -115,9 +115,6 @@ These are the input for circle 3:
 
 Everything that needs a person comes last, once every journey passes against the fakes:
 
-- the check against real Slack and Linear test workspaces;
-- publishing the extension to the Chrome Web Store.
-
-Until then, tests load the extension unpacked.
+- the check against real Slack and Linear test workspaces.
 
 Reasons are in [the circle 2 note](notes/2026-11-22-circle-2.md).
