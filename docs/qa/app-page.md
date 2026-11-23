@@ -65,7 +65,7 @@ On Linear's page, connected as above. Set `FAKE=http://127.0.0.1:<port>`, the po
 
 ## When a change fails
 
-On Linear's page as above, with Chloé, David and Gabriel active in Linear. `fail <code>` stands for `curl -s -H 'content-type: application/json' -d '{"connector": "linear", "call": "actions/run", "code": "<code>", "count": 1}' "$FAKE/_fake/failures"`, which makes the next change fail with that code.
+On Linear's page as above. Enable David and Gabriel again after the queueing check above, and wait until Chloé, David and Gabriel read "Active" in Linear. `fail <code>` stands for `curl -s -H 'content-type: application/json' -d '{"connector": "linear", "call": "actions/run", "code": "<code>", "count": 1}' "$FAKE/_fake/failures"`, which makes the next change fail with that code.
 
 - [ ] After `fail unexpected_response`, disabling Chloé runs, then her "In Linear" reads "Couldn’t disable" in red and the row ends with "Try again"; Chloé stays "Active" in `curl -s "$FAKE/_fake/state"`.
 - [ ] "Couldn’t disable" opens "Couldn’t disable Chloé Martin in Linear", "Asked by Mia Novak today at <time>. Chloé still has access to the Acme workspace.", the reason "Linear gave an answer Broccoli Access doesn’t recognise. Linear may have changed how its admin pages work. Nothing changed in Linear.", the hint "Try again in a while, or deactivate Chloé in Linear’s admin yourself and tell Broccoli Access.", "I did it by hand", "Open Linear admin" (to `https://linear.app/acme/settings/members`) and "Try again".

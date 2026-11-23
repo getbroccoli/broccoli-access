@@ -26,7 +26,7 @@ import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { dayAndTime } from "@/lib/dayAndTime";
 
-import { couldntChangeReason, failedChangeOptions } from "./couldntChange";
+import { couldntChangeHint, couldntChangeReason, failedChangeOptions } from "./couldntChange";
 import { DoneByHandDialog } from "./DoneByHandDialog";
 import { useChangeAccount } from "./useChangeAccount";
 
@@ -76,7 +76,8 @@ export function CouldntChangeDialog({
     app: app.name,
     workspace,
     person: { name, email: change.email },
-    connectionUserEmail: connection?.connectionUserEmail ?? null,
+    // Today's connection user says nothing about who it was when a change in history failed.
+    connectionUserEmail: account ? (connection?.connectionUserEmail ?? null) : null,
     credential: connection?.connector.connectionFields.find(({ secret }) => secret)?.kind ?? "TEXT",
   });
   const tryAgain = (accountId: string) => {
@@ -115,7 +116,10 @@ export function CouldntChangeDialog({
           </p>
           {account && (
             <p className="text-sm text-muted-foreground">
-              {hintOf(change.failure, options, { firstName, app: app.name, copy })}
+              {couldntChangeHint(change.failure, change.action, options, {
+                firstName,
+                app: app.name,
+              })}
             </p>
           )}
           <DialogFooter className="m-0 gap-2 border-0 bg-transparent p-0 sm:justify-between">
@@ -191,12 +195,10 @@ const COPY = {
   SUSPEND: {
     chip: "apps.couldnt.disable",
     title: "apps.couldnt.disableTitle",
-    hint: "apps.couldnt.hintDisable",
   },
   REACTIVATE: {
     chip: "apps.couldnt.enable",
     title: "apps.couldnt.enableTitle",
-    hint: "apps.couldnt.hintEnable",
   },
 } as const;
 
@@ -213,20 +215,4 @@ function askedBy({ requestedBy, requestedAt }: FailedChange): string {
 /** A failed Disable leaves the person their access; a member the app no longer lists says nothing either way. */
 function stillHasAccess({ action, failure }: FailedChange): boolean {
   return action === "SUSPEND" && failure !== "ACCOUNT_NOT_FOUND";
-}
-
-/** What to do next, matching the options the dialog offers. */
-function hintOf(
-  failure: NonNullable<FailedChange["failure"]>,
-  options: ReturnType<typeof failedChangeOptions>,
-  words: { firstName: string; app: string; copy: (typeof COPY)[keyof typeof COPY] },
-): string {
-  const { firstName, app, copy } = words;
-  if (failure === "ACCOUNT_NOT_FOUND") {
-    return t(options.scanNow ? "apps.couldnt.hintScan" : "apps.couldnt.hintScanned", { app });
-  }
-  if (failure === "NOT_ALLOWED") {
-    return t("apps.couldnt.hintByHandOnly", { app });
-  }
-  return t(copy.hint, { firstName, app });
 }

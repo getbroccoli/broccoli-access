@@ -3,7 +3,6 @@ import {
   EMPLOYEE,
   expect,
   failedDisable,
-  failLinearCall,
   linearMemberStatus,
   OWNER,
   pendingDisable,
@@ -60,11 +59,10 @@ test("marks Chloé's failed Disable done by hand and records her suspension unde
 test.for(["running", "succeeded", "done_by_hand"] as const)(
   "refuses to mark a %s change done by hand and preserves the account, change and history",
   async (status, { orm, seed, fakeConnectors }) => {
-    const { service, change, owner } = await pendingDisable(orm, seed, fakeConnectors.url);
+    const disable = status === "done_by_hand" ? failedDisable : pendingDisable;
+    const { service, change, owner } = await disable(orm, seed, fakeConnectors.url);
     if (status === "succeeded") await service.runChange(SYSTEM, change.id);
     if (status === "done_by_hand") {
-      await failLinearCall(fakeConnectors.url, "actions/run", "unexpected_response");
-      await service.runChange(SYSTEM, change.id);
       await service.markChangeDoneByHand(owner, change.id);
     }
     const before = await storedState(orm);

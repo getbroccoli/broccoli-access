@@ -7,7 +7,7 @@ import type {
   AppAccountStatus,
 } from "@/__generated__/graphql";
 import {
-  couldntChangeOptions,
+  couldntChangeHint,
   couldntChangeReason,
   failedChangeOptions,
   showsCouldntChange,
@@ -78,7 +78,7 @@ it.for([
 );
 
 it("offers only by hand after NOT_ALLOWED", () => {
-  expect(couldntChangeOptions("NOT_ALLOWED", { failedAt, lastScanAt: null })).toEqual({
+  expect(failedChangeOptions(failedSuspend("NOT_ALLOWED", null))).toEqual({
     tryAgain: false,
     byHand: true,
     scanNow: false,
@@ -88,23 +88,13 @@ it("offers only by hand after NOT_ALLOWED", () => {
 it.for([null, "2026-11-22T09:00:00Z", "2026-11-22T10:00:00Z"])(
   "offers only Scan now after ACCOUNT_NOT_FOUND when the last scan was %s",
   (lastScanAt) => {
-    expect(couldntChangeOptions("ACCOUNT_NOT_FOUND", { failedAt, lastScanAt })).toEqual({
+    expect(failedChangeOptions(failedSuspend("ACCOUNT_NOT_FOUND", lastScanAt))).toEqual({
       tryAgain: false,
       byHand: false,
       scanNow: true,
     });
   },
 );
-
-it("offers only Try again after ACCOUNT_NOT_FOUND once a later scan finished", () => {
-  expect(
-    couldntChangeOptions("ACCOUNT_NOT_FOUND", { failedAt, lastScanAt: "2026-11-22T11:00:00Z" }),
-  ).toEqual({
-    tryAgain: true,
-    byHand: false,
-    scanNow: false,
-  });
-});
 
 it.for([
   "UNEXPECTED_RESPONSE",
@@ -116,7 +106,7 @@ it.for([
   "WRONG_WORKSPACE",
   "OWNER_BROWSER_LOST",
 ] as const)("offers Try again and by hand after %s", (failure) => {
-  expect(couldntChangeOptions(failure, { failedAt, lastScanAt: null })).toEqual({
+  expect(failedChangeOptions(failedSuspend(failure, null))).toEqual({
     tryAgain: true,
     byHand: true,
     scanNow: false,
@@ -155,13 +145,71 @@ it.for([
   "offers recovery options after a later scan for %s with offered change %s",
   ([failure, offeredChange, expected]) => {
     expect(
-      failedChangeOptions({
-        offeredChange,
-        latestChange: { action: "SUSPEND", failure, finishedAt: failedAt },
-        app: { containerConnection: { scan: { readAt: "2026-11-22T11:00:00Z" } } },
-      }),
+      failedChangeOptions(failedSuspend(failure, "2026-11-22T11:00:00Z", offeredChange)),
     ).toEqual(expected);
   },
 );
 
-const failedAt = "2026-11-22T10:00:00Z";
+it.for([
+  [
+    "NOT_ALLOWED",
+    "SUSPEND",
+    { tryAgain: false, byHand: true, scanNow: false },
+    "Trying again won’t help. If someone with more rights in Linear makes the change there, tell Broccoli Access.",
+  ],
+  [
+    "ACCOUNT_NOT_FOUND",
+    "SUSPEND",
+    { tryAgain: false, byHand: false, scanNow: true },
+    "Trying again won’t help. Scan Linear to bring its member list up to date.",
+  ],
+  [
+    "ACCOUNT_NOT_FOUND",
+    "SUSPEND",
+    { tryAgain: true, byHand: false, scanNow: false },
+    "Linear was scanned since, so trying again may help.",
+  ],
+  [
+    "UNEXPECTED_RESPONSE",
+    "SUSPEND",
+    { tryAgain: true, byHand: true, scanNow: false },
+    "Try again in a while, or deactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
+  ],
+  [
+    "UNEXPECTED_RESPONSE",
+    "REACTIVATE",
+    { tryAgain: true, byHand: true, scanNow: false },
+    "Try again in a while, or reactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
+  ],
+  [
+    "APP_UNAVAILABLE",
+    "SUSPEND",
+    { tryAgain: false, byHand: true, scanNow: false },
+    "Deactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
+  ],
+  [
+    "APP_UNAVAILABLE",
+    "REACTIVATE",
+    { tryAgain: false, byHand: true, scanNow: false },
+    "Reactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
+  ],
+] as const)(
+  "suggests what to do after %s for %s with options %j",
+  ([failure, action, options, hint]) => {
+    expect(couldntChangeHint(failure, action, options, { firstName: "Ana", app: "Linear" })).toBe(
+      hint,
+    );
+  },
+);
+
+function failedSuspend(
+  failure: AccountChangeFailure,
+  readAt: string | null,
+  offeredChange: AccountChangeAction | null = "SUSPEND",
+) {
+  return {
+    offeredChange,
+    latestChange: { action: "SUSPEND" as const, failure, finishedAt: "2026-11-22T10:00:00Z" },
+    app: { containerConnection: { scan: { readAt } } },
+  };
+}

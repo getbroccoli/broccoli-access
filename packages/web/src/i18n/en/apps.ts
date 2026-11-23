@@ -139,6 +139,10 @@ export const appsEn = {
     "Try again in a while, or deactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
   "apps.couldnt.hintEnable":
     "Try again in a while, or reactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
+  "apps.couldnt.hintDisableByHand":
+    "Deactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
+  "apps.couldnt.hintEnableByHand":
+    "Reactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
   "apps.couldnt.hintByHandOnly":
     "Trying again won’t help. If someone with more rights in {app} makes the change there, tell Broccoli Access.",
   "apps.couldnt.hintScan":

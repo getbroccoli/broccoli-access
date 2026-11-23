@@ -40,44 +40,63 @@ export function couldntChangeReason(
   return `${reasonOf(failure, about)} ${t("apps.couldnt.nothingChanged", { app: about.app })}`;
 }
 
-/** What the owner may do about a failed change: try it again, say they made it by hand, or scan the app. */
-export function couldntChangeOptions(
-  failure: AccountChangeFailure,
-  { failedAt, lastScanAt }: { failedAt: string; lastScanAt: string | null },
-): { tryAgain: boolean; byHand: boolean; scanNow: boolean } {
-  if (failure === "NOT_ALLOWED") {
-    return { tryAgain: false, byHand: true, scanNow: false };
-  }
-  if (failure === "ACCOUNT_NOT_FOUND") {
-    // A scan since the failure may have read the member's new id, so trying again can help.
-    const scannedSince = lastScanAt !== null && Date.parse(lastScanAt) > Date.parse(failedAt);
-    return { tryAgain: scannedSince, byHand: false, scanNow: !scannedSince };
-  }
-  return { tryAgain: true, byHand: true, scanNow: false };
-}
-
 /**
- * What the owner may do about an account's failed latest change; Try again only while the account
- * offers that change, which the server requires (not while its connection needs reconnecting).
+ * What the owner may do about an account's failed latest change: try it again, say they made it by
+ * hand, or scan the app. Try again needs the account to offer that change, as the server does (not
+ * while its connection needs reconnecting); after `ACCOUNT_NOT_FOUND` it also needs a scan since the
+ * failure, which may have read the member's new id, and Scan now is offered until it helps.
  */
 export function failedChangeOptions({
   offeredChange,
   latestChange,
   app,
-}: FailedChangeFacts): ReturnType<typeof couldntChangeOptions> {
+}: FailedChangeFacts): FailedChangeOptions {
   if (!latestChange?.failure || !latestChange.finishedAt) {
     return { tryAgain: false, byHand: false, scanNow: false };
   }
-  const options = couldntChangeOptions(latestChange.failure, {
-    failedAt: latestChange.finishedAt,
-    lastScanAt: app.containerConnection?.scan?.readAt ?? null,
-  });
-  const tryAgain = options.tryAgain && offeredChange === latestChange.action;
-  // A scan since the member went missing that still lists no single member for the account helps
-  // only when run again, once the member is fixed in the app.
-  const scanAgain = latestChange.failure === "ACCOUNT_NOT_FOUND" && !tryAgain;
-  return { ...options, tryAgain, scanNow: options.scanNow || scanAgain };
+  const offered = offeredChange === latestChange.action;
+  if (latestChange.failure === "NOT_ALLOWED") {
+    return { tryAgain: false, byHand: true, scanNow: false };
+  }
+  if (latestChange.failure === "ACCOUNT_NOT_FOUND") {
+    const lastScanAt = app.containerConnection?.scan?.readAt ?? null;
+    const scannedSince =
+      lastScanAt !== null && Date.parse(lastScanAt) > Date.parse(latestChange.finishedAt);
+    const tryAgain = scannedSince && offered;
+    return { tryAgain, byHand: false, scanNow: !tryAgain };
+  }
+  return { tryAgain: offered, byHand: true, scanNow: false };
 }
+
+/** What helps now, matching the options the dialog offers. */
+export function couldntChangeHint(
+  failure: AccountChangeFailure,
+  action: AccountChangeAction,
+  { tryAgain, scanNow }: FailedChangeOptions,
+  { firstName, app }: { firstName: string; app: string },
+): string {
+  if (failure === "NOT_ALLOWED") {
+    return t("apps.couldnt.hintByHandOnly", { app });
+  }
+  if (failure === "ACCOUNT_NOT_FOUND") {
+    return t(scanNow ? "apps.couldnt.hintScan" : "apps.couldnt.hintScanned", { app });
+  }
+  const hints = action === "SUSPEND" ? DISABLE_HINTS : ENABLE_HINTS;
+  return t(tryAgain ? hints.tryAgain : hints.byHand, { firstName, app });
+}
+
+/** Try again, say it was done by hand, or scan the app. */
+export type FailedChangeOptions = { tryAgain: boolean; byHand: boolean; scanNow: boolean };
+
+const DISABLE_HINTS = {
+  tryAgain: "apps.couldnt.hintDisable",
+  byHand: "apps.couldnt.hintDisableByHand",
+} as const;
+
+const ENABLE_HINTS = {
+  tryAgain: "apps.couldnt.hintEnable",
+  byHand: "apps.couldnt.hintEnableByHand",
+} as const;
 
 /** The parts of an app account its failed change's options are decided from. */
 type FailedChangeFacts = {
