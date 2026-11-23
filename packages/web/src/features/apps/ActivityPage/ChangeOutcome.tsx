@@ -70,7 +70,7 @@ const REASONS: Record<AccountChangeFailure, MessageKey> = {
   RATE_LIMITED: "apps.activity.reason.tryLater",
   APP_UNAVAILABLE: "apps.activity.reason.tryLater",
   UNEXPECTED_RESPONSE: "apps.activity.reason.tryLater",
-  BLOCKED_BY_CHECK: "apps.activity.reason.tryLater",
+  BLOCKED_BY_CHECK: "apps.activity.reason.securityCheck",
   OWNER_BROWSER_LOST: "apps.activity.reason.tryLater",
   ACCOUNT_NOT_FOUND: "apps.activity.reason.scanNow",
   NOT_ALLOWED: "apps.activity.reason.notAllowed",

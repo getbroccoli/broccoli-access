@@ -119,7 +119,7 @@ type AppUser {
 
 # Adds the person to an account change; the server merges the types of the modules.
 type AccountChange {
-  "The employee with the change's email; null when nobody has it."
+  "The employee whose email is now the change's email; null when nobody has it."
   employee: Employee
 }
 

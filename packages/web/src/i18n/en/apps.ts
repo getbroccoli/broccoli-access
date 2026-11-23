@@ -93,6 +93,7 @@ export const appsEn = {
   "apps.activity.reason.reconnect": "Reconnect {app}",
   "apps.activity.reason.tryLater": "Try again in a while",
   "apps.activity.reason.scanNow": "Scan {app} now",
+  "apps.activity.reason.securityCheck": "{app} asked for a security check",
   "apps.activity.reason.notAllowed": "{app} doesn’t allow this change",
   "apps.activity.empty": "No Disable or Enable yet.",
   "apps.activity.error": "Couldn’t load Activity",
