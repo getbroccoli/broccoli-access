@@ -5,17 +5,19 @@ import { appAccountRepository, type AppUserAccount } from "../db";
 import { accountSince, type Since } from "../domain";
 import type { EmployeesByName } from "../ports";
 import { findDirectoryAppId, findEmployeesSuspendedInDirectory } from "./directory";
+import { findScannedConnections } from "./scannedConnections";
 
 /** An app's users: its accounts that belong to an employee. */
 export interface AppUserService {
   /**
    * The apps' users whose employee the caller may read, each app's users suspended in the
-   * directory first, then by name. Needs MANAGE_WORKSPACE.
+   * directory first, then by name, then those not in the app. Needs MANAGE_WORKSPACE.
    */
   readUsersOfApps: (ctx: SecurityContext, appIds: readonly string[]) => Promise<AppUser[]>;
   /**
-   * The employees' accounts in approved apps other than the directory: the active ones, and the
-   * suspended ones in apps with a connection; by app name. Needs MANAGE_WORKSPACE.
+   * The employees' accounts in approved apps other than the directory that are in their app: the
+   * active ones, and the suspended ones in apps with a connection; by app name. Needs
+   * MANAGE_WORKSPACE.
    */
   readUsersOfEmployees: (
     ctx: SecurityContext,
@@ -35,6 +37,11 @@ export interface AppUser {
   status: AccountStatus;
   /** Whether the employee's account in the directory is suspended. */
   suspendedInDirectory: boolean;
+  /**
+   * Whether its app's connection's last scan returned it; null without a connection or before its
+   * first scan finished. An account that is not in its app is no access.
+   */
+  inApp: boolean | null;
   /** The finding kinds that saw the account, sorted, such as `google_sign_in`. */
   foundVia: string[];
   since: Since;
@@ -59,8 +66,9 @@ export function createAppUserService({
     // only the first few per app, once a directory can be very large (left out of circle 1).
     async readUsersOfApps(ctx, appIds) {
       ctx.require("MANAGE_WORKSPACE");
+      const scanned = await findScannedConnections(orm, connectors);
       const [accounts, suspended] = await Promise.all([
-        appAccountRepository(orm).findUsersOfApps(appIds),
+        appAccountRepository(orm).findUsersOfApps(appIds, scanned),
         findEmployeesSuspendedInDirectory(orm, connectors),
       ]);
       const byName = await employees.readEmployees(ctx, [
@@ -74,14 +82,16 @@ export function createAppUserService({
         .map((account) => toAppUser(account, suspendedInDirectory))
         .sort(
           (one, other) =>
+            Number(one.inApp === false) - Number(other.inApp === false) ||
             Number(other.suspendedInDirectory) - Number(one.suspendedInDirectory) ||
             nameRank(one) - nameRank(other),
         );
     },
     async readUsersOfEmployees(ctx, employeeIds) {
       ctx.require("MANAGE_WORKSPACE");
+      const scanned = await findScannedConnections(orm, connectors);
       const [accounts, suspended, directoryAppId] = await Promise.all([
-        appAccountRepository(orm).findCurrentAccountsOfEmployees(employeeIds),
+        appAccountRepository(orm).findCurrentAccountsOfEmployees(employeeIds, scanned),
         findEmployeesSuspendedInDirectory(orm, connectors),
         findDirectoryAppId(orm, connectors),
       ]);
@@ -94,7 +104,7 @@ export function createAppUserService({
 }
 
 function toAppUser(account: AppUserAccount, suspendedInDirectory: ReadonlySet<string>): AppUser {
-  const { id, appId, employeeId, email, status, foundVia } = account;
+  const { id, appId, employeeId, email, status, foundVia, inApp } = account;
   return {
     id,
     appId,
@@ -102,6 +112,7 @@ function toAppUser(account: AppUserAccount, suspendedInDirectory: ReadonlySet<st
     email,
     status,
     suspendedInDirectory: suspendedInDirectory.has(employeeId),
+    inApp,
     foundVia: foundVia.toSorted(),
     since: accountSince(account),
   };

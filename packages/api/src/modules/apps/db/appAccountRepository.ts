@@ -1,7 +1,7 @@
-import { and, arrayContains, countDistinct, eq, isNotNull, or, sql } from "drizzle-orm";
+import { and, arrayContains, countDistinct, eq, isNotNull, or, type SQL, sql } from "drizzle-orm";
 
 import { anyOf, insertBatches, type Orm, ormOf, type Tx } from "../../../core/db";
-import type { AppAccount, AppStatus } from "../domain";
+import type { AppAccount, AppStatus, ScannedConnection } from "../domain";
 import { appAccounts } from "./appAccountsTable";
 import { appConnections } from "./appConnectionsTable";
 import { apps } from "./appsTable";
@@ -26,19 +26,30 @@ export interface AppAccountRepository {
   countPeople(appId: string): Promise<{ people: number; suspended: number }>;
   /** How many apps hold an account `findingKind` saw. */
   countAppsFoundVia(findingKind: string): Promise<number>;
-  /** The accounts with an employee in `appIds`: the apps' users. */
-  findUsersOfApps(appIds: readonly string[]): Promise<AppUserAccount[]>;
+  /** The apps among `kinds` that hold an account their finding kind found. */
+  findAppIdsFoundVia(kinds: readonly ScannedConnection[]): Promise<string[]>;
+  /** The accounts with an employee in `appIds`, each in its app or not as `scanned` say. */
+  findUsersOfApps(
+    appIds: readonly string[],
+    scanned: readonly ScannedConnection[],
+  ): Promise<AppUserAccount[]>;
   /**
-   * The employees' accounts in approved apps: the active ones, and the suspended ones in apps with
-   * a connection; by app name.
+   * The employees' accounts in approved apps that are access as `scanned` say: the active ones, and
+   * the suspended ones in apps with a connection; by app name.
    */
-  findCurrentAccountsOfEmployees(employeeIds: readonly string[]): Promise<AppUserAccount[]>;
+  findCurrentAccountsOfEmployees(
+    employeeIds: readonly string[],
+    scanned: readonly ScannedConnection[],
+  ): Promise<AppUserAccount[]>;
   /** How many employees hold an account in any app. */
   countEmployeesWithAccounts(): Promise<number>;
   /** The employees whose account in the app is suspended. */
   findSuspendedEmployeeIds(appId: string): Promise<string[]>;
-  /** Every account with an employee, with its app's name and status and its dates. */
-  findEmployeeAccounts(): Promise<EmployeeAppAccount[]>;
+  /**
+   * Every account with an employee that is access as `scanned` say, with its app's name and status
+   * and its dates.
+   */
+  findEmployeeAccounts(scanned: readonly ScannedConnection[]): Promise<EmployeeAppAccount[]>;
 }
 
 /** What the app list and an app's page read of a user's account. */
@@ -47,6 +58,8 @@ export interface AppUserAccount extends Pick<
   "id" | "appId" | "email" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
 > {
   employeeId: string;
+  /** Whether its app's scanned connection found it; null in an app without one (see `inApp`). */
+  inApp: boolean | null;
 }
 
 /** An employee's account with its app's name and status, as People and a person's page read it. */
@@ -114,14 +127,30 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .where(arrayContains(appAccounts.foundVia, [findingKind]));
       return row!.apps;
     },
-    findUsersOfApps: (appIds) =>
+    findAppIdsFoundVia: async (kinds) => {
+      if (kinds.length === 0) {
+        return [];
+      }
+      const rows = await orm()
+        .selectDistinct({ appId: appAccounts.appId })
+        .from(appAccounts)
+        .where(
+          or(
+            ...kinds.map(({ appId, findingKind }) =>
+              and(eq(appAccounts.appId, appId), arrayContains(appAccounts.foundVia, [findingKind])),
+            ),
+          ),
+        );
+      return rows.map(({ appId }) => appId);
+    },
+    findUsersOfApps: (appIds, scanned) =>
       orm()
-        .select(userColumns)
+        .select(userColumns(scanned))
         .from(appAccounts)
         .where(and(anyOf(appAccounts.appId, appIds), isNotNull(appAccounts.employeeId))),
-    findCurrentAccountsOfEmployees: (employeeIds) =>
+    findCurrentAccountsOfEmployees: (employeeIds, scanned) =>
       orm()
-        .select(userColumns)
+        .select(userColumns(scanned))
         .from(appAccounts)
         .innerJoin(apps, eq(apps.id, appAccounts.appId))
         .leftJoin(appConnections, eq(appConnections.appId, appAccounts.appId))
@@ -130,6 +159,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
             anyOf(appAccounts.employeeId, employeeIds),
             eq(apps.status, "approved"),
             or(eq(appAccounts.status, "active"), isNotNull(appConnections.id)),
+            isAccess(scanned),
           ),
         )
         .orderBy(apps.name, appAccounts.id),
@@ -152,7 +182,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         );
       return rows.map(({ employeeId }) => employeeId!);
     },
-    findEmployeeAccounts: () =>
+    findEmployeeAccounts: (scanned) =>
       orm()
         .select({
           employeeId: sql<string>`${appAccounts.employeeId}`,
@@ -168,8 +198,29 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         })
         .from(appAccounts)
         .innerJoin(apps, eq(apps.id, appAccounts.appId))
-        .where(isNotNull(appAccounts.employeeId)),
+        .where(and(isNotNull(appAccounts.employeeId), isAccess(scanned))),
   };
+}
+
+/**
+ * Whether the account is in its app: whether the finding kind of its app's scanned connection found
+ * it; null in an app without a scanned connection, whose accounts all count.
+ */
+export function inApp(scanned: readonly ScannedConnection[]): SQL<boolean | null> {
+  if (scanned.length === 0) {
+    return sql<null>`null::boolean`;
+  }
+  const whens = scanned.map(
+    ({ appId, findingKind }) =>
+      sql`when ${appAccounts.appId} = ${appId} then ${arrayContains(appAccounts.foundVia, [findingKind])}`,
+  );
+  // The builder has no CASE; without a matching WHEN it is null.
+  return sql<boolean | null>`case ${sql.join(whens, sql` `)} end`;
+}
+
+/** Whether the account is access: an account its app's scanned connection did not find is not. */
+export function isAccess(scanned: readonly ScannedConnection[]): SQL {
+  return sql`(${inApp(scanned)}) is not false`;
 }
 
 const columns = {
@@ -184,15 +235,18 @@ const columns = {
   firstSeenAt: appAccounts.firstSeenAt,
 };
 
-const userColumns = {
-  id: appAccounts.id,
-  appId: appAccounts.appId,
-  email: appAccounts.email,
-  // Never null: the queries keep only accounts with an employee.
-  employeeId: sql<string>`${appAccounts.employeeId}`,
-  status: appAccounts.status,
-  foundVia: appAccounts.foundVia,
-  grantedAt: appAccounts.grantedAt,
-  grantedBefore: appAccounts.grantedBefore,
-  firstSeenAt: appAccounts.firstSeenAt,
-};
+function userColumns(scanned: readonly ScannedConnection[]) {
+  return {
+    id: appAccounts.id,
+    appId: appAccounts.appId,
+    email: appAccounts.email,
+    // Never null: the queries keep only accounts with an employee.
+    employeeId: sql<string>`${appAccounts.employeeId}`,
+    status: appAccounts.status,
+    foundVia: appAccounts.foundVia,
+    grantedAt: appAccounts.grantedAt,
+    grantedBefore: appAccounts.grantedBefore,
+    firstSeenAt: appAccounts.firstSeenAt,
+    inApp: inApp(scanned),
+  };
+}

@@ -7,7 +7,7 @@ type App {
   "Its key in the built-in catalog, such as `slack`; null for an app the catalog lacks."
   catalogKey: String
   status: AppStatus!
-  "How many people have an account in it."
+  "How many people have an account in it; once its connection has scanned, only the accounts that scan returned count."
   peopleCount: Int!
   "The finding kinds that saw its people's accounts, sorted, such as `google_sign_in`; connector modules register them."
   foundVia: [String!]!
@@ -19,7 +19,7 @@ type App {
   suspendedWithAccessCount: Int!
   "Whether a connection reads it; a connected app stays approved, so it cannot be ignored."
   connected: Boolean!
-  "Its users: the accounts in it that belong to an employee, those whose employee the directory suspended first, then by name."
+  "The accounts in it that belong to an employee: its users, those whose employee the directory suspended first, then by name; then those not in it (`inApp` false), which are not its users."
   users("Keeps only the first this many, at least 1; all when null." first: Int): [AppUser!]!
   "Whether it is connected through a connector that can disable and enable its accounts (`managingConnector` names one, connected or not); whether an account offers Disable or Enable now is its `offeredChange`."
   canChangeAccounts: Boolean!
@@ -30,6 +30,8 @@ type AppUser {
   id: ID!
   "Whether the person may use the account in the app."
   status: AppAccountStatus!
+  "Whether its app's connection's last scan returned it; null when the app has no connection or before its first scan finished. An account not in its app, such as one only a Google sign-in found, is no access and offers no change."
+  inApp: Boolean
   "The finding kinds that saw the account, sorted, such as `google_sign_in`; connector modules register them."
   foundVia: [String!]!
   since: Since!
@@ -162,7 +164,7 @@ enum ReconnectCause {
 
 # Adds the person's app accounts to the employees module's Employee; the server merges the types.
 type Employee {
-  "Their accounts in approved apps other than the directory: the active ones, and the suspended ones in connected apps, by app name. Admins only."
+  "Their accounts in approved apps other than the directory that are in their app: the active ones, and the suspended ones in connected apps, by app name. Admins only."
   appAccounts: [AppUser!]!
 }
 

@@ -18,6 +18,15 @@ export interface AppAccount {
   firstSeenAt: Date;
 }
 
+/**
+ * A connection whose first scan has finished, with the finding kind of its own app's accounts: in
+ * its app, only the accounts that kind found are access.
+ */
+export interface ScannedConnection {
+  appId: string;
+  findingKind: string;
+}
+
 /** An account a finding kind saw in its last scan. */
 export interface FoundAccount {
   appId: string;

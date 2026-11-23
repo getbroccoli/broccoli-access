@@ -29,6 +29,7 @@ import {
 } from "../domain";
 
 import { findDirectoryAppId, findEmployeesSuspendedInDirectory } from "./directory";
+import { findScannedConnections } from "./scannedConnections";
 
 const recordHistory = createRecordHistoryService();
 const setupSteps = createSetupStepService();
@@ -84,8 +85,8 @@ export interface AppService {
   /** The employees whose account in the directory's app is suspended. Trusted read: no `ctx`. */
   findEmployeesSuspendedInDirectory: (db: Orm | Tx) => Promise<string[]>;
   /**
-   * Every account that belongs to an employee, with its app's name and status, whether the app is
-   * the directory's, how it was found and since when. Trusted read: no `ctx`.
+   * Every account that belongs to an employee and is in its app, with its app's name and status,
+   * whether the app is the directory's, how it was found and since when. Trusted read: no `ctx`.
    */
   findEmployeeAccounts: (db: Orm | Tx) => Promise<EmployeeAccountInApp[]>;
 }
@@ -100,7 +101,7 @@ export interface EmployeeAccountInApp extends Omit<
   since: Since;
 }
 
-/** An app with what the app list shows of it, computed from its users' accounts. */
+/** An app with what the app list shows of it, computed from its users' accounts that are in it. */
 export interface AppSummary extends App {
   /** How many people have an account in it. */
   peopleCount: number;
@@ -139,10 +140,11 @@ export function createAppService(dependencies: AppDependencies): AppService {
     },
     async listApps(ctx, { status, ...pageArgs }) {
       ctx.require("MANAGE_WORKSPACE");
+      const scanned = await findScannedConnections(orm, connectors);
       const page = await paginate(pageArgs, {
         order: { field: "PEOPLE", direction: "DESC" },
         keysetValues: APP_SORT_VALUES,
-        fetch: (query) => appRepository(orm).findPage({ ...query, status }),
+        fetch: (query) => appRepository(orm).findPage({ ...query, status, scanned }),
       });
       const summaries = await summarize(
         dependencies,
@@ -184,8 +186,9 @@ export function createAppService(dependencies: AppDependencies): AppService {
     directoryAppId: (db) => findDirectoryAppId(db, connectors),
     findEmployeesSuspendedInDirectory: (db) => findEmployeesSuspendedInDirectory(db, connectors),
     async findEmployeeAccounts(db) {
+      const scanned = await findScannedConnections(db, connectors);
       const [accounts, directoryAppId] = await Promise.all([
-        appAccountRepository(db).findEmployeeAccounts(),
+        appAccountRepository(db).findEmployeeAccounts(scanned),
         findDirectoryAppId(db, connectors),
       ]);
       return accounts.map(({ appId, grantedAt, grantedBefore, firstSeenAt, ...account }) => ({
@@ -273,13 +276,15 @@ async function summarize(
 ): Promise<AppSummary[]> {
   const accounts = appAccountRepository(orm);
   const appIds = apps.map(({ id }) => id);
-  const [users, directoryPeople, connections, suspended] = await Promise.all([
-    accounts.findUsersOfApps(appIds),
+  const scanned = await findScannedConnections(orm, connectors);
+  const [accountsOfUsers, directoryPeople, connections, suspended] = await Promise.all([
+    accounts.findUsersOfApps(appIds, scanned),
     // Every employee holds a directory account, so they are the directory's people.
     accounts.countEmployeesWithAccounts(),
     appConnectionRepository(orm).findByApps(appIds),
     findEmployeesSuspendedInDirectory(orm, connectors),
   ]);
+  const users = accountsOfUsers.filter(({ inApp }) => inApp !== false);
   const usersByApp = Map.groupBy(users, ({ appId }) => appId);
   const connectedAppIds = new Set(connections.map(({ appId }) => appId));
   const suspendedInDirectory = new Set(suspended);
