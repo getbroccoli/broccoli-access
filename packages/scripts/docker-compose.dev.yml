@@ -14,6 +14,9 @@ services:
   broccoli-access:
     profiles: [self-host]
 
+  ready:
+    profiles: [self-host]
+
   connectors:
     profiles: [self-host]
 

@@ -1,35 +1,42 @@
-# broccoli-access
+<p align="center">
+  <a href="https://getbroccoli.com">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/logo-dark.svg">
+      <img src=".github/assets/logo.svg" alt="Broccoli Access" width="96">
+    </picture>
+  </a>
+</p>
 
-The open-source SaaS access management app. Request, approve and remove access to every tool your team uses. Self-host it.
+<h1 align="center">Broccoli Access</h1>
 
-**Status:** early. Broccoli Access starts as a copy of [Broccoli](https://github.com/getbroccoli/broccoli), the open-source Employee Operations System, cut down to its base: setup by connecting Google Workspace, people, record history and email settings. Access management comes next; see the [product requirements](docs/prd.md) and [circle 1](docs/circle1.md).
+<p align="center">
+  <strong>The open-source SaaS access management app.</strong><br>
+  Request, approve and remove access to every tool your team uses. Self-host it.
+</p>
 
-## Install
+<p align="center">
+  <a href="https://getbroccoli.com">Website</a> ·
+  <a href="docs/guides/setup-guide.md">Setup guide</a> ·
+  <a href="docs/prd.md">Product requirements</a>
+</p>
 
-In an empty folder, download [`docker-compose.yml`](docker-compose.yml) and start it:
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licence-AGPL--3.0-5E9072" alt="Licence: AGPL-3.0"></a>
+  <a href="https://github.com/getbroccoli/broccoli-access/actions/workflows/ci.yml"><img src="https://github.com/getbroccoli/broccoli-access/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
+
+> **Early.** Setup with Google Workspace, people, record history and email settings work today. Access management comes next.
+
+## Quick install
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/getbroccoli/broccoli-access/main/docker-compose.yml
-docker compose up -d --wait
+docker compose up
 ```
 
-Once it returns, open http://localhost:8080 and connect Google Workspace. More in the [setup guide](docs/guides/setup-guide.md).
+Open http://localhost:8080.
 
-It runs two images from GitHub's container registry: `ghcr.io/getbroccoli/broccoli-access` and the connectors, `ghcr.io/getbroccoli/broccoli-access-connectors`. When a merge to `main` of either repository passes CI, its CI publishes its image for `linux/amd64` only, tagged `latest` and `sha-<7-character commit>`.
-
-- **Update:** `docker compose pull && docker compose up -d --wait`.
-- **Pin a version:** in `docker-compose.yml`, replace `latest` in both `image:` lines, each with a `sha-` tag from its own [package page](https://github.com/orgs/getbroccoli/packages), such as `ghcr.io/getbroccoli/broccoli-access:sha-1a2b3c4`.
-
-## Develop
-
-```sh
-pnpm install
-pnpm dev
-```
-
-`pnpm dev` starts this checkout's stack on free ports and prints its address, the address of Mailpit, which catches the email it sends, and the address of the [fake Google](docs/fake-apps.md) with the demo company Acme. `pnpm dev --drop-db` starts over with an empty database, and `pnpm dev:prune` removes the stacks of checkouts that no longer exist. Tests are in [testing](docs/testing.md).
-
-`docker compose up --build -d --wait` runs the self-hosted stack with the Broccoli Access image built from this checkout instead of the published one.
+[Self-hosted setup guide](docs/guides/setup-guide.md)
 
 ## Licence
 
