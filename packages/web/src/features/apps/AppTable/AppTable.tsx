@@ -33,7 +33,10 @@ type Props<Row extends { id: string }> = {
   emptyState: ReactNode;
 };
 
-/** A framed table of apps or of an app's users, the first rows only until the owner asks for the rest. */
+/**
+ * A framed table of apps, of an app's users or of account changes, the first rows only until the
+ * owner asks for the rest.
+ */
 export function AppTable<Row extends { id: string }>({
   rows,
   columns,

@@ -23,7 +23,10 @@ import type { ConnectionMember, ConnectionMembers } from "../ports";
 import { createAppConnectionService } from "./appConnectionService";
 import { failRunningChange, runAccountChange } from "./runAccountChange";
 
-/** Disable and Enable of app accounts: asked by the owner, run as a job, read by the account rows and Activity. */
+/**
+ * Disable and Enable of app accounts: asked by the owner, run as a job, read by the account rows
+ * and Activity.
+ */
 export interface AccountChangeService {
   /**
    * Asks for a Disable (`suspend`) or Enable (`reactivate`) of the app account: in one transaction
