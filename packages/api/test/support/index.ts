@@ -1,6 +1,7 @@
 export { expect } from "vitest";
 export { employeeDirectory } from "../../src/modules/employees";
 export { createAppConnectionService } from "../../src/modules/apps";
+export { appConnectionRepository } from "../../src/modules/apps/db";
 export { createGoogleWorkspaceConnector } from "../../src/modules/google";
 export { ADMIN, EMPLOYEE, OWNER, SETUP_HOLDER, SYSTEM } from "./testSecurityContext";
 export { createBrowser, type Browser } from "./browser";

@@ -5,6 +5,7 @@ import {
   appsModule,
   createAccountChangeService,
   createAppAccountService,
+  createAppInvitationService,
   createAppConnectionService,
   createAppService,
   createAppUserService,
@@ -66,7 +67,12 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   const scans = createScanService({
     ...core,
     connectors,
-    apps: { ...connectedApps, ...createAppAccountService(), ...apps },
+    apps: {
+      ...connectedApps,
+      ...createAppAccountService(),
+      ...createAppInvitationService(),
+      ...apps,
+    },
     directory: createDirectorySyncService(),
   });
   // One service for Settings and the extension, which share the app sessions handed over.

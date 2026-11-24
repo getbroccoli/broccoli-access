@@ -1,8 +1,12 @@
+import { sql } from "drizzle-orm";
+
 import {
   expect,
   test,
   OWNER,
   SYSTEM,
+  accountChanges,
+  appConnectionRepository,
   apps,
   canReferenceEmployee,
   connectLinear,
@@ -13,11 +17,51 @@ import {
   grantAtFakeGoogle,
   holdBeforeCommit,
   LINEAR_INPUT,
+  pendingDisableTest,
   scans,
+  serveAccountList,
   storedAppAccounts,
   storedApps,
   storedImportSources,
 } from "#test/support";
+import { ormOf } from "../../../core/db";
+
+pendingDisableTest(
+  "a scan waiting for its connection leaves a running change free to fail",
+  async ({ pending: { linear, owner, change, latest }, orm, transact, fakeConnectors }) => {
+    const server = await serveAccountList(fakeConnectors.url, (_request, response) => {
+      response.json({
+        accounts: [],
+        nextCursor: null,
+        invitations: [{ email: "ivan@acme.example", invitedAt: null, expiresAt: null }],
+      });
+    });
+    const scan = scans(orm, { connectors: containerConnectors(server.url) });
+    await scan.scanNow(owner, linear.connectionId);
+    const held = holdBeforeCommit(transact);
+    const holding = held.transact((tx) =>
+      appConnectionRepository(tx).lockById(linear.connectionId),
+    );
+    const pid = await held.ready;
+    const saving = scan.runScan(SYSTEM, linear.sourceId);
+    try {
+      await expectBlockedBy(orm, pid);
+      const service = accountChanges(orm, {
+        transact: (work, options) =>
+          transact(async (tx) => {
+            await ormOf(tx).execute(sql`set local lock_timeout = '2s'`);
+            return work(tx);
+          }, options),
+      });
+      await service.failChange(SYSTEM, change.id);
+      expect(await latest()).toMatchObject({ status: "failed" });
+    } finally {
+      held.release();
+      await Promise.all([holding, saving]);
+    }
+    expect(await scan.readScan(owner, linear.connectionId)).toMatchObject({ status: "scanned" });
+  },
+);
 
 test("a Google scan waiting for Linear leaves the employee available to account inserts", async ({
   orm,

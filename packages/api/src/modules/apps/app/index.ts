@@ -6,6 +6,7 @@ export {
   type LatestAccountChange,
 } from "./accountChangeService";
 export { createAppAccountService, type AppAccountService } from "./appAccountService";
+export { createAppInvitationService, type AppInvitationService } from "./appInvitationService";
 export type { AppInvite } from "./appInvite";
 export { createAppConnectionService, type AppConnectionService } from "./appConnectionService";
 export { createAppService, type AppService, type AppSummary } from "./appService";

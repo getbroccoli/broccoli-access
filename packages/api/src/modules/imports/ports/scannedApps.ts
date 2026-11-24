@@ -1,4 +1,8 @@
-import type { AccountStatus, ConnectorErrorCode } from "../../../core/connectors";
+import type {
+  AccountStatus,
+  ConnectorErrorCode,
+  PendingInvitation,
+} from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import type { HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
@@ -77,6 +81,18 @@ export interface ScannedApps {
       cause: HistoryAppend["cause"];
       /** When the scan began reading; an account changed since keeps its status. */
       readStartedAt: Date;
+    },
+  ): Promise<void>;
+  /**
+   * Makes the connection's stored pending invitations exactly `invitations`, joining `tx`; an
+   * invitation is never an account.
+   */
+  replaceInvitations(
+    ctx: SecurityContext,
+    tx: Tx,
+    scanned: {
+      connection: { id: string; appId: string };
+      invitations: readonly PendingInvitation[];
     },
   ): Promise<void>;
   /** Matches found apps to apps, creating the missing ones; returns app ids by external id. */

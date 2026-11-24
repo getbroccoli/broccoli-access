@@ -9,8 +9,12 @@ import { OWNER, SYSTEM } from "./testSecurityContext";
 import type { TestSeed } from "./testSeed";
 
 /** Posts a control to this test's fake app. */
-export async function postFakeControl(url: string, path: string) {
-  const response = await fetch(new URL(`/_fake/${path}`, url), { method: "POST" });
+export async function postFakeControl(url: string, path: string, body?: Record<string, unknown>) {
+  const response = await fetch(new URL(`/_fake/${path}`, url), {
+    method: "POST",
+    headers: body === undefined ? undefined : { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
   assert.equal(response.status, 204);
 }
 

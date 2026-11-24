@@ -35,7 +35,7 @@ The words Broccoli Access's code and docs use, and what each one means. Only Bro
 - **Extension**: the Broccoli Access extension for Chrome. It hands over app sessions.
 - **Disable, Enable**: the UI words for suspending an app account and making it active again (`suspend` and `reactivate` in code). A suspended account shows as "Disabled".
 - **Invite**: the UI word for asking a connected app to send its own invitation to an employee who has no account in it (`invite` in code).
-- **Invited**: an employee with no account in a connected app whose latest invite there succeeded or was done by hand, until a scan finds their account; the row shows "Invited on <date>".
+- **Invited**: an employee with no account in a connected app who has a pending invitation there, whoever sent it, as the app's last scan read it, or whose invite succeeded or was done by hand since that scan; the row shows "Invited on <date>". For an app whose connector cannot list invitations: their latest invite succeeded or was done by hand, until a scan finds their account.
 - **Account change**: one Invite, Disable, Enable or Remove, from the owner's click to its result (`account_changes`).
 - **Done by hand**: a failed account change that the owner made in the app themselves, then confirmed with "I did it by hand".
 - **Activity**: the page listing every account change, newest first. Not History, which belongs to one record.

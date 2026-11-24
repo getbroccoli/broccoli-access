@@ -168,11 +168,11 @@ enum ReconnectCause {
 type Employee {
   "Their accounts in approved apps other than the directory, leaving out those not in their app (`inApp` false): the active ones, and the suspended ones in connected apps, by app name. Admins only."
   appAccounts: [AppUser!]!
-  "The apps whose connection invites and whose last scan found no member with their email, where Invite or Reconnect is offered or an invite was asked, by app name. Admins only."
+  "The connected apps whose last scan found no member with their email, where Invite or Reconnect is offered, an invite was asked, or a scan read their pending invitation, also in an app whose connection cannot invite, by app name. Admins only."
   appInvites: [AppInvite!]!
 }
 
-"An employee's invite to an app they have no account in: offered, running, done or failed."
+"An employee's row for a connected app they have no account in: Invite offered, their invite running, done or failed, or Invited by a pending invitation a scan read in the app, whoever sent it."
 type AppInvite {
   "Unique per employee and app."
   id: ID!
@@ -181,9 +181,9 @@ type AppInvite {
   offered: Boolean!
   "Whether its row shows Reconnect instead of Invite: it would offer one, but the app's connection needs reconnecting."
   offersReconnect: Boolean!
-  "When the employee was invited, while the row shows Invited: the finish of the latest invite once it succeeded or was done by hand; null otherwise. The next scan that finds their member ends the row."
+  "When the employee was invited, while the row shows Invited; null otherwise. Where the app's scans read its pending invitations: the date of the employee's invitation as the app gives it, whoever sent it, else when a scan first saw it; or the finish of an invite that succeeded or was done by hand since the last scan. Elsewhere: the finish of the latest invite once it succeeded or was done by hand. The next scan that finds their member ends the row."
   invitedAt: DateTime
-  "Its latest invite; null before the first."
+  "The latest invite asked in Broccoli Access; null before the first. An invitation sent in the app itself is not one."
   latestInvite: AccountChange
 }
 

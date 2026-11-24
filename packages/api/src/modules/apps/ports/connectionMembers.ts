@@ -1,8 +1,8 @@
 import type { Orm, Tx } from "../../../core/db";
 
 /**
- * What the apps module reads from the imports module: the members connections' scans saw, and which
- * connections have finished a scan.
+ * What the apps module reads from the imports module: the members connections' scans saw, and when
+ * each connection last finished a scan.
  */
 export interface ConnectionMembers {
   /**
@@ -13,8 +13,11 @@ export interface ConnectionMembers {
     db: Orm | Tx,
     members: { connectionIds: readonly string[]; emails: readonly string[] },
   ): Promise<ConnectionMember[]>;
-  /** The connections whose source has finished a scan. Trusted read: no `ctx`. */
-  findScannedConnectionIds(db: Orm | Tx): Promise<string[]>;
+  /**
+   * When the last scan of each connection finished; a connection never scanned is left out.
+   * Trusted read: no `ctx`.
+   */
+  findLastScans(db: Orm | Tx): Promise<{ connectionId: string; scannedAt: Date }[]>;
 }
 
 /** A member of a connected app as its connection's last scan saw it. */

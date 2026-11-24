@@ -1,6 +1,7 @@
 fragment InviteStatusCell_appInvite on AppInvite {
   id
   offered
+  invitedAt
   latestInvite {
     id
     action

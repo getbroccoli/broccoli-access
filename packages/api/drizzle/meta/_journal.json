@@ -57,6 +57,13 @@
       "when": 1795526964241,
       "tag": "0007_remember_instance_origin",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795528535548,
+      "tag": "0008_scan_invitations",
+      "breakpoints": true
     }
   ]
 }
