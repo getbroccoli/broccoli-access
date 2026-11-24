@@ -1,9 +1,5 @@
 import { ApplicationError } from "../../../core/applicationError";
-import {
-  type AccountAction,
-  canChangeAccounts,
-  type ConnectorRegistry,
-} from "../../../core/connectors";
+import type { AccountAction, ConnectorRegistry } from "../../../core/connectors";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import type { JobQueue } from "../../../core/jobs";
 import type { Logger } from "../../../core/logger";
@@ -18,16 +14,18 @@ import {
   appAccountRepository,
   appConnectionRepository,
 } from "../db";
-import { type AccountChange, type AppAccount, offeredChange, offersReconnect } from "../domain";
-import type { ConnectionMember, ConnectionMembers } from "../ports";
+import type { AccountChange, AccountChangeAction } from "../domain";
+import type { ConnectionMembers, EmployeesByName } from "../ports";
+import { changingConnectors, readAccountFacts } from "./accountFacts";
 import { createAppConnectionService } from "./appConnectionService";
+import { type AppInvite, inviteEmployee, readAppInvites } from "./appInvite";
 import { markChangeDoneByHand } from "./markChangeDoneByHand";
 import type { ReconnectReason } from "./connectionReconnects";
 import { failRunningChange, runAccountChange } from "./runAccountChange";
 
 /**
- * Disable and Enable of app accounts: asked by the owner, run as a job, read by the account rows
- * and Activity.
+ * Disable and Enable of app accounts, and Invite of employees to apps they have no account in:
+ * asked by the owner, run as a job, read by the account and invite rows and Activity.
  */
 export interface AccountChangeService {
   /**
@@ -35,17 +33,36 @@ export interface AccountChangeService {
    * writes the change `running`, with the account's app and email and the connection's source key
    * copied, and queues its run, one per connection at a time; returns it with its place in the
    * queue. Needs MANAGE_WORKSPACE and a signed-in user; refuses an unknown account with NOT_FOUND,
-   * and an action the account does not offer now (`offeredChange`) with CONFLICT.
+   * and an action the account does not offer now (`offeredChange`), which Invite never is, with
+   * CONFLICT.
    */
   changeAccount: (
     ctx: SecurityContext,
-    input: { appAccountId: string; action: AccountAction },
+    input: { appAccountId: string; action: AccountChangeAction },
   ) => Promise<LatestAccountChange>;
+  /**
+   * Asks for an Invite of the employee to the app: in one transaction writes the invite `running`,
+   * with the employee's email and no account or source key, and queues its run like a Disable's;
+   * returns the employee's invite row with it. Needs MANAGE_WORKSPACE and a signed-in user; refuses
+   * an unknown employee or app with NOT_FOUND, and an invite not offered now (`inviteStateOf`) with
+   * CONFLICT.
+   */
+  inviteEmployee: (
+    ctx: SecurityContext,
+    input: { employeeId: string; appId: string },
+  ) => Promise<AppInvite>;
+  /**
+   * The employees' rows for the apps whose connection's connector lists `invite` and whose last scan
+   * found no member with their email, where Invite or Reconnect is offered or an invite was asked;
+   * by employee, then app name. Needs MANAGE_WORKSPACE.
+   */
+  readAppInvites: (ctx: SecurityContext, employeeIds: readonly string[]) => Promise<AppInvite[]>;
   /**
    * The run's job: makes the change through the connector, trying a rate-limited or unavailable
    * call again; saves a renewed connection first. When the member reads back with the new status,
    * the change succeeds and sets the account's status with a history line by the user who asked;
-   * otherwise it fails with the error. Skips a change no longer running. System only.
+   * an invite succeeds when the invitation, or the email's member, reads back. Otherwise it fails
+   * with the error. Skips a change no longer running. System only.
    */
   runChange: (ctx: SecurityContext, changeId: string) => Promise<void>;
   /** The job's attempts are used up: a running change fails with `app_unavailable`. System only. */
@@ -53,8 +70,9 @@ export interface AccountChangeService {
   /**
    * "I did it by hand": the change, failed and its account's latest, becomes `done_by_hand` with its
    * error kept, and the account takes the status the change asked for at once, with a history line
-   * by the signed-in user unless it already had it. Needs MANAGE_WORKSPACE; refuses an unknown change with NOT_FOUND, and
-   * any other with CONFLICT.
+   * by the signed-in user unless it already had it. A failed invite, its connection's and email's
+   * latest, becomes `done_by_hand` alone. Needs MANAGE_WORKSPACE; refuses an unknown change with
+   * NOT_FOUND, and any other with CONFLICT.
    */
   markChangeDoneByHand: (ctx: SecurityContext, changeId: string) => Promise<LatestAccountChange>;
   /** What each of the app accounts offers and its latest change, by account id. Needs MANAGE_WORKSPACE. */
@@ -128,6 +146,8 @@ export interface AccountChangeDependencies {
   /** Every connector a connection may name. */
   connectors: ConnectorRegistry;
   members: ConnectionMembers;
+  /** The employees module, which owns their emails, which invites go to. */
+  employees: EmployeesByName;
   /** Waits between attempts of a call; tests pass one that does not wait. */
   wait?: (ms: number) => Promise<void>;
 }
@@ -158,6 +178,8 @@ export function createAccountChangeService(
       );
       return change;
     },
+    inviteEmployee: (ctx, input) => inviteEmployee(dependencies, ctx, input),
+    readAppInvites: (ctx, employeeIds) => readAppInvites(dependencies, ctx, employeeIds),
     runChange: (ctx, changeId) => runAccountChange(run, ctx, changeId),
     failChange: (ctx, changeId) => failRunningChange(dependencies, ctx, changeId),
     markChangeDoneByHand: (ctx, changeId) => markChangeDoneByHand(dependencies, ctx, changeId),
@@ -165,7 +187,7 @@ export function createAccountChangeService(
       ctx.require("MANAGE_WORKSPACE");
       const changing = await changingConnectors(dependencies.connectors);
       const accounts = await appAccountRepository(orm).findByIds(appAccountIds);
-      const facts = gatherFacts(accounts, await readFacts(dependencies, orm, accounts), changing);
+      const facts = await readAccountFacts(dependencies, orm, accounts, changing);
       const running = [...facts.values()].flatMap(({ latest }) =>
         latest?.status === "running" ? [latest.id] : [],
       );
@@ -233,7 +255,8 @@ export function createAccountChangeService(
   };
 }
 
-const RUN_JOB = "apps.runAccountChange";
+/** The job that runs a change, one per connection at a time. */
+export const RUN_JOB = "apps.runAccountChange";
 
 const NOT_OFFERED = "This change is not offered on this account now.";
 
@@ -246,7 +269,12 @@ async function askForChange(
     action,
     requestedBy,
     changing,
-  }: { appAccountId: string; action: AccountAction; requestedBy: string; changing: Set<string> },
+  }: {
+    appAccountId: string;
+    action: AccountChangeAction;
+    requestedBy: string;
+    changing: Set<string>;
+  },
 ): Promise<LatestAccountChange> {
   const id = parseUuid(appAccountId);
   // Locked, so a change finishing meanwhile commits first and its outcome is read below.
@@ -254,7 +282,7 @@ async function askForChange(
   if (!account) {
     throw new ApplicationError("NOT_FOUND", "No app account has this id.");
   }
-  const facts = gatherFacts([account], await readFacts(dependencies, tx, [account]), changing);
+  const facts = await readAccountFacts(dependencies, tx, [account], changing);
   const { offered, connection, member } = facts.get(account.id)!;
   if (offered !== action || !connection || !member) {
     throw new ApplicationError("CONFLICT", NOT_OFFERED);
@@ -279,96 +307,9 @@ async function askForChange(
 }
 
 /** The change with its place in its connection's queue while it runs. */
-function withPlace(change: AccountChange, ahead: Map<string, number>): LatestAccountChange {
+export function withPlace(change: AccountChange, ahead: Map<string, number>): LatestAccountChange {
   return {
     ...change,
     changesAhead: change.status === "running" ? (ahead.get(change.id) ?? 0) : null,
   };
-}
-
-/** What the accounts' offers are decided from: their apps' connections, members and latest changes. */
-interface StoredFacts {
-  connections: AppConnection[];
-  members: ConnectionMember[];
-  latest: AccountChange[];
-}
-
-async function readFacts(
-  { members }: AccountChangeDependencies,
-  db: Orm | Tx,
-  accounts: readonly AppAccount[],
-): Promise<StoredFacts> {
-  const [connections, latest] = await Promise.all([
-    appConnectionRepository(db).findByApps(accounts.map(({ appId }) => appId)),
-    accountChangeRepository(db).findLatestOfAccounts(accounts.map(({ id }) => id)),
-  ]);
-  const found = await members.findConnectionMembers(db, {
-    connectionIds: connections.map(({ id }) => id),
-    emails: accounts.map(({ email }) => email),
-  });
-  return { connections, members: found, latest };
-}
-
-/** What decides each account's offer: its app's connection, the connection's member and its latest change. */
-interface AccountFacts {
-  connection: AppConnection | null;
-  /** Whether a member with the account's email is the connection's own user. */
-  isConnectionUser: boolean;
-  /** Null when the connection's last scan has no member with the account's email, or several. */
-  member: ConnectionMember | null;
-  latest: AccountChange | null;
-  offered: AccountAction | null;
-  /** Whether Reconnect shows instead of Disable or Enable. */
-  reconnectOffered: boolean;
-}
-
-function gatherFacts(
-  accounts: readonly AppAccount[],
-  { connections, members, latest }: StoredFacts,
-  changing: Set<string>,
-): Map<string, AccountFacts> {
-  const connectionByApp = new Map(connections.map((connection) => [connection.appId, connection]));
-  const membersByKey = Map.groupBy(
-    members,
-    ({ connectionId, email }) => `${connectionId} ${email}`,
-  );
-  const latestByAccount = new Map(latest.map((change) => [change.appAccountId, change]));
-  return new Map(
-    accounts.map((account) => {
-      const connection = connectionByApp.get(account.appId) ?? null;
-      const matches = connection
-        ? membersByKey.get(`${connection.id} ${account.email}`)
-        : undefined;
-      // Two members sharing the email leave the change's target unclear.
-      const member = matches?.length === 1 ? matches[0]! : null;
-      const isConnectionUser = matches?.some((match) => match.isConnectionUser) ?? false;
-      const change = latestByAccount.get(account.id) ?? null;
-      const offerFacts = {
-        status: account.status,
-        connection: connection && {
-          status: connection.status,
-          changesAccounts: changing.has(connection.connector),
-        },
-        record: member && { isConnectionUser },
-        changeRunning: change?.status === "running",
-      };
-      return [
-        account.id,
-        {
-          connection,
-          isConnectionUser,
-          member,
-          latest: change,
-          offered: offeredChange(offerFacts),
-          reconnectOffered: offersReconnect(offerFacts),
-        },
-      ];
-    }),
-  );
-}
-
-/** The keys of the connectors that list `suspend` and `reactivate`. */
-async function changingConnectors(connectors: ConnectorRegistry): Promise<Set<string>> {
-  const listed = await connectors.list();
-  return new Set(listed.filter((connector) => canChangeAccounts(connector)).map(({ key }) => key));
 }

@@ -11,7 +11,10 @@ import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterCon
 
 import { CurrentAccessTable } from "./CurrentAccessTable";
 
-/** A person: their status in Google, a warning while suspended with access, and their current access. */
+/**
+ * A person: their status in Google, a warning while suspended with access, and their current
+ * access, with the connected apps they may be invited to.
+ */
 export function PersonPage() {
   const { employeeId } = useParams({ from: "/_authenticated/people_/$employeeId" });
   // The route's loader has just read the page into the cache.
@@ -20,9 +23,11 @@ export function PersonPage() {
   // A connected app's scan, such as one started from a failed change's dialog or its first one,
   // moves their rows: poll the scans only, then read the person once.
   useRefetchAfterContainerConnectorScans(pageQuery.refetch);
-  // A running change moves its row; the page reads the person again until every change ends.
+  // A running change or invite moves its row; the page reads the person again until each ends.
   const isChanging =
-    person?.appAccounts.some((account) => account.latestChange?.status === "RUNNING") ?? false;
+    (person?.appAccounts.some((account) => account.latestChange?.status === "RUNNING") ||
+      person?.appInvites.some((invite) => invite.latestInvite?.status === "RUNNING")) ??
+    false;
   usePollWhileScanning(isChanging, pageQuery);
   useRefreshAfterChanges(isChanging, pageQuery.refetch);
   // The route's loader found the person, so they are missing only while a reload replaces them.
@@ -82,7 +87,7 @@ export function PersonPage() {
       )}
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold tracking-tight">{t("people.person.currentAccess")}</h2>
-        <CurrentAccessTable appAccounts={person.appAccounts} />
+        <CurrentAccessTable appAccounts={person.appAccounts} appInvites={person.appInvites} />
       </section>
     </div>
   );

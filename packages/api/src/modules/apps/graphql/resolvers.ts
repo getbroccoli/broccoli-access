@@ -13,6 +13,7 @@ import type {
   AccountChangeService,
   AccountChangeState,
   ConnectionState,
+  AppInvite,
   AppService,
   AppSummary,
   AppUser,
@@ -39,6 +40,8 @@ export function createResolvers(
     | "listAccountChanges"
     | "readRequesterNames"
     | "markChangeDoneByHand"
+    | "inviteEmployee"
+    | "readAppInvites"
   >,
 ): Resolvers {
   const loaders = createLoaders(services);
@@ -72,6 +75,9 @@ export function createResolvers(
         (await loaders.changeStates(context).load(id)).offersReconnect,
       latestChange: async ({ id }, _args, context) =>
         (await loaders.changeStates(context).load(id)).latestChange,
+    },
+    AppInvite: {
+      app: (invite, _args, context) => loaders.appsById(context).load(invite.appId),
     },
     ContainerConnection: {
       app: async ({ id }, _args, context) =>
@@ -113,6 +119,8 @@ export function createResolvers(
     Employee: {
       appAccounts: (employee, _args, context) =>
         loaders.accountsOfEmployees(context).load(employee.id),
+      appInvites: (employee, _args, context) =>
+        loaders.invitesOfEmployees(context).load(employee.id),
     },
   };
 }
@@ -159,21 +167,29 @@ function appsMutations(
       mutationPayload<ResolversTypes["AccountChangeMarkDoneByHandPayload"]>(async () => {
         const ctx = context.getActor();
         const change = await services.markChangeDoneByHand(ctx, input.id);
-        return { appUser: await appUserOf(services, ctx, change) };
+        return { appUser: await appUserOf(services, ctx, change), accountChange: change };
       }, ["NOT_FOUND", "CONFLICT"]),
+    inviteEmployee: (_parent, { input }, context) =>
+      mutationPayload<ResolversTypes["AppInvitePayload"]>(
+        async () => ({ appInvite: await services.inviteEmployee(context.getActor(), input) }),
+        ["NOT_FOUND", "CONFLICT"],
+      ),
   };
 }
 
 const STATUSES = { DISCOVERED: "discovered", APPROVED: "approved", IGNORED: "ignored" } as const;
 
-const ACTIONS = { SUSPEND: "suspend", REACTIVATE: "reactivate" } as const;
+const ACTIONS = { SUSPEND: "suspend", REACTIVATE: "reactivate", INVITE: "invite" } as const;
 
-/** The change's account as its app's users list it; null once it belongs to no employee. */
+/** The change's account as its app's users list it; null for an invite, or once it belongs to no employee. */
 async function appUserOf(
   services: Parameters<typeof createResolvers>[0],
   ctx: SecurityContext,
   change: AccountChange,
 ): Promise<AppUser | null> {
+  if (!change.appAccountId) {
+    return null;
+  }
   const users = await services.readUsersOfApps(ctx, [change.appId]);
   return users.find(({ id }) => id === change.appAccountId) ?? null;
 }
@@ -194,6 +210,14 @@ function createLoaders(services: Parameters<typeof createResolvers>[0]) {
         new DataLoader<string, AppUser[]>(async (employeeIds) => {
           const users = await services.readUsersOfEmployees(context.getActor(), employeeIds);
           const byEmployee = Map.groupBy(users, ({ employeeId }) => employeeId);
+          return employeeIds.map((employeeId) => byEmployee.get(employeeId) ?? []);
+        }),
+    ),
+    invitesOfEmployees: perRequest(
+      (context) =>
+        new DataLoader<string, AppInvite[]>(async (employeeIds) => {
+          const invites = await services.readAppInvites(context.getActor(), employeeIds);
+          const byEmployee = Map.groupBy(invites, ({ employeeId }) => employeeId);
           return employeeIds.map((employeeId) => byEmployee.get(employeeId) ?? []);
         }),
     ),

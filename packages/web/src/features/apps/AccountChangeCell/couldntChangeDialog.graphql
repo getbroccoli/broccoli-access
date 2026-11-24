@@ -58,6 +58,25 @@ mutation MarkAccountChangeDoneByHand($input: AccountChangeMarkDoneByHandInput!) 
           suspendedWithAccessCount
         }
       }
+      # For an invite: what changes on the employee's invite rows, which now show Invited; their
+      # fragments' other fields stay cached, and spreading them would pass the API's depth limit.
+      accountChange {
+        id
+        status
+        employee {
+          id
+          appInvites {
+            id
+            offered
+            offersReconnect
+            invitedAt
+            latestInvite {
+              id
+              status
+            }
+          }
+        }
+      }
       error {
         __typename
         ... on Error {

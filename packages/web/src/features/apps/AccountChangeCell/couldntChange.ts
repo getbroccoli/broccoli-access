@@ -100,7 +100,7 @@ export function couldntChangeHint(
     }
     return t(scanNow ? "apps.couldnt.hintScan" : "apps.couldnt.hintScanned", { app });
   }
-  const hints = action === "SUSPEND" ? DISABLE_HINTS : ENABLE_HINTS;
+  const hints = HINTS[action];
   if (reconnect) {
     return t(hints.reconnect, { firstName, app });
   }
@@ -133,6 +133,14 @@ const ENABLE_HINTS = {
   byHand: "apps.couldnt.hintEnableByHand",
   reconnect: "apps.couldnt.hintEnableAfterReconnect",
 } as const;
+
+const INVITE_HINTS = {
+  tryAgain: "apps.couldnt.hintInvite",
+  byHand: "apps.couldnt.hintInviteByHand",
+  reconnect: "apps.couldnt.hintInviteAfterReconnect",
+} as const;
+
+const HINTS = { SUSPEND: DISABLE_HINTS, REACTIVATE: ENABLE_HINTS, INVITE: INVITE_HINTS } as const;
 
 /** The parts of an app account its failed change's options are decided from. */
 type FailedChangeFacts = {

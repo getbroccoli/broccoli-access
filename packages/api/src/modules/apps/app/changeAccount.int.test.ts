@@ -16,9 +16,9 @@ import {
   test,
 } from "#test/support";
 
-import type { AccountAction } from "../../../core/connectors";
 import type { Orm } from "../../../core/db";
 import { appConnections, accountChanges as changesTable } from "../db";
+import type { AccountChangeAction } from "../domain";
 
 test("stores Chloé's running Disable with her Linear source key and queues it by connection", async ({
   orm,
@@ -109,6 +109,7 @@ test("returns one change ahead when another account is already queued on the con
 
 test.for([
   { reason: "the member who owns the connection", email: "admin@acme.example", action: "suspend" },
+  { reason: "Invite on an existing account", email: "chloe@acme.example", action: "invite" },
   { reason: "Enable on an active account", email: "chloe@acme.example", action: "reactivate" },
 ] as const)(
   "refuses $reason without storing or queuing a change",
@@ -275,7 +276,7 @@ async function expectRefusal(
   orm: Orm,
   connectorsUrl: string,
   appAccountId: string,
-  action: AccountAction = "suspend",
+  action: AccountChangeAction = "suspend",
   error = NOT_OFFERED,
   ctx = OWNER,
 ) {

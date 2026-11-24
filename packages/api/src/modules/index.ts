@@ -74,6 +74,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     connectedApps,
     scans,
   });
+  const employees = createEmployeeReadService({ ...core, accounts: apps });
   const manifests = [
     systemModule({
       ...core,
@@ -95,9 +96,9 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
         ...core,
         connectors: directoryConnectors,
         members: importRecords,
-        employees: createEmployeeReadService({ ...core, accounts: apps }),
+        employees,
       }),
-      ...createAccountChangeService({ ...core, connectors, members: importRecords }),
+      ...createAccountChangeService({ ...core, connectors, members: importRecords, employees }),
     }),
     extensionModule({ ...core, appSessions: containerConnections }),
   ];

@@ -1,5 +1,6 @@
 import { and, arrayContains, countDistinct, eq, isNotNull, or, type SQL, sql } from "drizzle-orm";
 
+import type { AccountStatus } from "../../../core/connectors";
 import { anyOf, insertBatches, type Orm, ormOf, type Tx } from "../../../core/db";
 import type { AppAccount, AppStatus, InAppFacts } from "../domain";
 import { appAccounts } from "./appAccountsTable";
@@ -38,8 +39,12 @@ export interface AppAccountRepository {
   ): Promise<AppUserAccount[]>;
   /** How many employees hold an account in any app. */
   countEmployeesWithAccounts(): Promise<number>;
-  /** The employees whose account in the app is suspended. */
-  findSuspendedEmployeeIds(appId: string): Promise<string[]>;
+  /** The employees whose account in the app has `status`; only those of `among` when given. */
+  findEmployeeIdsWithStatus(
+    appId: string,
+    status: AccountStatus,
+    among?: readonly string[],
+  ): Promise<string[]>;
   /**
    * Every account with an employee that is access as `facts` say, with its app's name and status
    * and its dates.
@@ -148,15 +153,15 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .from(appAccounts);
       return row!.employees;
     },
-    findSuspendedEmployeeIds: async (appId) => {
+    findEmployeeIdsWithStatus: async (appId, status, among) => {
       const rows = await orm()
         .selectDistinct({ employeeId: appAccounts.employeeId })
         .from(appAccounts)
         .where(
           and(
             eq(appAccounts.appId, appId),
-            eq(appAccounts.status, "suspended"),
-            isNotNull(appAccounts.employeeId),
+            eq(appAccounts.status, status),
+            among ? anyOf(appAccounts.employeeId, among) : isNotNull(appAccounts.employeeId),
           ),
         );
       return rows.map(({ employeeId }) => employeeId!);

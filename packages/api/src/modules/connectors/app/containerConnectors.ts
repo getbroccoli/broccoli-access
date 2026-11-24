@@ -237,6 +237,17 @@ function containerSession(
       }
       return { status: answer.account.values.status, connection: answer.connection };
     },
+    async invite(email) {
+      const answer = answerOf(
+        await client.runAction({ ...request(), action: "invite", account: { email } }),
+      );
+      keep(answer.connection);
+      // Success is the invitation, or the email's member, read back.
+      if ((answer.invitation ?? answer.account?.values)?.email !== email) {
+        throw new ConnectorError("unexpected_response");
+      }
+      return { connection: answer.connection };
+    },
   };
 }
 

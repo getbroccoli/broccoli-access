@@ -1,8 +1,11 @@
 import {
   canChangeAccounts,
+  canInvite,
   type ConnectionUpdate,
+  type Connector,
   ConnectorError,
   type ConnectorErrorCode,
+  type ConnectorSession,
   withConnectorRetries,
 } from "../../../core/connectors";
 import type { Transact, Tx } from "../../../core/db";
@@ -36,7 +39,13 @@ export async function runAccountChange(
   if (!error) {
     const finished = await finishSucceeded(transact, ctx, change);
     logger.info(
-      { changeId, appAccountId: change.appAccountId, finished },
+      {
+        changeId,
+        appAccountId: change.appAccountId,
+        connectionId: change.connectionId,
+        action: change.action,
+        finished,
+      },
       "Account change succeeded",
     );
     return;
@@ -49,6 +58,7 @@ export async function runAccountChange(
       changeId,
       appAccountId: change.appAccountId,
       connectionId: change.connectionId,
+      action: change.action,
       finished,
       failure: error,
       turnedToReconnect,
@@ -121,19 +131,18 @@ async function runAction(
     return { error: connection.reconnectCause, calledServer: false, secretsUsed: null };
   }
   const connector = (await connectors.list()).find(({ key }) => key === connection.connector);
-  // A connector the container no longer lists, or one that no longer changes accounts, cannot act now.
-  if (!connector || !canChangeAccounts(connector)) {
+  // A connector the container no longer lists, or one that no longer makes this change, cannot act now.
+  if (!connector || !canMake(connector, change)) {
     return { error: "app_unavailable", calledServer: false, secretsUsed: null };
   }
   let calledServer = false;
   const secrets = await connections.readSecrets(orm, change.connectionId);
   try {
     const session = await connector.openSession({ settings: connection.settings, secrets });
-    const account = { sourceKey: change.sourceKey, email: change.email };
     const result = await withConnectorRetries(
       () => {
         calledServer = true;
-        return session.runAction!(change.action, account);
+        return makeChange(session, change);
       },
       {
         wait,
@@ -148,15 +157,40 @@ async function runAction(
       ...result.connection,
       replacing: secrets!,
     });
-    // Success is the new status read back, never a call that went through.
-    const read = result.status === statusAfter(change.action);
-    return { error: read ? null : "unexpected_response", calledServer, secretsUsed: secrets };
+    return {
+      error: result.readBack ? null : "unexpected_response",
+      calledServer,
+      secretsUsed: secrets,
+    };
   } catch (error) {
     if (error instanceof ConnectorError) {
       return { error: error.code, calledServer, secretsUsed: secrets };
     }
     throw error;
   }
+}
+
+/** Whether the connector makes the change: it disables and enables accounts, or invites. */
+function canMake(connector: Connector, { action }: AccountChange): boolean {
+  return action === "invite" ? canInvite(connector) : canChangeAccounts(connector);
+}
+
+/**
+ * Makes the change in one call and tells whether it read back: the member's new status, or for an
+ * invite, the invitation or the email's member, which the session checks. Success is what is read
+ * back, never a call that went through.
+ */
+async function makeChange(
+  session: ConnectorSession,
+  change: AccountChange,
+): Promise<{ readBack: boolean; connection?: ConnectionUpdate }> {
+  if (change.action === "invite") {
+    return { ...(await session.invite!(change.email)), readBack: true };
+  }
+  // A Disable or Enable always copies the member's source key.
+  const account = { sourceKey: change.sourceKey!, email: change.email };
+  const { status, connection } = await session.runAction!(change.action, account);
+  return { readBack: status === statusAfter(change.action), connection };
 }
 
 /** Saves what the answer renewed, unless a reconnect replaced the secrets its call used meanwhile. */
@@ -214,8 +248,11 @@ async function finishSucceeded(
   change: AccountChange,
 ): Promise<boolean> {
   return transact(async (tx) => {
-    // The lock scans take first: a scan deleting the account also locks this change.
-    await appAccountRepository(tx).lockForSync();
+    // The lock scans take first: a scan deleting the account also locks this change. An invite,
+    // or a change whose account a scan deleted, has no account to wait for.
+    if (change.appAccountId) {
+      await appAccountRepository(tx).lockForSync();
+    }
     const changes = accountChangeRepository(tx);
     if ((await changes.lockById(change.id))?.status !== "running") {
       return false;

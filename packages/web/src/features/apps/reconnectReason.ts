@@ -64,8 +64,11 @@ export function foundLine({
   }
   const { employee, email, action } = foundByChange;
   const name = employee ? `${employee.firstName} ${employee.lastName}` : email;
-  return t(
-    action === "SUSPEND" ? "apps.reconnect.foundByDisable" : "apps.reconnect.foundByEnable",
-    { name, when },
-  );
+  return t(FOUND_BY[action], { name, when });
 }
+
+const FOUND_BY = {
+  SUSPEND: "apps.reconnect.foundByDisable",
+  REACTIVATE: "apps.reconnect.foundByEnable",
+  INVITE: "apps.reconnect.foundByInvite",
+} as const;

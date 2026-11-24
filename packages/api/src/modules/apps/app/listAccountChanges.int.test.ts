@@ -40,6 +40,38 @@ test("lists every Disable and Enable newest first with its outcome", async ({ or
   ]);
 });
 
+test("lists Ivan's invite beside a Disable, newest first", async ({ orm, seed }) => {
+  const source = await changeSource(seed);
+  const account = await seed.appAccount({ appId: source.appId });
+  const disable = await seed.accountChange({
+    ...source,
+    appAccountId: account.id,
+    email: account.email,
+    requestedAt: new Date("2026-03-01"),
+  });
+  const invite = await seed.accountChange({
+    ...source,
+    email: "ivan@acme.example",
+    appAccountId: null,
+    sourceKey: null,
+    action: "invite",
+    requestedAt: new Date("2026-03-02"),
+  });
+
+  const { edges } = await accountChanges(orm).listAccountChanges(OWNER, {});
+
+  expect(edges.map(({ node }) => node)).toMatchObject([
+    {
+      id: invite.id,
+      action: "invite",
+      email: "ivan@acme.example",
+      appAccountId: null,
+      appId: source.appId,
+    },
+    { id: disable.id, action: "suspend", appAccountId: account.id },
+  ]);
+});
+
 test("keeps the app and email of a change whose app account was deleted", async ({ orm, seed }) => {
   const source = await changeSource(seed);
   const change = await seed.accountChange({

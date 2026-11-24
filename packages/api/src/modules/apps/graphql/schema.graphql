@@ -47,7 +47,7 @@ type AppUser {
   latestChange: AccountChange
 }
 
-"One Disable or Enable of one app account, from the owner's click to its result."
+"One Disable or Enable of one app account, or one Invite of an employee to an app, from the owner's click to its result."
 type AccountChange {
   id: ID!
   action: AccountChangeAction!
@@ -56,7 +56,7 @@ type AccountChange {
   changesAhead: Int
   "When it stopped running; null while it runs."
   finishedAt: DateTime
-  "The account's email, lowercased, copied when the owner asked; it stays after a scan deletes the account."
+  "The account's email, or the invited employee's, lowercased, copied when the owner asked; it stays after a scan deletes the account."
   email: String!
   "The account's app."
   app: App!
@@ -107,21 +107,23 @@ type AccountChangeConnection {
   pageInfo: PageInfo!
 }
 
-"What an account change does in the app; the UI says Disable and Enable."
+"What an account change does in the app; the UI says Disable, Enable and Invite."
 enum AccountChangeAction {
   "Disable: suspend the account."
   SUSPEND
   "Enable: make the account active again."
   REACTIVATE
+  "Invite: the app sends its own invitation to the employee's email, as a regular member."
+  INVITE
 }
 
 "Where an account change is."
 enum AccountChangeStatus {
   "Waiting for its turn, or running."
   RUNNING
-  "The connector read the account's new status back."
+  "The connector read the account's new status back, or for an invite, the invitation or the email's member."
   SUCCEEDED
-  "Broccoli Access could not confirm the new status in the app; the saved account status did not change."
+  "Broccoli Access could not confirm the change in the app; the saved account status did not change."
   FAILED
   "It had failed, and the owner made the change in the app themselves."
   DONE_BY_HAND
@@ -148,7 +150,7 @@ type ReconnectReason {
   cause: ReconnectCause!
   "When a scan or an account change found it."
   foundAt: DateTime!
-  "The Disable or Enable that found it; null when a scan did."
+  "The Disable, Enable or Invite that found it; null when a scan did."
   foundByChange: AccountChange
 }
 
@@ -162,10 +164,27 @@ enum ReconnectCause {
   WRONG_WORKSPACE
 }
 
-# Adds the person's app accounts to the employees module's Employee; the server merges the types.
+# Adds the person's app accounts and invites to the employees module's Employee; the server merges the types.
 type Employee {
   "Their accounts in approved apps other than the directory, leaving out those not in their app (`inApp` false): the active ones, and the suspended ones in connected apps, by app name. Admins only."
   appAccounts: [AppUser!]!
+  "The apps whose connection invites and whose last scan found no member with their email, where Invite or Reconnect is offered or an invite was asked, by app name. Admins only."
+  appInvites: [AppInvite!]!
+}
+
+"An employee's invite to an app they have no account in: offered, running, done or failed."
+type AppInvite {
+  "Unique per employee and app."
+  id: ID!
+  app: App!
+  "Whether an invite is accepted now: the employee is active in the directory, the app's connection is connected, no invite runs and they are not invited. After a failed invite, the row shows Try again only where trying again can help."
+  offered: Boolean!
+  "Whether its row shows Reconnect instead of Invite: it would offer one, but the app's connection needs reconnecting."
+  offersReconnect: Boolean!
+  "When the employee was invited, while the row shows Invited: the finish of the latest invite once it succeeded or was done by hand; null otherwise. The next scan that finds their member ends the row."
+  invitedAt: DateTime
+  "Its latest invite; null before the first."
+  latestInvite: AccountChange
 }
 
 "Since when someone has had an account, as far as the sources know: when they granted access; before the log began, for a grant older than the log; otherwise when a scan first saw the account."
@@ -220,7 +239,15 @@ input AppIgnoreInput {
 input AppUserChangeInput {
   "The app account's id, as its AppUser has it."
   id: ID!
+  "SUSPEND or REACTIVATE; an account never offers INVITE."
   action: AccountChangeAction!
+}
+
+input AppInviteInput {
+  "The employee to invite."
+  employeeId: ID!
+  "The app to invite them to, through its connection."
+  appId: ID!
 }
 
 input AccountChangeMarkDoneByHandInput {
@@ -242,7 +269,9 @@ type AppsMutations {
   finishSetup(input: SetupFinishInput!): SetupFinishPayload!
   "Disables or enables an app account in its app: queues the change, which runs on the server one per connection at a time, in the order asked, and returns the account with it as its latest change. Refused with a NotFoundError for an unknown account, and a ConflictError when the account does not offer this action now (`offeredChange`). Admins only."
   changeAccount(input: AppUserChangeInput!): AppUserChangePayload!
-  "I did it by hand: the owner reports making a failed change in the app themselves; Broccoli Access calls no app. The change becomes DONE_BY_HAND and the status Broccoli Access records for the account takes the new value at once, with a history line unless it already had that status; the next scan checks it. Refused with a NotFoundError for an unknown change, and a ConflictError unless it failed and is its account's latest. Admins only."
+  "Invites an employee to an app they have no account in: queues the invite like a Disable, and returns their invite row with it as its latest invite. The app sends its own invitation; an email that already has a member or an invitation gets none. Refused with a NotFoundError for an unknown employee or app, and a ConflictError when the row does not offer Invite now (`offered`). Admins only."
+  inviteEmployee(input: AppInviteInput!): AppInvitePayload!
+  "I did it by hand: the owner reports making a failed change in the app themselves; Broccoli Access calls no app. The change becomes DONE_BY_HAND and the status Broccoli Access records for the account takes the new value at once, with a history line unless it already had that status; the next scan checks it. A failed invite becomes DONE_BY_HAND, which shows the employee Invited. Refused with a NotFoundError for an unknown change, and with a ConflictError unless the change failed and is the latest: its account's latest change, or for an invite, the latest invite of its connection and email. Admins only."
   markAccountChangeDoneByHand(
     input: AccountChangeMarkDoneByHandInput!
   ): AccountChangeMarkDoneByHandPayload!
@@ -272,13 +301,23 @@ type AppUserChangePayload {
 
 union AppUserChangeError = NotFoundError | ConflictError
 
-"The account with its change done by hand, or why it was refused; the account is null for one that belongs to no employee."
+"The account with its change done by hand, or why it was refused; the account is null for one that belongs to no employee, and for an invite."
 type AccountChangeMarkDoneByHandPayload {
   appUser: AppUser
+  "The change, now DONE_BY_HAND."
+  accountChange: AccountChange
   error: AccountChangeMarkDoneByHandError
 }
 
 union AccountChangeMarkDoneByHandError = NotFoundError | ConflictError
+
+"The employee's invite row with the invite queued, or why it was refused."
+type AppInvitePayload {
+  appInvite: AppInvite
+  error: AppInviteError
+}
+
+union AppInviteError = NotFoundError | ConflictError
 
 "Setup once finished, or why it was refused."
 type SetupFinishPayload {
@@ -295,7 +334,7 @@ type Query {
   apps(status: AppStatus!, "Page size, 1 to 10000." first: Int = 100, after: String): AppConnection!
   "How many apps have each status. Admins only."
   appCounts: AppCounts!
-  "Every Disable and Enable, newest first, one page at a time. Admins only."
+  "Every Disable, Enable and Invite, newest first, one page at a time. Admins only."
   accountChanges("Page size, 1 to 10000." first: Int = 100, after: String): AccountChangeConnection!
 }
 

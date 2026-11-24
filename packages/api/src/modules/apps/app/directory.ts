@@ -1,4 +1,4 @@
-import type { Connector } from "../../../core/connectors";
+import type { AccountStatus, Connector } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import { appAccountRepository, appConnectionRepository } from "../db";
 
@@ -22,11 +22,12 @@ export async function findDirectoryAppId(
   return connection?.appId ?? null;
 }
 
-/** The employees whose account in the directory's app is suspended. */
-export async function findEmployeesSuspendedInDirectory(
+/** The employees whose account in the directory's app has `status`; only those of `among` when given. */
+export async function findEmployeesInDirectory(
   db: Orm | Tx,
   connectors: DirectoryConnectors,
+  { status, among }: { status: AccountStatus; among?: readonly string[] },
 ): Promise<string[]> {
   const appId = await findDirectoryAppId(db, connectors);
-  return appId ? appAccountRepository(db).findSuspendedEmployeeIds(appId) : [];
+  return appId ? appAccountRepository(db).findEmployeeIdsWithStatus(appId, status, among) : [];
 }
