@@ -34,6 +34,7 @@ export interface AccountLinkService {
 export interface AccountWithoutPerson {
   id: string;
   app: App;
+  appId: string;
   email: string;
   displayName: string | null;
   suggestedEmployeeId: string | null;
@@ -79,6 +80,7 @@ export function createAccountLinkService(
             node: {
               id,
               app,
+              appId: app.id,
               email,
               displayName,
               suggestedEmployeeId: suggest({ email, displayName }),
