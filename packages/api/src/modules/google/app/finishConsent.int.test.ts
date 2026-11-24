@@ -118,7 +118,7 @@ test("accepts Google's full names for the email and profile scopes", async ({
 
 test("refuses a non-admin consent without writing anything", async ({ orm, fakeGoogle }) => {
   const { jobs, sent } = recordingJobQueue();
-  const { connection, input } = await googleSetup(orm, fakeGoogle.url, jobs);
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url, { jobs });
   const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
   const callback = await consentAtGoogle(authorizationUrl, { account: "chloe@acme.example" });
 
@@ -137,7 +137,7 @@ test("refuses a non-admin consent without writing anything", async ({ orm, fakeG
 
 test("consent creates a scanning source and queues its first scan", async ({ orm, fakeGoogle }) => {
   const { jobs, sent } = recordingJobQueue();
-  const { connection, input } = await googleSetup(orm, fakeGoogle.url, jobs);
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url, { jobs });
   const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
   const callback = await consentAtGoogle(authorizationUrl);
 

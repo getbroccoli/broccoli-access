@@ -3,11 +3,14 @@ query ConnectionsSettings {
     id
     googleWorkspace {
       id
+      googleApp
+      clientId
       domain
       adminEmail
       scan {
         id
         status
+        failure
         readAt
       }
     }

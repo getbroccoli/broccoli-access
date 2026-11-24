@@ -14,7 +14,8 @@ export const setupEn = {
     "Broccoli Access reads your people and the apps they signed in to with Google. It only reads: nothing changes in Google.",
   "setup.connect.howToConnect": "How to connect",
   "setup.connect.broccoliApp": "Use the Broccoli app",
-  "setup.connect.broccoliAppHint": "One click, nothing to set up in Google Cloud.",
+  "setup.connect.broccoliAppHint":
+    "Nothing to set up in Google Cloud. Google’s keys pass through Broccoli’s relay; your directory data goes straight to this server.",
   "setup.connect.comingSoon": "Coming soon",
   "setup.connect.ownApp": "Use your own Google app",
   "setup.connect.ownAppHint":
@@ -42,12 +43,12 @@ export const setupEn = {
   "setup.connect.submitHint":
     "Sign in with a super admin account. Google asks you to allow read access to users, their app access and sign-in logs.",
   "setup.connect.startFailed":
-    "Couldn’t open Google. Check the client ID and secret and try again.",
+    "Couldn’t open Google. Try again. If using your own app, check its client ID and secret.",
   "setup.connect.cancelled": "You cancelled at Google. Connect again when you’re ready.",
   "setup.connect.notSuperAdmin":
     "That Google account isn’t a super admin. Sign in with a super admin account.",
   "setup.connect.failed": "Couldn’t connect Google Workspace. Try again.",
-  "setup.connect.loadFailed": "Couldn’t load the redirect address.",
+  "setup.connect.loadFailed": "Couldn’t load the Google connection options.",
   "setup.connect.retry": "Retry",
   "setup.scan.title": "Scan your workspace",
   "setup.scan.heading": "Scanning {domain}",

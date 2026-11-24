@@ -6,6 +6,7 @@ import {
 } from "../../../core/connectors";
 import {
   createGoogleClient,
+  createGoogleRelayClient,
   type GoogleClient,
   type GoogleToken,
   type GoogleUser,
@@ -27,6 +28,7 @@ export function createGoogleWorkspaceConnector(addresses: {
   openIdConfigurationUrl: string;
   /** `GOOGLE_ADMIN_API_URL`. */
   adminApiUrl: string;
+  relayUrl?: string;
 }): Connector {
   const google = createGoogleClient(addresses);
   return {
@@ -45,11 +47,20 @@ export function createGoogleWorkspaceConnector(addresses: {
     settings: GOOGLE_WORKSPACE_SETTINGS,
     secrets: GOOGLE_WORKSPACE_SECRETS,
     async openSession(connection) {
-      const { clientId, previousClientIds } = parseGoogleWorkspaceSettings(connection.settings);
-      const secrets = GOOGLE_WORKSPACE_SECRETS.parse(connection.secrets);
-      const accessToken = await asConnectorError(signInError, async () =>
-        google.refreshAccessToken(await google.discover(), { clientId, ...secrets }),
+      const { clientId, previousClientIds, googleApp } = parseGoogleWorkspaceSettings(
+        connection.settings,
       );
+      const secrets = GOOGLE_WORKSPACE_SECRETS.parse(connection.secrets);
+      const accessToken = await asConnectorError(signInError, async () => {
+        if (googleApp === "broccoli_google_app") {
+          if (!addresses.relayUrl) throw new TypeError("The Google relay is unavailable");
+          return createGoogleRelayClient(addresses.relayUrl).refresh(secrets.refreshToken);
+        }
+        return google.refreshAccessToken(await google.discover(), {
+          clientId,
+          ...GOOGLE_WORKSPACE_SECRETS.required().parse(secrets),
+        });
+      });
       const readGrantLog = onceUntilRead(() =>
         grantLogSince(google, accessToken, new Date(Date.now() - GRANT_LOG_MS)),
       );

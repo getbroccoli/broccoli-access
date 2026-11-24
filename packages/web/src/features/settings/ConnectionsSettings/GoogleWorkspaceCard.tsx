@@ -14,6 +14,7 @@ type Props = {
 /** The Google Workspace connection: who connected it with which Google app, and its last scan. */
 export function GoogleWorkspaceCard({ connection }: Props) {
   const [scanNow, { loading, error }] = usePayloadMutation(ScanNowDocument);
+  const needsReconnect = connection.scan?.failure === "AUTHENTICATION_FAILED";
   const isScanning = connection.scan?.status === "SCANNING";
 
   return (
@@ -33,7 +34,7 @@ export function GoogleWorkspaceCard({ connection }: Props) {
             {t("settings.connections.googleWorkspace")}
           </h3>
           <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
-            {t("settings.connections.connected")}
+            {needsReconnect ? t("apps.reconnect.button") : t("settings.connections.connected")}
           </span>
         </div>
         <p className="text-sm text-foreground/80">
@@ -42,11 +43,20 @@ export function GoogleWorkspaceCard({ connection }: Props) {
             email: connection.adminEmail,
           })}
         </p>
+        <p className="break-all text-sm text-muted-foreground">
+          {connection.googleApp === "BROCCOLI_GOOGLE_APP"
+            ? t("settings.connections.broccoliApp")
+            : t("settings.connections.ownApp", { clientId: connection.clientId })}
+        </p>
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {isScanning ? t("scans.scanning") : formatLastScan(connection.scan?.readAt ?? null)}
         </p>
         {connection.scan?.status === "SCAN_FAILED" && (
-          <p className="text-sm text-destructive">{t("settings.connections.scanFailed")}</p>
+          <p className="text-sm text-destructive">
+            {needsReconnect
+              ? t("settings.connections.googleReconnect")
+              : t("settings.connections.scanFailed")}
+          </p>
         )}
         {error && (
           <p role="alert" className="text-sm text-destructive">
@@ -72,7 +82,7 @@ export function GoogleWorkspaceCard({ connection }: Props) {
           to="/settings/connections/google-app"
           className={cn(buttonVariants({ variant: "outline", size: "lg" }), "px-4")}
         >
-          {t("settings.connections.changeApp")}
+          {needsReconnect ? t("apps.reconnect.button") : t("settings.connections.changeApp")}
         </Link>
       </div>
     </article>

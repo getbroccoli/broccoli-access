@@ -33,11 +33,12 @@ export function googleRouter(
   const { resolveSecurity, publicOrigin } = http;
   return Router()
     .post("/google/connect", express.json({ limit: MAX_BODY_BYTES }), async (request, response) => {
-      const { clientId, clientSecret } = CONNECTION_START.parse(request.body ?? {});
+      const { clientId, clientSecret, googleApp } = CONNECTION_START.parse(request.body ?? {});
       try {
         const security = await requireSecurity(resolveSecurity, request, NOT_SETUP_HOLDER);
         response.json(
           await connection.startConnection(security, {
+            googleApp,
             clientId,
             clientSecret,
             publicOrigin: await publicOrigin(request),
@@ -96,6 +97,7 @@ const SIGN_IN_COOKIE = "broccoli_access_google_sign_in";
 const CHANGE_APP_COOKIE = "broccoli_access_google_change_app";
 
 const CONNECTION_START = z.object({
+  googleApp: z.enum(["own_google_app", "broccoli_google_app"]).default("own_google_app"),
   clientId: z.string().catch(""),
   clientSecret: z.string().catch(""),
 });
@@ -103,6 +105,7 @@ const CONNECTION_START = z.object({
 /** Google's redirect: a code, or an error such as `access_denied` when the person cancels. */
 const CONSENT_ANSWER = z.object({
   code: z.string().optional().catch(undefined),
+  handle: z.string().optional().catch(undefined),
   state: z.string().optional().catch(undefined),
   error: z.string().optional().catch(undefined),
 });
@@ -151,9 +154,13 @@ async function finishConsent(
   { request, response, answer }: Callback,
 ): Promise<void> {
   const { resolveSecurity, publicOrigin, startSession } = http;
-  if (answer.code === undefined || answer.state === undefined) {
+  if (
+    (answer.code === undefined && answer.handle === undefined) ||
+    answer.state === undefined ||
+    answer.error !== undefined
+  ) {
     const failure = cancelledOrFailed(answer);
-    logger.info({ failure }, "Google consent ended without a code");
+    logger.info({ failure }, "Google consent ended without an answer");
     sendBackToConnect(response, failure);
     return;
   }
@@ -161,6 +168,7 @@ async function finishConsent(
     const security = await requireSecurity(resolveSecurity, request, NOT_SETUP_HOLDER);
     const { userId } = await connection.finishConsent(security, {
       code: answer.code,
+      handle: answer.handle,
       state: answer.state,
       publicOrigin: await publicOrigin(request),
       setupToken: readSetupToken(request.headers.cookie),
@@ -182,15 +190,20 @@ async function finishSignIn(
 ): Promise<void> {
   const origin = await http.publicOrigin(request);
   response.clearCookie(SIGN_IN_COOKIE, consentCookie(origin));
-  if (answer.code === undefined || answer.state === undefined) {
+  if (
+    (answer.code === undefined && answer.handle === undefined) ||
+    answer.state === undefined ||
+    answer.error !== undefined
+  ) {
     const failure = cancelledOrFailed(answer);
-    logger.info({ failure }, "Google sign-in ended without a code");
+    logger.info({ failure }, "Google sign-in ended without an answer");
     sendBackToLogin(response, failure);
     return;
   }
   try {
     const { userId } = await signIn.finishSignIn({
       code: answer.code,
+      handle: answer.handle,
       state: answer.state,
       publicOrigin: origin,
       browserToken: parseCookies(request.headers.cookie ?? "").get(SIGN_IN_COOKIE) ?? null,
@@ -212,11 +225,12 @@ async function startAppChange(
   request: Request,
   response: Response,
 ): Promise<void> {
-  const { clientId, clientSecret } = CONNECTION_START.parse(request.body ?? {});
+  const { clientId, clientSecret, googleApp } = CONNECTION_START.parse(request.body ?? {});
   try {
     const security = await requireSecurity(http.resolveSecurity, request, NOT_OWNER);
     const origin = await http.publicOrigin(request);
     const { authorizationUrl, browserToken } = await connection.startAppChange(security, {
+      googleApp,
       clientId,
       clientSecret,
       publicOrigin: origin,
@@ -236,9 +250,13 @@ async function finishAppChange(
 ): Promise<void> {
   const origin = await http.publicOrigin(request);
   response.clearCookie(CHANGE_APP_COOKIE, consentCookie(origin));
-  if (answer.code === undefined || answer.state === undefined) {
+  if (
+    (answer.code === undefined && answer.handle === undefined) ||
+    answer.state === undefined ||
+    answer.error !== undefined
+  ) {
     const failure = cancelledOrFailed(answer);
-    logger.info({ failure }, "Google app change ended without a code");
+    logger.info({ failure }, "Google app change ended without an answer");
     sendBackToAppChange(response, failure);
     return;
   }
@@ -246,6 +264,7 @@ async function finishAppChange(
     const security = await requireSecurity(http.resolveSecurity, request, NOT_OWNER);
     await connection.finishAppChange(security, {
       code: answer.code,
+      handle: answer.handle,
       state: answer.state,
       publicOrigin: origin,
       browserToken: parseCookies(request.headers.cookie ?? "").get(CHANGE_APP_COOKIE) ?? null,

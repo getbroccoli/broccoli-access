@@ -2,6 +2,11 @@ import { ACME } from "@broccoli-access/fake-apps";
 import { onTestFinished } from "vitest";
 
 import {
+  GOOGLE_RELAY_URL,
+  SHARED_GOOGLE_APP,
+  SHARED_CLIENT_ID,
+  GOOGLE_SCOPES,
+  stubGoogleRelay,
   expect,
   test as baseTest,
   connectorContract,
@@ -204,3 +209,65 @@ test("a retried page reads only the tokens lists that failed", async ({
   );
   expect(readsPerUser.sort()).toEqual([1, 1, 2]);
 });
+
+test.for([
+  { failure: "invalid_grant", expected: "authentication_failed" },
+  { failure: "oauth", expected: "app_unavailable" },
+  { failure: "network", expected: "app_unavailable" },
+])(
+  "classifies shared refresh failure $failure as $expected",
+  async ({ failure, expected }, { fakeGoogle }) => {
+    const relay = stubGoogleRelay();
+    relay.refresh.mockImplementation(() => {
+      if (failure === "network") throw new TypeError("fetch failed");
+      return Response.json(
+        { ok: false, error: failure },
+        { status: failure === "oauth" ? 502 : 400 },
+      );
+    });
+    const connector = relayConnector(fakeGoogle.url);
+
+    await expect(
+      connector.openSession({
+        settings: SHARED_SETTINGS,
+        secrets: { refreshToken: "acme-refresh" },
+      }),
+    ).rejects.toMatchObject({ code: expected });
+
+    expect(relay.requests.map(({ url }) => url)).toEqual([GOOGLE_RELAY_URL + "/google/refresh"]);
+  },
+);
+
+test("an own-app connection missing its client secret cannot refresh through the relay", async ({
+  fakeGoogle,
+}) => {
+  const relay = stubGoogleRelay();
+  const connector = relayConnector(fakeGoogle.url);
+
+  await expect(
+    connector.openSession({
+      settings: { ...SHARED_SETTINGS, googleApp: "own_google_app" },
+      secrets: { refreshToken: "acme-refresh" },
+    }),
+  ).rejects.toThrow();
+
+  expect(relay.requests).toEqual([]);
+});
+
+const SHARED_SETTINGS = {
+  ...SHARED_GOOGLE_APP,
+  clientId: SHARED_CLIENT_ID,
+  domain: "acme.example",
+  organizationName: "Acme",
+  adminEmail: "admin@acme.example",
+  grantedScopes: GOOGLE_SCOPES,
+  previousClientIds: [],
+};
+
+function relayConnector(googleUrl: string) {
+  return createGoogleWorkspaceConnector({
+    openIdConfigurationUrl: googleUrl + "/.well-known/openid-configuration",
+    adminApiUrl: googleUrl,
+    relayUrl: GOOGLE_RELAY_URL,
+  });
+}

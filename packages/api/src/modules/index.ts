@@ -37,6 +37,7 @@ export interface ModuleSettings {
   googleAdminApiUrl: string;
   /** `CONNECTORS_URL`: the connectors container; unset means no app connects through it. */
   connectorsUrl?: string;
+  googleRelayUrl?: string;
 }
 
 /** Every module of the API, each given only the dependencies it uses. */
@@ -47,6 +48,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   const googleAddresses = {
     openIdConfigurationUrl: settings.googleOpenIdConfigurationUrl,
     adminApiUrl: settings.googleAdminApiUrl,
+    relayUrl: settings.googleRelayUrl,
   };
   const { directoryConnectors, containerConnectors, connectors } = createConnectors(
     core,
@@ -111,7 +113,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
 /** Google Workspace, the directory, then the connectors container's, read at start. */
 function createConnectors(
   { logger }: ModuleDependencies,
-  googleAddresses: { openIdConfigurationUrl: string; adminApiUrl: string },
+  googleAddresses: { openIdConfigurationUrl: string; adminApiUrl: string; relayUrl?: string },
   connectorsUrl: string | undefined,
 ) {
   const directoryConnectors = [createGoogleWorkspaceConnector(googleAddresses)];

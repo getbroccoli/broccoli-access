@@ -12,7 +12,7 @@ import { SETUP_HOLDER, SYSTEM } from "./testSecurityContext";
 
 /** Completes real consent, leaving its first scan queued for the test to run. */
 export async function googleScanSetup(orm: Orm, googleUrl: string, jobs?: JobQueue) {
-  const { connection, input } = await googleSetup(orm, googleUrl, jobs);
+  const { connection, input } = await googleSetup(orm, googleUrl, { jobs });
   const { authorizationUrl } = await connection.startConnection(SETUP_HOLDER, input);
   const callback = await consentAtGoogle(authorizationUrl);
   const { userId } = await connection.finishConsent(SETUP_HOLDER, {

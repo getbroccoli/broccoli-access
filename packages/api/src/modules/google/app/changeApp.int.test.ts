@@ -5,29 +5,21 @@ import {
   test,
   EMPLOYEE,
   SYSTEM,
-  googleScanSetup,
-  googleConnection,
   registerGoogleRedirect,
   consentAtGoogle,
   GOOGLE_SCOPES,
   TEST_SECRET_BOX,
-  employeeDirectory,
-  instances,
   recordHistory,
   storedApps,
   storedAppConnections,
-  storedUsers,
-  storedGoogleAccounts,
-  storedEmployees,
   storedAppAccounts,
-  storedImportSources,
-  storedImportRecords,
   storedRecordHistory,
   changeStoredGoogleDomain,
+  connectedWorkspace,
+  storedWorkspace,
 } from "#test/support";
 
 import type { Orm } from "../../../core/db";
-import { PrincipalSecurityContext } from "../../../core/security";
 import { OtherWorkspaceError } from "../domain";
 
 test("changing the Google app replaces credentials and scopes while keeping the owner, apps and people", async ({
@@ -248,50 +240,6 @@ test("refuses starting a Google app change without MANAGE_WORKSPACE", async ({
 
   expect(await storedChangeState(orm)).toEqual(before);
 });
-
-async function connectedWorkspace(orm: Orm, googleUrl: string) {
-  const { ownerUserId, connectionId, sourceId, scans } = await googleScanSetup(orm, googleUrl);
-  await scans.runScan(SYSTEM, sourceId);
-  const ctx = PrincipalSecurityContext.user(
-    {
-      userId: ownerUserId,
-      email: "admin@acme.example",
-      isOwner: true,
-      permissionProfiles: ["EMPLOYEE", "OWNER"],
-      employeeId: null,
-    },
-    employeeDirectory(orm),
-  );
-  const input = {
-    clientId: "replacement-google-client",
-    clientSecret: "replacement-google-secret",
-    publicOrigin: "http://localhost:3000",
-    now: new Date("2026-11-21T12:00:00Z"),
-  };
-  await registerGoogleRedirect(googleUrl, input.publicOrigin, input);
-  return {
-    connection: googleConnection(orm, { googleUrl }),
-    ctx,
-    input,
-    connectionId,
-    ownerUserId,
-    scans,
-    sourceId,
-  };
-}
-
-async function storedWorkspace(orm: Orm) {
-  return {
-    instance: await instances.readInstance(orm),
-    users: await storedUsers(orm),
-    googleAccounts: await storedGoogleAccounts(orm),
-    apps: await storedApps(orm),
-    people: await storedEmployees(orm),
-    appAccounts: await storedAppAccounts(orm),
-    sources: await storedImportSources(orm),
-    records: await storedImportRecords(orm),
-  };
-}
 
 async function storedChangeState(orm: Orm) {
   return {

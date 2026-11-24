@@ -9,7 +9,17 @@ import type { SecretBox } from "../../../core/secrets";
  * browser that started it, so only that browser redeems it: what the consent is for and the ID
  * token's nonce.
  */
-export type ConsentState = WorkspaceConsentState | SignInState | GoogleAppChangeState;
+export type ConsentState =
+  WorkspaceConsentState | SignInState | GoogleAppChangeState | RelayConsentState;
+
+/** The relay's compact state carries the proof needed to redeem its one-use handoff. */
+export interface RelayConsentState {
+  flow: WorkspaceConsentState["flow"] | SignInState["flow"] | GoogleAppChangeState["flow"];
+  googleApp: "broccoli_google_app";
+  nonce: string;
+  codeVerifier: string;
+  expiresAt: number;
+}
 
 /** Setup's consent, carrying the client credentials, which are stored only once it succeeds. */
 export interface WorkspaceConsentState {
@@ -53,12 +63,20 @@ export const CONSENT_LIFETIME_MS = 10 * 60_000;
 export function sealConsentState(
   secretBox: SecretBox,
   state:
-    | Omit<WorkspaceConsentState, "expiresAt">
+    | Omit<WorkspaceConsentState | GoogleAppChangeState, "expiresAt">
     | Omit<SignInState, "expiresAt">
-    | Omit<GoogleAppChangeState, "expiresAt">,
+    | Omit<RelayConsentState, "expiresAt">,
   { browserToken, now }: { browserToken: string; now: Date },
 ): string {
   const expiresAt = now.getTime() + CONSENT_LIFETIME_MS;
+  if ("codeVerifier" in state) {
+    const prefix = RELAY_PREFIXES[state.flow];
+    const sealed = secretBox.encrypt(
+      JSON.stringify([state.nonce, state.codeVerifier, expiresAt]),
+      associatedData(prefix, browserToken),
+    );
+    return `${prefix}${sealed}`;
+  }
   const sealed = secretBox.encrypt(
     JSON.stringify({ ...state, expiresAt }),
     associatedData(state.flow, browserToken),
@@ -68,6 +86,9 @@ export function sealConsentState(
 
 /** The flow `sealed` says it is for, unverified: only to choose the use case that opens it. */
 export function consentFlowOf(sealed: string): string {
+  for (const [flow, prefix] of Object.entries(RELAY_PREFIXES)) {
+    if (sealed.startsWith(prefix)) return flow;
+  }
   return sealed.slice(0, Math.max(sealed.indexOf(FLOW_SEPARATOR), 0));
 }
 
@@ -81,15 +102,31 @@ export function openConsentState(
   { browserToken, now }: { browserToken: string; now: Date },
 ): ConsentState | null {
   const flow = consentFlowOf(sealed);
-  let plaintext: string;
   try {
+    const prefix = RELAY_PREFIXES[flow as RelayConsentState["flow"]];
+    if (prefix && sealed.startsWith(prefix)) {
+      const plaintext = secretBox.decrypt(
+        sealed.slice(prefix.length),
+        associatedData(prefix, browserToken),
+      );
+      const [nonce, codeVerifier, expiresAt] = RELAY_STATE.parse(JSON.parse(plaintext));
+      return expiresAt > now.getTime()
+        ? {
+            flow: flow as RelayConsentState["flow"],
+            googleApp: "broccoli_google_app",
+            nonce,
+            codeVerifier,
+            expiresAt,
+          }
+        : null;
+    }
     const encrypted = sealed.slice(flow.length + FLOW_SEPARATOR.length);
-    plaintext = secretBox.decrypt(encrypted, associatedData(flow, browserToken));
+    const plaintext = secretBox.decrypt(encrypted, associatedData(flow, browserToken));
+    const state = CONSENT_STATE.parse(JSON.parse(plaintext));
+    return state.expiresAt > now.getTime() ? state : null;
   } catch {
     return null;
   }
-  const state = CONSENT_STATE.parse(JSON.parse(plaintext));
-  return state.expiresAt > now.getTime() ? state : null;
 }
 
 /** A random token for a consent's nonce or the browser a state is bound to. */
@@ -132,3 +169,11 @@ const CONSENT_STATE = z.discriminatedUnion("flow", [
     expiresAt: z.number(),
   }),
 ]);
+
+/** Short prefixes keep relay states URL-safe and below its 256-character limit. */
+const RELAY_PREFIXES = {
+  connect_google_workspace: "r0_",
+  sign_in_with_google: "r1_",
+  change_google_app: "r2_",
+} as const;
+const RELAY_STATE = z.tuple([z.string(), z.string(), z.number()]);

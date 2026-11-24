@@ -1,6 +1,7 @@
 query ConnectGoogle {
   setup {
     id
+    broccoliGoogleAppAvailable
     googleRedirectAddress
   }
 }

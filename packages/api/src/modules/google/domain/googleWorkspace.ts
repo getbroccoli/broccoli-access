@@ -31,8 +31,8 @@ export const GOOGLE_WORKSPACE_SCOPES = [
 
 /** The Google Workspace connection's settings; its client secret and refresh token are its secrets. */
 export interface GoogleWorkspaceSettings {
-  /** Whose Google app reads the workspace; a later circle adds Broccoli's own. */
-  googleApp: "own_google_app";
+  /** Whose Google app reads the workspace. */
+  googleApp: "own_google_app" | "broccoli_google_app";
   clientId: string;
   domain: string;
   organizationName: string;
@@ -52,7 +52,7 @@ export function parseGoogleWorkspaceSettings(settings: unknown): GoogleWorkspace
 
 /** The settings as stored: what the connector needs and Settings shows, never a secret. */
 export const GOOGLE_WORKSPACE_SETTINGS = z.object({
-  googleApp: z.literal("own_google_app"),
+  googleApp: z.enum(["own_google_app", "broccoli_google_app"]),
   clientId: z.string(),
   domain: z.string(),
   organizationName: z.string(),
@@ -64,7 +64,7 @@ export const GOOGLE_WORKSPACE_SETTINGS = z.object({
 
 /** The connection's secrets, stored encrypted: the Google app's client secret and the admin's refresh token. */
 export const GOOGLE_WORKSPACE_SECRETS = z.object({
-  clientSecret: z.string(),
+  clientSecret: z.string().optional(),
   refreshToken: z.string(),
 });
 

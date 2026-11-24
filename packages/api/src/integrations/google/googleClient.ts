@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { imageTypeOf, type ImageType } from "../../utils";
 import { bearer, fetchGoogleJson, fetchRequired } from "./fetchGoogleJson";
+import { shortScopeName } from "./shortScopeName";
 import { type GoogleGrantEventPage, readGrantEventPage } from "./grantEventPage";
 
 /** Google's OAuth 2.0, OpenID Connect and Directory endpoints, at the addresses the settings give. */
@@ -252,12 +253,6 @@ const TOKEN_LIST = z.object({ items: z.array(z.record(z.string(), z.unknown())).
 
 const TOKEN = z.object({ clientId: z.string(), displayText: z.string().optional() });
 
-/** Google's token response names the `email` and `profile` scopes by their full names. */
-const SHORT_SCOPE_NAMES: Partial<Record<string, string>> = {
-  "https://www.googleapis.com/auth/userinfo.email": "email",
-  "https://www.googleapis.com/auth/userinfo.profile": "profile",
-};
-
 async function readUserPage(
   directoryUrl: (path: string) => URL,
   accessToken: string,
@@ -291,10 +286,6 @@ function parsePhoto({ mimeType, photoData }: z.infer<typeof USER_PHOTO>): Google
     throw new Error("The photo's bytes are not the image type Google declares");
   }
   return { content, mimeType: type };
-}
-
-function shortScopeName(scope: string): string {
-  return SHORT_SCOPE_NAMES[scope] ?? scope;
 }
 
 function toGoogleToken(token: z.infer<typeof TOKEN>, raw: Record<string, unknown>): GoogleToken {

@@ -2,6 +2,8 @@
 type Setup {
   "Where Google sends the admin back after consent; the admin registers it as their Google app's redirect address."
   googleRedirectAddress: String!
+  "Whether this instance can connect through the shared Broccoli Google app."
+  broccoliGoogleAppAvailable: Boolean!
   "The connected Google organisation's name, which the sign-in page shows; null before Google Workspace is connected."
   organizationName: String
   "The connected Google organisation's primary domain, such as `acme.example`, which the sign-in page shows; null before Google Workspace is connected."
@@ -10,12 +12,20 @@ type Setup {
   googleWorkspace: GoogleWorkspaceConnection
 }
 
-"Google Workspace, connected with the instance's own Google app."
+"The connected Google Workspace and the Google app it uses."
 type GoogleWorkspaceConnection {
   id: ID!
+  googleApp: GoogleApp!
+  "The Google app used by this connection; never a secret."
+  clientId: String!
   "The workspace's primary domain, such as `acme.example`."
   domain: String!
   organizationName: String!
   "The super admin who connected it."
   adminEmail: String!
+}
+
+enum GoogleApp {
+  OWN_GOOGLE_APP
+  BROCCOLI_GOOGLE_APP
 }

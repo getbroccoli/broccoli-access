@@ -30,7 +30,7 @@ The first real run is on our own company.
 
 ## Principles
 
-- **Your data stays with you.** Data goes straight from Google and each app to your server. App keys, sessions and the integration user's secrets are stored there, encrypted.
+- **Your data stays with you.** Data goes straight from Google and each app to your server. App keys, sessions and the integration user's secrets are stored there, encrypted. With the Broccoli Google app, Google’s tokens pass through Broccoli’s relay for consent and refresh; directory data still goes straight from Google to your server. Using your own Google app bypasses the relay.
 - **Read before write.** Setup only reads. One Google permission it needs could also revoke an app's grant; broccoli-access never uses it for that. broccoli-access asks Google for write access at the moment the owner first uses a feature that needs it, and only for that feature.
 - **A person starts every change.** Every change in an app is one the owner starts and confirms. It is checked in the app afterwards and kept in history.
 - **Never get around an app's security.** A connector never hides that it is automated, and never bypasses a CAPTCHA or a bot check. When an app stops it, a person takes over. The integration user passes its own two-step sign-in with its own secret; that is signing in, not getting around.

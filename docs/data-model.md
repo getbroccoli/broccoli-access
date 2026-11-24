@@ -111,10 +111,11 @@ One row per connected app. It replaces Broccoli's `slack_connection`.
 - `encrypted_secrets`: the connector's secrets as one JSON object, encrypted with the connection's id as associated data, so a secret copied into another row does not decrypt.
 - `connected_at`.
 - Google Workspace:
-  - `settings` holds `googleApp` (`own_google_app`; a later circle adds `broccoli_google_app`), `clientId`, `domain`, `organizationName`, `adminEmail`, `grantedScopes`.
-  - The secrets are the client secret and the refresh token.
+  - `settings` holds `googleApp` (`own_google_app` or `broccoli_google_app`), `clientId`, `domain`, `organizationName`, `adminEmail`, `grantedScopes`, `previousClientIds`.
+  - Own-app secrets are `{ clientSecret, refreshToken }`. Broccoli-app secrets are `{ refreshToken }` only; its client secret stays on the relay. Both are encrypted.
+  - Switching apps updates the same connection and preserves its people, apps and owner. `previousClientIds` keeps old app IDs so scans exclude their grants along with the current app.
   - The organisation name is shown in the sidebar. There is no logo; the sidebar shows its initial.
-  - The row is written when the admin's consent comes back. Until then, the client ID and secret travel in the encrypted OAuth state.
+  - The row is written when verified consent comes back. Own-app credentials travel in encrypted OAuth state until then; Broccoli-app state carries a nonce and a handoff proof, and its client ID comes from the redeemed grant.
 
 ```json
 [
@@ -289,7 +290,7 @@ Every app a source found, and the connected apps themselves.
 
   In cases 2 to 4, the id is added to the app's `external_ids`, and a catalog app is created if missing. A record without an `appExternalId` belongs to its connection's app.
 
-- A Google grant to the instance's own Google app (the Google Workspace connection's `clientId`) is skipped: broccoli-access is not one of the company's apps.
+- A Google grant to any Google app used by the instance (the connection's `clientId` and `previousClientIds`) is skipped: broccoli-access is not one of the company's apps.
 - `status`: `discovered`, `approved`, `ignored`.
   - A connected app is `approved` when it is connected.
   - A found app starts `discovered`.
@@ -926,7 +927,6 @@ These are planned, not built yet. Each is added to the sections above when its c
 - Apps added by hand: no catalog key and no external ids.
 - Robots and the owner's-browser runtime: `screenshot_file_id` on account changes, kept in `files`, and the one-time owner-browser addresses, held in memory.
 - More apps from the connectors container (Notion, Figma, Claude, Codex): one connector key each, with an `app_connections` row and a source, and no table change.
-- "Use the Broccoli app": `googleApp` `broccoli_google_app` in the Google Workspace settings.
 - Last used: `app_accounts.last_used_at`, from the source's log.
 - Requests and approvals of access: processes, process runs and tasks on app accounts.
 - App owners: `apps.owner_employee_id`, invited with invites and permission profiles.

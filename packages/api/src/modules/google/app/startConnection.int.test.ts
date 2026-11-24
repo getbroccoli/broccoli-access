@@ -1,4 +1,14 @@
-import { expect, test, EMPLOYEE, SETUP_HOLDER, googleSetup, GOOGLE_SCOPES } from "#test/support";
+import {
+  expect,
+  test,
+  EMPLOYEE,
+  SETUP_HOLDER,
+  googleSetup,
+  GOOGLE_SCOPES,
+  SHARED_GOOGLE_APP,
+  GOOGLE_RELAY_URL,
+  startSharedGoogleSetup,
+} from "#test/support";
 
 test("requests offline consent with all Google Workspace scopes and encrypted credentials", async ({
   orm,
@@ -64,3 +74,40 @@ test.for(["clientId", "clientSecret"] as const)(
     });
   },
 );
+
+test("sends shared Workspace consent to the configured relay with compact state and a PKCE challenge", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { input, authorization } = await startSharedGoogleSetup(orm, fakeGoogle.url);
+
+  expect(authorization.origin + authorization.pathname).toBe(
+    GOOGLE_RELAY_URL + "/google/authorize",
+  );
+  expect(Object.fromEntries(authorization.searchParams)).toEqual({
+    return_to: input.publicOrigin + "/api/google/callback",
+    state: expect.stringMatching(/^[A-Za-z0-9_-]{1,256}$/) as unknown,
+    code_challenge: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) as unknown,
+    nonce: expect.stringMatching(/^[A-Za-z0-9_-]{1,256}$/) as unknown,
+    purpose: "connect",
+  });
+});
+
+test("reports that the shared Google app is unavailable when no relay is configured", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const {
+    connection,
+    input: { publicOrigin, setupToken, now },
+  } = await googleSetup(orm, fakeGoogle.url);
+
+  await expect(
+    connection.startConnection(SETUP_HOLDER, {
+      ...SHARED_GOOGLE_APP,
+      publicOrigin,
+      setupToken,
+      now,
+    }),
+  ).rejects.toMatchObject({ code: "UNAVAILABLE" });
+});

@@ -18,7 +18,10 @@ A manual check of setup held by one browser, which connects Google Workspace wit
 
 ## Connect Google Workspace
 
-- [ ] The page matches the design: "Step 1 of 3", "Connect Google Workspace", "How to connect" with "Use the Broccoli app" disabled and marked "Coming soon", and "Use your own Google app" selected.
+- [ ] Without `GOOGLE_RELAY_URL`, "Use the Broccoli app" is disabled and marked "Coming soon", and "Use your own Google app" is selected.
+- [ ] With a configured relay, the Broccoli app is selected. Its copy explains that Google’s keys pass through the relay while directory data goes directly to this server. Credential fields appear only after choosing your own app.
+- [ ] With real Google and a configured relay, connect as a workspace super admin, confirm the destination host, and allow Google’s requested permissions. The callback signs in the owner and starts the first scan. No grant to the Broccoli app appears among discovered apps.
+- [ ] Cancelling consent or failing its token verification saves no connection. Log out and sign in through the same Google app.
 - [ ] The redirect address is `<URL>/api/google/callback`; "Copy" shows "Copied", and the copied text equals the address the fake Google redirects to after consent.
 - [ ] The five Google Cloud steps are listed; each link opens Google Cloud in a new tab.
 - [ ] "Connect as Google admin" stays disabled until the client ID and secret are both filled in; the secret is masked.

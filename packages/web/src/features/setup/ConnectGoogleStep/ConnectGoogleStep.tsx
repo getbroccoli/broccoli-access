@@ -2,7 +2,6 @@ import type { MessageKey } from "@/i18n";
 
 import type { ConnectError } from "../connectSearch";
 import { GoogleAppForm } from "./GoogleAppForm";
-import { HowToConnect } from "./HowToConnect";
 
 const CONNECT_ERROR_MESSAGES: Record<ConnectError, MessageKey> = {
   cancelled: "setup.connect.cancelled",
@@ -16,16 +15,13 @@ type Props = {
 };
 
 /**
- * Setup's first step: the admin makes their own Google app, pastes its client ID and secret, and
- * leaves for Google's consent page; Google's answer comes back to the API, which signs them in.
+ * Setup's first step: choose a Google app and consent as a super admin, who becomes the owner.
  */
 export function ConnectGoogleStep({ connectError }: Props) {
   return (
     <GoogleAppForm
       consentPath="/api/google/connect"
       failure={connectError && CONNECT_ERROR_MESSAGES[connectError]}
-    >
-      <HowToConnect />
-    </GoogleAppForm>
+    />
   );
 }

@@ -3,9 +3,13 @@ export const settingsEn = {
   "settings.title": "Settings",
   "settings.connections.title": "Connections",
   "settings.connections.description": "Where Broccoli Access finds your people and their accounts.",
+  "settings.connections.broccoliApp": "Broccoli app",
+  "settings.connections.ownApp": "Your Google app: {clientId}",
   "settings.connections.googleWorkspace": "Google Workspace",
   "settings.connections.connected": "Connected",
-  "settings.connections.summary": "{domain}, connected as {email} with your own Google app.",
+  "settings.connections.summary": "{domain}, connected as {email}.",
+  "settings.connections.googleReconnect":
+    "Google access expired or was revoked. Reconnect, then choose Scan now.",
   "settings.connections.scanFailed": "The last scan failed. Try Scan now again.",
   "settings.connections.changeApp": "Change Google app",
   "settings.connections.loadFailed": "Couldn’t load the connections.",
@@ -140,7 +144,7 @@ export const settingsEn = {
     "This key reaches another {app} workspace than the connected one.",
   "settings.googleApp.title": "Change Google app",
   "settings.googleApp.description":
-    "Connect Google Workspace with another Google app of your own. Your people, apps and decisions stay as they are.",
+    "Connect Google Workspace with the Broccoli app or your own Google app. Your people, apps and decisions stay as they are.",
   "settings.googleApp.cancelled": "You cancelled at Google. The Google app hasn’t changed.",
   "settings.googleApp.otherWorkspace":
     "That Google account belongs to another Google Workspace. Sign in with a super admin account of the connected workspace.",
