@@ -44,7 +44,8 @@
       "src/lib/usePollWhileScanning",
       "src/lib/useRefetchAfterScan",
       "src/lib/useRouteAction",
-      "src/shell"
+      "src/shell",
+      "src/components/ScanNowButton"
     ],
     "src/features/auth": [
       "src/components/ui",
@@ -71,7 +72,8 @@
       "src/lib/useRefetchAfterContainerConnectorScans",
       "src/lib/usePollWhileScanning",
       "src/lib/useRefetchAfterScan",
-      "src/shell"
+      "src/shell",
+      "src/components/ScanNowButton"
     ],
     "src/features/settings": [
       "src/__generated__",
@@ -92,7 +94,8 @@
       "src/lib/useChromeExtension",
       "src/lib/usePollWhileScanning",
       "src/lib/useRefetchAfterContainerConnectorScans",
-      "src/shell"
+      "src/shell",
+      "src/components/ScanNowButton"
     ],
     "src/features/setup": [
       "src/__generated__",
@@ -103,7 +106,8 @@
       "src/lib/class-names",
       "src/lib/postJson",
       "src/lib/useCopyToClipboard",
-      "src/lib/useSessionChange"
+      "src/lib/useSessionChange",
+      "src/components/ScanNowButton"
     ],
     "src/components/dataTable": ["src/components/ui"],
     "src/components/InstallExtensionSteps": [
@@ -140,7 +144,14 @@
       "src/lib/usePollWhileScanning"
     ],
     "src/lib/useChromeExtension": ["src/__generated__", "src/apollo"],
-    "src/lib/dayAndTime": ["src/lib/calendarDay", "src/lib/since"]
+    "src/lib/dayAndTime": ["src/lib/calendarDay", "src/lib/since"],
+    "src/components/ScanNowButton": [
+      "src/__generated__",
+      "src/apollo",
+      "src/components/ui",
+      "src/i18n",
+      "src/lib/class-names"
+    ]
   },
   "deepImports": ["src/components/ui", "src/__generated__"]
 }

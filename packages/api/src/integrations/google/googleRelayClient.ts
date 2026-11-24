@@ -22,7 +22,9 @@ interface RelayAuthorization {
 }
 
 export function createGoogleRelayClient(relayUrl: string): GoogleRelayClient {
-  const endpoint = (path: string) => new URL(`google/${path}`, `${relayUrl.replace(/\/$/, "")}/`);
+  const base = new URL(relayUrl);
+  base.pathname = base.pathname.replace(/\/$/, "") + "/";
+  const endpoint = (path: string) => new URL(`google/${path}`, base);
   return {
     authorize({ returnTo, state, codeVerifier, nonce, purpose }) {
       const url = endpoint("authorize");
@@ -79,7 +81,10 @@ const REDEEMED = REFRESHED.extend({
 
 /** Relay transport failures remain distinct from a revoked Google grant. */
 export class GoogleRelayError extends Error {
-  constructor(readonly code: "authentication_failed" | "app_unavailable" | "unexpected_response") {
+  constructor(
+    readonly code:
+      "authentication_failed" | "invalid_handoff" | "app_unavailable" | "unexpected_response",
+  ) {
     super(`Google relay failed: ${code}`);
     this.name = "GoogleRelayError";
   }
@@ -101,6 +106,9 @@ async function relayError(response: Response): Promise<Error> {
   try {
     const body: unknown = JSON.parse(await readText(response, 64_000));
     const error = z.object({ ok: z.literal(false), error: z.string() }).safeParse(body);
+    if (error.success && error.data.error === "invalid_handoff") {
+      return new GoogleRelayError("invalid_handoff");
+    }
     if (error.success && error.data.error === "invalid_grant") {
       return new GoogleRelayError("authentication_failed");
     }

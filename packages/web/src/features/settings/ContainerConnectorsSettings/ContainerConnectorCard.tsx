@@ -10,7 +10,7 @@ import {
 } from "@/features/apps";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
-import { ScanNowButton } from "@/shell";
+import { ScanNowButton } from "@/components/ScanNowButton";
 
 import { ConnectionSummary } from "./ConnectionSummary";
 import { ConnectorStatusBadge } from "./ConnectorStatusBadge";

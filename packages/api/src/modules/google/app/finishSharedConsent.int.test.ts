@@ -76,6 +76,19 @@ test("redeems shared consent, makes the admin owner and queues the connection's 
   expect(sent).toEqual([{ name: "imports.scanConnection", payload: { sourceId: sources[0]!.id } }]);
 });
 
+test("an expired relay handoff is refused as invalid consent", async ({ orm, fakeGoogle }) => {
+  const { connection, input, state } = await startSharedGoogleSetup(orm, fakeGoogle.url);
+  const relay = stubGoogleRelay();
+  relay.redeem.mockReturnValueOnce(
+    Response.json({ ok: false, error: "invalid_handoff" }, { status: 400 }),
+  );
+
+  await expect(
+    connection.finishConsent(SETUP_HOLDER, { ...input, state, handle: RELAY_HANDLE }),
+  ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  expect(await storedAppConnections(orm)).toEqual([]);
+});
+
 test("reports a removed relay before contacting Google for an outstanding shared consent", async ({
   orm,
   fakeGoogle,

@@ -9,6 +9,7 @@ import {
   SHARED_GOOGLE_APP,
   RELAY_HANDLE,
   googleRelayGrant,
+  recordTokenRequests,
   stubGoogleRelay,
   assertRelayRedemption,
   consentAtGoogle,
@@ -24,6 +25,7 @@ import {
 
 import type { Orm } from "../../../core/db";
 import { OtherWorkspaceError } from "../domain";
+import { sealConsentState } from "../helpers";
 
 test("switching from own to shared to own keeps the connection, workspace records and previous client IDs", async ({
   orm,
@@ -77,50 +79,109 @@ test("switching from own to shared to own keeps the connection, workspace record
   expect(await storedWorkspace(orm)).toEqual(before);
 });
 
-test("after switching to the shared app a scan refreshes at the relay and excludes both instance apps", async ({
-  orm,
-  fakeGoogle,
-}) => {
-  const { workspace, grant, relay, answer, authorization } = await startSharedChange(
-    orm,
-    fakeGoogle.url,
-  );
-  const { ctx, connectionId, scans, sourceId } = workspace;
-  const apps = await storedApps(orm);
-  const accounts = await storedAppAccounts(orm);
-  await workspace.connection.finishAppChange(ctx, answer);
-  await assertRelayRedemption(relay.requests[0]!, authorization);
-  relay.refresh.mockImplementation(() =>
-    Response.json({ ok: true, access_token: grant.access_token }),
-  );
+test.for(["?", "#"])(
+  "a relay base ending in %s preserves its path for consent and scan refresh",
+  async (delimiter, { orm, fakeGoogle }) => {
+    const { workspace, grant, relay, answer, authorization } = await startSharedChange(
+      orm,
+      fakeGoogle.url,
+      await connectedWorkspace(orm, fakeGoogle.url, GOOGLE_RELAY_URL + delimiter),
+    );
+    expect(authorization.origin + authorization.pathname).toBe(
+      GOOGLE_RELAY_URL + "/google/authorize",
+    );
+    const { ctx, connectionId, scans, sourceId } = workspace;
+    const apps = await storedApps(orm);
+    const accounts = await storedAppAccounts(orm);
+    await workspace.connection.finishAppChange(ctx, answer);
+    await assertRelayRedemption(relay.requests[0]!, authorization);
+    relay.refresh.mockImplementation(() =>
+      Response.json({ ok: true, access_token: grant.access_token }),
+    );
 
-  await scans.scanNow(ctx, connectionId);
-  await scans.runScan(SYSTEM, sourceId);
+    await scans.scanNow(ctx, connectionId);
+    await scans.runScan(SYSTEM, sourceId);
 
-  const refresh = relay.requests[1]!;
-  expect(refresh.url).toBe(GOOGLE_RELAY_URL + "/google/refresh");
-  expect(refresh.method).toBe("POST");
-  expect(refresh.headers.get("content-type")).toMatch(/^application\/json\b/i);
-  expect(await refresh.json()).toEqual({ refresh_token: grant.refresh_token });
-  expect(await storedImportSources(orm)).toMatchObject([{ status: "scanned", failure: null }]);
-  expect(await storedApps(orm)).toEqual(apps);
-  expect(await storedAppAccounts(orm)).toEqual(accounts);
-});
+    const refresh = relay.requests[1]!;
+    expect(refresh.url).toBe(GOOGLE_RELAY_URL + "/google/refresh");
+    expect(refresh.method).toBe("POST");
+    expect(refresh.headers.get("content-type")).toMatch(/^application\/json\b/i);
+    expect(await refresh.json()).toEqual({ refresh_token: grant.refresh_token });
+    expect(await storedImportSources(orm)).toMatchObject([{ status: "scanned", failure: null }]);
+    expect(await storedApps(orm)).toEqual(apps);
+    expect(await storedAppAccounts(orm)).toEqual(accounts);
+  },
+);
 
 test("a shared app grant from another workspace keeps the original connection", async ({
   orm,
   fakeGoogle,
 }) => {
-  const {
-    workspace: { ctx, connection, connectionId },
-    answer,
-  } = await startSharedChange(orm, fakeGoogle.url);
+  const workspace = await connectedWorkspace(orm, fakeGoogle.url, GOOGLE_RELAY_URL);
+  const { ctx, connection, connectionId } = workspace;
   await changeStoredGoogleDomain(orm, connectionId, "other.acme.example");
+  const { answer } = await startSharedChange(orm, fakeGoogle.url, workspace);
   const before = await storedAppConnections(orm);
 
   await expect(connection.finishAppChange(ctx, answer)).rejects.toBeInstanceOf(OtherWorkspaceError);
 
   expect(await storedAppConnections(orm)).toEqual(before);
+});
+
+test("an own-app consent from before the upgrade cannot replace the shared app", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { workspace, answer } = await startSharedChange(orm, fakeGoogle.url);
+  const { connection, ctx, input } = workspace;
+  await connection.finishAppChange(ctx, answer);
+  const browserToken = "acme-change-browser";
+  const state = sealConsentState(
+    TEST_SECRET_BOX,
+    {
+      flow: "change_google_app",
+      clientId: input.clientId,
+      clientSecret: input.clientSecret,
+      nonce: "acme-consent",
+    },
+    { browserToken, now: input.now },
+  );
+  const requests = recordTokenRequests();
+
+  await expect(
+    connection.finishAppChange(ctx, {
+      ...input,
+      state,
+      browserToken,
+      code: "acme-code",
+    }),
+  ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  expect(requests).toEqual([]);
+});
+
+test("a shared consent returned after a newer reconnect keeps the renewed credentials", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { workspace, answer } = await startSharedChange(orm, fakeGoogle.url);
+  const { ctx, connection, input } = workspace;
+  const [before] = await storedAppConnections(orm);
+  const ownApp = { ...input, ...ACME.oauthClient };
+  const { authorizationUrl, browserToken } = await connection.startAppChange(ctx, ownApp);
+  const callback = await consentAtGoogle(authorizationUrl);
+  await connection.finishAppChange(ctx, {
+    ...ownApp,
+    browserToken,
+    code: callback.searchParams.get("code")!,
+    state: callback.searchParams.get("state")!,
+  });
+  const renewed = await storedAppConnections(orm);
+  expect(renewed[0]!.settings).toEqual(before!.settings);
+  expect(renewed[0]!.encryptedSecrets).not.toBe(before!.encryptedSecrets);
+
+  await expect(connection.finishAppChange(ctx, answer)).rejects.toMatchObject({ code: "CONFLICT" });
+
+  expect(await storedAppConnections(orm)).toEqual(renewed);
 });
 
 test("a delayed shared consent cannot overwrite a newer own-app change", async ({
@@ -170,8 +231,12 @@ test("a delayed shared consent cannot overwrite a newer own-app change", async (
   ]);
 });
 
-async function startSharedChange(orm: Orm, googleUrl: string) {
-  const workspace = await connectedWorkspace(orm, googleUrl, GOOGLE_RELAY_URL);
+async function startSharedChange(
+  orm: Orm,
+  googleUrl: string,
+  existing?: Awaited<ReturnType<typeof connectedWorkspace>>,
+) {
+  const workspace = existing ?? (await connectedWorkspace(orm, googleUrl, GOOGLE_RELAY_URL));
   const { now, publicOrigin } = workspace.input;
   const { authorizationUrl, browserToken } = await workspace.connection.startAppChange(
     workspace.ctx,
@@ -183,6 +248,7 @@ async function startSharedChange(orm: Orm, googleUrl: string) {
   );
   const authorization = new URL(authorizationUrl);
   expect(authorization.searchParams.get("purpose")).toBe("connect");
+  expect(authorization.searchParams.get("state")).toMatch(/^[A-Za-z0-9_-]{1,256}$/);
   const relay = stubGoogleRelay();
   const grant = await googleRelayGrant(googleUrl, authorization);
   relay.redeem.mockReturnValueOnce(Response.json(grant));

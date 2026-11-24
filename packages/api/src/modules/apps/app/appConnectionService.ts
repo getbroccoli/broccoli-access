@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 
 import { ApplicationError } from "../../../core/applicationError";
@@ -51,7 +52,7 @@ export interface AppConnectionService {
    * Replaces the connection's settings or secrets, whichever `update` carries, joining `tx`; new
    * settings add a line to its history, secrets never. With `replacing`, the secrets of the call
    * whose answer renewed them, it saves nothing once the stored secrets differ, such as after a
-   * reconnect; `replacingSettings` likewise refuses a changed app. Returns whether it saved.
+   * reconnect; `replacingRevision` likewise refuses a changed app. Returns whether it saved.
    * Admins only; refuses an unknown connection with NOT_FOUND.
    */
   changeConnection: (
@@ -62,7 +63,7 @@ export interface AppConnectionService {
       settings?: Record<string, unknown>;
       secrets?: Record<string, unknown>;
       replacing?: Record<string, unknown>;
-      replacingSettings?: Record<string, unknown>;
+      replacingRevision?: string;
     },
   ) => Promise<boolean>;
   /**
@@ -123,7 +124,10 @@ export interface AppConnectionService {
   ) => Promise<{
     connection: AppConnection;
     secrets: Record<string, string>;
+    revision: string;
   } | null>;
+  /** Locks the connection for this transaction; true only if its settings and credentials still match. */
+  holdConnectionRevision: (tx: Tx, connectionId: string, revision: string) => Promise<boolean>;
   /**
    * The connection's secrets, decrypted, such as Google Workspace's `{ clientSecret, refreshToken }`;
    * null for an unknown connection. Trusted read: no `ctx`, and never for a client.
@@ -173,7 +177,7 @@ export function createAppConnectionService({
       ctx,
       tx,
       connectionId,
-      { settings, secrets, replacing, replacingSettings },
+      { settings, secrets, replacing, replacingRevision },
     ) {
       ctx.require("MANAGE_WORKSPACE");
       const connections = appConnectionRepository(tx);
@@ -181,7 +185,7 @@ export function createAppConnectionService({
       if (!old) {
         throw new ApplicationError("NOT_FOUND", "No app connection has this id.");
       }
-      if (replacingSettings && !isDeepStrictEqual(replacingSettings, old.settings)) {
+      if (replacingRevision && !(await holdsRevision(tx, old, replacingRevision))) {
         return false;
       }
       if (replacing && !(await holdsSecrets(secretBox, tx, connectionId, replacing))) {
@@ -233,7 +237,15 @@ export function createAppConnectionService({
         string,
         string
       >;
-      return { connection, secrets };
+      return {
+        connection,
+        secrets,
+        revision: connectionRevision(connection.settings, encryptedSecrets),
+      };
+    },
+    async holdConnectionRevision(tx, connectionId, revision) {
+      const connection = await appConnectionRepository(tx).lockById(connectionId);
+      return connection !== null && holdsRevision(tx, connection, revision);
     },
     async readSecrets(db, connectionId) {
       const encrypted = await appConnectionRepository(db).findEncryptedSecrets(connectionId);
@@ -306,4 +318,19 @@ function signedInUserOf(ctx: SecurityContext): string {
     throw new ApplicationError("FORBIDDEN", "Only a signed-in admin accepts a notice.");
   }
   return ctx.user.userId;
+}
+
+function connectionRevision(settings: Record<string, unknown>, encryptedSecrets: string): string {
+  return createHash("sha256")
+    .update(JSON.stringify([settings, encryptedSecrets]))
+    .digest("base64url");
+}
+
+async function holdsRevision(
+  tx: Tx,
+  connection: AppConnection,
+  revision: string,
+): Promise<boolean> {
+  const encrypted = await appConnectionRepository(tx).findEncryptedSecrets(connection.id);
+  return encrypted !== null && connectionRevision(connection.settings, encrypted) === revision;
 }

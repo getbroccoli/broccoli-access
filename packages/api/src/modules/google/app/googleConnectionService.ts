@@ -193,12 +193,14 @@ export function createGoogleConnectionService(
     },
     async startAppChange(ctx, start) {
       ctx.require("MANAGE_WORKSPACE");
-      await requireConnection(connectedApps, orm);
+      const connection = await requireConnection(connectedApps, orm);
+      const stored = await connectedApps.readConnectionWithSecrets(orm, connection.id);
+      if (!stored) throw new ApplicationError("CONFLICT", "Google Workspace is not connected.");
       const browserToken = randomConsentToken();
       const authorizationUrl = await startConsent(
         google,
         secretBox,
-        { ...start, flow: "change_google_app", browserToken },
+        { ...start, flow: "change_google_app", browserToken, revision: stored.revision },
         dependencies.relayUrl,
       );
       return { authorizationUrl, browserToken };
@@ -210,7 +212,7 @@ export function createGoogleConnectionService(
         browserToken === null
           ? null
           : openConsentState(secretBox, answer.state, { browserToken, now });
-      if (change?.flow !== "change_google_app") {
+      if (change?.flow !== "change_google_app" || !change.revision) {
         throw new ApplicationError(
           "INVALID_INPUT",
           "The consent expired or was not this browser's.",
@@ -237,7 +239,7 @@ export function createGoogleConnectionService(
       const saved = await transact((tx) =>
         connectedApps.changeConnection(ctx, tx, connection.id, {
           settings: { ...changed },
-          replacingSettings: connection.settings,
+          replacingRevision: change.revision,
           secrets: {
             ...("clientSecret" in change && { clientSecret: change.clientSecret }),
             refreshToken: grant.tokens.refreshToken,

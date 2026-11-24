@@ -1,6 +1,7 @@
 import { ApplicationError, type FieldError, invalidInput } from "../../../core/applicationError";
 import {
   createGoogleRelayClient,
+  GoogleRelayError,
   type GoogleClient,
   type GoogleCustomer,
   type GoogleTokens,
@@ -49,7 +50,11 @@ export async function startConsent(
   if (start.googleApp === "broccoli_google_app") {
     const relay = requireGoogleRelay(relayUrl);
     const codeVerifier = randomConsentToken();
-    const state = sealConsentState(secretBox, { flow: start.flow, nonce, codeVerifier }, start);
+    const state = sealConsentState(
+      secretBox,
+      { flow: start.flow, nonce, codeVerifier, revision: start.revision },
+      start,
+    );
     return relay.authorize({
       returnTo: redirectUri,
       state,
@@ -62,7 +67,7 @@ export async function startConsent(
   const ownState =
     start.flow === "sign_in_with_google"
       ? { flow: start.flow, nonce }
-      : { flow: start.flow, ...credentials, nonce };
+      : { flow: start.flow, ...credentials, nonce, revision: start.revision };
   const state = sealConsentState(secretBox, ownState, start);
   const { authorizationEndpoint } = await google.discover();
   const signingIn = start.flow === "sign_in_with_google";
@@ -80,6 +85,7 @@ export async function startConsent(
 }
 
 interface GoogleConsentStart {
+  revision?: string;
   flow: ConsentState["flow"];
   googleApp?: GoogleWorkspaceSettings["googleApp"];
   clientId?: string;
@@ -168,6 +174,12 @@ async function refusingRejectedCode<T>(exchange: () => Promise<T>): Promise<T> {
   try {
     return await exchange();
   } catch (error) {
+    if (error instanceof GoogleRelayError && error.code === "invalid_handoff") {
+      throw new ApplicationError(
+        "INVALID_INPUT",
+        "The Google consent expired or was already used.",
+      );
+    }
     throw error instanceof UnsuccessfulAnswerError && error.status < SERVER_ERROR_STATUS
       ? new ApplicationError("INVALID_INPUT", `Google refused the code with ${error.status}.`)
       : error;

@@ -7,7 +7,8 @@ import { t } from "@/i18n";
 import { formatLastScan } from "@/lib/lastScan";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
-import { PageHeader, ScanNowButton } from "@/shell";
+import { PageHeader } from "@/shell";
+import { ScanNowButton } from "@/components/ScanNowButton";
 
 import { forgetAppLists } from "./cache";
 

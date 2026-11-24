@@ -1,3 +1,5 @@
+import { onTestFinished, vi } from "vitest";
+
 import { expect, test, consentAtGoogle } from "#test/support";
 
 test("the owner signs back in with Google and keeps the session on later requests", async ({
@@ -13,6 +15,7 @@ test("the owner signs back in with Google and keeps the session on later request
     .getSetCookie()
     .find((cookie) => cookie.startsWith("broccoli_access_google_sign_in="));
   expect(signInCookie).toMatch(/^broccoli_access_google_sign_in=[^;]+;/);
+  expect(signInCookie).toMatch(/;\s*Max-Age=600(?:;|$)/i);
   expect(signInCookie).toMatch(/;\s*HttpOnly(?:;|$)/i);
   expect(signInCookie).toMatch(/;\s*SameSite=Lax(?:;|$)/i);
   expect(signInCookie).toMatch(/;\s*Path=\/api\/google\/callback(?:;|$)/i);
@@ -22,10 +25,7 @@ test("the owner signs back in with Google and keeps the session on later request
   expect(response.status).toBe(302);
   expect(response.headers.get("location")).toBe("/");
   expect(response.headers.getSetCookie()).toEqual(
-    expect.arrayContaining([
-      expect.stringMatching(/^better-auth\.session_token=[^;]+;/),
-      expect.stringMatching(/^broccoli_access_google_sign_in=;/),
-    ]),
+    expect.arrayContaining([expect.stringMatching(/^better-auth\.session_token=[^;]+;/)]),
   );
   expect(await (await browser.graphql("{ me { id } }")).json()).toEqual({
     data: { me: { id: user.id } },
@@ -72,4 +72,31 @@ test("an older sign-in callback leaves the newer sign-in usable in the same brow
   expect(await (await browser.graphql("{ me { id } }")).json()).toEqual({
     data: { me: { id: user.id } },
   });
+});
+
+test("a successful sign-in response preserves a second sign-in started during its exchange", async ({
+  env,
+  fakeGoogle,
+}) => {
+  await env.signInAsOwner();
+  const browser = env.browser();
+  const first = await browser.getManual("/api/google/sign-in");
+  const callback = await consentAtGoogle(first.headers.get("location")!);
+  let secondAuthorization = "";
+  const fetchDirect = globalThis.fetch;
+  const exchange = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    if ((input instanceof Request ? input.url : String(input)) === fakeGoogle.url + "/token") {
+      exchange.mockRestore();
+      const second = await browser.getManual("/api/google/sign-in");
+      secondAuthorization = second.headers.get("location")!;
+    }
+    return fetchDirect(input, init);
+  });
+  onTestFinished(() => exchange.mockRestore());
+
+  const finished = await browser.getManual(callback.href);
+  expect(finished.headers.get("location")).toBe("/");
+  const secondCallback = await consentAtGoogle(secondAuthorization);
+
+  expect((await browser.getManual(secondCallback.href)).headers.get("location")).toBe("/");
 });

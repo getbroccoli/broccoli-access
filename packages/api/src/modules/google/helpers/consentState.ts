@@ -17,6 +17,7 @@ export interface RelayConsentState {
   flow: WorkspaceConsentState["flow"] | SignInState["flow"] | GoogleAppChangeState["flow"];
   nonce: string;
   codeVerifier: string;
+  revision?: string;
   expiresAt: number;
 }
 
@@ -35,6 +36,7 @@ export interface WorkspaceConsentState {
  * replace the old ones only once the consent succeeds.
  */
 export interface GoogleAppChangeState {
+  revision?: string;
   flow: "change_google_app";
   clientId: string;
   clientSecret: string;
@@ -71,7 +73,12 @@ export function sealConsentState(
   if ("codeVerifier" in state) {
     const prefix = RELAY_PREFIXES[state.flow];
     const sealed = secretBox.encrypt(
-      JSON.stringify([state.nonce, state.codeVerifier, expiresAt]),
+      JSON.stringify([
+        state.nonce,
+        state.codeVerifier,
+        expiresAt,
+        ...(state.revision ? [state.revision] : []),
+      ]),
       associatedData(prefix, browserToken),
     );
     return `${prefix}${sealed}`;
@@ -108,12 +115,13 @@ export function openConsentState(
         sealed.slice(prefix.length),
         associatedData(prefix, browserToken),
       );
-      const [nonce, codeVerifier, expiresAt] = RELAY_STATE.parse(JSON.parse(plaintext));
+      const [nonce, codeVerifier, expiresAt, revision] = RELAY_STATE.parse(JSON.parse(plaintext));
       return expiresAt > now.getTime()
         ? {
             flow: flow as RelayConsentState["flow"],
             nonce,
             codeVerifier,
+            revision,
             expiresAt,
           }
         : null;
@@ -161,6 +169,7 @@ const CONSENT_STATE = z.discriminatedUnion("flow", [
   }),
   z.object({
     flow: z.literal("change_google_app"),
+    revision: z.string().optional(),
     clientId: z.string(),
     clientSecret: z.string(),
     nonce: z.string(),
@@ -174,4 +183,4 @@ const RELAY_PREFIXES = {
   sign_in_with_google: "r1_",
   change_google_app: "r2_",
 } as const;
-const RELAY_STATE = z.tuple([z.string(), z.string(), z.number()]);
+const RELAY_STATE = z.tuple([z.string(), z.string(), z.number(), z.string().optional()]);

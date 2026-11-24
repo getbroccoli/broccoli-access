@@ -247,14 +247,18 @@ test("refuses starting a Google app change without MANAGE_WORKSPACE", async ({
   expect(await storedChangeState(orm)).toEqual(before);
 });
 
-test("a scan uses matching credentials when the Google app changes during connector discovery", async ({
+test("a scan retries after an app switch without recording either instance app", async ({
   orm,
   fakeGoogle,
 }) => {
-  const { connection, ctx, input, connectionId, sourceId } = await connectedWorkspace(
-    orm,
-    fakeGoogle.url,
-  );
+  const {
+    connection,
+    ctx,
+    input,
+    connectionId,
+    sourceId,
+    scans: retry,
+  } = await connectedWorkspace(orm, fakeGoogle.url);
   const { authorizationUrl, browserToken } = await connection.startAppChange(ctx, input);
   const callback = await consentAtGoogle(authorizationUrl);
   const manifest = await startFakeHttpServer(async () => {
@@ -277,8 +281,20 @@ test("a scan uses matching credentials when the Google app changes during connec
   });
   await scan.scanNow(ctx, connectionId);
 
-  await scan.runScan(SYSTEM, sourceId);
+  const initialApps = await storedApps(orm);
+  const scanHistory = async () =>
+    (await storedRecordHistory(orm)).filter((entry) => entry.causeKind === "found_by_scan");
+  const initialHistory = await scanHistory();
 
+  await expect(scan.runScan(SYSTEM, sourceId)).rejects.toMatchObject({ code: "CONFLICT" });
+
+  expect(await storedImportSources(orm)).toMatchObject([{ id: sourceId, status: "scanning" }]);
+  expect(await storedApps(orm)).toEqual(initialApps);
+  expect(await scanHistory()).toEqual(initialHistory);
+
+  await retry.runScan(SYSTEM, sourceId);
+
+  expect(await storedApps(orm)).toEqual(initialApps);
   expect(await storedAppConnections(orm)).toMatchObject([
     { settings: { clientId: input.clientId } },
   ]);

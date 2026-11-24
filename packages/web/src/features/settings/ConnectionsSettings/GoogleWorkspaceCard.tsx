@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
 
-import { type ConnectionsSettingsQuery, ScanNowDocument } from "@/__generated__/graphql";
-import { usePayloadMutation } from "@/apollo";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { type ConnectionsSettingsQuery } from "@/__generated__/graphql";
+import { ScanNowButton } from "@/components/ScanNowButton";
+import { buttonVariants } from "@/components/ui/button";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { formatLastScan } from "@/lib/lastScan";
@@ -13,7 +13,6 @@ type Props = {
 
 /** The Google Workspace connection: who connected it with which Google app, and its last scan. */
 export function GoogleWorkspaceCard({ connection }: Props) {
-  const [scanNow, { loading, error }] = usePayloadMutation(ScanNowDocument);
   const needsReconnect = connection.scan?.failure === "AUTHENTICATION_FAILED";
   const isScanning = connection.scan?.status === "SCANNING";
 
@@ -58,26 +57,9 @@ export function GoogleWorkspaceCard({ connection }: Props) {
               : t("settings.connections.scanFailed")}
           </p>
         )}
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {t("scans.scanNowFailed")}
-          </p>
-        )}
       </div>
       <div className="flex shrink-0 flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          className="px-4"
-          disabled={isScanning || loading}
-          // `usePayloadMutation` keeps a failure for display, so the rejection needs no handling here.
-          onClick={() =>
-            void scanNow({ variables: { connectionId: connection.id } }).catch(() => undefined)
-          }
-        >
-          {t("scans.scanNow")}
-        </Button>
+        <ScanNowButton connectionId={connection.id} isScanning={isScanning} className="pb-0" />
         <Link
           to="/settings/connections/google-app"
           className={cn(buttonVariants({ variant: "outline", size: "lg" }), "px-4")}

@@ -2,8 +2,8 @@ import { useQuery } from "@apollo/client/react";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
-import { ScanNowDocument, SetupScanDocument } from "@/__generated__/graphql";
-import { usePayloadMutation } from "@/apollo";
+import { SetupScanDocument } from "@/__generated__/graphql";
+import { ScanNowButton } from "@/components/ScanNowButton";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { t } from "@/i18n";
 
@@ -24,10 +24,11 @@ const STARTING_SCAN: ScanSteps = {
 /** Setup's second step, where the owner lands after connecting Google: the scan of their workspace. */
 export function ScanStep() {
   const { data, error, refetch, startPolling, stopPolling } = useQuery(SetupScanDocument);
-  const [scanNow, { loading, error: retryError }] = usePayloadMutation(ScanNowDocument);
   const connection = data?.setup.googleWorkspace;
   const failed = connection?.scan?.status === "SCAN_FAILED";
-  const needsReconnect = connection?.scan?.failure === "AUTHENTICATION_FAILED";
+  const needsReconnect =
+    connection?.scan?.failure === "AUTHENTICATION_FAILED" ||
+    connection?.scan?.failure === "PERMISSION_MISSING";
   const finished = connection?.scan != null && connection.scan.status !== "SCANNING";
   const scanned = connection?.scan?.status === "SCANNED";
   const router = useRouter();
@@ -97,21 +98,11 @@ export function ScanStep() {
               {t("apps.reconnect.button")}
             </Link>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            disabled={loading}
-            onClick={() =>
-              void scanNow({ variables: { connectionId: connection.id } }).catch(() => undefined)
-            }
-          >
-            {t("scans.scanNow")}
-          </Button>
-          {retryError && (
-            <p role="alert" className="text-sm text-destructive">
-              {t("scans.scanNowFailed")}
-            </p>
-          )}
+          <ScanNowButton
+            connectionId={connection.id}
+            isScanning={false}
+            className="items-start pb-0"
+          />
         </div>
       )}
     </SetupLayout>

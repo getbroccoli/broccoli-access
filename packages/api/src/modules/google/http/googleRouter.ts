@@ -189,7 +189,6 @@ async function finishSignIn(
       browserToken: parseCookies(request.headers.cookie ?? "").get(SIGN_IN_COOKIE) ?? null,
       now: new Date(),
     });
-    response.clearCookie(SIGN_IN_COOKIE, consentCookie(origin));
     response.append("Set-Cookie", await http.startSession(userId));
     logger.info({ userId }, "Signed in with Google");
     response.redirect(302, HOME);
@@ -246,7 +245,6 @@ async function finishAppChange(
       browserToken: parseCookies(request.headers.cookie ?? "").get(CHANGE_APP_COOKIE) ?? null,
       now: new Date(),
     });
-    response.clearCookie(CHANGE_APP_COOKIE, consentCookie(origin));
     response.redirect(302, CONNECTIONS_PAGE);
   } catch (error) {
     const failure = appChangeFailureOf(error);

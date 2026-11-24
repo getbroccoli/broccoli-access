@@ -22,7 +22,7 @@ export interface ConnectedApps {
     connection: {
       settings: Record<string, unknown>;
       secrets: Record<string, string>;
-      replacingSettings?: Record<string, unknown>;
+      replacingRevision?: string;
     },
   ): Promise<boolean>;
   /** The connection of `connector` without its secrets, or null. */
@@ -37,5 +37,6 @@ export interface ConnectedApps {
   ): Promise<{
     connection: { id: string; settings: Record<string, unknown> };
     secrets: Record<string, string>;
+    revision: string;
   } | null>;
 }

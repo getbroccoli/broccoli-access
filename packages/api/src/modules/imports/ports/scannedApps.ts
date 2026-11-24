@@ -21,7 +21,10 @@ export interface ScannedApps {
   ): Promise<{
     connection: { id: string; connector: string; appId: string; settings: Record<string, unknown> };
     secrets: Record<string, unknown>;
+    revision: string;
   } | null>;
+  /** Locks the connection; true if its settings and credentials still match the scan. */
+  holdConnectionRevision(tx: Tx, connectionId: string, revision: string): Promise<boolean>;
   /** Holds off other account syncs and connects until `tx` ends; a scan's save takes it first. */
   holdAccountSyncs(ctx: SecurityContext, tx: Tx): Promise<void>;
   /**

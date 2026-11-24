@@ -57,6 +57,18 @@ export function GoogleAppForm({ consentPath, failure }: Props) {
     setStartFailed(true);
   };
 
+  if (!data)
+    return error ? (
+      <div role="alert" className="flex flex-col items-start gap-3">
+        <p className="text-sm text-destructive">{t("setup.connect.loadFailed")}</p>
+        <Button type="button" variant="outline" onClick={() => void refetch()}>
+          {t("setup.connect.retry")}
+        </Button>
+      </div>
+    ) : (
+      <Skeleton className="h-64 rounded-xl" />
+    );
+
   return (
     <form
       noValidate
@@ -70,22 +82,11 @@ export function GoogleAppForm({ consentPath, failure }: Props) {
         selected={googleApp}
         onSelect={setChoice}
         available={available}
-        disabled={!data || starting}
+        disabled={starting}
       />
-      {(ownApp || !data) && (
+      {ownApp && (
         <div className="flex flex-col gap-6 rounded-xl border border-border p-5 sm:p-7">
-          {data ? (
-            <RedirectAddress address={data.setup.googleRedirectAddress} />
-          ) : error ? (
-            <div role="alert" className="flex flex-col items-start gap-3">
-              <p className="text-sm text-destructive">{t("setup.connect.loadFailed")}</p>
-              <Button type="button" variant="outline" onClick={() => void refetch()}>
-                {t("setup.connect.retry")}
-              </Button>
-            </div>
-          ) : (
-            <Skeleton className="h-[72px] rounded-lg" />
-          )}
+          <RedirectAddress address={data.setup.googleRedirectAddress} />
           <GoogleCloudSteps />
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
@@ -94,7 +95,7 @@ export function GoogleAppForm({ consentPath, failure }: Props) {
                 id="google-client-id"
                 autoComplete="off"
                 spellCheck={false}
-                disabled={!data || starting}
+                disabled={starting}
                 className="h-11 rounded-lg px-4"
                 value={clientId}
                 onChange={(event) => setClientId(event.target.value)}
@@ -107,7 +108,7 @@ export function GoogleAppForm({ consentPath, failure }: Props) {
                 type="password"
                 autoComplete="off"
                 spellCheck={false}
-                disabled={!data || starting}
+                disabled={starting}
                 className="h-11 rounded-lg px-4"
                 value={clientSecret}
                 onChange={(event) => setClientSecret(event.target.value)}
@@ -121,7 +122,7 @@ export function GoogleAppForm({ consentPath, failure }: Props) {
           type="submit"
           size="lg"
           className="h-12 gap-2.5 rounded-xl px-5 text-base"
-          disabled={!data || !isFilledIn || starting}
+          disabled={!isFilledIn || starting}
           aria-describedby="google-connect-hint"
         >
           <GoogleLogo weight="bold" className="size-5" aria-hidden />
