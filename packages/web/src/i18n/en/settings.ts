@@ -39,9 +39,9 @@ export const settingsEn = {
   "settings.integrationUser.authenticationFailed":
     "Google refused this user’s password or two-step code. Check in Google admin that the user is active, then try again.",
   "settings.integrationUser.connectorsUnavailable":
-    "Broccoli Access couldn’t reach the connectors container, which signs in for it. Check that it is set up and running, then try again.",
+    "Broccoli Access couldn’t sign in through the connectors container. Check that it is set up and running, then try again.",
   "settings.integrationUser.signInDidNotFinish":
-    "Setting up two-step sign-in didn’t finish. Try again.",
+    "Broccoli Access couldn’t finish signing in to Google as this user. Try again.",
   "settings.integrationUser.tryAgain": "Try again",
   "settings.integrationUser.tryAgainFailed": "Couldn’t start signing in. Try again.",
   "settings.integrationUser.dialogTitle": "Create the integration user",

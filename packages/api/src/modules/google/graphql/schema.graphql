@@ -43,7 +43,7 @@ type IntegrationUser {
 enum IntegrationUserSignInStatus {
   "Broccoli Access is signing in to Google as it and setting up its two-step sign-in."
   SETTING_UP_TWO_STEP_SIGN_IN
-  "Its two-step sign-in is on and Broccoli Access holds the secret."
+  "Its two-step sign-in is on and Broccoli Access holds the secret; a later attempt, whatever its end, does not change this."
   SIGNS_IN_WITH_TWO_STEP_SIGN_IN
   "The last attempt failed or never finished; the owner tries again."
   SIGN_IN_NEEDS_OWNER
@@ -54,7 +54,7 @@ enum IntegrationUserSignInFailure {
   BLOCKED_BY_CHECK
   "Google refused its password or two-step code."
   AUTHENTICATION_FAILED
-  "The connectors container, whose browser signs in, did not answer or is not configured."
+  "The connectors container, whose browser signs in, failed, did not answer or is not configured."
   CONNECTORS_CONTAINER_UNAVAILABLE
   "The attempt ended another way, or its reason is no longer known, such as after a restart."
   SIGN_IN_DID_NOT_FINISH
