@@ -13,6 +13,14 @@
         <span class="name">Broccoli Access</span>
         <span class="version" data-version></span>
       </header>
+      <div class="card-body">
+        <p class="text">
+          The extension pairs Chrome with your Broccoli Access instance. When you connect or
+          reconnect an app through the extension, it asks your permission to send that app’s session
+          cookies and any required token to Broccoli Access. Broccoli Access uses that session to
+          manage user accounts in the app.
+        </p>
+      </div>
       <section class="card-body" data-state="not-paired" hidden>
         <h1 class="state">Not paired</h1>
         <p class="text">
@@ -29,10 +37,6 @@
           <dt data-since>Since</dt>
           <dd data-since data-paired-at></dd>
         </dl>
-        <p class="note">
-          It hands over your Slack session only when you connect or reconnect Slack in Broccoli
-          Access.
-        </p>
         <p class="alert" role="alert" data-unpair-failed hidden>
           Couldn't confirm that this Chrome was unpaired. Try Unpair again.
         </p>

@@ -49,6 +49,7 @@ Start with the owner unpaired (Unpair in Settings) and a Chrome profile without 
 - [ ] By keyboard alone, each Copy button (`chrome://extensions` and the ID) copies its text and reads "Copied" for a moment; Tab also reaches each value, which selects itself.
 - [ ] "Download the extension" downloads `broccoli-access-extension.zip`; unzipped and loaded unpacked as the steps say, the dialog moves on to step 2 without a reload.
 - [ ] With the extension installed, the card offers "Download the extension" again under "It doesn’t update itself…".
+- [ ] Open the extension popup before and after pairing. Both states explain what the extension asks permission to send and how Broccoli Access uses the app session.
 - [ ] With the extension not paired, it opens on step 2 "Pair the extension with Broccoli Access", Extension ticked, naming this address and "Installed in Chrome on <platform>. Not paired yet."; "Pair this Chrome" pairs as the Chrome extension card does, and the dialog moves on by itself.
 - [ ] Paired, it opens on step 3 "Before you connect Slack" with Slack's notice; "Accept and continue" stays disabled until "I’ve read this and choose to connect Slack." is ticked.
 - [ ] Step 4 "Sign in to Slack in Chrome, then Connect" lists what the extension sends, with "Open Slack in a new tab ↗" to `https://slack.com`.
