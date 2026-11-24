@@ -134,7 +134,7 @@ curl -s -H 'content-type: application/json' -d '{"milliseconds": 5000}' "$FAKE/_
 ```
 
 - `reset` puts back the seed: members, failures, the delay, the Linear key, and no Slack session.
-- `state` lists each workspace's members with their status and role, its pending invitations with their role, and under `changes` each change an action made, with the member who made it (`madeBy`).
+- `state` lists each workspace's members with their status and role, its pending invitations with their role, and under `changes` the last 100 changes actions made, oldest first, with the member who made each (`madeBy`).
 - A member control changes the member as an admin would in the app.
 - `failures` makes the next `count` calls of that connector and `call` (`connections/test`, `accounts/list`, `actions/run` or `connections/sign-in`) answer the contract error `code`. The call `integration-user/setup` takes no `connector`.
 - After `sessions/expire`, every Slack app session fails with `authentication_failed` until a new sign-in; after `keys/revoke`, the Linear key fails until `reset`.

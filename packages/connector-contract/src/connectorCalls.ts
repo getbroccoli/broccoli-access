@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** The calls that carry a connection, by their path after `/v1/`. */
+/** The calls that carry a connection and a runtime, by their path after `/v1/`. */
 export const CONNECTOR_CALLS = ["connections/test", "accounts/list", "actions/run"] as const;
 
 /** The calls that carry the integration user and no runtime: the container's own browser signs in. */
