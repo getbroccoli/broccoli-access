@@ -73,13 +73,13 @@ async function signIn(
 ): Promise<IntegrationUserSignInFailure | undefined> {
   const { logger } = dependencies;
   try {
-    const failure = await setUpTwoStepSignIn(dependencies);
-    if (failure) {
-      logger.warn({ failure }, "Integration user could not sign in to Google");
+    const failed = await setUpTwoStepSignIn(dependencies);
+    if (failed) {
+      logger.warn(failed, "Integration user could not sign in to Google");
     } else {
       logger.info("Integration user signs in to Google with two-step sign-in");
     }
-    return failure;
+    return failed?.failure;
   } catch (error) {
     logger.error(
       { kind: error instanceof Error ? error.name : typeof error },
@@ -93,26 +93,35 @@ async function setUpTwoStepSignIn({
   orm,
   secretBox,
   connectorsContainer,
-}: IntegrationUserSignInDependencies): Promise<IntegrationUserSignInFailure | undefined> {
+}: IntegrationUserSignInDependencies): Promise<FailedSignIn | undefined> {
   const repository = integrationUserRepository(orm);
   const [user, secrets] = await Promise.all([repository.find(), readSecrets({ orm, secretBox })]);
   if (!user || !secrets) {
-    return "setup_did_not_finish";
+    return { failure: "setup_did_not_finish" };
   }
   if (!connectorsContainer) {
-    return "connectors_container_unavailable";
+    return { failure: "connectors_container_unavailable" };
   }
   const { password, totpSecret = null } = secrets;
   const setup = await connectorsContainer.setUpIntegrationUser({
     integrationUser: { email: user.email, password, totpSecret },
   });
   if ("error" in setup) {
-    return SIGN_IN_FAILURES[setup.error] ?? "setup_did_not_finish";
+    return {
+      failure: SIGN_IN_FAILURES[setup.error] ?? "setup_did_not_finish",
+      connectorError: setup.error,
+    };
   }
   await repository.replaceEncryptedSecrets(
     encryptIntegrationUserSecrets(secretBox, { password, totpSecret: setup.answer.totpSecret }),
   );
   return undefined;
+}
+
+/** Why an attempt failed, with the container's error when it answered one, for the log. */
+interface FailedSignIn {
+  failure: IntegrationUserSignInFailure;
+  connectorError?: string;
 }
 
 /** The container's errors the owner is told apart; every other one reads as an unfinished setup. */
