@@ -58,7 +58,8 @@ mutation MarkAccountChangeDoneByHand($input: AccountChangeMarkDoneByHandInput!) 
           suspendedWithAccessCount
         }
       }
-      # For an invite: the employee's invite rows, which now show Invited.
+      # For an invite: what changes on the employee's invite rows, which now show Invited; their
+      # fragments' other fields stay cached, and spreading them would pass the API's depth limit.
       accountChange {
         id
         status
@@ -66,8 +67,13 @@ mutation MarkAccountChangeDoneByHand($input: AccountChangeMarkDoneByHandInput!) 
           id
           appInvites {
             id
-            ...InviteCell_appInvite
-            ...InviteStatusCell_appInvite
+            offered
+            offersReconnect
+            invitedAt
+            latestInvite {
+              id
+              status
+            }
           }
         }
       }
