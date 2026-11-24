@@ -145,4 +145,9 @@ export {
 } from "./googleRelay";
 export { startSharedGoogleSetup, finishSharedGoogleSetup } from "./sharedGoogleSetup";
 export { connectedWorkspace, storedWorkspace } from "./connectedWorkspace";
-export { integrationUserTest, CREATION_START, consentAnswer } from "./integrationUserTest";
+export {
+  integrationUserTest,
+  CREATION_START,
+  consentAnswer,
+  failIntegrationUserSetup,
+} from "./integrationUserTest";

@@ -18,6 +18,20 @@ query ConnectionsSettings {
     integrationUser {
       id
       email
+      signInStatus
+      signInFailure
+    }
+  }
+}
+
+mutation SignInAsIntegrationUser {
+  google {
+    signInAsIntegrationUser {
+      integrationUser {
+        id
+        signInStatus
+        signInFailure
+      }
     }
   }
 }

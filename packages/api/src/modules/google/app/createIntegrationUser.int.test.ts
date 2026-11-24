@@ -117,10 +117,9 @@ test("stores the normalized Google identity and the new offline grant together",
     createdBy: owner.user!.userId,
     createdAt: expect.any(Date) as unknown,
   });
-  expect(await users.readIntegrationUser(owner)).toEqual({
-    id: row.googleUserId,
-    email: START.email,
-  });
+  const signIn = { status: "sign_in_needs_owner", failure: "connectors_container_unavailable" };
+  const expectedUser = { id: row.googleUserId, email: START.email, signIn };
+  await expect.poll(() => users.readIntegrationUser(owner)).toEqual(expectedUser);
   expect(await transact((tx) => users.readGoogleUserId(SYSTEM, tx))).toBe(row.googleUserId);
   const [after] = await storedAppConnections(orm);
   expect(after!.id).toBe(connectionId);

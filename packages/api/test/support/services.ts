@@ -115,9 +115,14 @@ export function googleConnection(
 
 export function integrationUsers(
   orm: Orm,
-  { googleUrl, logger = createLogger("silent") }: { googleUrl: string; logger?: Logger },
+  {
+    googleUrl,
+    connectorsUrl,
+    logger = createLogger("silent"),
+  }: { googleUrl: string; connectorsUrl?: string; logger?: Logger },
 ) {
   return createIntegrationUserService({
+    connectorsUrl,
     orm,
     transact: testTransactor(orm),
     secretBox: TEST_SECRET_BOX,

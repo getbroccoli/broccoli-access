@@ -29,11 +29,49 @@ type GoogleWorkspaceConnection {
   canChangeUsers: Boolean!
 }
 
-"The Google Workspace user Broccoli Access created for itself, which connectors act as. Its password is never returned."
+"The Google Workspace user Broccoli Access created for itself, which connectors act as. Its password and two-step secret are never returned."
 type IntegrationUser {
   "The directory's id for it."
   id: ID!
   email: String!
+  "Where signing in to Google as it stands."
+  signInStatus: IntegrationUserSignInStatus!
+  "Why signing in needs the owner; set exactly when `signInStatus` is `SIGN_IN_NEEDS_OWNER`."
+  signInFailure: IntegrationUserSignInFailure
+}
+
+enum IntegrationUserSignInStatus {
+  "Broccoli Access is signing in to Google as it and setting up its two-step sign-in."
+  SETTING_UP_TWO_STEP_SIGN_IN
+  "Its two-step sign-in is on and Broccoli Access holds the secret."
+  SIGNS_IN_WITH_TWO_STEP_SIGN_IN
+  "The last attempt failed or never finished; the owner tries again."
+  SIGN_IN_NEEDS_OWNER
+}
+
+enum IntegrationUserSignInFailure {
+  "Google showed a CAPTCHA or another check, which Broccoli Access never gets around."
+  BLOCKED_BY_CHECK
+  "Google refused its password or two-step code."
+  AUTHENTICATION_FAILED
+  "The connectors container, whose browser signs in, did not answer or is not configured."
+  CONNECTORS_CONTAINER_UNAVAILABLE
+  "The attempt ended another way, or the instance restarted during it."
+  SETUP_DID_NOT_FINISH
+}
+
+type GoogleMutations {
+  "Starts signing in to Google as the integration user again, unless an attempt runs, and returns it at once; `signInStatus` tells how the attempt ends. Owner only."
+  signInAsIntegrationUser: IntegrationUserMutationPayload!
+}
+
+"The integration user after a change."
+type IntegrationUserMutationPayload {
+  integrationUser: IntegrationUser
+}
+
+type Mutation {
+  google: GoogleMutations!
 }
 
 enum GoogleApp {

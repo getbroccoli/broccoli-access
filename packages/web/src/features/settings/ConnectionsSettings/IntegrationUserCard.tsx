@@ -1,11 +1,8 @@
-import { ArrowUpRight } from "@phosphor-icons/react";
-
 import type { ConnectionsSettingsQuery } from "@/__generated__/graphql";
-import { buttonVariants } from "@/components/ui/button";
 import { t, type MessageKey } from "@/i18n";
-import { cn } from "@/lib/class-names";
 
 import type { IntegrationUserError } from "./connectionsSearch";
+import { CreatedIntegrationUserCard } from "./CreatedIntegrationUserCard";
 import { CreateIntegrationUserDialog } from "./CreateIntegrationUserDialog";
 import { IntegrationUserMark } from "./IntegrationUserMark";
 
@@ -31,34 +28,7 @@ type Props = {
 /** The integration user: what it is with the offer to create it, or the one created. */
 export function IntegrationUserCard({ integrationUser, domain, usesOwnGoogleApp, failure }: Props) {
   if (integrationUser) {
-    return (
-      <article
-        aria-labelledby="integration-user-title"
-        className="flex flex-col gap-4 rounded-xl border border-border p-6 sm:flex-row sm:items-start"
-      >
-        <IntegrationUserMark />
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <h3 id="integration-user-title" className="text-base font-semibold break-all">
-            {integrationUser.email}
-          </h3>
-          <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
-            {t("settings.integrationUser.created")}
-          </span>
-        </div>
-        <a
-          href="https://admin.google.com"
-          target="_blank"
-          rel="noreferrer"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "lg" }),
-            "shrink-0 gap-1.5 px-4",
-          )}
-        >
-          {t("settings.integrationUser.openInGoogleAdmin")}
-          <ArrowUpRight size={14} aria-hidden />
-        </a>
-      </article>
-    );
+    return <CreatedIntegrationUserCard integrationUser={integrationUser} />;
   }
   return (
     <article

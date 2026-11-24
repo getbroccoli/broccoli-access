@@ -1,4 +1,7 @@
+import type { ConnectorErrorCode } from "@broccoli-access/connector-contract";
+
 import type { Orm } from "../../src/core/db";
+import { postFakeControl } from "./reconnect";
 import { test } from "./fixture";
 import { consentAtGoogle, registerGoogleRedirect } from "./googleConsent";
 import { createdGoogleUsers } from "./fakeGoogleControls";
@@ -12,9 +15,13 @@ import {
 
 export const integrationUserTest = test.extend<{
   workspace: Awaited<ReturnType<typeof connectedWorkspace>>;
+  signInWorkspace: Awaited<ReturnType<typeof connectedWorkspace>>;
 }>({
   workspace: async ({ orm, fakeGoogle }, use) => {
     await use(await connectedWorkspace(orm, fakeGoogle.url));
+  },
+  signInWorkspace: async ({ orm, fakeGoogle, fakeConnectors }, use) => {
+    await use(await connectedWorkspace(orm, fakeGoogle.url, fakeConnectors.url));
   },
 });
 
@@ -38,15 +45,22 @@ export async function consentAnswer(
   };
 }
 
-async function connectedWorkspace(orm: Orm, googleUrl: string) {
+export function failIntegrationUserSetup(url: string, code: ConnectorErrorCode) {
+  return postFakeControl(url, "failures", { call: "integration-user/setup", code, count: 1 });
+}
+
+async function connectedWorkspace(orm: Orm, googleUrl: string, connectorsUrl?: string) {
   const { owner, connectionId } = await googleScanSetup(orm, googleUrl);
-  const users = integrationUsers(orm, { googleUrl });
+  const users = integrationUsers(orm, { googleUrl, connectorsUrl });
+  const allowCreation = async (email = CREATION_START.email, account?: string) =>
+    consentAnswer(await users.startCreation(owner, { ...CREATION_START, email }), account);
   return {
     owner,
     connectionId,
     users,
-    allowCreation: async (email = CREATION_START.email, account?: string) =>
-      consentAnswer(await users.startCreation(owner, { ...CREATION_START, email }), account),
+    allowCreation,
+    createUser: async () => users.finishCreation(owner, await allowCreation()),
+    readSignIn: async () => (await users.readIntegrationUser(owner))?.signIn,
     reconnect: async (client: { clientId: string; clientSecret: string }) => {
       const { publicOrigin, now } = CREATION_START;
       await registerGoogleRedirect(googleUrl, publicOrigin, client);

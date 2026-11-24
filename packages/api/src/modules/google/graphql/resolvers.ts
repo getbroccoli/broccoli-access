@@ -1,12 +1,24 @@
 import { type Resolvers, toEnum } from "../../../core/graphql";
+import type { SecurityContext } from "../../../core/security";
 import type { GoogleConnectionService, IntegrationUserService } from "../app";
 import { googleRedirectAddress } from "../domain";
 
 export function createResolvers(
   google: Pick<GoogleConnectionService, "readConnection" | "readOrganization">,
   broccoliGoogleAppAvailable: boolean,
-  integrationUsers: Pick<IntegrationUserService, "readIntegrationUser">,
+  integrationUsers: Pick<IntegrationUserService, "readIntegrationUser" | "startSignIn">,
 ): Resolvers {
+  const readIntegrationUser = async (actor: SecurityContext) => {
+    const found = await integrationUsers.readIntegrationUser(actor);
+    return (
+      found && {
+        id: found.id,
+        email: found.email,
+        signInStatus: toEnum(found.signIn.status),
+        signInFailure: found.signIn.failure && toEnum(found.signIn.failure),
+      }
+    );
+  };
   return {
     Setup: {
       broccoliGoogleAppAvailable: () => broccoliGoogleAppAvailable,
@@ -18,8 +30,17 @@ export function createResolvers(
         const connection = await google.readConnection(context.getActor());
         return connection && { ...connection, googleApp: toEnum(connection.googleApp) };
       },
-      integrationUser: (_parent, _args, context) =>
-        integrationUsers.readIntegrationUser(context.getActor()),
+      integrationUser: (_parent, _args, context) => readIntegrationUser(context.getActor()),
+    },
+    Mutation: {
+      google: () => ({}),
+    },
+    GoogleMutations: {
+      signInAsIntegrationUser: async (_parent, _args, context) => {
+        const actor = context.getActor();
+        await integrationUsers.startSignIn(actor);
+        return { integrationUser: await readIntegrationUser(actor) };
+      },
     },
   };
 }
