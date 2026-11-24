@@ -36,6 +36,20 @@ export function GoogleWorkspaceCard({ connection }: Props) {
           <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
             {needsReconnect ? t("apps.reconnect.button") : t("settings.connections.connected")}
           </span>
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-xs font-medium",
+              connection.canChangeUsers
+                ? "bg-blue-50 text-blue-700"
+                : "bg-muted text-foreground/70",
+            )}
+          >
+            {t(
+              connection.canChangeUsers
+                ? "settings.connections.canChangeUsers"
+                : "settings.connections.readsOnly",
+            )}
+          </span>
         </div>
         <p className="text-sm text-foreground/80">
           {t("settings.connections.summary", {

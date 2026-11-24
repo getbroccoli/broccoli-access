@@ -1,26 +1,25 @@
 import { parseCookies } from "better-auth/cookies";
-import express, { type CookieOptions, type Request, type Response, Router } from "express";
+import express, { type Request, type Response, Router } from "express";
 
-import { ApplicationError, sendApplicationError } from "../../../core/applicationError";
 import { readSetupToken } from "../../../core/instance";
 import type { Logger } from "../../../core/logger";
 import type { ModuleHttp } from "../../../core/moduleManifest";
-import type { SecurityContext } from "../../../core/security";
-import { UnsuccessfulAnswerError } from "../../../utils";
-import type { GoogleConnectionService, GoogleSignInService } from "../app";
+import { NotSuperAdminError, OtherWorkspaceError, UnknownGoogleAccountError } from "../domain";
+import { type ConsentState, consentFlowOf } from "../helpers";
 import {
-  GOOGLE_CALLBACK_PATH,
-  NotSuperAdminError,
-  OtherWorkspaceError,
-  UnknownGoogleAccountError,
-} from "../domain";
-import { CONSENT_LIFETIME_MS, type ConsentState, consentFlowOf } from "../helpers";
+  type Callback,
+  cancelledOrFailed,
+  consentCookie,
+  type GoogleRoutes,
+  logRefusal,
+  requireSecurity,
+  sendStartFailure,
+} from "./consentHandling";
+import { hasConsentAnswer, parseAnswer, parseStart } from "./googleConsentInput";
 import {
-  parseStart,
-  parseAnswer,
-  hasConsentAnswer,
-  type ConsentAnswer,
-} from "./googleConsentInput";
+  finishIntegrationUserCreation,
+  startIntegrationUserCreation,
+} from "./integrationUserRoutes";
 
 /**
  * Google's side of setup, sign-in and Settings, under `/api`: `POST /google/connect` starts the
@@ -30,32 +29,17 @@ import {
  * person on, or back with why it failed.
  */
 export function googleRouter(
-  { connection, signIn }: { connection: GoogleConnectionService; signIn: GoogleSignInService },
+  services: Pick<GoogleRoutes, "connection" | "signIn" | "integrationUsers">,
   http: ModuleHttp,
   logger: Logger,
 ): Router {
-  const routes = { connection, signIn, http, logger };
-  const { resolveSecurity, publicOrigin } = http;
+  const routes = { ...services, http, logger };
+  const { signIn } = services;
+  const { publicOrigin } = http;
   return Router()
-    .post("/google/connect", express.json({ limit: MAX_BODY_BYTES }), async (request, response) => {
-      try {
-        const { clientId, clientSecret, googleApp } = parseStart(request.body);
-        const security = await requireSecurity(resolveSecurity, request, NOT_SETUP_HOLDER);
-        response.json(
-          await connection.startConnection(security, {
-            googleApp,
-            clientId,
-            clientSecret,
-            publicOrigin: await publicOrigin(request),
-            browserOrigin: request.headers.origin,
-            setupToken: readSetupToken(request.headers.cookie),
-            now: new Date(),
-          }),
-        );
-      } catch (error) {
-        sendStartFailure(error, response, logger);
-      }
-    })
+    .post("/google/connect", express.json({ limit: MAX_BODY_BYTES }), (request, response) =>
+      startConnection(routes, request, response),
+    )
     .get("/google/sign-in", async (request, response) => {
       try {
         const origin = await publicOrigin(request);
@@ -73,13 +57,16 @@ export function googleRouter(
     .post("/google/change-app", express.json({ limit: MAX_BODY_BYTES }), (request, response) =>
       startAppChange(routes, request, response),
     )
+    .post(
+      "/google/integration-user",
+      express.json({ limit: MAX_BODY_BYTES }),
+      (request, response) => startIntegrationUserCreation(routes, request, response),
+    )
     .get("/google/callback", async (request, response) => {
       const answer = parseAnswer(request.query);
       await finisherOf(consentFlowOf(answer.state ?? ""))(routes, { request, response, answer });
     });
 }
-
-const INTERNAL_SERVER_ERROR = 500;
 
 /** Far above two Google client credentials. */
 const MAX_BODY_BYTES = "10kb";
@@ -102,21 +89,6 @@ const SIGN_IN_COOKIE = "broccoli_access_google_sign_in";
 /** Binds a Google app change's `state` to the browser that started it, like `SIGN_IN_COOKIE`. */
 const CHANGE_APP_COOKIE = "broccoli_access_google_change_app";
 
-/** What the callback's handlers use. */
-interface GoogleRoutes {
-  connection: GoogleConnectionService;
-  signIn: GoogleSignInService;
-  http: ModuleHttp;
-  logger: Logger;
-}
-
-/** One callback request with Google's answer. */
-interface Callback {
-  request: Request;
-  response: Response;
-  answer: ConsentAnswer;
-}
-
 /** Why the connect step failed, as the setup page shows it. */
 type ConnectFailure = "cancelled" | "not_super_admin" | "failed";
 
@@ -133,8 +105,35 @@ function finisherOf(flow: string): (routes: GoogleRoutes, callback: Callback) =>
       return finishSignIn;
     case "change_google_app" satisfies ConsentState["flow"]:
       return finishAppChange;
+    case "create_integration_user" satisfies ConsentState["flow"]:
+      return finishIntegrationUserCreation;
     default:
       return finishConsent;
+  }
+}
+
+/** Starts the admin's consent for the browser holding setup. */
+async function startConnection(
+  { connection, http, logger }: GoogleRoutes,
+  request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const { clientId, clientSecret, googleApp } = parseStart(request.body);
+    const security = await requireSecurity(http.resolveSecurity, request, NOT_SETUP_HOLDER);
+    response.json(
+      await connection.startConnection(security, {
+        googleApp,
+        clientId,
+        clientSecret,
+        publicOrigin: await http.publicOrigin(request),
+        browserOrigin: request.headers.origin,
+        setupToken: readSetupToken(request.headers.cookie),
+        now: new Date(),
+      }),
+    );
+  } catch (error) {
+    sendStartFailure(error, response, logger);
   }
 }
 
@@ -260,71 +259,6 @@ function appChangeFailureOf(error: unknown): AppChangeFailure {
     return "other_workspace";
   }
   return error instanceof NotSuperAdminError ? "not_super_admin" : "failed";
-}
-
-/** HttpOnly, sent on Google's top-level redirect back (SameSite=Lax), Secure on HTTPS. */
-function consentCookie(publicOrigin: string): CookieOptions {
-  return {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: publicOrigin.startsWith("https:"),
-    path: GOOGLE_CALLBACK_PATH,
-    maxAge: CONSENT_LIFETIME_MS,
-  };
-}
-
-function cancelledOrFailed({ error }: ConsentAnswer): "cancelled" | "failed" {
-  return error === "access_denied" ? "cancelled" : "failed";
-}
-
-/** The caller's security context; refuses a request without a session with FORBIDDEN. */
-async function requireSecurity(
-  resolveSecurity: ModuleHttp["resolveSecurity"],
-  request: Request,
-  refusal: string,
-): Promise<SecurityContext> {
-  const { security } = await resolveSecurity(request.headers);
-  if (!security) {
-    throw new ApplicationError("FORBIDDEN", refusal);
-  }
-  return security;
-}
-
-/** An expected refusal as its status; anything else as a 500, logged without its contents. */
-function sendStartFailure(error: unknown, response: Response, logger: Logger): void {
-  if (error instanceof ApplicationError) {
-    sendApplicationError(error, response);
-    return;
-  }
-  logger.error(failureFacts(error), "Google consent could not start");
-  response.sendStatus(INTERNAL_SERVER_ERROR);
-}
-
-/** A refusal the flow expects is a warning; anything else, such as Postgres failing, an error. */
-function logRefusal(
-  logger: Logger,
-  error: unknown,
-  failure: ConnectFailure | SignInFailure | AppChangeFailure,
-  message: string,
-): void {
-  const expected =
-    error instanceof ApplicationError ||
-    error instanceof NotSuperAdminError ||
-    error instanceof OtherWorkspaceError ||
-    error instanceof UnknownGoogleAccountError;
-  logger[expected ? "warn" : "error"]({ failure, ...failureFacts(error) }, message);
-}
-
-/**
- * What a log may say about a failure: its class, an HTTP answer's status and an application error's
- * code. Never its message or stack, which can carry Google's addresses (RULE31).
- */
-function failureFacts(error: unknown): { kind: string; status?: number; code?: string } {
-  return {
-    kind: error instanceof Error ? error.name : typeof error,
-    ...(error instanceof UnsuccessfulAnswerError && { status: error.status }),
-    ...(error instanceof ApplicationError && { code: error.code }),
-  };
 }
 
 function sendBackToConnect(response: Response, failure: ConnectFailure): void {

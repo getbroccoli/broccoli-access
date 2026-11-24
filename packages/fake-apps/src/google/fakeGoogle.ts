@@ -9,6 +9,7 @@ import { directoryRoutes } from "./directory";
 import { grantEventRoutes } from "./grantEvents";
 import { signInRoutes } from "./signIn";
 import { findPerson, seededState } from "./state";
+import { userWriteRoutes } from "./userWrites";
 
 export interface FakeGoogleOptions {
   /** Redirect addresses registered for the seed's OAuth client. */
@@ -71,6 +72,7 @@ function fakeGoogleApp(context: FakeGoogleContext): express.Express {
   app.disable("x-powered-by");
   app.use(signInRoutes(context));
   app.use(directoryRoutes(context));
+  app.use(userWriteRoutes(context));
   app.use(grantEventRoutes(context));
   app.use(controlRoutes(context));
   return app;

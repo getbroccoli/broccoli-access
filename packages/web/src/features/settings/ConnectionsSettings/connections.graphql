@@ -7,12 +7,17 @@ query ConnectionsSettings {
       clientId
       domain
       adminEmail
+      canChangeUsers
       scan {
         id
         status
         failure
         readAt
       }
+    }
+    integrationUser {
+      id
+      email
     }
   }
 }

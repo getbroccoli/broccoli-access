@@ -71,6 +71,13 @@
       "when": 1795531321645,
       "tag": "0009_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795533678239,
+      "tag": "0010_create_integration_user",
+      "breakpoints": true
     }
   ]
 }

@@ -17,6 +17,7 @@ import {
   type App,
   type AppAccountRepository,
 } from "../../src/modules/apps/db";
+import { integrationUserRepository } from "../../src/modules/google/db";
 import { employeeTemplates, templateApps, templates } from "../../src/modules/templates/db";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { seedUser } from "./seedUser";
@@ -178,6 +179,17 @@ export class TestSeed {
       connector,
       settings: {},
       encryptedSecrets: TEST_SECRET_BOX.encrypt("{}", id),
+    });
+  }
+
+  async integrationUser(fields: { email: string; googleUserId: string; createdBy: string }) {
+    await integrationUserRepository(this.orm).insert({
+      ...fields,
+      createdAt: new Date("2026-11-21T12:00:00Z"),
+      encryptedSecrets: TEST_SECRET_BOX.encrypt(
+        JSON.stringify({ password: "acme-demo-password-for-the-integration-user" }),
+        "integration_user",
+      ),
     });
   }
 

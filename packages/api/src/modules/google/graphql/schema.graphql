@@ -10,6 +10,8 @@ type Setup {
   organizationDomain: String
   "The Google Workspace connection; null before it exists. Owner only, though the rest of `Setup` is public."
   googleWorkspace: GoogleWorkspaceConnection
+  "The integration user; null before the owner creates it. Owner only, though the rest of `Setup` is public."
+  integrationUser: IntegrationUser
 }
 
 "The connected Google Workspace and the Google app it uses."
@@ -23,6 +25,15 @@ type GoogleWorkspaceConnection {
   organizationName: String!
   "The super admin who connected it."
   adminEmail: String!
+  "Whether the admin allowed creating and changing the directory's users, which setup's consent does not ask for."
+  canChangeUsers: Boolean!
+}
+
+"The Google Workspace user Broccoli Access created for itself, which connectors act as. Its password is never returned."
+type IntegrationUser {
+  "The directory's id for it."
+  id: ID!
+  email: String!
 }
 
 enum GoogleApp {

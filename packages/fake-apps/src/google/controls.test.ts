@@ -3,6 +3,10 @@ import { expect } from "vitest";
 
 import {
   ADMIN_SCOPES,
+  insertGoogleUser,
+  updateGoogleUser,
+  NEW_USER,
+  USER_WRITE_SCOPE,
   authorizationParams,
   control,
   DAY,
@@ -64,13 +68,7 @@ it("reports the unmodified seed counts without authentication", async ({ fake })
   const response = await fetch(`${fake.url}/_fake/state`);
 
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
-    people: 42,
-    suspendedPeople: 2,
-    apps: 37,
-    grants: ACME.grants.length,
-    events: 27,
-  });
+  expect(await response.json()).toEqual(SEED_STATE);
 });
 
 it.for([
@@ -96,22 +94,14 @@ it.for([
 });
 
 it("counts distinct granted clients rather than grants as apps", async ({ fake }) => {
-  await control(fake.url, "/grants", {
-    email: "ana@acme.example",
-    clientId: "new-app",
-    appName: "New app",
-  });
-  await control(fake.url, "/grants", {
-    email: "ben@acme.example",
-    clientId: "new-app",
-    appName: "New app",
-  });
+  for (const email of ["ana@acme.example", "ben@acme.example"]) {
+    await control(fake.url, "/grants", { email, clientId: "new-app", appName: "New app" });
+  }
 
   const response = await fetch(`${fake.url}/_fake/state`);
 
   expect(await response.json()).toEqual({
-    people: 42,
-    suspendedPeople: 2,
+    ...SEED_STATE,
     apps: 38,
     grants: ACME.grants.length + 2,
     events: 29,
@@ -188,13 +178,9 @@ it("resets modified people and grants to the seed", async ({ fake }) => {
 
   await control(fake.url, "/reset");
 
-  expect(await fetch(`${fake.url}/_fake/state`).then((response) => response.json())).toEqual({
-    people: 42,
-    suspendedPeople: 2,
-    apps: 37,
-    grants: ACME.grants.length,
-    events: 27,
-  });
+  expect(await fetch(`${fake.url}/_fake/state`).then((response) => response.json())).toEqual(
+    SEED_STATE,
+  );
   const tokens = await signIn(fake.url, { scope: ADMIN_SCOPES });
   const headers = { authorization: `Bearer ${tokens.access_token}` };
   const users = (await fetch(`${fake.url}${USERS_PATH}`, { headers }).then((response) =>
@@ -296,3 +282,66 @@ it("forgets registered clients on reset", async ({ fake }) => {
   expect(response.status).toBe(401);
   expect(await response.text()).toContain("invalid_client");
 });
+
+it("reports only public fields of created users until reset", async ({ fake }) => {
+  const { access_token } = await signIn(fake.url, { scope: USER_WRITE_SCOPE });
+  expect((await insertGoogleUser(fake.url, access_token)).status).toBe(200);
+  expect((await updateGoogleUser(fake.url, access_token, NEW_USER.primaryEmail, true)).status).toBe(
+    200,
+  );
+
+  const response = await fetch(`${fake.url}/_fake/state`);
+  const state = (await response.json()) as FakeState;
+  expect(state.createdUsers).toEqual([
+    { primaryEmail: NEW_USER.primaryEmail, suspended: true, changePasswordAtNextLogin: false },
+  ]);
+  expect(JSON.stringify(state)).not.toContain(NEW_USER.password);
+  expect(JSON.stringify(state)).not.toContain('"password"');
+
+  await control(fake.url, "/reset");
+  expect(await (await fetch(`${fake.url}/_fake/state`)).json()).toMatchObject({ createdUsers: [] });
+});
+
+it("deletes a user from the directory and returns 404 when it is already gone", async ({
+  fake,
+}) => {
+  const { access_token } = await signIn(fake.url, { scope: ADMIN_SCOPES });
+  const email = "chloe@acme.example";
+
+  await control(fake.url, `/users/${email}/delete`);
+
+  const response = await fetch(`${fake.url}${USERS_PATH}&maxResults=100`, {
+    headers: { authorization: `Bearer ${access_token}` },
+  });
+  expect(response.status).toBe(200);
+  const { users } = (await response.json()) as DirectoryUsers;
+  expect(users).toHaveLength(ACME.people.length - 1);
+  expect(users.map(({ primaryEmail }) => primaryEmail)).not.toContain(email);
+  expect((await fetch(`${fake.url}/_fake/users/${email}/delete`, { method: "POST" })).status).toBe(
+    404,
+  );
+});
+
+it("invalidates a deleted user's access and refresh tokens", async ({ fake }) => {
+  const email = "chloe@acme.example";
+  const tokens = await signIn(fake.url, { account: email, access_type: "offline" });
+  const headers = { authorization: `Bearer ${tokens.access_token}` };
+  expect((await fetch(`${fake.url}/v1/userinfo`, { headers })).status).toBe(200);
+  expect(tokens.refresh_token).toBeTruthy();
+
+  await control(fake.url, `/users/${email}/delete`);
+
+  expect((await fetch(`${fake.url}/v1/userinfo`, { headers })).status).toBe(401);
+  const refreshed = await refreshAccessToken(fake.url, tokens.refresh_token!);
+  expect(refreshed.status).toBe(400);
+  expect(await refreshed.json()).toMatchObject({ error: "invalid_grant" });
+});
+
+const SEED_STATE = {
+  createdUsers: [],
+  people: 42,
+  suspendedPeople: 2,
+  apps: 37,
+  grants: ACME.grants.length,
+  events: 27,
+};

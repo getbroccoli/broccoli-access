@@ -14,3 +14,11 @@ export {
   UnknownGoogleAccountError,
   withGoogleApp,
 } from "./googleWorkspace";
+export {
+  EmailTakenError,
+  GOOGLE_USER_WRITE_SCOPE,
+  INTEGRATION_USER_NAME,
+  type IntegrationUser,
+  parseIntegrationUserEmail,
+  UserWriteRefusedError,
+} from "./integrationUser";

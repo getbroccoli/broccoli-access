@@ -33,3 +33,4 @@ export { callConnector, linearRequest, listSlackPages, memberAccount } from "./c
 export { signInToFakeSlack, slackOwnerRequest } from "./signInToFakeSlack";
 export { integrationUser, inviteSlackAdmin } from "./integrationUser";
 export { testWithCreatedGoogleUser } from "./createdGoogleUser";
+export { NEW_USER, USER_WRITE_SCOPE, insertGoogleUser, updateGoogleUser } from "./userWrites";

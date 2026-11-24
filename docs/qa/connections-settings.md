@@ -1,6 +1,6 @@
 # QA: Connections settings
 
-A manual check of Settings → Connections against a development stack: the Google Workspace card, "Scan now", "Change Google app" and the apps the connectors container connects.
+A manual check of Settings → Connections against a development stack: the Google Workspace card, "Scan now", "Change Google app", the integration user and the apps the connectors container connects.
 
 ## Setup
 
@@ -27,6 +27,23 @@ A manual check of Settings → Connections against a development stack: the Goog
 - [ ] Choosing Cancel at Google returns to the change page with "You cancelled at Google. The Google app hasn’t changed."
 - [ ] Consenting as a user who is not a super admin returns with "That Google account isn’t a super admin. Sign in with a super admin account."
 - [ ] After a change, signing out and "Sign in with Google" asks Google with the new client and lands signed in.
+
+## Integration user
+
+Start without an integration user (`pnpm dev --drop-db`, then setup again).
+
+- [ ] The Google Workspace card shows "Reads only" beside "Connected".
+- [ ] "Integration user" heads a green card between "Directory" and "Apps": "Give Broccoli Access its own user", "An integration user is a separate Google Workspace account, such as broccoli@acme.example, that Broccoli Access signs in to your apps with. It creates, changes and removes accounts as this user, not with your own session.", three points ("If an app blocks automation, it blocks this user, not you.", "Keeps working when you are signed out or away.", "Suspend it in Google to stop everything at once.") and "Create integration user".
+- [ ] "Create integration user" opens the dialog "Create the integration user": "Its email address" holds "broccoli" before a fixed "@acme.example", with "Google will ask you to allow creating users. This uses one paid Google seat.", "Cancel" and "Continue to Google"; Escape and "Cancel" close it.
+- [ ] At 390 px wide, "Create integration user" wraps under the card's text, and its dialog fits the screen without scrolling sideways.
+- [ ] An address such as "bro ccoli" shows "Use letters and digits, with single dots, hyphens or underscores between them." under the field and stays in the dialog.
+- [ ] "Continue to Google" opens the fake's consent page, which lists only "See, create and change users in your organisation", also after another account allowed it. Cancel there returns to Connections with "You cancelled at Google. No integration user was created." in the card, and the Google Workspace card still shows "Reads only".
+- [ ] After `POST <fake>/_fake/consent/refuse-scope` with `{"scope":"https://www.googleapis.com/auth/admin.directory.user"}`, Allow returns with "Google didn’t get your permission to create users, so no integration user was created. Try again and allow it."
+- [ ] With the address "ana", Allow returns with "That address is already used in your Google Workspace. Pick another one."
+- [ ] Choosing Chloé Martin on the consent page returns with "That Google account isn’t a super admin. Sign in with a super admin account."
+- [ ] With "broccoli", Allow as Mia Novak returns to Connections: the card shows "broccoli@acme.example" with "Created" and "Open in Google admin", which opens `https://admin.google.com` in a new tab; the Google Workspace card shows "Can create and change users"; and `GET <fake>/_fake/state` lists `broccoli@acme.example` under `createdUsers`, with no password.
+- [ ] Connected with the Broccoli Google app, the card shows "Creating it needs your own Google app. Change the Google app above first." and no "Create integration user".
+- [ ] After "Scan now", People does not list `broccoli@acme.example`, and its count is unchanged.
 
 ## Apps
 

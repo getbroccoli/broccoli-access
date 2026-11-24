@@ -101,6 +101,7 @@ test("maps all 42 Google directory users to their own app's accounts", async ({
       },
       isAdmin: person.isSuperAdmin,
       suspended: person.suspended,
+      changePasswordAtNextLogin: false,
       orgUnitPath: "/",
       ...(person.managerEmail !== null && {
         relations: [{ value: person.managerEmail, type: "manager" }],

@@ -45,3 +45,25 @@ export async function revokeAtFakeGoogle(
   });
   assert.equal(response.status, 204);
 }
+
+export async function refuseGoogleScope(googleUrl: string, scope: string) {
+  const response = await fetch(`${googleUrl}/_fake/consent/refuse-scope`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ scope }),
+  });
+  assert.equal(response.status, 204);
+}
+
+export async function createdGoogleUsers(googleUrl: string) {
+  const response = await fetch(`${googleUrl}/_fake/state`);
+  assert.equal(response.status, 200);
+  const state = (await response.json()) as {
+    createdUsers: {
+      primaryEmail: string;
+      suspended: boolean;
+      changePasswordAtNextLogin: boolean;
+    }[];
+  };
+  return state.createdUsers;
+}

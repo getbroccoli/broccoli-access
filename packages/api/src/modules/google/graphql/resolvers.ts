@@ -1,10 +1,11 @@
 import { type Resolvers, toEnum } from "../../../core/graphql";
-import type { GoogleConnectionService } from "../app";
+import type { GoogleConnectionService, IntegrationUserService } from "../app";
 import { googleRedirectAddress } from "../domain";
 
 export function createResolvers(
   google: Pick<GoogleConnectionService, "readConnection" | "readOrganization">,
   broccoliGoogleAppAvailable: boolean,
+  integrationUsers: Pick<IntegrationUserService, "readIntegrationUser">,
 ): Resolvers {
   return {
     Setup: {
@@ -17,6 +18,8 @@ export function createResolvers(
         const connection = await google.readConnection(context.getActor());
         return connection && { ...connection, googleApp: toEnum(connection.googleApp) };
       },
+      integrationUser: (_parent, _args, context) =>
+        integrationUsers.readIntegrationUser(context.getActor()),
     },
   };
 }

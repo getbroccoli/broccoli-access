@@ -5,3 +5,7 @@ export {
 } from "./googleConnectionService";
 export { createGoogleSignInService, type GoogleSignInService } from "./googleSignInService";
 export { createGoogleWorkspaceConnector } from "./googleWorkspaceConnector";
+export {
+  createIntegrationUserService,
+  type IntegrationUserService,
+} from "./integrationUserService";

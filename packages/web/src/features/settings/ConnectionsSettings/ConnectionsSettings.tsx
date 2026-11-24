@@ -9,10 +9,17 @@ import { PageHeader } from "@/shell";
 
 import { ContainerConnectorsSettings } from "../ContainerConnectorsSettings";
 import { ChromeExtensionCard } from "./ChromeExtensionCard";
+import type { IntegrationUserError } from "./connectionsSearch";
 import { GoogleWorkspaceCard } from "./GoogleWorkspaceCard";
+import { IntegrationUserCard } from "./IntegrationUserCard";
+
+type Props = {
+  /** Why the last creation of the integration user failed, from Google's redirect back. */
+  integrationUserError: IntegrationUserError | undefined;
+};
 
 /** Settings' Connections page: where Broccoli Access finds people and their accounts. */
-export function ConnectionsSettings() {
+export function ConnectionsSettings({ integrationUserError }: Props) {
   // A scan started elsewhere, such as in another tab, changes the connection outside this cache.
   const query = useQuery(ConnectionsSettingsDocument, { fetchPolicy: "cache-and-network" });
   const { data, error, refetch } = query;
@@ -43,6 +50,22 @@ export function ConnectionsSettings() {
             !data && <Skeleton className="h-[150px] rounded-xl" />
           )}
         </section>
+        {connection && (
+          <section aria-labelledby="integration-user-section" className="flex flex-col gap-2.5">
+            <h2
+              id="integration-user-section"
+              className="text-sm font-semibold text-muted-foreground"
+            >
+              {t("settings.integrationUser.section")}
+            </h2>
+            <IntegrationUserCard
+              integrationUser={data.setup.integrationUser}
+              domain={connection.domain}
+              usesOwnGoogleApp={connection.googleApp === "OWN_GOOGLE_APP"}
+              failure={integrationUserError}
+            />
+          </section>
+        )}
         <ContainerConnectorsSettings />
       </div>
       <ChromeExtensionCard />

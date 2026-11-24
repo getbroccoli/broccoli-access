@@ -10,7 +10,11 @@ import type { SecretBox } from "../../../core/secrets";
  * token's nonce.
  */
 export type ConsentState =
-  WorkspaceConsentState | SignInState | GoogleAppChangeState | RelayConsentState;
+  | WorkspaceConsentState
+  | SignInState
+  | GoogleAppChangeState
+  | IntegrationUserCreationState
+  | RelayConsentState;
 
 /** The relay's compact state carries the proof needed to redeem its one-use handoff. */
 export interface RelayConsentState {
@@ -53,6 +57,15 @@ export interface SignInState {
   expiresAt: number;
 }
 
+/** The owner creating the integration user, carrying the address they picked for it. */
+export interface IntegrationUserCreationState {
+  flow: "create_integration_user";
+  email: string;
+  nonce: string;
+  /** Epoch milliseconds after which Google's answer is refused. */
+  expiresAt: number;
+}
+
 /** How long a person has between starting a consent and Google's answer: ten minutes. */
 export const CONSENT_LIFETIME_MS = 10 * 60_000;
 
@@ -66,6 +79,7 @@ export function sealConsentState(
   state:
     | Omit<WorkspaceConsentState | GoogleAppChangeState, "expiresAt">
     | Omit<SignInState, "expiresAt">
+    | Omit<IntegrationUserCreationState, "expiresAt">
     | Omit<RelayConsentState, "expiresAt">,
   { browserToken, now }: { browserToken: string; now: Date },
 ): string {
@@ -172,6 +186,12 @@ const CONSENT_STATE = z.discriminatedUnion("flow", [
     revision: z.string().optional(),
     clientId: z.string(),
     clientSecret: z.string(),
+    nonce: z.string(),
+    expiresAt: z.number(),
+  }),
+  z.object({
+    flow: z.literal("create_integration_user"),
+    email: z.string(),
     nonce: z.string(),
     expiresAt: z.number(),
   }),

@@ -10,7 +10,7 @@ import type { Logger } from "../../../core/logger";
 import type { SecurityContext } from "../../../core/security";
 import { importSourceRepository } from "../db";
 import { type Scan, type ScanCounts, type ScanProgress, scanOf } from "../domain";
-import type { DirectoryPeople, ScannedApps } from "../ports";
+import type { DirectoryPeople, IntegrationUser, ScannedApps } from "../ports";
 import { type ScanFailure, scanSource } from "./scanSource";
 
 /** Scans of connected apps: queued in the caller's transaction, run as a job, read by the scan page. */
@@ -66,6 +66,8 @@ export interface ScanDependencies {
   connectors: ConnectorRegistry;
   apps: ScannedApps;
   directory: DirectoryPeople;
+  /** Whose directory account creates no employee. */
+  integrationUser: IntegrationUser;
   /** Waits between attempts of a call; tests pass one that does not wait. */
   wait?: (ms: number) => Promise<void>;
 }

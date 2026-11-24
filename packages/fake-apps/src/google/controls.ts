@@ -18,18 +18,11 @@ export function controlRoutes(context: FakeGoogleContext): Router {
       context.reset();
       response.sendStatus(204);
     })
-    .get("/_fake/state", (_request, response) => {
-      const { people, grants, events } = context.state;
-      response.json({
-        people: people.length,
-        suspendedPeople: people.filter((person) => person.suspended).length,
-        apps: new Set(grants.map((grant) => grant.clientId)).size,
-        grants: grants.length,
-        events: events.length,
-      });
-    })
+    .get("/_fake/state", showState(context))
     .post("/_fake/users/:email/suspend", setSuspended(context, true))
     .post("/_fake/users/:email/unsuspend", setSuspended(context, false))
+    .post("/_fake/users/:email/delete", deleteUser(context))
+    .post("/_fake/consent/refuse-scope", refuseScope(context))
     .post("/_fake/grants", addGrant(context))
     .delete("/_fake/grants", deleteGrant(context))
     .post("/_fake/failures", planFailures(context))
@@ -59,6 +52,8 @@ const PLANNED_FAILURE = z.object({
   count: z.number().int().positive(),
 });
 
+const REFUSED_SCOPE = z.object({ scope: z.string().min(1) });
+
 const NEW_CLIENT = z.object({
   clientId: z.string().min(1),
   clientSecret: z.string().min(1),
@@ -68,6 +63,27 @@ const NEW_CLIENT = z.object({
 /** The default scopes of a grant added by hand: what an app asks for to sign people in. */
 const SIGN_IN_SCOPES = ["openid", "email", "profile"];
 
+/** Counts of what the fake holds, and the users created since the last reset, never a password. */
+function showState(context: FakeGoogleContext): RequestHandler {
+  return (_request, response) => {
+    const { people, grants, events } = context.state;
+    response.json({
+      people: people.length,
+      suspendedPeople: people.filter((person) => person.suspended).length,
+      apps: new Set(grants.map((grant) => grant.clientId)).size,
+      grants: grants.length,
+      events: events.length,
+      createdUsers: people
+        .filter((person) => person.createdSinceReset)
+        .map(({ email, suspended, changePasswordAtNextLogin }) => ({
+          primaryEmail: email,
+          suspended,
+          changePasswordAtNextLogin,
+        })),
+    });
+  };
+}
+
 function setSuspended(
   context: FakeGoogleContext,
   suspended: boolean,
@@ -76,6 +92,32 @@ function setSuspended(
     const person = findPerson(context.state, request.params.email);
     if (person === undefined) return notFound(response, "No person has this email");
     person.suspended = suspended;
+    response.sendStatus(204);
+  };
+}
+
+/** The user leaves the directory with their grants and tokens, as when an admin deletes them in Google. */
+function deleteUser(context: FakeGoogleContext): RequestHandler<{ email: string }> {
+  return (request, response) => {
+    const { state } = context;
+    const person = findPerson(state, request.params.email);
+    if (person === undefined) return notFound(response, "No person has this email");
+    state.people = state.people.filter((other) => other !== person);
+    state.grants = state.grants.filter((grant) => grant.email !== person.email);
+    for (const tokens of [state.accessTokens, state.refreshTokens, state.authorizationCodes]) {
+      for (const [token, holder] of tokens) {
+        if (holder.email === person.email) tokens.delete(token);
+      }
+    }
+    response.sendStatus(204);
+  };
+}
+
+function refuseScope(context: FakeGoogleContext): RequestHandler {
+  return (request, response) => {
+    const body = REFUSED_SCOPE.safeParse(request.body);
+    if (!body.success) return invalidBody(response, body.error);
+    context.state.refusedScope = body.data.scope;
     response.sendStatus(204);
   };
 }
