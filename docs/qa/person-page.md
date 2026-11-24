@@ -30,7 +30,7 @@ Approve Slack again on its page, connect Linear as in [Connections settings](con
 
 ### Account actions with templates
 
-- [ ] Create a template named Linear users with Linear as its only app. Assign it to Chloé, then take it off. Her Linear row shows **Active** and **Extra** together and still offers **Disable**. Disable it from that row. Progress gives way to **Disabled** and **Enable**, and Extra clears.
+- [ ] Create a template named Linear users with Linear as its only app. Assign it to Chloé, then take it off. Her Linear row shows a single **Extra** status badge and offers **Disable**. Use `fail unexpected_response` and disable the account from that row. **Extra** stays visible during progress and alongside **Couldn’t disable** and **Try again**. Retry. Once the account is disabled, Extra clears and the row shows **Disabled** and **Enable**.
 - [ ] Assign Linear users to Chloé again. The row shows both **Disabled** and **Missing**. Set `fail unexpected_response` as described above, then choose **Enable**. Open the failure and choose **I did it by hand**. With the Network panel recording, use a local test proxy to allow the confirmation mutation and fail the next person-page read once. Confirm. The page says the change was saved, explains that the displayed access could not refresh and offers a retry.
 - [ ] Retry from that message. The Network panel shows a read and just one confirmation mutation across both attempts. Without a reload, the row shows **Active** and **Disable**, and Missing clears.
 
