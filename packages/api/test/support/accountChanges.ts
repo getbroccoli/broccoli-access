@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { AccountStatus, ListedAccount } from "@broccoli-access/connector-contract";
 import { ACME_LINEAR, type SeedMember } from "@broccoli-access/fake-apps";
 
+import type { ConnectorRegistry } from "../../src/core/connectors";
 import type { Orm, Transact } from "../../src/core/db";
 import type { JobQueue } from "../../src/core/jobs";
 import { createLogger } from "../../src/core/logger";
@@ -23,11 +24,17 @@ export function accountChanges(
   orm: Orm,
   {
     connectorsUrl,
+    connectors: suppliedConnectors,
     jobs = recordingJobQueue().jobs,
     transact = testTransactor(orm),
-  }: { connectorsUrl?: string; jobs?: JobQueue; transact?: Transact } = {},
+  }: {
+    connectors?: ConnectorRegistry;
+    connectorsUrl?: string;
+    jobs?: JobQueue;
+    transact?: Transact;
+  } = {},
 ) {
-  const container = containerConnectors(connectorsUrl);
+  const container = suppliedConnectors ?? containerConnectors(connectorsUrl);
   const google = createGoogleWorkspaceConnector({
     openIdConfigurationUrl: "http://127.0.0.1:9/.well-known/openid-configuration",
     adminApiUrl: "http://127.0.0.1:9",

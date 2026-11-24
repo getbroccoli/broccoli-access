@@ -1,13 +1,19 @@
-import { ApplicationError, invalidInput } from "../../../core/applicationError";
+import { invalidInput } from "../../../core/applicationError";
 import type { Tx } from "../../../core/db";
 import type { ModuleDependencies } from "../../../core/moduleManifest";
 import { type Connection, type PageArgs, paginate } from "../../../core/pagination";
 import { createRecordHistoryService, type FieldChange } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
-import { TEMPLATE_SORT_VALUES, templateRepository } from "../db";
+import { assignmentRepository, TEMPLATE_SORT_VALUES, templateRepository } from "../db";
 import { parseTemplateName, type Template, TemplateNameTakenError } from "../domain";
-import type { AppsById } from "../ports";
+import type { AppsById, EmployeeById, PersonAccess } from "../ports";
+import {
+  createTemplateAssignmentService,
+  type TemplateAssignmentService,
+} from "./templateAssignmentService";
+import { lockTemplate } from "./lockTemplate";
+import { reviewLostApps } from "./reviewLostApps";
 
 const recordHistory = createRecordHistoryService();
 
@@ -15,7 +21,7 @@ const recordHistory = createRecordHistoryService();
  * Templates, the named lists of apps the owner assigns to people: each change in one transaction
  * with its history line. Every operation needs MANAGE_WORKSPACE.
  */
-export interface TemplateService {
+export interface TemplateService extends TemplateAssignmentService {
   /** The templates, by name ignoring case. */
   listTemplates: (ctx: SecurityContext, args: PageArgs) => Promise<Connection<Template>>;
   /** The template; null for an unknown or malformed id. */
@@ -53,7 +59,8 @@ interface TemplateAppInput {
 
 type TemplateDependencies = Pick<ModuleDependencies, "orm" | "transact" | "logger"> & {
   /** The apps module, which knows each app's name and whether the company uses it. */
-  apps: AppsById;
+  apps: AppsById & PersonAccess;
+  employees: EmployeeById;
 };
 
 export function createTemplateService({
@@ -61,8 +68,10 @@ export function createTemplateService({
   transact,
   logger,
   apps,
+  employees,
 }: TemplateDependencies): TemplateService {
   return {
+    ...createTemplateAssignmentService({ orm, transact, logger, apps, employees }),
     async listTemplates(ctx, pageArgs) {
       ctx.require("MANAGE_WORKSPACE");
       return paginate(pageArgs, {
@@ -117,7 +126,15 @@ export function createTemplateService({
       ctx.require("MANAGE_WORKSPACE");
       const deleted = await transact(async (tx) => {
         const template = await lockTemplate(tx, templateId);
+        const assigned = await assignmentRepository(tx).forTemplates([template.id]);
         await templateRepository(tx).delete(template.id);
+        await reviewLostApps(
+          ctx,
+          tx,
+          apps,
+          assigned.map((row) => row.employeeId),
+          template.apps.map((row) => row.appId),
+        );
         await appendHistory(ctx, tx, {
           templateId: template.id,
           operation: "DELETED",
@@ -163,15 +180,23 @@ export function createTemplateService({
         if (!app || !member) {
           return { template: before, changed: false };
         }
+        const assigned = await assignmentRepository(tx).forTemplates([before.id]);
         await templateRepository(tx).deleteApp(before.id, app.id);
+        await reviewLostApps(
+          ctx,
+          tx,
+          apps,
+          assigned.map((row) => row.employeeId),
+          [app.id],
+        );
         const takenOut = { field: "app", oldValue: app.id, oldLabel: app.name, newValue: null };
         await appendHistory(ctx, tx, {
           templateId: before.id,
           operation: "UPDATED",
           change: takenOut,
         });
-        const apps = before.apps.filter(({ id }) => id !== member.id);
-        return { template: { ...before, apps }, changed: true };
+        const remaining = before.apps.filter(({ id }) => id !== member.id);
+        return { template: { ...before, apps: remaining }, changed: true };
       });
       if (changed) {
         logger.info({ templateId: template.id, appId: app?.id }, "App taken out of a template");
@@ -179,16 +204,6 @@ export function createTemplateService({
       return template;
     },
   };
-}
-
-/** The template, locked until the transaction ends; refuses an unknown or malformed id. */
-async function lockTemplate(tx: Tx, templateId: string): Promise<Template> {
-  const id = parseUuid(templateId);
-  const template = id && (await templateRepository(tx).lockById(id));
-  if (!template) {
-    throw new ApplicationError("NOT_FOUND", "No template has this id.");
-  }
-  return template;
 }
 
 /** The app with its name and status; null for an unknown or malformed id. */

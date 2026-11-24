@@ -11,13 +11,13 @@ A manual check of a person's page, `/people/<id>`, against a development stack.
 
 - [ ] The page shows "‹ People", which leads back to People, Ana's initials, "Ana Ruiz" with a "Suspended in Google" badge, and `ana@acme.example` below.
 - [ ] An amber box reads "Ana is suspended in Google but still has accounts in 3 approved apps."
-- [ ] Under "Current access", the table lists App, In the app ("Active"), Found via and Since, with "No connection" at the end of each row: Figma, Notion and Slack, in that order, Figma and Notion with their logo and Slack with its initial, "Google sign-in" and "Before <date>" about six months before the scan. Google Workspace is not listed.
-- [ ] Ben Ito's page reads "Ben is suspended in Google but still has accounts in 1 approved app." and lists Slack only.
+- [ ] Under "Apps", Figma, Notion and Slack show "Active", "Google sign-in" and "Before <date>" about six months before the scan. Google Workspace shows "Disabled". The templates section offers no assignment while Ana is suspended.
+- [ ] Ben Ito's page reads "Ben is suspended in Google but still has accounts in 1 approved app." and lists his Slack and directory accounts.
 
 ## Active person
 
-- [ ] Chloé Martin's page has no badge and no amber box, and lists her approved apps by name.
-- [ ] Ignore Slack on its page and open Ben's page again: the "Suspended in Google" badge stays, the amber box is gone and the table reads "No accounts in approved apps."
+- [ ] Chloé Martin's page shows the Active badge, offers Assign template and lists her apps by name.
+- [ ] Ignore Slack on its page and open Ben's page again: the "Suspended in Google" badge stays, the amber box is gone and his directory account stays listed.
 
 ## Disable and Enable
 
@@ -32,18 +32,25 @@ Approve Slack again on its page, connect Linear as in [Connections settings](con
 
 Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page](app-page.md) says, and open Ivan Petrov's page: he is active in Google and has no Linear member.
 
-- [ ] After his accounts, the table lists Linear with "No account" and "Invite". Ana's and Ben's pages (suspended in Google) and Chloé's (a Linear member) list no such row.
+- [ ] The table lists Linear with "No account" and "Invite". Ana's and Ben's pages (suspended in Google) and Chloé's (a Linear member) list no such row.
 - [ ] "Invite" asks "Invite Ivan Petrov to Linear?" with Person (Ivan Petrov, ivan@acme.example), App (Linear) and Workspace (Acme), "Linear sends Ivan an invitation to join this workspace as a regular member, unless they already have one or have joined. Their account shows here once Linear is scanned after they join.", "Cancel" and "Invite to Linear".
 - [ ] Confirming shows "Inviting to Linear…", then "Invited on <today>" without a reload; `curl -s "$FAKE/_fake/state" | jq '.invitations.linear'` lists one invitation for ivan@acme.example. A reload keeps "Invited on <today>" and no "Invite".
 - [ ] After "Scan now" on Linear's page, his row still reads "Invited on <today>": the scan read the invitation in Linear.
 - [ ] After `curl -s -X POST "$FAKE/_fake/linear/invitations/ivan%40acme.example/expire"`, his row stays "Invited on <today>" until "Scan now" on Linear's page; then it offers "Invite" again.
 - [ ] Invite him again. After `curl -s -X POST "$FAKE/_fake/linear/invitations/ivan@acme.example/accept"` and "Scan now" on Linear's page, Ivan's Linear row reads "Active", "Linear members" and "Disable", and the invite row is gone.
 - [ ] With Slack connected (see [Connections settings](connections-settings.md#apps)), Ivan's page offers "Invite" on Slack too.
-- [ ] An invitation sent in Slack itself shows: after `curl -s -H 'content-type: application/json' -d '{"email": "ivan@acme.example"}' "$FAKE/_fake/slack/invitations"` and "Scan now" on Slack's page, his Slack row reads "No account" and "Invited on <today>", the day the scan first saw it, with no "Invite". People still counts no Slack account for him.
+- [ ] An invitation sent in Slack itself shows: after `curl -s -H 'content-type: application/json' -d '{"email": "ivan@acme.example"}' "$FAKE/_fake/slack/invitations"` and "Scan now" on Slack's page, his Slack row reads "Invited on <today>", the day the scan first saw it, with no "Invite". People still counts no Slack account for him.
 - [ ] After `curl -s -X POST "$FAKE/_fake/slack/invitations/ivan%40acme.example/expire"` and "Scan now" on Slack's page, his Slack row offers "Invite" again, and inviting him puts one invitation for ivan@acme.example in `.invitations.slack`.
 - [ ] After `fail unexpected_response` (see [the app page](app-page.md#when-a-change-fails)), inviting Elif Demir to Linear ends with "Couldn’t invite" in red and "Try again". The dialog reads "Couldn’t invite Elif Demir to Linear", the reason ending "Nothing changed in Linear.", "Try again in a while, or invite Elif in Linear’s admin yourself and tell Broccoli Access.", "I did it by hand", "Open Linear admin" and "Try again".
 - [ ] "I did it by hand" asks "Did you invite Elif Demir to Linear yourself?"; "Yes, I did it" turns her row to "No account" and "Invited on <today>" at once.
 - [ ] With Linear in Reconnect (`curl -s -X POST "$FAKE/_fake/linear/keys/revoke"`, then "Scan now" on Linear's page), Lena Fischer's Linear row shows "Reconnect" instead of "Invite".
+
+## Assign templates
+
+1. In Templates, create Everyone with Google Workspace and Miro, and Engineer with Figma. Open Ivan Petrov from People.
+2. Choose **+ Assign template**, then Everyone. Repeat for Engineer. Both chips show their names and a take-off button. Each app appears once, with its template in **From**. Apps Ivan lacks show **Missing**.
+3. Open Engineer. Follow Ivan's link under **People with this template** back to his page. Take Engineer off and check that Ivan leaves its people list and the count drops by one.
+4. Give the same app through both templates. Removing either source keeps one row and the other source. Taking the last source off an active account shows **Extra**.
 
 ## No delete
 

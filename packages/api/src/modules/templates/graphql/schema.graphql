@@ -8,6 +8,8 @@ type Template {
   apps: [TemplateApp!]!
   "How many people have it."
   peopleCount: Int!
+  "The employees who have this template, by name."
+  people: [Employee!]!
 }
 
 "One app in one template."
@@ -56,7 +58,54 @@ input TemplateTakeOutAppInput {
   appId: ID!
 }
 
+type Employee {
+  "Templates assigned to this person, in assignment order."
+  templates: [Template!]!
+  "Every app given by a template or choice, every account, and the connected apps offering Invite."
+  templateApps: [PersonApp!]!
+}
+
+type PersonApp {
+  "The templates that list this app for this employee."
+  templates: [Template!]!
+  role: String
+  "Null for an app that only offers Invite."
+  state: PersonAppState
+}
+
+enum PersonAppState {
+  ACTIVE
+  SUSPENDED
+  MISSING
+  INVITED
+  EXTRA
+}
+
+input TemplateAssignInput {
+  id: ID!
+  employeeId: ID!
+}
+input TemplateTakeOffInput {
+  id: ID!
+  employeeId: ID!
+}
+
+type TemplateAssignPayload {
+  template: Template
+  error: TemplateAssignError
+}
+union TemplateAssignError = InvalidInputError | NotFoundError
+type TemplateTakeOffPayload {
+  template: Template
+  error: TemplateTakeOffError
+}
+union TemplateTakeOffError = NotFoundError
+
 type TemplatesMutations {
+  "Gives this template to a person active in the directory. Owner only."
+  assign(input: TemplateAssignInput!): TemplateAssignPayload!
+  "Takes this template off the employee. Owner only."
+  takeOff(input: TemplateTakeOffInput!): TemplateTakeOffPayload!
   "Adds a template without apps. Admins only."
   create(input: TemplateCreateInput!): TemplateCreatePayload!
   "Renames a template. Admins only."

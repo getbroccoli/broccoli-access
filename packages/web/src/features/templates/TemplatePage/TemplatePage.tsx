@@ -9,6 +9,7 @@ import { t } from "@/i18n";
 import { AddAppMenu } from "./AddAppMenu";
 import { DeleteTemplateButton } from "./DeleteTemplateButton";
 import { RenameTemplateButton } from "./RenameTemplateButton";
+import { TemplatePeople } from "./TemplatePeople";
 import { TemplateAppsTable } from "./TemplateAppsTable";
 import { useTemplateAppChanges } from "./useTemplateAppChanges";
 
@@ -75,9 +76,7 @@ export function TemplatePage() {
           {t("templates.people.title")}{" "}
           <span className="font-medium text-muted-foreground">{template.peopleCount}</span>
         </h2>
-        {template.peopleCount === 0 && (
-          <p className="text-sm text-muted-foreground">{t("templates.people.empty")}</p>
-        )}
+        <TemplatePeople key={template.id} people={template.people} />
       </section>
     </div>
   );

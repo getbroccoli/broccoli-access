@@ -92,6 +92,7 @@ export {
   storedTemplates,
   storedTemplateApps,
   storedEmployeeTemplates,
+  storedEmployeeAppChoices,
 } from "./storedScan";
 export {
   SCAN_NOW,

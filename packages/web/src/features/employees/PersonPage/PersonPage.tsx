@@ -9,6 +9,7 @@ import { t } from "@/i18n";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 
+import { PersonTemplates } from "./PersonTemplates";
 import { CurrentAccessTable } from "./CurrentAccessTable";
 
 /**
@@ -41,7 +42,7 @@ export function PersonPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <Link
         to="/people"
         className="flex w-fit items-center gap-1.5 text-sm text-foreground/80 transition-colors hover:text-foreground"
@@ -61,6 +62,11 @@ export function PersonPage() {
             <h1 className="truncate text-2xl font-semibold tracking-tight">
               {person.firstName} {person.lastName}
             </h1>
+            {person.status === "ACTIVE" && (
+              <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
+                {t("people.status.active")}
+              </span>
+            )}
             {person.status === "SUSPENDED" && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
                 {t("people.person.suspendedInGoogle")}
@@ -85,9 +91,14 @@ export function PersonPage() {
             ` ${t(appCount === 1 ? "people.person.disableWhereConnectedOne" : "people.person.disableWhereConnected")}`}
         </p>
       )}
+      <PersonTemplates
+        person={person}
+        available={pageQuery.data!.templates.edges.map(({ node }) => node)}
+        refresh={pageQuery.refetch}
+      />
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold tracking-tight">{t("people.person.currentAccess")}</h2>
-        <CurrentAccessTable appAccounts={person.appAccounts} appInvites={person.appInvites} />
+        <h2 className="text-lg font-semibold tracking-tight">{t("templates.apps.title")}</h2>
+        <CurrentAccessTable person={person} />
       </section>
     </div>
   );

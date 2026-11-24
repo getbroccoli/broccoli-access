@@ -49,7 +49,10 @@ export interface AppAccountRepository {
    * Every account with an employee that is access as `facts` say, with its app's name and status
    * and its dates.
    */
-  findEmployeeAccounts(facts: InAppFacts): Promise<EmployeeAppAccount[]>;
+  findEmployeeAccounts(
+    facts: InAppFacts,
+    employeeIds?: readonly string[],
+  ): Promise<EmployeeAppAccount[]>;
 }
 
 /** What the app list and an app's page read of a user's account. */
@@ -166,7 +169,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         );
       return rows.map(({ employeeId }) => employeeId!);
     },
-    findEmployeeAccounts: (facts) =>
+    findEmployeeAccounts: (facts, employeeIds) =>
       orm()
         .select({
           employeeId: sql<string>`${appAccounts.employeeId}`,
@@ -182,7 +185,14 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         })
         .from(appAccounts)
         .innerJoin(apps, eq(apps.id, appAccounts.appId))
-        .where(and(isNotNull(appAccounts.employeeId), isAccess(facts))),
+        .where(
+          and(
+            employeeIds
+              ? anyOf(appAccounts.employeeId, employeeIds)
+              : isNotNull(appAccounts.employeeId),
+            isAccess(facts),
+          ),
+        ),
   };
 }
 

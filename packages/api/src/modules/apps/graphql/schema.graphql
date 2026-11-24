@@ -328,6 +328,10 @@ type SetupFinishPayload {
 union SetupFinishError = InvalidInputError | ConflictError
 
 # Adds the app to a template's app; the server merges the types of the modules.
+type PersonApp {
+  app: App!
+}
+
 type TemplateApp {
   "The app the template lists."
   app: App!

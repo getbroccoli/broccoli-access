@@ -95,6 +95,12 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     scans,
   });
   const employees = createEmployeeReadService({ ...core, accounts: apps });
+  const changes = createAccountChangeService({
+    ...core,
+    connectors,
+    members: importRecords,
+    employees,
+  });
   const manifests = [
     systemModule({
       ...core,
@@ -120,10 +126,14 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
         members: importRecords,
         employees,
       }),
-      ...createAccountChangeService({ ...core, connectors, members: importRecords, employees }),
+      ...changes,
     }),
     extensionModule({ ...core, appSessions: containerConnections }),
-    templatesModule({ ...core, apps }),
+    templatesModule({
+      ...core,
+      apps: { ...apps, readAppInvites: changes.readAppInvites },
+      employees,
+    }),
   ];
   return {
     manifests: [...manifests, recordsManifest(core, manifests)],

@@ -26,6 +26,12 @@ query TemplatePage($id: ID!) {
     id
     name
     peopleCount
+    people {
+      id
+      firstName
+      lastName
+      avatarUrl
+    }
     apps {
       id
       app {

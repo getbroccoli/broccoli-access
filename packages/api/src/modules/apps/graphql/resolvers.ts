@@ -79,6 +79,9 @@ export function createResolvers(
     AppInvite: {
       app: (invite, _args, context) => loaders.appsById(context).load(invite.appId),
     },
+    PersonApp: {
+      app: (row, _args, context) => loaders.appsById(context).load(row.appId),
+    },
     TemplateApp: {
       app: (templateApp, _args, context) => loaders.appsById(context).load(templateApp.appId),
     },

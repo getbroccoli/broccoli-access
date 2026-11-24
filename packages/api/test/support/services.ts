@@ -37,6 +37,7 @@ import {
   type GoogleConnectionService,
 } from "../../src/modules/google";
 import { createTemplateService } from "../../src/modules/templates";
+import { accountChanges } from "./accountChanges";
 import { fakeMail } from "./fakeMail";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { testTransactor } from "./testTransactor";
@@ -148,12 +149,13 @@ export function apps(orm: Orm, transact: Transact = testTransactor(orm)): AppSer
   });
 }
 
-export function templates(orm: Orm) {
+export function templates(orm: Orm, options: { connectors?: ConnectorRegistry } = {}) {
   return createTemplateService({
     orm,
     transact: testTransactor(orm),
     logger: createLogger("silent"),
-    apps: apps(orm),
+    apps: { ...apps(orm), readAppInvites: accountChanges(orm, options).readAppInvites },
+    employees: employeeServices(orm),
   });
 }
 

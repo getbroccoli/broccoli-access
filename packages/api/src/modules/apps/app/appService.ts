@@ -91,14 +91,14 @@ export interface AppService {
    * Every account that belongs to an employee and is in its app, with its app's name and status,
    * whether the app is the directory's, how it was found and since when. Trusted read: no `ctx`.
    */
-  findEmployeeAccounts: (db: Orm | Tx) => Promise<EmployeeAccountInApp[]>;
+  findEmployeeAccounts: (
+    db: Orm | Tx,
+    employeeIds?: readonly string[],
+  ) => Promise<EmployeeAccountInApp[]>;
 }
 
 /** An employee's account as People and a person's page read it. */
-export interface EmployeeAccountInApp extends Omit<
-  EmployeeAppAccount,
-  "appId" | keyof AccountDates
-> {
+export interface EmployeeAccountInApp extends Omit<EmployeeAppAccount, keyof AccountDates> {
   /** Whether the app is the directory's, such as Google Workspace. */
   inDirectory: boolean;
   since: Since;
@@ -191,14 +191,15 @@ export function createAppService(dependencies: AppDependencies): AppService {
     directoryAppId: (db) => findDirectoryAppId(db, connectors),
     findEmployeesSuspendedInDirectory: (db) =>
       findEmployeesInDirectory(db, connectors, { status: "suspended" }),
-    async findEmployeeAccounts(db) {
+    async findEmployeeAccounts(db, employeeIds) {
       const inAppFacts = await findInAppFacts(db, dependencies);
       const [accounts, directoryAppId] = await Promise.all([
-        appAccountRepository(db).findEmployeeAccounts(inAppFacts),
+        appAccountRepository(db).findEmployeeAccounts(inAppFacts, employeeIds),
         findDirectoryAppId(db, connectors),
       ]);
       return accounts.map(({ appId, grantedAt, grantedBefore, firstSeenAt, ...account }) => ({
         ...account,
+        appId,
         inDirectory: appId === directoryAppId,
         since: accountSince({ grantedAt, grantedBefore, firstSeenAt }),
       }));

@@ -1,8 +1,56 @@
-import { mutationPayload, type Resolvers, type ResolversTypes } from "../../../core/graphql";
+import DataLoader from "dataloader";
+import type { SecurityContext } from "../../../core/security";
+import {
+  mutationPayload,
+  perRequest,
+  toEnum,
+  type Resolvers,
+  type ResolversTypes,
+} from "../../../core/graphql";
 import type { TemplateService } from "../app";
 
-export function createResolvers(services: TemplateService): Resolvers {
+/** The employees module reads and sorts the people visible to this caller. */
+export type ReadTemplateEmployees = (
+  ctx: SecurityContext,
+  ids: readonly string[],
+) => Promise<Awaited<ResolversTypes["Employee"]>[]>;
+
+export function createResolvers(
+  services: TemplateService,
+  readEmployees: ReadTemplateEmployees,
+): Resolvers {
+  const assigned = perRequest(
+    (ctx) =>
+      new DataLoader((ids: readonly string[]) =>
+        services.readEmployeeTemplates(ctx.getActor(), ids),
+      ),
+  );
+  const apps = perRequest(
+    (ctx) =>
+      new DataLoader((ids: readonly string[]) => services.readEmployeeApps(ctx.getActor(), ids)),
+  );
+  const people = perRequest(
+    (ctx) =>
+      new DataLoader(async (ids: readonly string[]) => {
+        const actor = ctx.getActor();
+        const assignedPeople = await services.readTemplatePeople(actor, ids);
+        const employees = await readEmployees(actor, [...new Set(assignedPeople.flat())]);
+        const rank = new Map(employees.map((employee, index) => [employee.id, index]));
+        return assignedPeople.map((group) =>
+          group
+            .flatMap((id) => rank.get(id) ?? [])
+            .sort((a, b) => a - b)
+            .map((index) => employees[index]!),
+        );
+      }),
+  );
   return {
+    Employee: {
+      templates: (employee, _args, ctx) => assigned(ctx).load(employee.id),
+      templateApps: (employee, _args, ctx) => apps(ctx).load(employee.id),
+    },
+    Template: { people: (template, _args, ctx) => people(ctx).load(template.id) },
+    PersonApp: { state: ({ state }) => state && toEnum(state) },
     Query: {
       template: (_parent, { id }, context) => services.readTemplate(context.getActor(), id),
       templates: (_parent, { first, after }, context) =>
@@ -12,6 +60,16 @@ export function createResolvers(services: TemplateService): Resolvers {
       templates: () => ({}),
     },
     TemplatesMutations: {
+      assign: (_parent, { input }, context) =>
+        mutationPayload<ResolversTypes["TemplateAssignPayload"]>(
+          async () => ({ template: await services.assign(context.getActor(), input) }),
+          ["INVALID_INPUT", "NOT_FOUND"],
+        ),
+      takeOff: (_parent, { input }, context) =>
+        mutationPayload<ResolversTypes["TemplateTakeOffPayload"]>(
+          async () => ({ template: await services.takeOff(context.getActor(), input) }),
+          ["NOT_FOUND"],
+        ),
       create: (_parent, { input }, context) =>
         mutationPayload<ResolversTypes["TemplateCreatePayload"]>(
           async () => ({ template: await services.createTemplate(context.getActor(), input) }),

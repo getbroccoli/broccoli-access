@@ -1,19 +1,29 @@
 import { readSdl } from "../../core/graphql";
-import type { ModuleDependencies, ModuleManifest } from "../../core/moduleManifest";
+import type { ModuleManifest } from "../../core/moduleManifest";
 import { createTemplateService } from "./app";
-import { createResolvers } from "./graphql";
-import type { AppsById } from "./ports";
+import { createResolvers, type ReadTemplateEmployees } from "./graphql";
 
-// Public values.
 export { createTemplateService } from "./app";
 
-/** Templates, the named lists of apps: create, rename and delete them, and add and take out apps. */
+/** Templates, their people, and the apps they give them. */
 export function templatesModule(
-  dependencies: Pick<ModuleDependencies, "orm" | "transact" | "logger"> & { apps: AppsById },
+  dependencies: Parameters<typeof createTemplateService>[0] & {
+    employees: { readEmployees: ReadTemplateEmployees };
+  },
 ): ModuleManifest {
+  const service = createTemplateService(dependencies);
   return {
     name: "templates",
     typeDefs: readSdl(import.meta.url, "./graphql/schema.graphql"),
-    resolvers: createResolvers(createTemplateService(dependencies)),
+    resolvers: createResolvers(service, dependencies.employees.readEmployees),
+    async eventsBeforeCommit(tx, events) {
+      if (
+        events.some(
+          (event) => event.type === "records.changed" && event.payload.recordType === "app_account",
+        )
+      ) {
+        await service.clearInactiveReviews(tx);
+      }
+    },
   };
 }

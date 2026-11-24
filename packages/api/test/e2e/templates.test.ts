@@ -143,6 +143,14 @@ test.for([
     "templates.takeOutApp",
     'mutation { templates { takeOutApp(input: { id: "1", appId: "2" }) { template { id } } } }',
   ],
+  [
+    "templates.assign",
+    'mutation { templates { assign(input: { id: "1", employeeId: "2" }) { template { id } } } }',
+  ],
+  [
+    "templates.takeOff",
+    'mutation { templates { takeOff(input: { id: "1", employeeId: "2" }) { template { id } } } }',
+  ],
 ] as const)("refuses %s without a session", async ([, query], { env }) => {
   await env.signInAsOwner();
 
