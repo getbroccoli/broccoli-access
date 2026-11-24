@@ -66,7 +66,7 @@ Each is reshaped when the one before it ends. Circles 3 and 4 are planned.
 
 1. **See who has access to what:** Google Workspace, apps selected after the scan, and people suspended in Google who still have accounts. See [circle 1](circle1.md).
 2. **Disable and enable accounts:** Slack through the owner's app session and Linear through its API, by hand when automation cannot make the change, and an Activity page of every change. See [circle 2](circle2.md). Invites were added after it.
-3. **Give and take away access:** everything we know how to build, in this order.
+3. **Give and take away access:** everything we know how to build, in this order. See [circle 3](circle3.md).
    1. **The integration user, Remove, and accounts without a person:**
       - Create the integration user in Google, with write access asked for at that moment.
       - Connect an app by choosing how: the integration user, which is recommended, or the owner's own session. For the integration user, the owner invites it as an admin in the app and presses Connect; broccoli-access accepts the invitation and signs in by itself.
@@ -104,6 +104,7 @@ The connector factory runs next to the circles, from now, and is part of neither
 
 - [Circle 1](circle1.md): scope, setup and testing.
 - [Circle 2](circle2.md): connectors, app sessions, and disabling and enabling accounts.
+- [Circle 3](circle3.md): the integration user, Remove, templates, joiners and leavers.
 - [Connector contract](connector-contract.md): how the core talks to the connectors container.
 - [Data model](data-model.md): every table, with example rows.
 - [Fake apps](fake-apps.md): the fake apps the tests run against.

@@ -687,6 +687,8 @@ The [connector contract](connector-contract.md) changes with `remove`, `roles` a
 - `roles` (circle 3, part 2): the roles the app has, each `{ "key", "name", "isDefault" }`, with exactly one default. `invite` takes an optional role key, and the core sends one only to a connector that lists `roles`.
 - Google Workspace lists `invite` (circle 3, part 3), which creates the directory account, and `suspend` and `reactivate` (circle 3, part 3), which offboarding uses. It asks for the scope `admin.directory.user` when first used.
 - A connector's method (official API, internal API, robot) is its own business. The core never stores it.
+- `capabilities` add `sign_in`: the container can sign in to the app as the integration user (see the [connector contract](connector-contract.md#post-v1connectionssign-in)).
+- Errors add `not_invited`, from signing in only: the integration user has no invitation and no account in the app.
 
 ### integration_user (new, circle 3, part 1)
 
