@@ -21,6 +21,8 @@ const setupSteps = createSetupStepService();
 /** How a scan ended without saving: its connector error, and what turning to Reconnect needs. */
 export interface ScanFailure {
   failure: ConnectorErrorCode;
+  /** A directory failure is valid only for the credentials that produced it. */
+  directoryRevision?: string;
   /** The secrets its failing call used, after the scan's own renewals; null before it read them. */
   secretsUsed: Record<string, unknown> | null;
   /** Whether the connection may turn to Reconnect: one of the connectors container's. */
@@ -62,9 +64,10 @@ export async function scanSource(
     if (!(error instanceof ConnectorError)) {
       throw error;
     }
-    // Google Workspace, the directory, has no Reconnect: its failure stays the scan's.
+    // Directory recovery uses its scan failure, rather than changing the connection status.
     return {
       failure: error.code,
+      directoryRevision: connector?.isDirectory ? revision : undefined,
       secretsUsed: used.secrets,
       reconnects: connector?.isDirectory === false,
     };

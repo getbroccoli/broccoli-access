@@ -6,6 +6,7 @@ import { SetupScanDocument } from "@/__generated__/graphql";
 import { ScanNowButton } from "@/components/ScanNowButton";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { t } from "@/i18n";
+import { needsGoogleReconnect } from "@/lib/googleScan";
 
 import { SetupLayout } from "../SetupLayout";
 import { scanStepHints, type ScanSteps } from "./scanStepHints";
@@ -26,9 +27,7 @@ export function ScanStep() {
   const { data, error, refetch, startPolling, stopPolling } = useQuery(SetupScanDocument);
   const connection = data?.setup.googleWorkspace;
   const failed = connection?.scan?.status === "SCAN_FAILED";
-  const needsReconnect =
-    connection?.scan?.failure === "AUTHENTICATION_FAILED" ||
-    connection?.scan?.failure === "PERMISSION_MISSING";
+  const needsReconnect = needsGoogleReconnect(connection?.scan?.failure);
   const finished = connection?.scan != null && connection.scan.status !== "SCANNING";
   const scanned = connection?.scan?.status === "SCANNED";
   const router = useRouter();

@@ -5,6 +5,7 @@ import { ScanNowButton } from "@/components/ScanNowButton";
 import { buttonVariants } from "@/components/ui/button";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
+import { needsGoogleReconnect } from "@/lib/googleScan";
 import { formatLastScan } from "@/lib/lastScan";
 
 type Props = {
@@ -13,7 +14,7 @@ type Props = {
 
 /** The Google Workspace connection: who connected it with which Google app, and its last scan. */
 export function GoogleWorkspaceCard({ connection }: Props) {
-  const needsReconnect = connection.scan?.failure === "AUTHENTICATION_FAILED";
+  const needsReconnect = needsGoogleReconnect(connection.scan?.failure);
   const isScanning = connection.scan?.status === "SCANNING";
 
   return (

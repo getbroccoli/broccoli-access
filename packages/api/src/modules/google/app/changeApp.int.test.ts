@@ -11,6 +11,7 @@ import {
   GOOGLE_SCOPES,
   TEST_SECRET_BOX,
   recordHistory,
+  postFakeControl,
   storedApps,
   storedAppConnections,
   storedAppAccounts,
@@ -247,61 +248,66 @@ test("refuses starting a Google app change without MANAGE_WORKSPACE", async ({
   expect(await storedChangeState(orm)).toEqual(before);
 });
 
-test("a scan retries after an app switch without recording either instance app", async ({
-  orm,
-  fakeGoogle,
-}) => {
-  const {
-    connection,
-    ctx,
-    input,
-    connectionId,
-    sourceId,
-    scans: retry,
-  } = await connectedWorkspace(orm, fakeGoogle.url);
-  const { authorizationUrl, browserToken } = await connection.startAppChange(ctx, input);
-  const callback = await consentAtGoogle(authorizationUrl);
-  const manifest = await startFakeHttpServer(async () => {
-    await connection.finishAppChange(ctx, {
-      ...input,
-      browserToken,
-      code: callback.searchParams.get("code")!,
-      state: callback.searchParams.get("state")!,
+test.for(["valid", "revoked"] as const)(
+  "a scan using a %s old refresh token retries after an app switch without recording stale results",
+  async (oldToken, { orm, fakeGoogle }) => {
+    const {
+      connection,
+      ctx,
+      input,
+      connectionId,
+      sourceId,
+      scans: retry,
+    } = await connectedWorkspace(orm, fakeGoogle.url);
+    const { authorizationUrl, browserToken } = await connection.startAppChange(ctx, input);
+    const callback = await consentAtGoogle(authorizationUrl);
+    const manifest = await startFakeHttpServer(async () => {
+      if (oldToken === "revoked") await postFakeControl(fakeGoogle.url, "tokens/revoke");
+      await connection.finishAppChange(ctx, {
+        ...input,
+        browserToken,
+        code: callback.searchParams.get("code")!,
+        state: callback.searchParams.get("state")!,
+      });
+      return { status: 200, body: { connectors: [] } };
     });
-    return { status: 200, body: { connectors: [] } };
-  });
-  onTestFinished(() => manifest.stop());
-  const container = containerConnectors(manifest.url);
-  const google = createGoogleWorkspaceConnector({
-    openIdConfigurationUrl: fakeGoogle.url + "/.well-known/openid-configuration",
-    adminApiUrl: fakeGoogle.url,
-  });
-  const scan = scans(orm, {
-    connectors: { list: async () => [google, ...(await container.list())] },
-  });
-  await scan.scanNow(ctx, connectionId);
+    onTestFinished(() => manifest.stop());
+    const container = containerConnectors(manifest.url);
+    const google = createGoogleWorkspaceConnector({
+      openIdConfigurationUrl: fakeGoogle.url + "/.well-known/openid-configuration",
+      adminApiUrl: fakeGoogle.url,
+    });
+    const scan = scans(orm, {
+      connectors: { list: async () => [google, ...(await container.list())] },
+    });
+    await scan.scanNow(ctx, connectionId);
 
-  const initialApps = await storedApps(orm);
-  const scanHistory = async () =>
-    (await storedRecordHistory(orm)).filter((entry) => entry.causeKind === "found_by_scan");
-  const initialHistory = await scanHistory();
+    const initialApps = await storedApps(orm);
+    const scanHistory = async () =>
+      (await storedRecordHistory(orm)).filter(
+        (entry) => entry.causeKind === "found_by_scan" || entry.causeKind === "connector_error",
+      );
+    const initialHistory = await scanHistory();
 
-  await expect(scan.runScan(SYSTEM, sourceId)).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(scan.runScan(SYSTEM, sourceId)).rejects.toMatchObject({ code: "CONFLICT" });
 
-  expect(await storedImportSources(orm)).toMatchObject([{ id: sourceId, status: "scanning" }]);
-  expect(await storedApps(orm)).toEqual(initialApps);
-  expect(await scanHistory()).toEqual(initialHistory);
+    expect(await storedImportSources(orm)).toMatchObject([
+      { id: sourceId, status: "scanning", failure: null },
+    ]);
+    expect(await storedApps(orm)).toEqual(initialApps);
+    expect(await scanHistory()).toEqual(initialHistory);
 
-  await retry.runScan(SYSTEM, sourceId);
+    await retry.runScan(SYSTEM, sourceId);
 
-  expect(await storedApps(orm)).toEqual(initialApps);
-  expect(await storedAppConnections(orm)).toMatchObject([
-    { settings: { clientId: input.clientId } },
-  ]);
-  expect(await storedImportSources(orm)).toMatchObject([
-    { id: sourceId, status: "scanned", failure: null },
-  ]);
-});
+    expect(await storedApps(orm)).toEqual(initialApps);
+    expect(await storedAppConnections(orm)).toMatchObject([
+      { settings: { clientId: input.clientId } },
+    ]);
+    expect(await storedImportSources(orm)).toMatchObject([
+      { id: sourceId, status: "scanned", failure: null },
+    ]);
+  },
+);
 
 async function storedChangeState(orm: Orm) {
   return {

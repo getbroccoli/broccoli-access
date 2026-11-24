@@ -119,18 +119,14 @@ export function createGoogleConnectionService(
     async startConnection(ctx, start) {
       ctx.requireSetupHolder();
       const browserToken = await requireConnectStep(orm, start.setupToken, start.now);
-      const origin = await rememberConsentOrigin(
-        ctx,
-        dependencies,
-        start.browserOrigin ?? start.publicOrigin,
-      );
+      const origin = await rememberConsentOrigin(ctx, dependencies, start);
       return {
         authorizationUrl: await startConsent(
           google,
           secretBox,
           {
             ...start,
-            publicOrigin: start.googleApp === "broccoli_google_app" ? origin : start.publicOrigin,
+            publicOrigin: origin,
             flow: "connect_google_workspace",
             browserToken,
           },
@@ -166,18 +162,14 @@ export function createGoogleConnectionService(
       const connection = await requireConnection(connectedApps, orm);
       const stored = await connectedApps.readConnectionWithSecrets(orm, connection.id);
       if (!stored) throw new ApplicationError("CONFLICT", "Google Workspace is not connected.");
-      const origin = await rememberConsentOrigin(
-        ctx,
-        dependencies,
-        start.browserOrigin ?? start.publicOrigin,
-      );
+      const origin = await rememberConsentOrigin(ctx, dependencies, start);
       const browserToken = randomConsentToken();
       const authorizationUrl = await startConsent(
         google,
         secretBox,
         {
           ...start,
-          publicOrigin: start.googleApp === "broccoli_google_app" ? origin : start.publicOrigin,
+          publicOrigin: origin,
           flow: "change_google_app",
           browserToken,
           revision: stored.revision,

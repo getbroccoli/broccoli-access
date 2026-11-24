@@ -2,6 +2,7 @@ import type { Orm } from "../../../core/db";
 import { createInstanceService } from "../../../core/instance";
 import type { SecurityContext } from "../../../core/security";
 import type { GoogleConnectionDependencies } from "./googleConnectionService";
+import type { AppChangeStart } from "./googleConnectionTypes";
 
 import { ApplicationError, type FieldError, invalidInput } from "../../../core/applicationError";
 import {
@@ -163,14 +164,18 @@ export async function verifyIdentity(
 export async function rememberConsentOrigin(
   ctx: SecurityContext,
   { transact, publicUrl, logger }: GoogleConnectionDependencies,
-  origin: string,
+  { publicOrigin, browserOrigin, googleApp }: AppChangeStart,
 ): Promise<string> {
   const configured = publicUrl && new URL(publicUrl).origin;
   const remembered = await transact((tx) =>
-    createInstanceService().rememberPublicOrigin(ctx, tx, configured || origin),
+    createInstanceService().rememberPublicOrigin(
+      ctx,
+      tx,
+      configured || browserOrigin || publicOrigin,
+    ),
   );
   logger.info({ outcome: "destination_bound" }, "Google consent destination selected");
-  return configured || remembered;
+  return googleApp === "broccoli_google_app" ? configured || remembered : publicOrigin;
 }
 
 /** Public consent uses only a destination established by setup, an admin or deployment config. */

@@ -95,7 +95,8 @@
       "src/lib/usePollWhileScanning",
       "src/lib/useRefetchAfterContainerConnectorScans",
       "src/shell",
-      "src/components/ScanNowButton"
+      "src/components/ScanNowButton",
+      "src/lib/googleScan"
     ],
     "src/features/setup": [
       "src/__generated__",
@@ -107,7 +108,8 @@
       "src/lib/postJson",
       "src/lib/useCopyToClipboard",
       "src/lib/useSessionChange",
-      "src/components/ScanNowButton"
+      "src/components/ScanNowButton",
+      "src/lib/googleScan"
     ],
     "src/components/dataTable": ["src/components/ui"],
     "src/components/InstallExtensionSteps": [
@@ -151,7 +153,8 @@
       "src/components/ui",
       "src/i18n",
       "src/lib/class-names"
-    ]
+    ],
+    "src/lib/googleScan": ["src/__generated__"]
   },
   "deepImports": ["src/components/ui", "src/__generated__"]
 }
