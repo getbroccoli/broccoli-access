@@ -2,7 +2,7 @@ import { ApplicationError } from "../../../core/applicationError";
 import type { Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
-import { accountChangeRepository, appAccountRepository, appConnectionRepository } from "../db";
+import { accountChangeRepository, appAccountRepository } from "../db";
 import type { AccountChange } from "../domain";
 import type { AccountChangeDependencies, LatestAccountChange } from "./accountChangeService";
 import { setAccountStatus } from "./setAccountStatus";
@@ -71,8 +71,10 @@ async function lockLatestFailure(tx: Tx, id: string): Promise<AccountChange> {
 
 /**
  * The newest change of the change's account, or for an invite, of its connection and email;
- * undefined once a scan deleted the account. A Try again asked meanwhile holds the account, or the
- * invite's connection, until it commits, and is then read here.
+ * undefined once a scan deleted the account. A Try again asked meanwhile holds the account until it
+ * commits, and is then read here. An invite locks nothing more: a failing run locks its connection
+ * before its change, and an invite done by hand sets nothing, so a Try again asked meanwhile only
+ * runs as well.
  */
 async function lockLatestOfSubject(
   tx: Tx,
@@ -80,7 +82,6 @@ async function lockLatestOfSubject(
 ): Promise<AccountChange | undefined> {
   const changes = accountChangeRepository(tx);
   if (change.action === "invite") {
-    await appConnectionRepository(tx).lockById(change.connectionId);
     const [latest] = await changes.findLatestInvites([change.connectionId], [change.email]);
     return latest;
   }

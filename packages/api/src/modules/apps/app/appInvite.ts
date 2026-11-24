@@ -110,7 +110,7 @@ async function askForInvite(
     connectors: readonly Connector[];
   },
 ): Promise<AppInvite> {
-  const connection = await lockConnectionOfApp(tx, appId);
+  const connection = await findConnectionOfApp(tx, appId);
   const facts = await readInviteFacts(dependencies, tx, {
     employees: [employee],
     connections: [connection],
@@ -141,18 +141,13 @@ async function askForInvite(
   return { ...row, latestInvite: withPlace(change, await changes.countChangesAhead([change.id])) };
 }
 
-/**
- * The app's connection, locked so a "done by hand" of an email's failed invite commits first;
- * refuses an unknown app with NOT_FOUND, and one without a connection with CONFLICT.
- */
-async function lockConnectionOfApp(tx: Tx, appId: string): Promise<AppConnection> {
+/** The app's connection; refuses an unknown app with NOT_FOUND, and one without a connection with CONFLICT. */
+async function findConnectionOfApp(tx: Tx, appId: string): Promise<AppConnection> {
   const app = parseUuid(appId) && (await appRepository(tx).findById(appId));
   if (!app) {
     throw new ApplicationError("NOT_FOUND", "No app has this id.");
   }
-  const connections = appConnectionRepository(tx);
-  const [found] = await connections.findByApps([app.id]);
-  const connection = found && (await connections.lockById(found.id));
+  const [connection] = await appConnectionRepository(tx).findByApps([app.id]);
   if (!connection) {
     throw new ApplicationError("CONFLICT", NOT_OFFERED);
   }
@@ -186,7 +181,10 @@ async function readInviteFacts(
   const connectionIds = connections.map(({ id }) => id);
   const emails = employees.map(({ email }) => email);
   const [active, scanned, found, latest] = await Promise.all([
-    findEmployeesInDirectory(db, connectors, "active"),
+    findEmployeesInDirectory(db, connectors, {
+      status: "active",
+      among: employees.map(({ id }) => id),
+    }),
     members.findScannedConnectionIds(db),
     members.findConnectionMembers(db, { connectionIds, emails }),
     accountChangeRepository(db).findLatestInvites(connectionIds, emails),
