@@ -7,11 +7,13 @@ import {
   control,
   exchangeCode,
   refreshAccessToken,
+  REDIRECT_URI,
   signIn,
   test as it,
   type TokenResponse,
   type FakeState,
 } from "#test/support";
+import { ACME } from "../seed";
 
 it("issues no refresh token for online consent", async ({ fake }) => {
   const tokens = await signIn(fake.url, { prompt: "consent" });
@@ -128,5 +130,28 @@ it("rejects a revoked refresh token with Google's invalid_grant body", async ({ 
   expect(await response.json()).toEqual({
     error: "invalid_grant",
     error_description: "Token has been expired or revoked.",
+  });
+});
+
+it("accepts HTTP Basic client credentials when exchanging a code", async ({ fake }) => {
+  const code = await authorizeCode(fake.url);
+  const credentials = Buffer.from(
+    `${ACME.oauthClient.clientId}:${ACME.oauthClient.clientSecret}`,
+  ).toString("base64");
+
+  const response = await fetch(`${fake.url}/token`, {
+    method: "POST",
+    headers: { authorization: `Basic ${credentials}` },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: REDIRECT_URI,
+    }),
+  });
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    access_token: expect.any(String),
+    token_type: "Bearer",
   });
 });

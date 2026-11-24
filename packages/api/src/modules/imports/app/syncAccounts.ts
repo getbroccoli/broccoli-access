@@ -8,7 +8,7 @@ import {
 import type { Tx } from "../../../core/db";
 import type { HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
-import type { DirectoryPeople, ScannedApps } from "../ports";
+import type { DirectoryPeople, IntegrationUser, ScannedApps } from "../ports";
 
 /** What one scan found, to sync into employees, apps and app accounts. */
 export interface ScanFindings {
@@ -29,7 +29,7 @@ export interface ScanFindings {
 // its next scan; read every source's records once that wait matters.
 /**
  * The sync after a scan, joining `tx`: the directory's own accounts create and update employees,
- * with their changed photos; another connector's link to the employee with the same email. They
+ * with their changed photos, except the integration user's, which is nobody's; another connector's link to the employee with the same email. They
  * become the connection's app accounts, found via the connector's own-app finding kind; the
  * accounts in other apps go to their matched apps, found via its other-app finding kind. Every
  * change is found by the scan of `sourceId`. The pending invitations of a connector that lists
@@ -39,7 +39,11 @@ export async function syncAccounts(
   ctx: SecurityContext,
   tx: Tx,
   { sourceId, connection, connector, accounts, invitations, photos, readStartedAt }: ScanFindings,
-  { apps, directory }: { apps: ScannedApps; directory: DirectoryPeople },
+  {
+    apps,
+    directory,
+    integrationUser,
+  }: { apps: ScannedApps; directory: DirectoryPeople; integrationUser: IntegrationUser },
 ): Promise<void> {
   // Before the accounts: a new invitation waits for its connection's row, which a change failing
   // into Reconnect locks before its change rows; deleting an account locks its changes' rows.
@@ -52,7 +56,9 @@ export async function syncAccounts(
     ? await directory.syncDirectoryPeople(
         ctx,
         tx,
-        ownAccounts.map((account) => directoryPerson(account, photos)),
+        (await peopleAmong(ctx, tx, ownAccounts, integrationUser)).map((account) =>
+          directoryPerson(account, photos),
+        ),
         cause,
       )
     : await directory.findEmployeeIdsByEmail(
@@ -79,6 +85,17 @@ export async function syncAccounts(
       readStartedAt,
     });
   }
+}
+
+/** The directory's accounts that are people: all but the integration user's, known by its id. */
+async function peopleAmong(
+  ctx: SecurityContext,
+  tx: Tx,
+  directoryAccounts: readonly ImportedAccount[],
+  integrationUser: IntegrationUser,
+): Promise<readonly ImportedAccount[]> {
+  const integrationUserId = await integrationUser.readGoogleUserId(ctx, tx);
+  return directoryAccounts.filter(({ sourceKey }) => sourceKey !== integrationUserId);
 }
 
 /** Matches the accounts' apps, creating the missing ones, then syncs the accounts into them. */

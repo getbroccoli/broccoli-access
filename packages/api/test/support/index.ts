@@ -29,6 +29,7 @@ export {
   mailSettings,
   googleConnection,
   googleSignIn,
+  integrationUsers,
   scans,
   apps,
   appUsers,
@@ -58,10 +59,12 @@ export { hostileText, storedTextSnapshot } from "./hostileText";
 export { storedTextProbe } from "./storedTextProbe";
 export { startFakeHttpServer } from "./fakeHttpServer";
 export { expectHistoryReplaysTo } from "./employeeHistory";
-export { registerGoogleRedirect, consentAtGoogle } from "./googleConsent";
+export { registerGoogleRedirect, consentAtGoogle, refreshGoogleGrant } from "./googleConsent";
 export {
   storedAppConnections,
+  storedIntegrationUsers,
   storedGoogleAccounts,
+  connectionSecrets,
   storedUsers,
   changeStoredGoogleDomain,
 } from "./storedGoogleConnection";
@@ -72,6 +75,8 @@ export { connectorContract, type ConnectorContractCase } from "./connectorContra
 export { recordingJobQueue } from "./recordingJobQueue";
 export {
   failFakeGoogle,
+  refuseGoogleScope,
+  createdGoogleUsers,
   suspendAtFakeGoogle,
   grantAtFakeGoogle,
   revokeAtFakeGoogle,
@@ -88,7 +93,12 @@ export {
   storedTemplateApps,
   storedEmployeeTemplates,
 } from "./storedScan";
-export { readGoogleConnection, finishSetupWithPreselectedApps, scannedApps } from "./scannedGoogle";
+export {
+  SCAN_NOW,
+  readGoogleConnection,
+  finishSetupWithPreselectedApps,
+  scannedApps,
+} from "./scannedGoogle";
 export {
   connectLinear,
   containerConnections,
@@ -129,5 +139,6 @@ export {
   assertRelayRedemption,
   googleRelayGrant,
 } from "./googleRelay";
-export { startSharedGoogleSetup } from "./sharedGoogleSetup";
+export { startSharedGoogleSetup, finishSharedGoogleSetup } from "./sharedGoogleSetup";
 export { connectedWorkspace, storedWorkspace } from "./connectedWorkspace";
+export { integrationUserTest, CREATION_START, consentAnswer } from "./integrationUserTest";

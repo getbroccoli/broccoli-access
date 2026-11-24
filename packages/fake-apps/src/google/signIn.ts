@@ -77,6 +77,7 @@ const AUTHORIZATION_REQUEST = z.object({
   state: z.string().optional(),
   access_type: z.string().optional(),
   prompt: z.string().optional(),
+  include_granted_scopes: z.string().optional(),
   nonce: z.string().optional(),
 });
 
@@ -101,13 +102,25 @@ function showConsentPage(context: FakeGoogleContext): RequestHandler {
     response.type("html").send(
       consentPageHtml({
         appName: client.name,
-        scopes: parameters.scope.split(" "),
+        scopes: scopesToAllow(parameters),
         accounts: context.state.people.filter((person) => !person.suspended),
         parameters,
       }),
     );
   };
 }
+
+/**
+ * The permissions the page lists: with `include_granted_scopes`, the API permissions asked for and
+ * never the sign-in scopes, as Google's incremental consent does.
+ */
+function scopesToAllow(parameters: AuthorizationRequest): string[] {
+  const asked = parameters.scope.split(" ");
+  if (parameters.include_granted_scopes !== "true") return asked;
+  return asked.filter((scope) => !SIGN_IN_SCOPES.includes(scope));
+}
+
+const SIGN_IN_SCOPES = ["openid", "email", "profile"];
 
 function decideConsent(context: FakeGoogleContext): RequestHandler {
   return (request, response) => {
@@ -136,14 +149,16 @@ function authorize(
   email: string,
 ): string {
   const { state } = context;
-  const scopes = parameters.scope.split(" ");
+  const refused = state.refusedScope;
+  state.refusedScope = null;
+  const scopes = parameters.scope.split(" ").filter((scope) => scope !== refused);
   const earlier = findGrant(state, email, client.clientId);
   const consentsNow =
     !scopes.every((scope) => earlier?.scopes.includes(scope)) ||
     (parameters.prompt ?? "").split(" ").includes("consent");
+  // Google adds newly granted scopes to what the person granted the client before.
+  const grantedScopes = [...new Set([...(earlier?.scopes ?? []), ...scopes])];
   if (consentsNow) {
-    // Google adds newly granted scopes to what the person granted the client before.
-    const grantedScopes = [...new Set([...(earlier?.scopes ?? []), ...scopes])];
     const grant = { email, clientId: client.clientId, appName: client.name, scopes: grantedScopes };
     grantAccess(state, { ...grant, grantedAt: context.now() }, context.now());
   }
@@ -151,7 +166,11 @@ function authorize(
   state.authorizationCodes.set(code, {
     email,
     clientId: client.clientId,
-    scopes,
+    // With `include_granted_scopes`, the token also holds what the person granted before.
+    scopes:
+      parameters.include_granted_scopes === "true"
+        ? grantedScopes.filter((scope) => scope !== refused)
+        : scopes,
     redirectUri: parameters.redirect_uri,
     nonce: parameters.nonce,
     issuesRefreshToken: consentsNow && parameters.access_type === "offline",

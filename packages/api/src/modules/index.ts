@@ -22,7 +22,11 @@ import {
   employeesModule,
 } from "./employees";
 import { extensionModule } from "./extension";
-import { createGoogleWorkspaceConnector, googleModule } from "./google";
+import {
+  createGoogleWorkspaceConnector,
+  createIntegrationUserService,
+  googleModule,
+} from "./google";
 import { createImportRecordService, createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
 import { templatesModule } from "./templates";
@@ -58,6 +62,12 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     settings.connectorsUrl,
   );
   const connectedApps = createAppConnectionService(core);
+  // One service for Settings and the scans, which skip the integration user.
+  const integrationUsers = createIntegrationUserService({
+    ...core,
+    ...googleAddresses,
+    connectedApps,
+  });
   const importRecords = createImportRecordService();
   const apps = createAppService({
     ...core,
@@ -75,6 +85,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       ...apps,
     },
     directory: createDirectorySyncService(),
+    integrationUser: integrationUsers,
   });
   // One service for Settings and the extension, which share the app sessions handed over.
   const containerConnections = createContainerConnectionService({
@@ -97,6 +108,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       connectedApps,
       scans,
       employeeDirectory: directory,
+      integrationUsers,
     }),
     importsModule(scans),
     connectorsModule(containerConnections),

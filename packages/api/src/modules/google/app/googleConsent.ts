@@ -92,7 +92,7 @@ export async function startConsent(
 
 interface GoogleConsentStart {
   revision?: string;
-  flow: ConsentState["flow"];
+  flow: RelayConsentState["flow"];
   googleApp?: GoogleWorkspaceSettings["googleApp"];
   clientId?: string;
   clientSecret?: string;

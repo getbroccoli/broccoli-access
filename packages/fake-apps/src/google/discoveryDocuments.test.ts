@@ -3,6 +3,9 @@ import { expect } from "vitest";
 
 import {
   ADMIN_SCOPES,
+  insertGoogleUser,
+  updateGoogleUser,
+  USER_WRITE_SCOPE,
   CUSTOMER_PATH,
   control,
   refreshAccessToken,
@@ -60,6 +63,21 @@ it.for([
     ).toEqual([]);
   }
 });
+
+it.for(["insert", "update"] as const)(
+  "returns a Directory User for users.%s",
+  async (method, { fake }) => {
+    const { access_token } = await signIn(fake.url, { scope: USER_WRITE_SCOPE });
+
+    const response =
+      method === "insert"
+        ? await insertGoogleUser(fake.url, access_token)
+        : await updateGoogleUser(fake.url, access_token, "chloe@acme.example", true);
+
+    expect(response.status).toBe(200);
+    expect(schemaViolations("directory", "User", await response.json())).toEqual([]);
+  },
+);
 
 it("publishes only Google's OpenID keys and supported values", async ({ fake }) => {
   const response = await fetch(`${fake.url}/.well-known/openid-configuration`);

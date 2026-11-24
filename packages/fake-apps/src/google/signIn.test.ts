@@ -4,6 +4,11 @@ import { expect, onTestFinished } from "vitest";
 
 import {
   ADMIN_SCOPES,
+  control,
+  CUSTOMER_PATH,
+  insertGoogleUser,
+  USER_WRITE_SCOPE,
+  SCOPES,
   authorizationParams,
   authorizeCode,
   exchangeCode,
@@ -110,8 +115,15 @@ it("redirects Allow to the registered address with a code and unchanged state", 
   expect(location.searchParams.get("state")).toBe(params.get("state"));
 });
 
-it("redirects Cancel with access_denied and unchanged state", async ({ fake }) => {
-  const params = authorizationParams({ account: "admin@acme.example", decision: "cancel" });
+it("keeps the earlier grant when incremental consent is cancelled", async ({ fake }) => {
+  const previous = await signIn(fake.url, { scope: ADMIN_SCOPES });
+  const before = (await (await fetch(`${fake.url}/_fake/state`)).json()) as FakeState;
+  const params = authorizationParams({
+    account: "admin@acme.example",
+    decision: "cancel",
+    scope: USER_WRITE_SCOPE,
+    include_granted_scopes: "true",
+  });
 
   const response = await fetch(`${fake.url}/o/oauth2/v2/auth`, {
     method: "POST",
@@ -126,11 +138,14 @@ it("redirects Cancel with access_denied and unchanged state", async ({ fake }) =
     error: "access_denied",
     state: params.get("state"),
   });
-  const state = (await fetch(`${fake.url}/_fake/state`).then((result) =>
-    result.json(),
-  )) as FakeState;
-  expect(state.grants).toBe(ACME.grants.length);
-  expect(state.events).toBe(27);
+  expect(await (await fetch(`${fake.url}/_fake/state`)).json()).toEqual(before);
+  const grants = await fetch(`${fake.url}/admin/directory/v1/users/admin@acme.example/tokens`, {
+    headers: { authorization: `Bearer ${previous.access_token}` },
+  });
+  const { items } = (await grants.json()) as DirectoryTokens;
+  expect(
+    items.find(({ clientId }) => clientId === ACME.oauthClient.clientId)?.scopes.toSorted(),
+  ).toEqual(ADMIN_SCOPES.split(" ").sort());
 });
 
 it("exchanges a code for a Bearer access token and an ID token", async ({ fake }) => {
@@ -145,29 +160,6 @@ it("exchanges a code for a Bearer access token and an ID token", async ({ fake }
     scope: "openid email profile",
     token_type: "Bearer",
     id_token: expect.any(String),
-  });
-});
-
-it("accepts HTTP Basic client credentials when exchanging a code", async ({ fake }) => {
-  const code = await authorizeCode(fake.url);
-  const credentials = Buffer.from(
-    `${ACME.oauthClient.clientId}:${ACME.oauthClient.clientSecret}`,
-  ).toString("base64");
-
-  const response = await fetch(`${fake.url}/token`, {
-    method: "POST",
-    headers: { authorization: `Basic ${credentials}` },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: REDIRECT_URI,
-    }),
-  });
-
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({
-    access_token: expect.any(String),
-    token_type: "Bearer",
   });
 });
 
@@ -258,4 +250,91 @@ it("records consent in Directory tokens and Reports", async ({ fake }) => {
       id: expect.objectContaining({ time: fake.now.toISOString() }),
     }),
   ]);
+});
+
+it.for(["no previous grant", "another account granted the write scope"])(
+  "lists only the write permission on incremental consent with %s",
+  async (priorGrant, { fake }) => {
+    if (priorGrant === "another account granted the write scope") {
+      await signIn(fake.url, { account: "chloe@acme.example", scope: USER_WRITE_SCOPE });
+    }
+    const params = authorizationParams({
+      scope: `openid email profile ${USER_WRITE_SCOPE}`,
+      include_granted_scopes: "true",
+    });
+
+    const page = await fetch(`${fake.url}/o/oauth2/v2/auth?${params.toString()}`);
+
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect([...html.matchAll(/<li>(.*?)<\/li>/gs)].map((match) => match[1]?.trim())).toEqual([
+      "See, create and change users in your organisation",
+    ]);
+  },
+);
+
+it("issues an incremental token that can use both grants for the same client and account", async ({
+  fake,
+}) => {
+  await signIn(fake.url, { scope: SCOPES.customer });
+  await signIn(fake.url, { account: "chloe@acme.example", scope: SCOPES.users });
+  await control(fake.url, "/clients", {
+    clientId: "other-client",
+    clientSecret: "other-secret",
+    redirectUris: [REDIRECT_URI],
+  });
+  await signIn(fake.url, {
+    client_id: "other-client",
+    client_secret: "other-secret",
+    scope: SCOPES.reports,
+  });
+
+  const token = await signIn(fake.url, { scope: USER_WRITE_SCOPE, include_granted_scopes: "true" });
+
+  expect(token.scope.split(" ").sort()).toEqual([SCOPES.customer, USER_WRITE_SCOPE].sort());
+  expect(
+    (
+      await fetch(`${fake.url}${CUSTOMER_PATH}`, {
+        headers: { authorization: `Bearer ${token.access_token}` },
+      })
+    ).status,
+  ).toBe(200);
+  expect((await insertGoogleUser(fake.url, token.access_token)).status).toBe(200);
+});
+
+it("omits a refused scope from just the next Allow", async ({ fake }) => {
+  await control(fake.url, "/consent/refuse-scope", { scope: USER_WRITE_SCOPE });
+  const request = { scope: `${SCOPES.customer} ${USER_WRITE_SCOPE}` };
+
+  const partial = await signIn(fake.url, request);
+  expect(partial.scope).toBe(SCOPES.customer);
+  expect((await insertGoogleUser(fake.url, partial.access_token)).status).toBe(403);
+
+  const full = await signIn(fake.url, request);
+  expect(full.scope.split(" ").sort()).toEqual(request.scope.split(" ").sort());
+  expect((await insertGoogleUser(fake.url, full.access_token)).status).toBe(200);
+});
+
+it("omits a previously granted write scope for one incremental consent when it is refused", async ({
+  fake,
+}) => {
+  const request = { scope: `openid ${USER_WRITE_SCOPE}`, include_granted_scopes: "true" };
+  const previous = await signIn(fake.url, request);
+  expect(previous.scope.split(" ")).toContain(USER_WRITE_SCOPE);
+  await control(fake.url, "/consent/refuse-scope", { scope: USER_WRITE_SCOPE });
+
+  const partial = await signIn(fake.url, request);
+  expect(partial.scope.split(" ")).not.toContain(USER_WRITE_SCOPE);
+
+  const next = await signIn(fake.url, request);
+  expect(next.scope.split(" ")).toContain(USER_WRITE_SCOPE);
+});
+
+it("lists constructor as a requested scope", async ({ fake }) => {
+  const params = authorizationParams({ scope: "constructor" });
+
+  const response = await fetch(`${fake.url}/o/oauth2/v2/auth?${params.toString()}`);
+
+  expect(response.status).toBe(200);
+  expect(await response.text()).toMatch(/<li>\s*constructor\s*<\/li>/);
 });

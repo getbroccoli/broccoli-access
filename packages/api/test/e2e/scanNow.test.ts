@@ -1,4 +1,4 @@
-import { expect, test, suspendAtFakeGoogle, readGoogleConnection } from "#test/support";
+import { expect, test, suspendAtFakeGoogle, readGoogleConnection, SCAN_NOW } from "#test/support";
 
 test("Scan now picks up a suspension and advances the last scan time", async ({
   env,
@@ -50,9 +50,3 @@ test("refuses Scan now without a session", async ({ env }) => {
     errors: [{ extensions: { code: "UNAUTHENTICATED" } }],
   });
 });
-
-const SCAN_NOW = `mutation ($connectionId: ID!) {
-  imports { scanConnection(connectionId: $connectionId) {
-    scan { id status readAt people { count suspended } }
-  } }
-}`;

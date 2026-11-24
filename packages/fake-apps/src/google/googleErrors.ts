@@ -20,7 +20,8 @@ export type GoogleApiError =
   | "backendError"
   | "invalid"
   | "badRequest"
-  | "notFound";
+  | "notFound"
+  | "duplicate";
 
 /** Answers with Google's JSON error body for `error`. */
 export function sendGoogleError(response: Response, error: GoogleApiError): void {
@@ -114,5 +115,11 @@ const GOOGLE_ERRORS: Record<GoogleApiError, GoogleErrorBody> = {
     status: "NOT_FOUND",
     message: "Resource Not Found: userKey",
     reason: "notFound",
+  },
+  duplicate: {
+    code: 409,
+    status: "ALREADY_EXISTS",
+    message: "Entity already exists.",
+    reason: "duplicate",
   },
 };

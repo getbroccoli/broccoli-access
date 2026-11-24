@@ -41,6 +41,7 @@ export interface GrantEvents {
 }
 
 export interface FakeState {
+  createdUsers: { primaryEmail: string; suspended: boolean; changePasswordAtNextLogin: boolean }[];
   people: number;
   suspendedPeople: number;
   apps: number;

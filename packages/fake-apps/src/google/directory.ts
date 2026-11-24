@@ -2,13 +2,12 @@ import { createHash } from "node:crypto";
 
 import { Router, type RequestHandler } from "express";
 
-import type { SeedPerson } from "../seed";
 import { pageOf } from "../utils";
 import { adminAccess } from "./adminAccess";
 import type { FakeGoogleContext } from "./context";
 import { sendGoogleError } from "./googleErrors";
 import { parsePageRequest } from "./pageRequest";
-import { findPerson, fullName, type GoogleState } from "./state";
+import { type DirectoryPerson, findPerson, fullName, type GoogleState } from "./state";
 
 /** Google's Directory API v1: the customer, its users, their photos and each user's app grants. */
 export function directoryRoutes(context: FakeGoogleContext): Router {
@@ -117,7 +116,8 @@ function isAcme(state: GoogleState, customerKey: string): boolean {
   return customerKey === "my_customer" || customerKey === state.customer.id;
 }
 
-function directoryUser(state: GoogleState, person: SeedPerson) {
+/** A person as Directory answers them, in `users.list` and after a write. */
+export function directoryUser(state: GoogleState, person: DirectoryPerson) {
   return {
     kind: "admin#directory#user",
     id: person.id,
@@ -129,6 +129,7 @@ function directoryUser(state: GoogleState, person: SeedPerson) {
     },
     isAdmin: person.isSuperAdmin,
     suspended: person.suspended,
+    changePasswordAtNextLogin: person.changePasswordAtNextLogin,
     orgUnitPath: "/",
     ...(person.managerEmail !== null && {
       relations: [{ value: person.managerEmail, type: "manager" }],

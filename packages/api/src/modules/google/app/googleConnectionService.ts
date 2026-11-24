@@ -11,6 +11,7 @@ import {
 } from "../../../core/security";
 import { createGoogleClient } from "../../../integrations/google";
 import {
+  GOOGLE_USER_WRITE_SCOPE,
   GOOGLE_WORKSPACE,
   type GoogleWorkspaceSettings,
   parseGoogleWorkspaceSettings,
@@ -229,9 +230,18 @@ export function createGoogleConnectionService(
       if (!connection) {
         return null;
       }
-      const { domain, organizationName, adminEmail, googleApp, clientId } =
-        parseGoogleWorkspaceSettings(connection.settings);
-      return { id: connection.id, domain, organizationName, adminEmail, googleApp, clientId };
+      const { grantedScopes, ...settings } = parseGoogleWorkspaceSettings(connection.settings);
+      const { domain, organizationName, adminEmail, googleApp, clientId } = settings;
+      const canChangeUsers = grantedScopes.includes(GOOGLE_USER_WRITE_SCOPE);
+      return {
+        id: connection.id,
+        domain,
+        organizationName,
+        adminEmail,
+        googleApp,
+        clientId,
+        canChangeUsers,
+      };
     },
     async readOrganization() {
       const connection = await connectedApps.readConnection(orm, GOOGLE_WORKSPACE);

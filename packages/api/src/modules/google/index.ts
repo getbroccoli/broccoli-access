@@ -4,6 +4,7 @@ import {
   createGoogleConnectionService,
   createGoogleSignInService,
   type GoogleConnectionDependencies,
+  type IntegrationUserService,
 } from "./app";
 import { createResolvers } from "./graphql";
 import { googleRouter } from "./http";
@@ -13,6 +14,7 @@ export {
   createGoogleConnectionService,
   createGoogleSignInService,
   createGoogleWorkspaceConnector,
+  createIntegrationUserService,
 } from "./app";
 
 // Public types.
@@ -20,15 +22,22 @@ export type { GoogleConnectionService } from "./app";
 
 /**
  * Google Workspace connected with either Google app: the consent at setup, signing in
- * with Google after it, and Google's redirect for both.
+ * with Google after it, creating the integration user, and Google's redirect for them all.
  */
-export function googleModule(dependencies: GoogleConnectionDependencies): ModuleManifest {
+export function googleModule(
+  dependencies: GoogleConnectionDependencies & {
+    /** The one the scans read too, built by the composition root. */
+    integrationUsers: IntegrationUserService;
+  },
+): ModuleManifest {
+  const { integrationUsers } = dependencies;
   const connection = createGoogleConnectionService(dependencies);
   const signIn = createGoogleSignInService(dependencies);
   return {
     name: "google",
     typeDefs: readSdl(import.meta.url, "./graphql/schema.graphql"),
-    resolvers: createResolvers(connection, Boolean(dependencies.relayUrl)),
-    router: (http) => googleRouter({ connection, signIn }, http, dependencies.logger),
+    resolvers: createResolvers(connection, Boolean(dependencies.relayUrl), integrationUsers),
+    router: (http) =>
+      googleRouter({ connection, signIn, integrationUsers }, http, dependencies.logger),
   };
 }

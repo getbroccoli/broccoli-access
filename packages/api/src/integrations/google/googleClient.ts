@@ -20,6 +20,8 @@ export interface GoogleClient {
   readCustomer(accessToken: string): Promise<GoogleCustomer>;
   /** The customer's user with Google's user id `userId`, paging the Directory; null when absent. */
   findUser(accessToken: string, userId: string): Promise<GoogleUser | null>;
+  /** Creates a user who keeps the password given; Google refuses a taken address with a 409. */
+  createUser(accessToken: string, user: NewGoogleUser): Promise<GoogleUser>;
   /** One page of the customer's users, from a null page token; `nextPageToken` is null on the last. */
   listUsers(accessToken: string, pageToken: string | null): Promise<GoogleUserPage>;
   /**
@@ -83,6 +85,13 @@ export interface GoogleUser {
   managerEmail: string | null;
   /** The user as Google sent it. */
   raw: Record<string, unknown>;
+}
+
+export interface NewGoogleUser {
+  email: string;
+  givenName: string;
+  familyName: string;
+  password: string;
 }
 
 export interface GoogleUserPage {
@@ -181,6 +190,20 @@ export function createGoogleClient({
       } while (pageToken !== null);
       return null;
     },
+    createUser: async (accessToken, { email, givenName, familyName, password }) => {
+      const body = {
+        primaryEmail: email,
+        name: { givenName, familyName },
+        password,
+        changePasswordAtNextLogin: false,
+      };
+      const user = await fetchRequired(directoryUrl("users"), RAW_RECORD, {
+        method: "POST",
+        headers: { ...bearer(accessToken).headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return toGoogleUser(DIRECTORY_USER.parse(user), user);
+    },
     listUsers: (accessToken, pageToken) => readUserPage(directoryUrl, accessToken, pageToken),
     readPhoto: async (accessToken, userId) => {
       const url = directoryUrl(`users/${encodeURIComponent(userId)}/photos/thumbnail`);
@@ -237,9 +260,11 @@ const DIRECTORY_USER = z.object({
   relations: z.array(z.object({ type: z.string(), value: z.string() })).optional(),
 });
 
+const RAW_RECORD = z.record(z.string(), z.unknown());
+
 // Users stay as Google sent them, so each keeps every field for its import record.
 const USERS_PAGE = z.object({
-  users: z.array(z.record(z.string(), z.unknown())).optional(),
+  users: z.array(RAW_RECORD).optional(),
   nextPageToken: z.string().optional(),
 });
 

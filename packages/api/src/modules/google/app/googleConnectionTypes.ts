@@ -40,4 +40,6 @@ export interface GoogleWorkspaceConnection {
   domain: string;
   organizationName: string;
   adminEmail: string;
+  /** Whether the admin allowed creating and changing the directory's users. */
+  canChangeUsers: boolean;
 }

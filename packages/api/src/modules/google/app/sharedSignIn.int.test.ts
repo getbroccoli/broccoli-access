@@ -3,12 +3,10 @@ import { onTestFinished, vi } from "vitest";
 import {
   expect,
   test,
-  SETUP_HOLDER,
   GOOGLE_RELAY_URL,
   RELAY_HANDLE,
-  startSharedGoogleSetup,
+  finishSharedGoogleSetup,
   googleRelayGrant,
-  stubGoogleRelay,
   assertRelayRedemption,
   googleSignIn,
   storedGoogleAccounts,
@@ -112,15 +110,7 @@ test.for(["another browser", "setup consent"])(
 );
 
 async function startOwnerSignIn(orm: Orm, googleUrl: string) {
-  const setup = await startSharedGoogleSetup(orm, googleUrl);
-  const relay = stubGoogleRelay();
-  const grant = await googleRelayGrant(googleUrl, setup.authorization);
-  relay.redeem.mockReturnValueOnce(Response.json(grant));
-  const owner = await setup.connection.finishConsent(SETUP_HOLDER, {
-    ...setup.input,
-    state: setup.state,
-    handle: RELAY_HANDLE,
-  });
+  const { setup, relay, owner } = await finishSharedGoogleSetup(orm, googleUrl);
   const signIn = googleSignIn(orm, { googleUrl, relayUrl: GOOGLE_RELAY_URL });
   const { now } = setup.input;
   const publicOrigin = "https://alias.acme.example";

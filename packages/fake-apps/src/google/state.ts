@@ -5,7 +5,7 @@ import type { ConnectorError } from "./googleErrors";
 /** Everything the fake Google holds, in memory; a reset replaces it with a fresh seeded one. */
 export interface GoogleState {
   customer: SeedCustomer;
-  people: SeedPerson[];
+  people: DirectoryPerson[];
   grants: Grant[];
   events: GrantEvent[];
   clients: OAuthClient[];
@@ -13,6 +13,17 @@ export interface GoogleState {
   refreshTokens: Map<string, RefreshToken>;
   authorizationCodes: Map<string, AuthorizationCode>;
   failures: Map<AdminMethod, PlannedFailure>;
+  /** The scope the next consent leaves out, as when an admin unticks it; null for none. */
+  refusedScope: string | null;
+  /** How many users the Directory API created, so each gets an id no other had. */
+  createdUserCount: number;
+}
+
+/** A directory user: a seeded person, or one the Directory API created. */
+export interface DirectoryPerson extends SeedPerson {
+  changePasswordAtNextLogin: boolean;
+  /** Created through the Directory API since the last reset, which `/_fake/state` lists. */
+  createdSinceReset: boolean;
 }
 
 /** A person's consent to an OAuth client, as Directory tokens list it. */
@@ -80,7 +91,11 @@ const FIRST_EVENT_QUALIFIER = 7310462093812215871n;
 export function seededState(seed: AcmeSeed, start: Date, redirectUris: string[]): GoogleState {
   const state: GoogleState = {
     customer: seed.customer,
-    people: seed.people.map((person) => ({ ...person })),
+    people: seed.people.map((person) => ({
+      ...person,
+      changePasswordAtNextLogin: false,
+      createdSinceReset: false,
+    })),
     grants: [],
     events: [],
     clients: [{ ...seed.oauthClient, redirectUris }],
@@ -88,6 +103,8 @@ export function seededState(seed: AcmeSeed, start: Date, redirectUris: string[])
     refreshTokens: new Map(),
     authorizationCodes: new Map(),
     failures: new Map(),
+    refusedScope: null,
+    createdUserCount: 0,
   };
   for (const { email, clientId, scopes, daysBeforeStart } of seed.grants) {
     const appName = seed.apps.find((app) => app.clientId === clientId)?.name ?? clientId;
@@ -132,7 +149,7 @@ export function findGrant(state: GoogleState, email: string, clientId: string): 
 }
 
 /** Finds a person by Google user id or by email, as Directory's `userKey` does. */
-export function findPerson(state: GoogleState, userKey: string): SeedPerson | undefined {
+export function findPerson(state: GoogleState, userKey: string): DirectoryPerson | undefined {
   const key = userKey.toLowerCase();
   return state.people.find((person) => person.id === key || person.email === key);
 }

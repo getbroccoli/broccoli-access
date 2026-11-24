@@ -2,7 +2,7 @@ import type { Orm, Transact } from "../../src/core/db";
 import type { ConnectorRegistry } from "../../src/core/connectors";
 import type { JobQueue } from "../../src/core/jobs";
 import { createMailSettingsService, type MailSettingsService } from "../../src/core/instance";
-import { createLogger } from "../../src/core/logger";
+import { createLogger, type Logger } from "../../src/core/logger";
 import {
   createEmployeeReadService,
   createEmployeeService,
@@ -31,6 +31,7 @@ import {
 } from "../../src/modules/imports";
 import {
   createGoogleConnectionService,
+  createIntegrationUserService,
   createGoogleSignInService,
   createGoogleWorkspaceConnector,
   type GoogleConnectionService,
@@ -104,6 +105,21 @@ export function googleConnection(
     connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
     employeeDirectory: employeeDirectory(orm),
     scans: scans(orm, { googleUrl, relayUrl, jobs }),
+  });
+}
+
+export function integrationUsers(
+  orm: Orm,
+  { googleUrl, logger = createLogger("silent") }: { googleUrl: string; logger?: Logger },
+) {
+  return createIntegrationUserService({
+    orm,
+    transact: testTransactor(orm),
+    secretBox: TEST_SECRET_BOX,
+    logger,
+    openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
+    adminApiUrl: googleUrl,
+    connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
   });
 }
 
@@ -190,6 +206,7 @@ export function scans(
       ...apps(orm),
     },
     directory: createDirectorySyncService(),
+    integrationUser: integrationUsers(orm, { googleUrl }),
     wait: () => Promise.resolve(),
   });
 }

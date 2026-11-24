@@ -105,6 +105,7 @@
       "src/modules/*",
       "src/modules/employees/db",
       "src/modules/apps/db",
+      "src/modules/google/db",
       "src/modules/imports/db",
       "src/modules/templates/db",
       "src/utils"

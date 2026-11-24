@@ -65,3 +65,9 @@ export async function scannedApps(browser: Browser) {
     .toEqual({ count: 37, step: "SELECT_APPS" });
   return discovered;
 }
+
+export const SCAN_NOW = `mutation ($connectionId: ID!) {
+  imports { scanConnection(connectionId: $connectionId) {
+    scan { id status readAt people { count suspended } }
+  } }
+}`;

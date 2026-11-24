@@ -1,6 +1,12 @@
 import type { Orm } from "../../src/core/db";
 import { googleSetup } from "./googleSetup";
-import { GOOGLE_RELAY_URL, SHARED_GOOGLE_APP } from "./googleRelay";
+import {
+  GOOGLE_RELAY_URL,
+  SHARED_GOOGLE_APP,
+  RELAY_HANDLE,
+  googleRelayGrant,
+  stubGoogleRelay,
+} from "./googleRelay";
 import { SETUP_HOLDER } from "./testSecurityContext";
 import { recordingJobQueue } from "./recordingJobQueue";
 
@@ -20,4 +26,17 @@ export async function startSharedGoogleSetup(orm: Orm, googleUrl: string) {
     state: authorization.searchParams.get("state")!,
     sent,
   };
+}
+
+export async function finishSharedGoogleSetup(orm: Orm, googleUrl: string) {
+  const setup = await startSharedGoogleSetup(orm, googleUrl);
+  const relay = stubGoogleRelay();
+  const grant = await googleRelayGrant(googleUrl, setup.authorization);
+  relay.redeem.mockReturnValueOnce(Response.json(grant));
+  const owner = await setup.connection.finishConsent(SETUP_HOLDER, {
+    ...setup.input,
+    state: setup.state,
+    handle: RELAY_HANDLE,
+  });
+  return { setup, relay, owner };
 }

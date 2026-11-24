@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 
 import type { Orm } from "../../src/core/db";
+import { PrincipalSecurityContext } from "../../src/core/security";
+import { employeeDirectory } from "../../src/modules/employees";
 import type { JobQueue } from "../../src/core/jobs";
 import { consentAtGoogle } from "./googleConsent";
 import { googleSetup } from "./googleSetup";
@@ -26,6 +28,16 @@ export async function googleScanSetup(orm: Orm, googleUrl: string, jobs?: JobQue
   assert(source);
   return {
     ownerUserId: userId,
+    owner: PrincipalSecurityContext.user(
+      {
+        userId,
+        email: "admin@acme.example",
+        isOwner: true,
+        permissionProfiles: ["EMPLOYEE", "OWNER"],
+        employeeId: null,
+      },
+      employeeDirectory(orm),
+    ),
     connectionId: saved.id,
     sourceId: source.id,
     scans: scans(orm, { googleUrl, jobs }),

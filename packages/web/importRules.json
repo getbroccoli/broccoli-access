@@ -102,6 +102,7 @@
       "src/lib/class-names",
       "src/lib/extensionDownload",
       "src/lib/lastScan",
+      "src/lib/postJson",
       "src/lib/since",
       "src/lib/useChromeExtension",
       "src/lib/usePollWhileScanning",
