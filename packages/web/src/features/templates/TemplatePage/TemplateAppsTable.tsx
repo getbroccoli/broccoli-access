@@ -21,7 +21,7 @@ const FIRST_APPS = 50;
 
 /** A template's apps in the order added, each with "Take out". */
 export function TemplateAppsTable({ apps, disabled, onTakeOut, onSetRole }: Props) {
-  const { data, loading } = useQuery(TemplateRoleOptionsDocument, {
+  const { data, loading, refetch } = useQuery(TemplateRoleOptionsDocument, {
     skip: !apps.some(({ app }) => app.connected),
     fetchPolicy: "cache-and-network",
   });
@@ -47,8 +47,26 @@ export function TemplateAppsTable({ apps, disabled, onTakeOut, onSetRole }: Prop
       cell: ({ app, role }) => {
         if (!app.connected)
           return <StatusBadge tone="warning">{t("settings.apps.notConnected")}</StatusBadge>;
-        const roles = rolesByApp.get(app.id);
-        if (!roles) return t(loading ? "templates.role.loading" : "templates.role.loadFailed");
+        if (!data) {
+          if (loading) return t("templates.role.loading");
+          return (
+            <span role="alert" className="flex flex-wrap items-center gap-2">
+              {t("templates.role.loadFailed")}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void refetch().catch(() => undefined)}
+              >
+                {t("templates.retry")}
+              </Button>
+            </span>
+          );
+        }
+        // An app no container connector connects, such as Google Workspace, offers no roles.
+        // shortcut: a connectors container that is down lists no connectors, so its apps read as
+        // having no roles until the next read; show the failure once the API reports one.
+        const roles = rolesByApp.get(app.id) ?? [];
         return roles.length || role !== null ? (
           <select
             aria-label={t("templates.role.label", { app: app.name })}

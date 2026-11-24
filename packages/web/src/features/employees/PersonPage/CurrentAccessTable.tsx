@@ -33,7 +33,7 @@ export function CurrentAccessTable({ person }: { person: Person }) {
             {showSources ? (
               <>
                 <TableHead className="w-1/4 font-normal text-muted-foreground">
-                  {t("templates.role.expected")}
+                  {t("people.person.role")}
                 </TableHead>
                 <TableHead className="w-[17%] font-normal text-muted-foreground">
                   {t("people.person.from")}

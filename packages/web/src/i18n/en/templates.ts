@@ -23,7 +23,7 @@ export const templatesEn = {
   "templates.role.expected": "Expected role",
   "templates.role.nextInvite": "This choice applies to future invites.",
   "templates.role.loading": "Loading roles…",
-  "templates.role.loadFailed": "Couldn’t load roles. Reload to try again.",
+  "templates.role.loadFailed": "Couldn’t load roles.",
   "templates.role.ownerUpdates": "Ask an owner to update one of the assigned templates.",
   "templates.role.label": "Role in {app}",
   "templates.role.unavailable": "{role} (unavailable)",
