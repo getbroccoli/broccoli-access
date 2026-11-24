@@ -7,10 +7,12 @@ import type { Orm, Transact } from "../../src/core/db";
 import type { JobQueue } from "../../src/core/jobs";
 import { createLogger } from "../../src/core/logger";
 import { createAccountChangeService } from "../../src/modules/apps";
+import { createEmployeeReadService } from "../../src/modules/employees";
 import { createGoogleWorkspaceConnector } from "../../src/modules/google";
 import { createImportRecordService } from "../../src/modules/imports";
 import { connectLinear, containerConnectors, failLinearCall } from "./containerConnections";
 import { recordingJobQueue } from "./recordingJobQueue";
+import { apps } from "./services";
 import { storedAppAccounts } from "./storedScan";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { SYSTEM } from "./testSecurityContext";
@@ -37,6 +39,7 @@ export function accountChanges(
     jobs,
     connectors,
     members: createImportRecordService(),
+    employees: createEmployeeReadService({ orm, accounts: apps(orm) }),
     secretBox: TEST_SECRET_BOX,
     logger: createLogger("silent"),
     wait: () => Promise.resolve(),

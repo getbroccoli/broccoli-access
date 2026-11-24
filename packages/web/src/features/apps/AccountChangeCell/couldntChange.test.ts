@@ -102,13 +102,10 @@ it.for([
   ).toBe(reason);
 });
 
+const byHandOnly = { tryAgain: false, byHand: true, scanNow: false, reconnect: false };
+
 it("offers only by hand after NOT_ALLOWED", () => {
-  expect(failedChangeOptions(failedSuspend("NOT_ALLOWED", null))).toEqual({
-    tryAgain: false,
-    byHand: true,
-    scanNow: false,
-    reconnect: false,
-  });
+  expect(failedChangeOptions(failedSuspend("NOT_ALLOWED", null))).toEqual(byHandOnly);
 });
 
 it.for([null, "2026-11-22T09:00:00Z", "2026-11-22T10:00:00Z"])(
@@ -202,11 +199,7 @@ it.for([
     { tryAgain: true, byHand: false, scanNow: false, reconnect: false },
   ],
   ["ACCOUNT_NOT_FOUND", null, { tryAgain: false, byHand: false, scanNow: true, reconnect: false }],
-  [
-    "UNEXPECTED_RESPONSE",
-    null,
-    { tryAgain: false, byHand: true, scanNow: false, reconnect: false },
-  ],
+  ["UNEXPECTED_RESPONSE", null, byHandOnly],
 ] satisfies [
   AccountChangeFailure,
   AccountChangeAction | null,
@@ -236,7 +229,7 @@ it.for([
   [
     "NOT_ALLOWED",
     "SUSPEND",
-    { tryAgain: false, byHand: true, scanNow: false, reconnect: false },
+    byHandOnly,
     "Trying again won’t help. If someone with more rights in Linear makes the change there, tell Broccoli Access.",
   ],
   [
@@ -266,14 +259,32 @@ it.for([
   [
     "APP_UNAVAILABLE",
     "SUSPEND",
-    { tryAgain: false, byHand: true, scanNow: false, reconnect: false },
+    byHandOnly,
     "Deactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
   ],
   [
     "APP_UNAVAILABLE",
     "REACTIVATE",
-    { tryAgain: false, byHand: true, scanNow: false, reconnect: false },
+    byHandOnly,
     "Reactivate Ana in Linear’s admin yourself and tell Broccoli Access.",
+  ],
+  [
+    "UNEXPECTED_RESPONSE",
+    "INVITE",
+    { tryAgain: true, byHand: true, scanNow: false, reconnect: false },
+    "Try again in a while, or invite Ana in Linear’s admin yourself and tell Broccoli Access.",
+  ],
+  [
+    "APP_UNAVAILABLE",
+    "INVITE",
+    byHandOnly,
+    "Invite Ana in Linear’s admin yourself and tell Broccoli Access.",
+  ],
+  [
+    "AUTHENTICATION_FAILED",
+    "INVITE",
+    { tryAgain: false, byHand: true, scanNow: false, reconnect: true },
+    "After you reconnect, this row shows Try again. Or invite Ana in Linear’s admin yourself and tell Broccoli Access.",
   ],
 ] as const)(
   "suggests what to do after %s for %s with options %j",
