@@ -29,7 +29,7 @@ import {
 
 /**
  * The integration user: the Google Workspace user Broccoli Access creates for itself, once the
- * owner allows it to create users, and signs in to Google as by itself. Its secrets leave this
+ * owner allows it to create users, and signs in to Google as it by itself. Its secrets leave this
  * service only for the connectors container.
  */
 export interface IntegrationUserService {

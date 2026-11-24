@@ -8,17 +8,6 @@ export function createResolvers(
   broccoliGoogleAppAvailable: boolean,
   integrationUsers: Pick<IntegrationUserService, "readIntegrationUser" | "startSignIn">,
 ): Resolvers {
-  const readIntegrationUser = async (actor: SecurityContext) => {
-    const found = await integrationUsers.readIntegrationUser(actor);
-    return (
-      found && {
-        id: found.id,
-        email: found.email,
-        signInStatus: toEnum(found.signIn.status),
-        signInFailure: found.signIn.failure && toEnum(found.signIn.failure),
-      }
-    );
-  };
   return {
     Setup: {
       broccoliGoogleAppAvailable: () => broccoliGoogleAppAvailable,
@@ -30,7 +19,8 @@ export function createResolvers(
         const connection = await google.readConnection(context.getActor());
         return connection && { ...connection, googleApp: toEnum(connection.googleApp) };
       },
-      integrationUser: (_parent, _args, context) => readIntegrationUser(context.getActor()),
+      integrationUser: (_parent, _args, context) =>
+        readIntegrationUser(integrationUsers, context.getActor()),
     },
     Mutation: {
       google: () => ({}),
@@ -39,8 +29,24 @@ export function createResolvers(
       signInAsIntegrationUser: async (_parent, _args, context) => {
         const actor = context.getActor();
         await integrationUsers.startSignIn(actor);
-        return { integrationUser: await readIntegrationUser(actor) };
+        return { integrationUser: await readIntegrationUser(integrationUsers, actor) };
       },
     },
   };
+}
+
+/** The integration user in the schema's shape, its sign-in as two fields. */
+async function readIntegrationUser(
+  integrationUsers: Pick<IntegrationUserService, "readIntegrationUser">,
+  actor: SecurityContext,
+) {
+  const found = await integrationUsers.readIntegrationUser(actor);
+  return (
+    found && {
+      id: found.id,
+      email: found.email,
+      signInStatus: toEnum(found.signIn.status),
+      signInFailure: found.signIn.failure && toEnum(found.signIn.failure),
+    }
+  );
 }
