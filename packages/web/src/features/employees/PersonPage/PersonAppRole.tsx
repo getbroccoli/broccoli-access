@@ -16,7 +16,8 @@ export function PersonAppRole({ row, employeeId }: Props) {
   const [pick, { loading }] = usePayloadMutation(PickPersonAppRoleDocument);
   const { app, role, roleConflict } = row;
   if (!roleConflict) {
-    if ((!row.templates.length || !app.connected) && !role) return "—";
+    // No role to show: no template gives the app, or its connection offers no roles.
+    if (!role && (!row.templates.length || !app.connected || !app.roles.length)) return "—";
     const listed = app.roles.find((option) =>
       role === null ? option.isDefault : option.key === role,
     );
