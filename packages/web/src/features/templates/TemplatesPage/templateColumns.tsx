@@ -9,7 +9,7 @@ type TemplateRow = TemplatesPageQuery["templates"]["edges"][number]["node"];
 const TEMPLATE: DataTableColumn<TemplateRow> = {
   id: "template",
   header: t("templates.column.template"),
-  className: "min-w-40",
+  className: "w-48",
   cell: ({ id, name }) => (
     <Link
       to="/templates/$templateId"
@@ -32,7 +32,7 @@ const APPS: DataTableColumn<TemplateRow> = {
 const PEOPLE: DataTableColumn<TemplateRow> = {
   id: "people",
   header: t("templates.column.people"),
-  className: "text-foreground/80 tabular-nums",
+  className: "w-56 text-foreground/80 tabular-nums",
   cell: ({ peopleCount }) => peopleCount,
 };
 
