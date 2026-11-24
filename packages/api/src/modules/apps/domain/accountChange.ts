@@ -2,18 +2,21 @@ import type { RuntimeKind } from "@broccoli-access/connector-contract";
 
 import type { AccountAction, AccountStatus, ConnectorErrorCode } from "../../../core/connectors";
 
-/** One Disable or Enable of one app account, from the owner's click to its result. */
+/**
+ * One Disable or Enable of one app account, or one Invite of an employee to an app, from the
+ * owner's click to its result.
+ */
 export interface AccountChange {
   id: string;
-  /** Null once a scan deleted the account; the change stays. */
+  /** Null for an invite, and once a scan deleted the account; the change stays. */
   appAccountId: string | null;
   appId: string;
-  /** The account's email, lowercased, copied when the owner asked. */
+  /** The account's email, or the invited employee's, lowercased, copied when the owner asked. */
   email: string;
   connectionId: string;
-  action: AccountAction;
-  /** The member's id in the app, copied from the connection's record when the owner asked. */
-  sourceKey: string;
+  action: AccountChangeAction;
+  /** The member's id in the app, copied from the connection's record when the owner asked; null for an invite. */
+  sourceKey: string | null;
   status: AccountChangeStatus;
   /** Each runtime tried, in order; `error` is null for the one that worked. */
   attempts: AccountChangeAttempt[];
@@ -25,6 +28,9 @@ export interface AccountChange {
   /** When it stopped `running`. */
   finishedAt: Date | null;
 }
+
+/** Disable (`suspend`), Enable (`reactivate`) or Invite (`invite`). */
+export type AccountChangeAction = AccountAction | "invite";
 
 /** `running` covers waiting for its turn too; `done_by_hand` follows a failure. */
 export const ACCOUNT_CHANGE_STATUSES = ["running", "succeeded", "failed", "done_by_hand"] as const;

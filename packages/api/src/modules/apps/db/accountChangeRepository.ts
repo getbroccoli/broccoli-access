@@ -19,12 +19,12 @@ import { accountChanges, type StoredAttempt } from "./accountChangesTable";
 
 /** Account changes in Postgres, through the pool or inside a transaction. */
 export interface AccountChangeRepository {
-  /** Stores a running change; null when its account already has one running. */
+  /**
+   * Stores a running change; null when its account already has one running, or for an invite, when
+   * its connection and email already have one running.
+   */
   insertRunning(
-    change: Omit<
-      AccountChange,
-      "id" | "appAccountId" | "status" | "attempts" | "error" | "finishedAt"
-    > & { appAccountId: string },
+    change: Omit<AccountChange, "id" | "status" | "attempts" | "error" | "finishedAt">,
   ): Promise<AccountChange | null>;
   findById(id: string): Promise<AccountChange | null>;
   /** The changes with these ids; an unknown id is left out. */
@@ -51,6 +51,11 @@ export interface AccountChangeRepository {
   findAccountsChangedSince(appAccountIds: readonly string[], since: Date): Promise<string[]>;
   /** Each account's newest change; an account without one is left out. */
   findLatestOfAccounts(appAccountIds: readonly string[]): Promise<AccountChange[]>;
+  /** The newest invite of each of the connections and emails; one never invited is left out. */
+  findLatestInvites(
+    connectionIds: readonly string[],
+    emails: readonly string[],
+  ): Promise<AccountChange[]>;
   /** For each change of `changeIds`, how many running changes of its connection were asked before it. */
   countChangesAhead(changeIds: readonly string[]): Promise<Map<string, number>>;
   /** Up to `limit` changes after the one with sort values `after`, newest first. */
@@ -80,11 +85,9 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
       const [stored] = await orm()
         .insert(accountChanges)
         .values({ ...change, status: "running", attempts: [] })
-        // Waits for a concurrent ask of the same account, then stores nothing if it committed.
-        .onConflictDoNothing({
-          target: accountChanges.appAccountId,
-          where: sql`${accountChanges.status} = 'running'`,
-        })
+        // Waits for a concurrent ask of the same account or invite, then stores nothing if it
+        // committed: both one-running indexes arbitrate.
+        .onConflictDoNothing()
         .returning();
       return stored ? toChange(stored) : null;
     },
@@ -148,6 +151,25 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .where(anyOf(accountChanges.appAccountId, appAccountIds))
         .orderBy(
           accountChanges.appAccountId,
+          desc(accountChanges.requestedAt),
+          desc(accountChanges.id),
+        );
+      return rows.map(toChange);
+    },
+    findLatestInvites: async (connectionIds, emails) => {
+      const rows = await orm()
+        .selectDistinctOn([accountChanges.connectionId, accountChanges.email])
+        .from(accountChanges)
+        .where(
+          and(
+            eq(accountChanges.action, "invite"),
+            anyOf(accountChanges.connectionId, connectionIds),
+            anyOf(accountChanges.email, emails),
+          ),
+        )
+        .orderBy(
+          accountChanges.connectionId,
+          accountChanges.email,
           desc(accountChanges.requestedAt),
           desc(accountChanges.id),
         );

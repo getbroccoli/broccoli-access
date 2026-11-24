@@ -66,6 +66,9 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
     AppUser: {
       employee: (user, _args, context) => employeesById(context).load(user.employeeId),
     },
+    AppInvite: {
+      employee: (invite, _args, context) => employeesById(context).load(invite.employeeId),
+    },
     AccountChange: {
       employee: (change, _args, context) => employeesByEmail(context).load(change.email),
     },

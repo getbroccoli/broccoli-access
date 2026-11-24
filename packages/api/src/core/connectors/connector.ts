@@ -15,7 +15,10 @@ export interface Connector {
   key: string;
   version: number;
   name: string;
-  /** What it can do with its app's accounts: `list_accounts`, plus `suspend` and `reactivate` to change them. */
+  /**
+   * What it can do with its app's accounts: `list_accounts`, plus `suspend` and `reactivate` to
+   * change them, and `invite` to invite an email.
+   */
   capabilities: readonly Capability[];
   /** Where its calls can run, in the order they are tried. */
   runtimes: readonly RuntimeKind[];
@@ -70,6 +73,11 @@ export interface ConnectorSession {
     action: AccountAction,
     account: { sourceKey: string; email: string },
   ): Promise<ActionResult>;
+  /**
+   * Invites the email as a member, unless it already has a member or a pending invitation, then
+   * reads the invitation or the member back. A connector that lists `invite` has it.
+   */
+  invite?(email: string): Promise<InviteResult>;
 }
 
 export interface ConnectionDetails {
@@ -90,6 +98,12 @@ export interface AccountPage {
 /** A member as read after an action. */
 export interface ActionResult {
   status: AccountStatus;
+  /** Renewed settings or secrets, saved before the result is used. */
+  connection?: ConnectionUpdate;
+}
+
+/** An invite read back: the invitation, or the email's member. */
+export interface InviteResult {
   /** Renewed settings or secrets, saved before the result is used. */
   connection?: ConnectionUpdate;
 }
@@ -175,4 +189,12 @@ export function canChangeAccounts({
     capabilities.includes("reactivate") &&
     runtimes.includes("server")
   );
+}
+
+/** Whether it can invite an email to its app: it lists `invite` and the `server` runtime. */
+export function canInvite({
+  capabilities,
+  runtimes,
+}: Pick<Connector, "capabilities" | "runtimes">): boolean {
+  return capabilities.includes("invite") && runtimes.includes("server");
 }

@@ -7,7 +7,7 @@ import type { ConnectionMembers, EmployeesByName } from "../ports";
 import {
   type DirectoryConnectors,
   findDirectoryAppId,
-  findEmployeesSuspendedInDirectory,
+  findEmployeesInDirectory,
 } from "./directory";
 import { findInAppFacts } from "./inAppFacts";
 
@@ -72,7 +72,7 @@ export function createAppUserService(dependencies: AppUserDependencies): AppUser
       const inAppFacts = await findInAppFacts(orm, dependencies);
       const [accounts, suspended] = await Promise.all([
         appAccountRepository(orm).findUsersOfApps(appIds, inAppFacts),
-        findEmployeesSuspendedInDirectory(orm, connectors),
+        findEmployeesInDirectory(orm, connectors, "suspended"),
       ]);
       const byName = await employees.readEmployees(ctx, [
         ...new Set(accounts.map(({ employeeId }) => employeeId)),
@@ -95,7 +95,7 @@ export function createAppUserService(dependencies: AppUserDependencies): AppUser
       const inAppFacts = await findInAppFacts(orm, dependencies);
       const [accounts, suspended, directoryAppId] = await Promise.all([
         appAccountRepository(orm).findCurrentAccountsOfEmployees(employeeIds, inAppFacts),
-        findEmployeesSuspendedInDirectory(orm, connectors),
+        findEmployeesInDirectory(orm, connectors, "suspended"),
         findDirectoryAppId(orm, connectors),
       ]);
       const suspendedInDirectory = new Set(suspended);

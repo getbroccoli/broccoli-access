@@ -8,7 +8,8 @@ const recordHistory = createRecordHistoryService();
 
 /**
  * Gives the change's account the status the change asked for, with a history line for `line`'s
- * cause; nothing when a scan deleted the account or it already has that status.
+ * cause; nothing for an invite, which has no account, when a scan deleted the account, or when it
+ * already has that status.
  */
 export async function setAccountStatus(
   ctx: SecurityContext,
@@ -16,6 +17,9 @@ export async function setAccountStatus(
   change: AccountChange,
   line: Pick<HistoryAppend, "cause" | "requestedBy">,
 ): Promise<void> {
+  if (change.action === "invite") {
+    return;
+  }
   const accounts = appAccountRepository(tx);
   const [before] = change.appAccountId ? await accounts.findByIds([change.appAccountId]) : [];
   const status = statusAfter(change.action);

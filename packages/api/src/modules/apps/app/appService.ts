@@ -30,7 +30,7 @@ import type { ConnectionMembers } from "../ports";
 import {
   type DirectoryConnectors,
   findDirectoryAppId,
-  findEmployeesSuspendedInDirectory,
+  findEmployeesInDirectory,
 } from "./directory";
 import { findInAppFacts } from "./inAppFacts";
 
@@ -189,7 +189,8 @@ export function createAppService(dependencies: AppDependencies): AppService {
       logger.info({ approved, ignored }, "Setup finished: the selected apps are approved");
     },
     directoryAppId: (db) => findDirectoryAppId(db, connectors),
-    findEmployeesSuspendedInDirectory: (db) => findEmployeesSuspendedInDirectory(db, connectors),
+    findEmployeesSuspendedInDirectory: (db) =>
+      findEmployeesInDirectory(db, connectors, "suspended"),
     async findEmployeeAccounts(db) {
       const inAppFacts = await findInAppFacts(db, dependencies);
       const [accounts, directoryAppId] = await Promise.all([
@@ -288,7 +289,7 @@ async function summarize(
     // Every employee holds a directory account, so they are the directory's people.
     accounts.countEmployeesWithAccounts(),
     appConnectionRepository(orm).findByApps(appIds),
-    findEmployeesSuspendedInDirectory(orm, connectors),
+    findEmployeesInDirectory(orm, connectors, "suspended"),
   ]);
   const users = accountsOfUsers.filter(({ inApp }) => inApp !== false);
   const usersByApp = Map.groupBy(users, ({ appId }) => appId);

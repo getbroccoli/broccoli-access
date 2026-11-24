@@ -9,28 +9,28 @@ import { appAccounts } from "./appAccountsTable";
 import { appConnections } from "./appConnectionsTable";
 import { apps } from "./appsTable";
 
-/** One Disable or Enable of one app account, from the owner's click to its result. */
+/** One Disable or Enable of one app account, or one Invite of an employee to an app, from the owner's click to its result. */
 export const accountChanges = pgTable(
   "account_changes",
   {
     id: uuid("id")
       .primaryKey()
       .default(sql`uuidv7()`),
-    /** Turns null when a scan deletes the account; the change stays. */
+    /** Null for an invite; turns null when a scan deletes the account, and the change stays. */
     appAccountId: uuid("app_account_id").references(() => appAccounts.id, {
       onDelete: "set null",
     }),
     appId: uuid("app_id")
       .notNull()
       .references(() => apps.id),
-    /** The account's email, lowercased, copied when the owner asks. */
+    /** The account's email, or the invited employee's, lowercased, copied when the owner asks. */
     email: text("email").notNull(),
     connectionId: uuid("connection_id")
       .notNull()
       .references(() => appConnections.id),
-    action: text("action", { enum: ["suspend", "reactivate"] }).notNull(),
-    /** The member's id in the app, copied from the connection's import record. */
-    sourceKey: text("source_key").notNull(),
+    action: text("action", { enum: ["suspend", "reactivate", "invite"] }).notNull(),
+    /** The member's id in the app, copied from the connection's import record; null for an invite. */
+    sourceKey: text("source_key"),
     status: text("status", { enum: ACCOUNT_CHANGE_STATUSES }).notNull(),
     /** Each runtime tried, in order, as `{ runtime, error, at }`. */
     attempts: jsonb("attempts").$type<StoredAttempt[]>().notNull(),
@@ -46,8 +46,12 @@ export const accountChanges = pgTable(
     uniqueIndex("account_changes_one_running")
       .on(table.appAccountId)
       .where(sql`${table.status} = 'running'`),
+    // One at a time: an email has at most one running invite per connection.
+    uniqueIndex("account_changes_one_running_invite")
+      .on(table.connectionId, table.email)
+      .where(sql`${table.status} = 'running' and ${table.action} = 'invite'`),
     index("account_changes_app_account").on(table.appAccountId, table.requestedAt),
-    check("account_changes_action", sql`${table.action} in ('suspend', 'reactivate')`),
+    check("account_changes_action", sql`${table.action} in ('suspend', 'reactivate', 'invite')`),
     check(
       "account_changes_status",
       sql`${table.status} in ('running', 'succeeded', 'failed', 'done_by_hand')`,
