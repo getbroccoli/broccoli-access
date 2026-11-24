@@ -26,7 +26,7 @@ export function consentPageHtml({ appName, scopes, accounts, parameters }: Conse
     )
     .join("<br>\n");
   const permissions = scopes
-    .map((scope) => `<li>${escape(SCOPE_PERMISSIONS[scope] ?? scope)}</li>`)
+    .map((scope) => `<li>${escape(SCOPE_PERMISSIONS.get(scope) ?? scope)}</li>`)
     .join("\n");
   return page(
     `Sign in to ${appName}`,
@@ -47,10 +47,12 @@ ${permissions}
 }
 
 /** Google's wording of a permission, for the scopes the design names; the others show as the scope. */
-const SCOPE_PERMISSIONS: Partial<Record<string, string>> = {
-  "https://www.googleapis.com/auth/admin.directory.user":
+const SCOPE_PERMISSIONS = new Map([
+  [
+    "https://www.googleapis.com/auth/admin.directory.user",
     "See, create and change users in your organisation",
-};
+  ],
+]);
 
 /** Google's error page for an authorization request it will not redirect, such as `invalid_client`. */
 export function authorizationErrorHtml(status: number, error: string): string {

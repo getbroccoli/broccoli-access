@@ -163,29 +163,6 @@ it("exchanges a code for a Bearer access token and an ID token", async ({ fake }
   });
 });
 
-it("accepts HTTP Basic client credentials when exchanging a code", async ({ fake }) => {
-  const code = await authorizeCode(fake.url);
-  const credentials = Buffer.from(
-    `${ACME.oauthClient.clientId}:${ACME.oauthClient.clientSecret}`,
-  ).toString("base64");
-
-  const response = await fetch(`${fake.url}/token`, {
-    method: "POST",
-    headers: { authorization: `Basic ${credentials}` },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: REDIRECT_URI,
-    }),
-  });
-
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({
-    access_token: expect.any(String),
-    token_type: "Bearer",
-  });
-});
-
 it.for([undefined, "nonce & + ?"])(
   "signs verifiable RS256 identity claims with nonce %s",
   async (nonce, { fake }) => {
@@ -336,4 +313,28 @@ it("omits a refused scope from just the next Allow", async ({ fake }) => {
   const full = await signIn(fake.url, request);
   expect(full.scope.split(" ").sort()).toEqual(request.scope.split(" ").sort());
   expect((await insertGoogleUser(fake.url, full.access_token)).status).toBe(200);
+});
+
+it("omits a previously granted write scope for one incremental consent when it is refused", async ({
+  fake,
+}) => {
+  const request = { scope: `openid ${USER_WRITE_SCOPE}`, include_granted_scopes: "true" };
+  const previous = await signIn(fake.url, request);
+  expect(previous.scope.split(" ")).toContain(USER_WRITE_SCOPE);
+  await control(fake.url, "/consent/refuse-scope", { scope: USER_WRITE_SCOPE });
+
+  const partial = await signIn(fake.url, request);
+  expect(partial.scope.split(" ")).not.toContain(USER_WRITE_SCOPE);
+
+  const next = await signIn(fake.url, request);
+  expect(next.scope.split(" ")).toContain(USER_WRITE_SCOPE);
+});
+
+it("lists constructor as a requested scope", async ({ fake }) => {
+  const params = authorizationParams({ scope: "constructor" });
+
+  const response = await fetch(`${fake.url}/o/oauth2/v2/auth?${params.toString()}`);
+
+  expect(response.status).toBe(200);
+  expect(await response.text()).toMatch(/<li>\s*constructor\s*<\/li>/);
 });

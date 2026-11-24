@@ -25,8 +25,9 @@ export async function startIntegrationUserCreation(
   request: Request,
   response: Response,
 ): Promise<void> {
-  const { email } = CREATION_START.parse(request.body ?? {});
   try {
+    // A body of another shape has no address, which the service refuses as required.
+    const email = CREATION_START.safeParse(request.body).data?.email ?? "";
     const security = await requireSecurity(http.resolveSecurity, request, NOT_OWNER);
     const origin = await http.publicOrigin(request);
     const { authorizationUrl, browserToken } = await integrationUsers.startCreation(security, {

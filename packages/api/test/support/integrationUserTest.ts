@@ -1,10 +1,14 @@
 import type { Orm } from "../../src/core/db";
 import { test } from "./fixture";
-import { consentAtGoogle } from "./googleConsent";
+import { consentAtGoogle, registerGoogleRedirect } from "./googleConsent";
 import { createdGoogleUsers } from "./fakeGoogleControls";
 import { googleScanSetup } from "./googleScanSetup";
-import { integrationUsers } from "./services";
-import { storedIntegrationUsers, storedAppConnections } from "./storedGoogleConnection";
+import { googleConnection, integrationUsers } from "./services";
+import {
+  connectionSecrets,
+  storedIntegrationUsers,
+  storedAppConnections,
+} from "./storedGoogleConnection";
 
 export const integrationUserTest = test.extend<{
   workspace: Awaited<ReturnType<typeof connectedWorkspace>>;
@@ -43,6 +47,15 @@ async function connectedWorkspace(orm: Orm, googleUrl: string) {
     users,
     allowCreation: async (email = CREATION_START.email, account?: string) =>
       consentAnswer(await users.startCreation(owner, { ...CREATION_START, email }), account),
+    reconnect: async (client: { clientId: string; clientSecret: string }) => {
+      const { publicOrigin, now } = CREATION_START;
+      await registerGoogleRedirect(googleUrl, publicOrigin, client);
+      const connection = googleConnection(orm, { googleUrl });
+      const start = await connection.startAppChange(owner, { ...client, publicOrigin, now });
+      await connection.finishAppChange(owner, await consentAnswer(start));
+      const [reconnected] = await storedAppConnections(orm);
+      return connectionSecrets(reconnected!).refreshToken;
+    },
     readState: async () => ({
       rows: await storedIntegrationUsers(orm),
       connections: await storedAppConnections(orm),

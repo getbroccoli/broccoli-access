@@ -61,6 +61,8 @@ export interface SignInState {
 export interface IntegrationUserCreationState {
   flow: "create_integration_user";
   email: string;
+  /** The connection's stored version at the start; an answer to another version is refused. */
+  revision: string;
   nonce: string;
   /** Epoch milliseconds after which Google's answer is refused. */
   expiresAt: number;
@@ -192,6 +194,7 @@ const CONSENT_STATE = z.discriminatedUnion("flow", [
   z.object({
     flow: z.literal("create_integration_user"),
     email: z.string(),
+    revision: z.string(),
     nonce: z.string(),
     expiresAt: z.number(),
   }),

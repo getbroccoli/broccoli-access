@@ -101,7 +101,7 @@ export function createIntegrationUserService(
   return {
     async startCreation(ctx, { email: input, publicOrigin, now }) {
       requireOwner(ctx);
-      const { settings } = await readOwnGoogleApp(connectedApps, orm);
+      const { settings, revision } = await readOwnGoogleApp(connectedApps, orm);
       const parsed = parseIntegrationUserEmail(input, settings.domain);
       if ("problem" in parsed) {
         throw invalidInput([{ field: "email", code: parsed.problem }]);
@@ -111,7 +111,7 @@ export function createIntegrationUserService(
       const browserToken = randomConsentToken();
       const state = sealConsentState(
         secretBox,
-        { flow: "create_integration_user", email: parsed.email, nonce },
+        { flow: "create_integration_user", email: parsed.email, revision, nonce },
         { browserToken, now },
       );
       const { authorizationEndpoint } = await google.discover();
@@ -150,6 +150,7 @@ export function createIntegrationUserService(
           ...answer,
           email: creation.email,
           nonce: creation.nonce,
+          revision: creation.revision,
           createdBy,
         });
       } finally {
@@ -206,6 +207,8 @@ interface WriteGrant {
   accessToken: string;
   refreshToken: string;
   scopes: string[];
+  /** The super admin who consented, whose refresh token the connection now uses. */
+  adminEmail: string;
 }
 
 /** The owner's user id; refuses everyone else, the system included, with FORBIDDEN. */
@@ -225,6 +228,7 @@ async function createFromConsent(
   consent: Omit<IntegrationUserAnswer, "state" | "browserToken"> & {
     email: string;
     nonce: string;
+    revision: string;
     createdBy: string;
   },
 ): Promise<void> {
@@ -232,6 +236,9 @@ async function createFromConsent(
   const { email, createdBy, now } = consent;
   await refuseSecondIntegrationUser(orm);
   const googleApp = await readOwnGoogleApp(connectedApps, orm);
+  if (googleApp.revision !== consent.revision) {
+    throw googleAppChanged();
+  }
   const grant = await verifyWriteGrant(google, googleApp, consent);
   const password = randomPassword();
   const googleUserId = await createDirectoryUser(google, grant.accessToken, { email, password });
@@ -268,6 +275,11 @@ async function refuseSecondIntegrationUser(db: Orm | Tx): Promise<void> {
   }
 }
 
+/** The connection is no longer the version the consent started from, such as after a reconnect. */
+function googleAppChanged(): ApplicationError {
+  return new ApplicationError("CONFLICT", "The Google app changed during consent. Try again.");
+}
+
 function integrationUserExists(): ApplicationError {
   return new ApplicationError("CONFLICT", "The integration user already exists.");
 }
@@ -296,7 +308,7 @@ async function verifyWriteGrant(
   if (refreshToken === null || settings.grantedScopes.some((scope) => !scopes.includes(scope))) {
     throw new ApplicationError("INVALID_INPUT", "Google's grant does not hold the earlier one.");
   }
-  return { accessToken, refreshToken, scopes };
+  return { accessToken, refreshToken, scopes, adminEmail: admin.email };
 }
 
 /** Creates the user in the directory and returns its id; a taken address is `EmailTakenError`. */
@@ -342,12 +354,12 @@ async function saveIntegrationUser(
         throw integrationUserExists();
       }
       const saved = await connectedApps.changeConnection(ctx, tx, connectionId, {
-        settings: { ...settings, grantedScopes: grant.scopes },
+        settings: { ...settings, adminEmail: grant.adminEmail, grantedScopes: grant.scopes },
         secrets: { clientSecret, refreshToken: grant.refreshToken },
         replacingRevision: revision,
       });
       if (!saved) {
-        throw new ApplicationError("CONFLICT", "The Google app changed during consent. Try again.");
+        throw googleAppChanged();
       }
     });
   } catch (error) {

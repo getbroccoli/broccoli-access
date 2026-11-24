@@ -89,6 +89,14 @@ test("cancelling at Google returns to Connections with read-only access and no i
   expect(await (await browser.graphql(SETTINGS)).json()).toEqual(EMPTY_SETTINGS);
 });
 
+test("returns 400 when the owner posts an array to start creation", async ({ env }) => {
+  const { browser } = await env.signInAsOwner();
+
+  const response = await browser.post("/api/google/integration-user", []);
+
+  expect(response.status).toBe(400);
+});
+
 test("refuses to start creation without a session", async ({ env }) => {
   await env.signInAsOwner();
 

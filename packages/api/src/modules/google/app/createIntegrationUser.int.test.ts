@@ -6,7 +6,6 @@ import {
   ADMIN,
   consentAnswer,
   CREATION_START as START,
-  connectedWorkspace,
   finishSharedGoogleSetup,
   createdGoogleUsers,
   changeStoredGoogleDomain,
@@ -34,6 +33,11 @@ import {
   UserWriteRefusedError,
 } from "../domain";
 
+const NON_OWNERS = [
+  ["employee", EMPLOYEE],
+  ["non-owner admin", ADMIN],
+] as const;
+
 test("requires a Google Workspace connection before creation", async ({ orm, fakeGoogle }) => {
   const users = integrationUsers(orm, { googleUrl: fakeGoogle.url });
 
@@ -43,10 +47,7 @@ test("requires a Google Workspace connection before creation", async ({ orm, fak
   });
 });
 
-test("asks the connected client for incremental offline consent to write users", async ({
-  workspace,
-  fakeGoogle,
-}) => {
+test("asks for incremental offline consent to write users", async ({ workspace, fakeGoogle }) => {
   const { users, owner } = workspace;
 
   const started = await users.startCreation(owner, START);
@@ -74,6 +75,7 @@ test.for([
   ["a b@acme.example", "invalid"],
   ["broccoli@sub.acme.example", "invalid"],
   ["broccoli@other.example", "invalid"],
+  [`${"a".repeat(65)}@acme.example`, "invalid"],
 ] as const)("refuses the integration address '%s' as %s", async ([email, code], { workspace }) => {
   const { users, owner } = workspace;
   await expect(users.startCreation(owner, { ...START, email })).rejects.toMatchObject({
@@ -82,13 +84,14 @@ test.for([
   });
 });
 
-test.for([
-  ["employee", EMPLOYEE],
-  ["non-owner admin", ADMIN],
-] as const)("refuses to start creation for a %s", async ([, caller], { workspace }) => {
-  await expect(workspace.users.startCreation(caller, START)).rejects.toMatchObject({
-    code: "FORBIDDEN",
-  });
+test("accepts a 64-character local part", async ({ workspace }) => {
+  const email = `${"a".repeat(64)}@acme.example`;
+  const started = await workspace.users.startCreation(workspace.owner, { ...START, email });
+  expect(started.authorizationUrl).toBeTruthy();
+});
+
+test.for(NON_OWNERS)("refuses to start creation for a %s", async ([, caller], { workspace }) => {
+  await expect(workspace.users.startCreation(caller, START)).rejects.toMatchObject(FORBIDDEN);
 });
 
 test("stores the normalized Google identity and the new offline grant together", async ({
@@ -101,12 +104,9 @@ test("stores the normalized Google identity and the new offline grant together",
   expect(await users.readIntegrationUser(owner)).toBeNull();
   expect(await users.readGoogleUserId(SYSTEM, orm)).toBeNull();
   const [before] = await storedAppConnections(orm);
-  const started = await users.startCreation(owner, {
-    ...START,
-    email: "  Broccoli@ACME.Example  ",
-  });
+  const answer = await workspace.allowCreation("  Broccoli@ACME.Example  ");
 
-  await users.finishCreation(owner, await consentAnswer(started));
+  await users.finishCreation(owner, answer);
 
   const rows = await storedIntegrationUsers(orm);
   expect(rows).toHaveLength(1);
@@ -176,25 +176,20 @@ test("keeps the generated password encrypted and out of answers, logs and histor
 
 test("restricts integration user identity reads to the owner", async ({ workspace }) => {
   const { users } = workspace;
-  await expect(users.readIntegrationUser(EMPLOYEE)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await expect(users.readIntegrationUser(EMPLOYEE)).rejects.toMatchObject(FORBIDDEN);
 });
 
 test("restricts internal Google user id reads to the system", async ({ workspace, orm }) => {
   const { users } = workspace;
-  await expect(users.readGoogleUserId(workspace.owner, orm)).rejects.toMatchObject({
-    code: "FORBIDDEN",
-  });
+  await expect(users.readGoogleUserId(workspace.owner, orm)).rejects.toMatchObject(FORBIDDEN);
 });
 
-test.for([
-  ["employee", EMPLOYEE],
-  ["non-owner admin", ADMIN],
-] as const)("refuses to finish creation for a %s", async ([, caller], { workspace }) => {
+test.for(NON_OWNERS)("refuses to finish creation for a %s", async ([, caller], { workspace }) => {
   const { users } = workspace;
   const before = await workspace.readState();
   const answer = await workspace.allowCreation();
 
-  await expect(users.finishCreation(caller, answer)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await expect(users.finishCreation(caller, answer)).rejects.toMatchObject(FORBIDDEN);
   expect(await workspace.readState()).toEqual(before);
 });
 
@@ -228,10 +223,7 @@ test("rejects a sign-in callback as creation consent", async ({ workspace, orm, 
   expect(await workspace.readState()).toEqual(before);
 });
 
-test("leaves the users and connection unchanged when write permission is refused", async ({
-  workspace,
-  fakeGoogle,
-}) => {
+test("keeps users and grants after refused consent", async ({ workspace, fakeGoogle }) => {
   const { users, owner } = workspace;
   const before = await workspace.readState();
   await refuseGoogleScope(fakeGoogle.url, WRITE_SCOPE);
@@ -317,24 +309,33 @@ test("requires the owner's own Google app to start creation", async ({ orm, fake
   });
 });
 
-test("refuses outstanding creation consent after the owner changes the Google app", async ({
-  orm,
-  fakeGoogle,
-}) => {
-  const { connection, ctx, input } = await connectedWorkspace(orm, fakeGoogle.url);
-  const users = integrationUsers(orm, { googleUrl: fakeGoogle.url });
-  const answer = await consentAnswer(await users.startCreation(ctx, START));
-  const change = await connection.startAppChange(ctx, input);
-  await connection.finishAppChange(ctx, await consentAnswer(change));
+test.for([
+  [
+    "changes the Google app",
+    { clientId: "replacement-google-client", clientSecret: "replacement-google-secret" },
+  ],
+  ["reconnects the same Google app", ACME.oauthClient],
+] as const)(
+  "refuses outstanding creation consent after the owner %s",
+  async ([, client], { workspace }) => {
+    const answer = await workspace.allowCreation();
+    const refreshToken = await workspace.reconnect(client);
 
-  await expect(users.finishCreation(ctx, answer)).rejects.toMatchObject({ code: "INVALID_INPUT" });
-  expect(await storedIntegrationUsers(orm)).toEqual([]);
-  expect(await createdGoogleUsers(fakeGoogle.url)).toEqual([]);
-});
+    await expect(workspace.users.finishCreation(workspace.owner, answer)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "The Google app changed during consent. Try again.",
+    });
+    const { rows, created, connections } = await workspace.readState();
+    expect(rows).toEqual([]);
+    expect(created).toEqual([]);
+    expect(connectionSecrets(connections[0]!).refreshToken === refreshToken).toBe(true);
+  },
+);
 
 const WRITE_SCOPE = "https://www.googleapis.com/auth/admin.directory.user";
 const INVALID_CONSENT = {
   code: "INVALID_INPUT",
   message: "The consent expired or was not this browser's.",
 };
+const FORBIDDEN = { code: "FORBIDDEN" };
 const ALREADY_EXISTS = { code: "CONFLICT", message: "The integration user already exists." };

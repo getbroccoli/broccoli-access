@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
 import { FieldError } from "@/components/form";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,17 @@ export function CreateIntegrationUserDialog({ domain }: Props) {
   const [localPart, setLocalPart] = useState(DEFAULT_LOCAL_PART);
   const [starting, setStarting] = useState(false);
   const [failure, setFailure] = useState<StartFailure | null>(null);
+
+  // Back from Google can restore this page as it was left, still waiting for a start that ended.
+  useEffect(() => {
+    const stopWaiting = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setStarting(false);
+      }
+    };
+    window.addEventListener("pageshow", stopWaiting);
+    return () => window.removeEventListener("pageshow", stopWaiting);
+  }, []);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

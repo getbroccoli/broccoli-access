@@ -149,8 +149,9 @@ function authorize(
   email: string,
 ): string {
   const { state } = context;
-  const scopes = parameters.scope.split(" ").filter((scope) => scope !== state.refusedScope);
+  const refused = state.refusedScope;
   state.refusedScope = null;
+  const scopes = parameters.scope.split(" ").filter((scope) => scope !== refused);
   const earlier = findGrant(state, email, client.clientId);
   const consentsNow =
     !scopes.every((scope) => earlier?.scopes.includes(scope)) ||
@@ -166,7 +167,10 @@ function authorize(
     email,
     clientId: client.clientId,
     // With `include_granted_scopes`, the token also holds what the person granted before.
-    scopes: parameters.include_granted_scopes === "true" ? grantedScopes : scopes,
+    scopes:
+      parameters.include_granted_scopes === "true"
+        ? grantedScopes.filter((scope) => scope !== refused)
+        : scopes,
     redirectUri: parameters.redirect_uri,
     nonce: parameters.nonce,
     issuesRefreshToken: consentsNow && parameters.access_type === "offline",

@@ -29,9 +29,13 @@ export function parseIntegrationUserEmail(
   }
   const separator = email.lastIndexOf("@");
   const isOfDomain = email.slice(separator + 1) === domain.toLowerCase();
-  const hasLocalPart = separator > 0 && LOCAL_PART.test(email.slice(0, separator));
+  const hasLocalPart =
+    separator > 0 && separator <= MAX_LOCAL_PART && LOCAL_PART.test(email.slice(0, separator));
   return isOfDomain && hasLocalPart ? { email } : { problem: "invalid" };
 }
+
+/** The longest username Google Workspace takes. */
+const MAX_LOCAL_PART = 64;
 
 /** Letters, digits and single separators inside, which every Google Workspace username allows. */
 const LOCAL_PART = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
