@@ -8,6 +8,7 @@
       "src/features/employees",
       "src/features/settings",
       "src/features/setup",
+      "src/features/templates",
       "src/i18n",
       "src/shell"
     ],
@@ -74,6 +75,17 @@
       "src/lib/useRefetchAfterScan",
       "src/shell",
       "src/components/ScanNowButton"
+    ],
+    "src/features/templates": [
+      "src/__generated__",
+      "src/apollo",
+      "src/components/AppMark",
+      "src/components/dataTable",
+      "src/components/form",
+      "src/components/ui",
+      "src/features/apps",
+      "src/i18n",
+      "src/shell"
     ],
     "src/features/settings": [
       "src/__generated__",

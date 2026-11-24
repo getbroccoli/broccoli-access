@@ -3,6 +3,7 @@ export { ActivityPage } from "./ActivityPage";
 export { AppAccountStatusCell, AppPage, InviteStatusCell, loadAppPage } from "./AppPage";
 export { AppsPage } from "./AppsPage";
 export { appsSearch } from "./appsSearch";
+export { AppTable } from "./AppTable";
 export { forgetAppLists } from "./cache";
 export { ConnectAppSessionDialog } from "./ConnectAppSessionDialog";
 export { ConnectContainerConnectorDialog } from "./ConnectContainerConnectorDialog";

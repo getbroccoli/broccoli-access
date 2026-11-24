@@ -5,6 +5,7 @@ import { recordHistory } from "../../src/core/records/db";
 import { apps, appAccounts } from "../../src/modules/apps/db";
 import { employees } from "../../src/modules/employees/db";
 import { importSources, importRecords } from "../../src/modules/imports/db";
+import { employeeTemplates, templateApps, templates } from "../../src/modules/templates/db";
 
 /** Stable raw reads to compare the complete persisted state before and after a scan. */
 export function storedApps(orm: Orm) {
@@ -24,6 +25,16 @@ export function storedImportRecords(orm: Orm) {
 }
 export function storedRecordHistory(orm: Orm) {
   return orm.select().from(recordHistory).orderBy(recordHistory.id);
+}
+
+export function storedTemplates(orm: Orm) {
+  return orm.select().from(templates).orderBy(templates.id);
+}
+export function storedTemplateApps(orm: Orm) {
+  return orm.select().from(templateApps).orderBy(templateApps.id);
+}
+export function storedEmployeeTemplates(orm: Orm) {
+  return orm.select().from(employeeTemplates).orderBy(employeeTemplates.id);
 }
 
 /** Whether an account can take its employee foreign-key lock without waiting. */

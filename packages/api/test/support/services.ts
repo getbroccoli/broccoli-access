@@ -35,6 +35,7 @@ import {
   createGoogleWorkspaceConnector,
   type GoogleConnectionService,
 } from "../../src/modules/google";
+import { createTemplateService } from "../../src/modules/templates";
 import { fakeMail } from "./fakeMail";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { testTransactor } from "./testTransactor";
@@ -128,6 +129,15 @@ export function apps(orm: Orm, transact: Transact = testTransactor(orm)): AppSer
     logger: createLogger("silent"),
     connectors: GOOGLE_DIRECTORY,
     members: createImportRecordService(),
+  });
+}
+
+export function templates(orm: Orm) {
+  return createTemplateService({
+    orm,
+    transact: testTransactor(orm),
+    logger: createLogger("silent"),
+    apps: apps(orm),
   });
 }
 

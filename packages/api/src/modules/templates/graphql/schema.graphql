@@ -1,0 +1,121 @@
+"A named list of apps that the owner assigns to people."
+type Template {
+  id: ID!
+  "Unique, compared without case."
+  name: String!
+  createdAt: DateTime!
+  "Its apps, in the order they were added."
+  apps: [TemplateApp!]!
+  "How many people have it."
+  peopleCount: Int!
+}
+
+"One app in one template."
+type TemplateApp {
+  "This listing's own id, not the app's."
+  id: ID!
+}
+
+type TemplateEdge {
+  cursor: String!
+  node: Template!
+}
+
+type TemplateConnection {
+  edges: [TemplateEdge!]!
+  pageInfo: PageInfo!
+}
+
+input TemplateCreateInput {
+  "Unique, compared without case; 1 to 100 characters once trimmed."
+  name: String!
+}
+
+"The fields to change; a field left out stays as it is, and null clears a field that may be empty."
+input TemplateUpdateInput {
+  id: ID!
+  "Unique, compared without case; 1 to 100 characters once trimmed. It cannot be empty, so null is refused."
+  name: String
+}
+
+input TemplateDeleteInput {
+  id: ID!
+}
+
+input TemplateAddAppInput {
+  "The template."
+  id: ID!
+  "The id of one of the company's approved apps."
+  appId: ID!
+}
+
+input TemplateTakeOutAppInput {
+  "The template."
+  id: ID!
+  "The app's own id (`TemplateApp.app.id`)."
+  appId: ID!
+}
+
+type TemplatesMutations {
+  "Adds a template without apps. Admins only."
+  create(input: TemplateCreateInput!): TemplateCreatePayload!
+  "Renames a template. Admins only."
+  update(input: TemplateUpdateInput!): TemplateUpdatePayload!
+  "Deletes a template, its list of apps and its assignments to people; the apps themselves and every account stay. Admins only."
+  delete(input: TemplateDeleteInput!): TemplateDeletePayload!
+  "Adds an approved app to a template; an app already in it changes nothing. Admins only."
+  addApp(input: TemplateAddAppInput!): TemplateAddAppPayload!
+  "Takes an app out of a template; an app that is not in it changes nothing. Admins only."
+  takeOutApp(input: TemplateTakeOutAppInput!): TemplateTakeOutAppPayload!
+}
+
+"The new template, or why it was refused."
+type TemplateCreatePayload {
+  template: Template
+  error: TemplateCreateError
+}
+
+union TemplateCreateError = InvalidInputError
+
+"The changed template, or why the change was refused."
+type TemplateUpdatePayload {
+  template: Template
+  error: TemplateUpdateError
+}
+
+union TemplateUpdateError = InvalidInputError | NotFoundError
+
+"Why the template was not deleted; null once it is."
+type TemplateDeletePayload {
+  error: TemplateDeleteError
+}
+
+union TemplateDeleteError = NotFoundError
+
+"The template with the app in it, or why it was refused."
+type TemplateAddAppPayload {
+  template: Template
+  error: TemplateAddAppError
+}
+
+union TemplateAddAppError = InvalidInputError | NotFoundError
+
+"The template without the app, or why it was refused."
+type TemplateTakeOutAppPayload {
+  template: Template
+  error: TemplateTakeOutAppError
+}
+
+union TemplateTakeOutAppError = NotFoundError
+
+# Each module declares its own root fields; the server merges them into one type.
+type Query {
+  "One template; null when there is none. Admins only."
+  template(id: ID!): Template
+  "Templates by name, one page at a time. Admins only."
+  templates("Page size, 1 to 10000." first: Int = 100, after: String): TemplateConnection!
+}
+
+type Mutation {
+  templates: TemplatesMutations!
+}

@@ -8,6 +8,7 @@ import { codegenMappers as extensionMappers } from "./src/modules/extension/code
 import { codegenMappers as googleMappers } from "./src/modules/google/codegen";
 import { codegenMappers as importMappers } from "./src/modules/imports/codegen";
 import { codegenMappers as systemMappers } from "./src/modules/system/codegen";
+import { codegenMappers as templateMappers } from "./src/modules/templates/codegen";
 
 const config: CodegenConfig = {
   schema: "src/**/*.graphql",
@@ -29,6 +30,7 @@ const config: CodegenConfig = {
           ...googleMappers,
           ...importMappers,
           ...systemMappers,
+          ...templateMappers,
           ...recordMappers,
         },
       },

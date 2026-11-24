@@ -17,6 +17,7 @@ import {
   type App,
   type AppAccountRepository,
 } from "../../src/modules/apps/db";
+import { employeeTemplates, templateApps, templates } from "../../src/modules/templates/db";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { seedUser } from "./seedUser";
 import { testTransactor } from "./testTransactor";
@@ -127,6 +128,29 @@ export class TestSeed {
       status,
     );
     return app!;
+  }
+
+  async template({
+    name = `Template ${++this.#count}`,
+    appIds = [],
+  }: { name?: string; appIds?: string[] } = {}) {
+    const [template] = await this.orm.insert(templates).values({ name }).returning();
+    if (appIds.length) {
+      await this.orm
+        .insert(templateApps)
+        .values(appIds.map((appId) => ({ templateId: template!.id, appId })));
+    }
+    return template!;
+  }
+
+  async employeeTemplate(
+    assignment: Pick<
+      typeof employeeTemplates.$inferInsert,
+      "employeeId" | "templateId" | "assignedBy"
+    >,
+  ) {
+    const [row] = await this.orm.insert(employeeTemplates).values(assignment).returning();
+    return row!;
   }
 
   async appAccount({
