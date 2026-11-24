@@ -60,6 +60,8 @@ export const peopleEn = {
   "people.person.moreApps": "Show more apps",
   "people.person.moreFailed": "Couldn’t load more. Try again.",
   "people.person.templateChangeFailed": "Couldn’t update {name}. Reload and try again.",
+  "people.person.pickRole": "Pick a role…",
+  "people.person.roleFrom": "{role}, from {templates}",
   "people.person.role": "Role",
   "people.person.from": "From",
   "people.person.noTemplate": "No template",

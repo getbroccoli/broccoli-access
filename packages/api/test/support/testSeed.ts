@@ -149,6 +149,23 @@ export class TestSeed {
     return template!;
   }
 
+  async assignedTemplateApp({
+    appId,
+    role,
+    employeeId,
+    assignedBy,
+  }: {
+    appId: string;
+    role: string | null;
+    employeeId: string;
+    assignedBy: string;
+  }) {
+    const template = await this.template();
+    await this.orm.insert(templateApps).values({ templateId: template.id, appId, role });
+    await this.employeeTemplate({ templateId: template.id, employeeId, assignedBy });
+    return template;
+  }
+
   async employeeAppChoice(choice: typeof employeeAppChoices.$inferInsert) {
     await this.orm.insert(employeeAppChoices).values(choice);
   }

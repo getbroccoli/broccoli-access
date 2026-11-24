@@ -49,6 +49,7 @@ test("lists a shared app once with both template sources and the apps each templ
     accountStatus: "active",
     templates: [fromEveryone],
     role: null,
+    roleConflict: false,
     state: "active",
   });
   expect.soft(rows).toContainEqual({
@@ -56,10 +57,16 @@ test("lists a shared app once with both template sources and the apps each templ
     accountStatus: null,
     templates: [fromEngineer],
     role: null,
+    roleConflict: false,
     state: "missing",
   });
   const shared = rows!.find(({ appId }) => appId === slack.id);
-  expect.soft(shared).toMatchObject({ accountStatus: "suspended", role: null, state: "missing" });
+  expect.soft(shared).toMatchObject({
+    accountStatus: "suspended",
+    role: null,
+    roleConflict: false,
+    state: "missing",
+  });
   expect(shared!.templates).toHaveLength(2);
   expect(shared!.templates).toEqual(expect.arrayContaining([fromEveryone, fromEngineer]));
 });

@@ -105,7 +105,7 @@ export const appsEn = {
   "apps.change.refused":
     "Couldn’t ask to change {name} in {app}. Reload the page to see the account’s status.",
   "apps.change.inviteRefused":
-    "Couldn’t ask to invite {name} to {app}. Reload the page to see whether they’re invited.",
+    "Couldn’t ask to invite {name} to {app}. Check the invite status and the role on their templates, then try again.",
   "apps.change.disableTitle": "Disable {name} in {app}?",
   "apps.change.enableTitle": "Enable {name} in {app}?",
   "apps.change.inviteTitle": "Invite {name} to {app}?",
@@ -117,7 +117,7 @@ export const appsEn = {
   "apps.change.enableEffect":
     "This account becomes active in this workspace again. You can disable it again later.",
   "apps.change.inviteEffect":
-    "{app} sends {firstName} an invitation to join this workspace as a regular member, unless they already have one or have joined. Their account shows here once {app} is scanned after they join.",
+    "{app} sends {firstName} an invitation to join this workspace, unless they already have one or have joined. Their account shows here once {app} is scanned after they join.",
   "apps.change.howItWorks":
     "Broccoli Access makes the change with your {field}, then reads the account back from {app}.",
   "apps.change.howInviteWorks":
@@ -139,6 +139,13 @@ export const appsEn = {
   "apps.couldnt.unexpectedResponse":
     "{app} gave an answer Broccoli Access doesn’t recognise. {app} may have changed how its admin pages work.",
   "apps.couldnt.blockedByCheck": "{app} asked for a check that Broccoli Access never gets past.",
+  "apps.change.appDefault": "App default",
+  "apps.couldnt.inviteWasUnavailable":
+    "{app} or the requested role was unavailable when Broccoli Access tried to invite this person.",
+  "apps.couldnt.hintInviteRole":
+    "Reconnect {app} and resolve the template role before trying the invite again.",
+  "apps.couldnt.inviteUnavailable":
+    "Check the connection to {app} and the role on this person’s templates before trying again.",
   "apps.couldnt.noAnswer": "{app} didn’t answer after three tries.",
   "apps.couldnt.keyRefused": "{app} refused the API key: it was revoked or expired.",
   "apps.couldnt.sessionExpired": "Your {app} session expired or was signed out.",

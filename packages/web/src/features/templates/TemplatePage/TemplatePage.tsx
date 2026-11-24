@@ -22,7 +22,7 @@ export function TemplatePage() {
     variables: { id: templateId },
   });
   const template = data?.template;
-  const { changing, add, takeOut } = useTemplateAppChanges(templateId);
+  const { changing, add, takeOut, setRole } = useTemplateAppChanges(templateId);
   const appsHeading = useRef<HTMLHeadingElement>(null);
   // The route's loader found the template, so it is missing only once it is deleted.
   if (!template) {
@@ -68,6 +68,7 @@ export function TemplatePage() {
         <TemplateAppsTable
           apps={template.apps}
           disabled={changing}
+          onSetRole={(app, role) => void setRole(app, role)}
           // The row leaves with its button, so focus moves to the section it was in.
           onTakeOut={(app) =>
             void takeOut(app).then((left) => left && appsHeading.current?.focus())

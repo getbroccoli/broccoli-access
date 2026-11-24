@@ -1,8 +1,9 @@
-import type { TemplatePageQuery } from "@/__generated__/graphql";
+import { useQuery } from "@apollo/client/react";
+import { TemplateRoleOptionsDocument, type TemplatePageQuery } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
 import type { DataTableColumn } from "@/components/dataTable";
 import { Button } from "@/components/ui/button";
-import { AppTable } from "@/features/apps";
+import { AppTable, StatusBadge } from "@/features/apps";
 import { t } from "@/i18n";
 
 type TemplateAppRow = NonNullable<TemplatePageQuery["template"]>["apps"][number];
@@ -11,6 +12,7 @@ type Props = {
   apps: readonly TemplateAppRow[];
   /** While another change of the template's apps runs. */
   disabled: boolean;
+  onSetRole: (app: TemplateAppRow["app"], role: string | null) => void;
   onTakeOut: (app: TemplateAppRow["app"]) => void;
 };
 
@@ -18,7 +20,16 @@ type Props = {
 const FIRST_APPS = 50;
 
 /** A template's apps in the order added, each with "Take out". */
-export function TemplateAppsTable({ apps, disabled, onTakeOut }: Props) {
+export function TemplateAppsTable({ apps, disabled, onTakeOut, onSetRole }: Props) {
+  const { data, loading, refetch } = useQuery(TemplateRoleOptionsDocument, {
+    skip: !apps.some(({ app }) => app.connected),
+    fetchPolicy: "cache-and-network",
+  });
+  const rolesByApp = new Map(
+    data?.containerConnectors.flatMap(({ connection }) =>
+      connection ? [[connection.app.id, connection.app.roles] as const] : [],
+    ),
+  );
   const columns: DataTableColumn<TemplateAppRow>[] = [
     {
       id: "app",
@@ -29,6 +40,57 @@ export function TemplateAppsTable({ apps, disabled, onTakeOut }: Props) {
           {app.name}
         </span>
       ),
+    },
+    {
+      id: "role",
+      header: t("people.person.role"),
+      cell: ({ app, role }) => {
+        if (!app.connected)
+          return <StatusBadge tone="warning">{t("settings.apps.notConnected")}</StatusBadge>;
+        if (!data) {
+          if (loading) return t("templates.role.loading");
+          return (
+            <span role="alert" className="flex flex-wrap items-center gap-2">
+              {t("templates.role.loadFailed")}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void refetch().catch(() => undefined)}
+              >
+                {t("templates.retry")}
+              </Button>
+            </span>
+          );
+        }
+        // An app no container connector connects, such as Google Workspace, offers no roles.
+        // shortcut: a connectors container that is down lists no connectors, so its apps read as
+        // having no roles until the next read; show the failure once the API reports one.
+        const roles = rolesByApp.get(app.id) ?? [];
+        return roles.length || role !== null ? (
+          <select
+            aria-label={t("templates.role.label", { app: app.name })}
+            className="h-8 max-w-full rounded-lg border border-input bg-background px-2 text-sm"
+            disabled={disabled}
+            value={role ?? roles.find((option) => option.isDefault)?.key}
+            onChange={(event) => onSetRole(app, event.target.value || null)}
+          >
+            {role !== null && !roles.some((option) => option.key === role) && (
+              <option disabled value={role}>
+                {t("templates.role.unavailable", { role })}
+              </option>
+            )}
+            {!roles.length && <option value="">{t("templates.role.default")}</option>}
+            {roles.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          t("templates.role.default")
+        );
+      },
     },
     {
       id: "actions",

@@ -33,6 +33,7 @@ type AppResolverServices = Pick<
   | "listApps"
   | "readApp"
   | "readApps"
+  | "readAppRoles"
   | "readUsersOfApps"
   | "countApps"
   | "approveApp"
@@ -53,6 +54,8 @@ export function createResolvers(
   people: RequestLoader<{ appAccounts: AppUser[]; appInvites: AppInvite[] }>,
 ): Resolvers {
   const loaders = createLoaders(services);
+  const appOf = ({ appId }: { appId: string }, _args: unknown, ctx: GraphqlContext) =>
+    loaders.appsById(ctx).load(appId);
   const summary = (app: AccountWithoutPerson["app"] | AppSummary, context: GraphqlContext) =>
     "peopleCount" in app ? app : loaders.appsById(context).load(app.id);
   return {
@@ -96,15 +99,9 @@ export function createResolvers(
       latestChange: async (user, _args, context) =>
         (await loaders.actions(user, context)).latestChange,
     },
-    AppInvite: {
-      app: (invite, _args, context) => loaders.appsById(context).load(invite.appId),
-    },
-    PersonApp: {
-      app: (row, _args, context) => loaders.appsById(context).load(row.appId),
-    },
-    TemplateApp: {
-      app: (templateApp, _args, context) => loaders.appsById(context).load(templateApp.appId),
-    },
+    AppInvite: { app: appOf },
+    PersonApp: { app: appOf },
+    TemplateApp: { app: appOf },
     ContainerConnection: {
       app: async ({ id }, _args, context) =>
         loaders.appsById(context).load((await loaders.connectionStates(context).load(id)).appId),
@@ -133,6 +130,7 @@ export function createResolvers(
       failure: ({ error }) => error && toEnum(error),
     },
     App: {
+      roles: (app, _args, context) => loaders.roles(context).load(app.id),
       peopleCount: async (app, _args, context) => (await summary(app, context)).peopleCount,
       foundVia: async (app, _args, context) => (await summary(app, context)).foundVia,
       since: async (app, _args, context) => (await summary(app, context)).since,
@@ -251,6 +249,13 @@ function createLoaders(services: AppResolverServices) {
           const users = await services.readUsersOfApps(context.getActor(), appIds);
           const byApp = Map.groupBy(users, ({ appId }) => appId);
           return appIds.map((appId) => byApp.get(appId) ?? []);
+        }),
+    ),
+    roles: perRequest(
+      (context) =>
+        new DataLoader(async (ids: readonly string[]) => {
+          const roles = await services.readAppRoles(context.getActor(), ids);
+          return ids.map((id) => roles.get(id) ?? []);
         }),
     ),
     appsById: perRequest(

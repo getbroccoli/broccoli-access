@@ -14,6 +14,8 @@ type Template {
 
 "One app in one template."
 type TemplateApp {
+  "Role key, or null for the app’s default."
+  role: String
   "This listing's own id, not the app's."
   id: ID!
 }
@@ -79,10 +81,19 @@ type PersonApp {
   accountStatus: AppAccountStatus
   "The templates that list this app for this employee."
   templates: [Template!]!
-  "The explicitly chosen role, or null before a role is chosen."
+  "Whether the owner still has to settle different template roles."
+  roleConflict: Boolean!
+  "The template and role behind each option in an unresolved conflict."
+  roleSources: [TemplateRoleSource!]!
+  "The role given by the templates or picked by the owner, or null for the default or a conflict."
   role: String
   "Expected access compared with the held account: active access is Active or Extra, a pending invitation is Invited, and an expected app without either is Missing, even for a disabled account. Other disabled accounts are Suspended. Null for invitation controls alone. Employee.appAccounts supplies the underlying account status and actions."
   state: PersonAppState
+}
+
+type TemplateRoleSource {
+  template: Template!
+  role: String
 }
 
 enum PersonAppState {
@@ -113,7 +124,38 @@ type TemplateTakeOffPayload {
 }
 union TemplateTakeOffError = NotFoundError
 
+input TemplateSetAppRoleInput {
+  id: ID!
+  appId: ID!
+  "Null selects the app's default."
+  role: String
+}
+
+input TemplatePickRoleInput {
+  employeeId: ID!
+  appId: ID!
+  "One of the conflicting template roles, including null for the default."
+  role: String
+}
+
+type TemplateSetAppRolePayload {
+  template: Template
+  error: TemplateSetAppRoleError
+}
+union TemplateSetAppRoleError = InvalidInputError | NotFoundError
+
+type TemplatePickRolePayload {
+  "The saved role key, or null for the app default."
+  role: String
+  error: TemplatePickRoleError
+}
+union TemplatePickRoleError = InvalidInputError | NotFoundError | ConflictError
+
 type TemplatesMutations {
+  "Sets the invite role on an app already in this template. Admins only."
+  setAppRole(input: TemplateSetAppRoleInput!): TemplateSetAppRolePayload!
+  "Settles a role conflict for this person and app. Owner only."
+  pickRole(input: TemplatePickRoleInput!): TemplatePickRolePayload!
   "Gives this template to a person active in the directory. Owner only."
   assign(input: TemplateAssignInput!): TemplateAssignPayload!
   "Takes this template off the employee. Owner only."

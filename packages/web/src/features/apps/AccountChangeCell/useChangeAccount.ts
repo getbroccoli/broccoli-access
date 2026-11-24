@@ -5,8 +5,10 @@ import {
   ChangeAccountDocument,
   InviteEmployeeDocument,
 } from "@/__generated__/graphql";
-import { usePayloadMutation } from "@/apollo";
+import { useCache, usePayloadMutation } from "@/apollo";
 import { t } from "@/i18n";
+
+import { forgetPersonApps } from "../cache";
 
 /**
  * What a change is asked for, and how copy names it: the account for Disable and Enable, or the
@@ -18,12 +20,14 @@ export type ChangeTarget = { name: string; app: string } & (
 
 /**
  * Asks for a Disable or Enable of an account, or an Invite of an employee to an app; a refused ask
- * shows a toast, and the row keeps showing what it showed.
+ * shows a toast. A refused Disable or Enable leaves the row as it was; a refused Invite reads the
+ * page again, since what the row offered no longer holds.
  */
 export function useChangeAccount(): {
   changeAccount: (target: ChangeTarget, action: AccountChangeAction) => Promise<void>;
   loading: boolean;
 } {
+  const cache = useCache();
   const [change, changing] = usePayloadMutation(ChangeAccountDocument);
   const [invite, inviting] = usePayloadMutation(InviteEmployeeDocument);
   const changeAccount = async (target: ChangeTarget, action: AccountChangeAction) => {
@@ -38,6 +42,7 @@ export function useChangeAccount(): {
     } catch {
       const refused = "accountId" in target ? "apps.change.refused" : "apps.change.inviteRefused";
       toast.error(t(refused, { name: target.name, app: target.app }));
+      if (!("accountId" in target)) forgetPersonApps(cache, target.employeeId);
     }
   };
   return { changeAccount, loading: changing.loading || inviting.loading };

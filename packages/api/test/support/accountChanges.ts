@@ -8,6 +8,7 @@ import type { Orm, Transact } from "../../src/core/db";
 import type { JobQueue } from "../../src/core/jobs";
 import { createLogger } from "../../src/core/logger";
 import { createAccountChangeService } from "../../src/modules/apps";
+import { readInviteRole } from "../../src/modules/templates";
 import { createEmployeeReadService } from "../../src/modules/employees";
 import { createGoogleWorkspaceConnector } from "../../src/modules/google";
 import { createImportRecordService } from "../../src/modules/imports";
@@ -41,6 +42,7 @@ export function accountChanges(
   });
   const connectors = { list: async () => [google, ...(await container.list())] };
   return createAccountChangeService({
+    readInviteRole,
     orm,
     transact,
     jobs,

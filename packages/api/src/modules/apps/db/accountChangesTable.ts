@@ -25,6 +25,7 @@ export const accountChanges = pgTable(
       .references(() => apps.id),
     /** The account's email, or the invited employee's, lowercased, copied when the owner asks. */
     email: text("email").notNull(),
+    role: text("role"),
     connectionId: uuid("connection_id")
       .notNull()
       .references(() => appConnections.id),

@@ -67,6 +67,7 @@ export function CurrentAccessTable({ person }: { person: Person }) {
               <PersonAppRow
                 key={account?.id ?? row.app.id}
                 row={row}
+                employeeId={person.id}
                 account={account}
                 showEmail={!!account && (held.length > 1 || account.email !== person.email)}
                 first={index === 0}

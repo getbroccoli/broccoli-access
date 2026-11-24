@@ -4,7 +4,7 @@ import type { ModuleManifest } from "../../core/moduleManifest";
 import { createTemplateService } from "./app";
 import { createResolvers, type ReadTemplateEmployees } from "./graphql";
 
-export { createTemplateService, type TemplateService } from "./app";
+export { readInviteRole, createTemplateService, type TemplateService } from "./app";
 
 /** Templates, their people, and the apps they give them. */
 export function templatesModule(

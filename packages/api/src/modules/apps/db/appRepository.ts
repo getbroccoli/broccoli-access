@@ -1,4 +1,4 @@
-import { and, count, countDistinct, eq, sql } from "drizzle-orm";
+import { and, count, countDistinct, eq, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -42,6 +42,7 @@ export interface AppRepository {
   /** The app; null when there is none. */
   findById(id: string): Promise<App | null>;
   /** The apps with these ids; an unknown id is left out. */
+  tryLockForReview(id: string): Promise<boolean>;
   lockForReview(ids: readonly string[]): Promise<{ id: string; name: string }[]>;
   findByIds(ids: readonly string[]): Promise<App[]>;
   /** The app, locked until the transaction ends; null when there is none. */
@@ -106,10 +107,15 @@ export function appRepository(db: Orm | Tx): AppRepository {
         ]),
       ) as Record<AppStatus, number>;
     },
+    async tryLockForReview(id) {
+      const { rows } = await orm().execute<{ locked: boolean }>(
+        sql`select pg_try_advisory_xact_lock(${reviewLockKey(sql`${id}::uuid`)}) as locked`,
+      );
+      return rows[0]!.locked;
+    },
     async lockForReview(ids) {
       // Metadata updates can already hold app rows in scan order. Review locks have their own namespace.
-      await orm()
-        .execute(sql`select pg_advisory_xact_lock(hashtextextended('template-review/' || id, 0))
+      await orm().execute(sql`select pg_advisory_xact_lock(${reviewLockKey(sql`id`)})
         from (select distinct id from unnest(${sql.param([...ids])}::uuid[]) as ids(id) order by id) as ordered`);
       return orm().select({ id: apps.id, name: apps.name }).from(apps).where(anyOf(apps.id, ids));
     },
@@ -145,3 +151,7 @@ const PAGE_ORDER = keysetOrder(
   sql`${apps.id}`,
   false,
 );
+
+function reviewLockKey(id: SQL) {
+  return sql`hashtextextended('template-review/' || ${id}, 0)`;
+}

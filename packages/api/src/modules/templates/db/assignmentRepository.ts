@@ -11,9 +11,16 @@ export interface AssignmentRepository {
   employeeIds(templateId: string): Promise<string[]>;
   assign(assignment: Assignment, assignedBy: string): Promise<boolean>;
   takeOff(assignment: Assignment): Promise<boolean>;
-  choicesFor(ids: readonly string[]): Promise<EmployeeAppChoice[]>;
+  choicesFor(
+    ids: readonly string[],
+    appIds?: readonly string[],
+    choice?: EmployeeAppChoice["choice"],
+  ): Promise<EmployeeAppChoice[]>;
   listedApps(ids: readonly string[]): Promise<Set<string>>;
-  sources(employeeIds: readonly string[], appIds: readonly string[]): Promise<EmployeeAppPair[]>;
+  sources(
+    pairs: readonly EmployeeAppPair[],
+  ): Promise<(EmployeeAppPair & { role: string | null })[]>;
+  saveRolePick(pair: EmployeeAppPair, role: string | null): Promise<void>;
   peoplePage(
     templateId: string,
     after: string | null,
@@ -21,7 +28,10 @@ export interface AssignmentRepository {
   ): Promise<{ id: string; employeeId: string }[]>;
   markForReview(pairs: EmployeeAppPair[]): Promise<EmployeeAppPair[]>;
   reviews(appIds: readonly string[]): Promise<EmployeeAppPair[]>;
-  clearReviews(pairs: EmployeeAppPair[]): Promise<EmployeeAppPair[]>;
+  clearChoices(
+    pairs: EmployeeAppPair[],
+    choice: "role_picked" | "to_review",
+  ): Promise<EmployeeAppPair[]>;
 }
 
 interface Assignment {
@@ -69,8 +79,26 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
         .returning({ id: employeeTemplates.id });
       return removed.length > 0;
     },
-    choicesFor: (ids) =>
-      orm.select().from(employeeAppChoices).where(anyOf(employeeAppChoices.employeeId, ids)),
+    choicesFor: (ids, appIds, choice) =>
+      orm
+        .select()
+        .from(employeeAppChoices)
+        .where(
+          and(
+            anyOf(employeeAppChoices.employeeId, ids),
+            choice && eq(employeeAppChoices.choice, choice),
+            appIds && anyOf(employeeAppChoices.appId, appIds),
+          ),
+        ),
+    async saveRolePick(pair, role) {
+      await orm
+        .insert(employeeAppChoices)
+        .values({ ...pair, choice: "role_picked", role })
+        .onConflictDoUpdate({
+          target: [PAIR.employeeId, PAIR.appId],
+          set: { choice: "role_picked", role },
+        });
+    },
     async listedApps(ids) {
       const listed = await orm
         .selectDistinct({ appId: templateApps.appId })
@@ -78,14 +106,16 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
         .where(anyOf(templateApps.appId, ids));
       return new Set(listed.map(({ appId }) => appId));
     },
-    sources: (employeeIds, appIds) =>
+    sources: (pairs) =>
       orm
-        .selectDistinct({ employeeId: employeeTemplates.employeeId, appId: templateApps.appId })
+        .selectDistinct({
+          employeeId: employeeTemplates.employeeId,
+          appId: templateApps.appId,
+          role: templateApps.role,
+        })
         .from(employeeTemplates)
         .innerJoin(templateApps, eq(templateApps.templateId, employeeTemplates.templateId))
-        .where(
-          and(anyOf(employeeTemplates.employeeId, employeeIds), anyOf(templateApps.appId, appIds)),
-        ),
+        .where(sql`(${employeeTemplates.employeeId},${templateApps.appId}) in ${pairList(pairs)}`),
     peoplePage: (templateId, after, limit) =>
       orm
         .select({ id: employeeTemplates.id, employeeId: employeeTemplates.employeeId })
@@ -117,18 +147,22 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
         .where(
           and(eq(employeeAppChoices.choice, "to_review"), anyOf(employeeAppChoices.appId, appIds)),
         ),
-    clearReviews: (pairs) =>
+    clearChoices: (pairs, choice) =>
       orm
         .delete(employeeAppChoices)
         .where(
           and(
-            eq(employeeAppChoices.choice, "to_review"),
+            eq(employeeAppChoices.choice, choice),
             // Bind each column once; the two arrays pair up by position.
-            sql`(${PAIR.employeeId},${PAIR.appId}) in (select * from unnest(${sql.param(pairs.map((p) => p.employeeId))}::uuid[],${sql.param(pairs.map((p) => p.appId))}::uuid[]))`,
+            sql`(${PAIR.employeeId},${PAIR.appId}) in ${pairList(pairs)}`,
           ),
         )
         .returning(PAIR),
   };
+}
+
+function pairList(pairs: readonly EmployeeAppPair[]) {
+  return sql`(select * from unnest(${sql.param(pairs.map((pair) => pair.employeeId))}::uuid[],${sql.param(pairs.map((pair) => pair.appId))}::uuid[]))`;
 }
 
 const PAIR = { employeeId: employeeAppChoices.employeeId, appId: employeeAppChoices.appId };

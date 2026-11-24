@@ -1,7 +1,9 @@
 import type { ApolloCache } from "@apollo/client";
 import {
   AccountsWithoutPersonDocument,
+  PersonPageDocument,
   type AccountsWithoutPersonQuery,
+  type PersonPageQuery,
 } from "@/__generated__/graphql";
 import { evictRecord } from "@/apollo";
 
@@ -33,5 +35,42 @@ export function storeAccountWindow(
   cache.writeQuery({
     query: AccountsWithoutPersonDocument,
     data: { accountsWithoutPerson: { ...page, edges } },
+  });
+}
+
+/** Apply the confirmed choice without discarding pages loaded with Show more. */
+export function storePickedRole(
+  cache: ApolloCache,
+  employeeId: string,
+  pickedFrom: NonNullable<PersonPageQuery["employee"]>["personApps"]["edges"][number]["node"],
+  role: string | null,
+) {
+  cache.updateQuery({ query: PersonPageDocument, variables: { id: employeeId } }, (previous) => {
+    if (!previous?.employee) return previous;
+    const { employee } = previous;
+    return {
+      ...previous,
+      employee: {
+        ...employee,
+        personApps: {
+          ...employee.personApps,
+          edges: employee.personApps.edges.map((edge) =>
+            edge.node.app.id === pickedFrom.app.id &&
+            edge.node.roleConflict &&
+            edge.node.roleSources.length === pickedFrom.roleSources.length &&
+            edge.node.roleSources.every(
+              (source, i) =>
+                source.role === pickedFrom.roleSources[i]?.role &&
+                source.template.id === pickedFrom.roleSources[i]?.template.id,
+            )
+              ? {
+                  ...edge,
+                  node: { ...edge.node, role, roleConflict: false, roleSources: [] },
+                }
+              : edge,
+          ),
+        },
+      },
+    };
   });
 }

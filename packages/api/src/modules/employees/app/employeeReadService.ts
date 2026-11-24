@@ -38,7 +38,11 @@ export interface EmployeeReadService {
   /** The employee with this id, or null when there is none. */
   readEmployee: (ctx: SecurityContext, id: string) => Promise<Employee | null>;
   /** The employees with these ids the caller may read, sorted by name; an unknown id is left out. */
-  readEmployees: (ctx: SecurityContext, ids: readonly string[], db?: Orm) => Promise<Employee[]>;
+  readEmployees: (
+    ctx: SecurityContext,
+    ids: readonly string[],
+    db?: Orm | Tx,
+  ) => Promise<Employee[]>;
   /** The employees the caller may read, keyed by their linked app account. */
   readAccountOwners: (
     ctx: SecurityContext,

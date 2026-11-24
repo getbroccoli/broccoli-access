@@ -13,6 +13,9 @@ import {
   showsCouldntChange,
 } from "./couldntChange";
 
+const unavailableInvite =
+  "Check the connection to Linear and the role on this person’s templates before trying again.";
+
 it.for([
   [
     "UNEXPECTED_RESPONSE",
@@ -28,6 +31,7 @@ it.for([
   ],
   ["RATE_LIMITED", "TEXT", null, "Linear didn’t answer after three tries."],
   ["APP_UNAVAILABLE", "TEXT", null, "Linear didn’t answer after three tries."],
+  ["APP_UNAVAILABLE", "TEXT", null, unavailableInvite, "INVITE"],
   ["AUTHENTICATION_FAILED", "TEXT", null, "Linear refused the API key: it was revoked or expired."],
   ["AUTHENTICATION_FAILED", "APP_SESSION", null, "Your Linear session expired or was signed out."],
   [
@@ -63,10 +67,11 @@ it.for([
     "The Chrome window making the change closed before Linear answered.",
   ],
 ] as const)(
-  "explains %s with %s and connection email %s",
-  ([failure, credential, connectionUserEmail, reason]) => {
+  "explains %s with %s and connection email %s as %s",
+  ([failure, credential, connectionUserEmail, reason, action]) => {
     expect(
       couldntChangeReason(failure, {
+        action: action ?? "SUSPEND",
         app: "Linear",
         workspace: "Acme",
         person: { name: "Ana Ruiz", email: "ana@acme.example" },

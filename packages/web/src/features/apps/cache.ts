@@ -24,6 +24,16 @@ export function forgetAccessCounts(cache: ApolloCache): void {
 }
 
 /**
+ * Drops a person's apps and invite rows after a refused Invite, which what the row offered no
+ * longer matches, so their page loads them afresh.
+ */
+export function forgetPersonApps(cache: ApolloCache, employeeId: string): void {
+  const id = cache.identify({ __typename: "Employee", id: employeeId });
+  cache.evict({ id, fieldName: "personApps" });
+  cache.evict({ id, fieldName: "appInvites" });
+}
+
+/**
  * The open queries a reconnect changes beyond its payload, read again once it succeeds: a person's
  * invite rows, which offer Invite again instead of Reconnect.
  */

@@ -18,6 +18,7 @@ export interface Template {
 export interface TemplateApp {
   id: string;
   appId: string;
+  role: string | null;
 }
 
 /** Template names are unique: another template already has this one, ignoring case. */

@@ -118,12 +118,19 @@ async function changeAssignment(
     const template = await lockTemplate(tx, input.id);
     const repo = assignmentRepository(tx);
     const assignment = { employeeId, templateId: template.id };
-    if (action === "assign") await requireActiveEmployee(tx, apps, employees, employeeId);
+    if (action === "assign") {
+      await requireActiveEmployee(tx, apps, employees, employeeId);
+    }
     const changed =
       action === "assign"
         ? await repo.assign(assignment, assignedBy)
         : await repo.takeOff(assignment);
     if (!changed) return { template, changed };
+    if (action === "assign")
+      await apps.lockAppsForReview(
+        tx,
+        template.apps.map(({ appId }) => appId),
+      );
     await recordAssignment(ctx, tx, employeeId, template, action);
     if (action === "takeOff")
       await reviewLostApps(

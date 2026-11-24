@@ -30,6 +30,8 @@ export function showsCouldntChange({
 export function couldntChangeReason(
   failure: AccountChangeFailure,
   about: {
+    action?: AccountChangeAction;
+    historical?: boolean;
     app: string;
     workspace: string;
     person: { name: string; email: string };
@@ -89,7 +91,7 @@ export function couldntChangeHint(
   failure: AccountChangeFailure,
   action: AccountChangeAction,
   { tryAgain, scanNow, reconnect }: FailedChangeOptions,
-  { firstName, app }: { firstName: string; app: string },
+  { firstName, app, roleConflict }: { firstName: string; app: string; roleConflict?: boolean },
 ): string {
   if (failure === "NOT_ALLOWED") {
     return t("apps.couldnt.hintByHandOnly", { app });
@@ -102,6 +104,7 @@ export function couldntChangeHint(
   }
   const hints = HINTS[action];
   if (reconnect) {
+    if (action === "INVITE" && roleConflict) return t("apps.couldnt.hintInviteRole", { app });
     return t(hints.reconnect, { firstName, app });
   }
   return t(tryAgain ? hints.tryAgain : hints.byHand, { firstName, app });
@@ -166,6 +169,8 @@ function reasonOf(
     person,
     connectionUserEmail,
     credential,
+    action,
+    historical,
   }: Parameters<typeof couldntChangeReason>[1],
 ): string {
   const withSession = credential === "APP_SESSION";
@@ -174,8 +179,14 @@ function reasonOf(
       return t("apps.couldnt.unexpectedResponse", { app });
     case "BLOCKED_BY_CHECK":
       return t("apps.couldnt.blockedByCheck", { app });
-    case "RATE_LIMITED":
     case "APP_UNAVAILABLE":
+      if (action === "INVITE")
+        return t(
+          historical ? "apps.couldnt.inviteWasUnavailable" : "apps.couldnt.inviteUnavailable",
+          { app },
+        );
+      return t("apps.couldnt.noAnswer", { app });
+    case "RATE_LIMITED":
       return t("apps.couldnt.noAnswer", { app });
     case "AUTHENTICATION_FAILED":
     case "PERMISSION_MISSING":

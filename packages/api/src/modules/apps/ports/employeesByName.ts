@@ -1,4 +1,4 @@
-import type { Orm } from "../../../core/db";
+import type { Orm, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 
 /** What apps need from the employees module: their order by name, and the emails invites go to. */
@@ -7,6 +7,6 @@ export interface EmployeesByName {
   readEmployees(
     ctx: SecurityContext,
     ids: readonly string[],
-    db?: Orm,
+    db?: Orm | Tx,
   ): Promise<{ id: string; email: string; firstName: string; lastName: string }[]>;
 }

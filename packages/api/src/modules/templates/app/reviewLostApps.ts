@@ -4,6 +4,8 @@ import { PrincipalSecurityContext, type SecurityContext } from "../../../core/se
 import { assignmentRepository, type EmployeeAppPair } from "../db";
 import type { PersonAccess, EmployeeById } from "../ports";
 
+import { clearStaleRolePicks } from "./templateRoles";
+
 const history = createRecordHistoryService();
 
 /** After a source is taken away, mark just the active accounts that no longer have another source. */
@@ -23,8 +25,12 @@ export async function reviewLostApps(
   const active = (await apps.findEmployeeAccounts(tx, employeeIds, lostAppIds)).filter(
     (account) => account.status === "active",
   );
+  const picks = await repo.choicesFor(employeeIds, lostAppIds, "role_picked");
+  if (!active.length && !picks.length) return;
+  const sources = await repo.sources([...active, ...picks]);
+  await clearStaleRolePicks(ctx, tx, picks, sources);
   if (!active.length) return;
-  const remaining = new Set((await repo.sources(employeeIds, lostAppIds)).map(pairKey));
+  const remaining = new Set(sources.map(pairKey));
   const lost = new Map(
     active
       .filter((pair) => !remaining.has(pairKey(pair)))
@@ -56,7 +62,7 @@ export async function clearInactiveReviews(
   const active = new Set(accounts.filter((account) => account.status === "active").map(pairKey));
   const ended = reviews.filter((pair) => !active.has(pairKey(pair)));
   if (!ended.length) return;
-  const cleared = await repo.clearReviews(ended);
+  const cleared = await repo.clearChoices(ended, "to_review");
   await recordChoiceChanges(
     PrincipalSecurityContext.system(),
     tx,

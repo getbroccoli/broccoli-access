@@ -36,6 +36,7 @@ export interface TemplateRepository {
   ): Promise<KeysetRow<Template, unknown[]>[]>;
   /** Adds the app to the template, which must not list it yet. */
   insertApp(templateId: string, appId: string): Promise<TemplateApp>;
+  setAppRole(id: string, role: string | null): Promise<void>;
   deleteApp(templateId: string, appId: string): Promise<void>;
 }
 
@@ -107,8 +108,11 @@ export function templateRepository(db: Orm | Tx): TemplateRepository {
       const [app] = await orm()
         .insert(templateApps)
         .values({ templateId, appId })
-        .returning({ id: templateApps.id, appId: templateApps.appId });
+        .returning({ id: templateApps.id, appId: templateApps.appId, role: templateApps.role });
       return app!;
+    },
+    async setAppRole(id, role) {
+      await orm().update(templateApps).set({ role }).where(eq(templateApps.id, id));
     },
     deleteApp: async (templateId, appId) => {
       await orm()
@@ -152,9 +156,10 @@ async function readAppsAndPeople(orm: Orm, rows: readonly StoredTemplate[]): Pro
   const peopleByTemplate = new Map(people.map((row) => [row.templateId, row.people]));
   return rows.map((template) => ({
     ...template,
-    apps: (appsByTemplate.get(template.id) ?? []).map(({ id, appId }): TemplateApp => ({
+    apps: (appsByTemplate.get(template.id) ?? []).map(({ id, appId, role }): TemplateApp => ({
       id,
       appId,
+      role,
     })),
     peopleCount: peopleByTemplate.get(template.id) ?? 0,
   }));

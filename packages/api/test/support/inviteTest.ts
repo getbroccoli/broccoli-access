@@ -6,6 +6,9 @@ import type { Orm } from "../../src/core/db";
 import { PrincipalSecurityContext } from "../../src/core/security";
 import { employeeDirectory } from "../../src/modules/employees";
 import { accountChanges, scannedLinear } from "./accountChanges";
+import { containerConnectors } from "./containerConnections";
+import { templates } from "./services";
+import type { TestSeed } from "./testSeed";
 import { test } from "./fixture";
 import { googleScanSetup } from "./googleScanSetup";
 import { recordingJobQueue } from "./recordingJobQueue";
@@ -13,8 +16,8 @@ import { storedEmployees } from "./storedScan";
 import { SYSTEM } from "./testSecurityContext";
 
 export const inviteTest = test.extend<{ workspace: Awaited<ReturnType<typeof scannedWorkspace>> }>({
-  workspace: async ({ orm, fakeGoogle, fakeConnectors }, use) => {
-    await use(await scannedWorkspace(orm, fakeGoogle.url, fakeConnectors.url));
+  workspace: async ({ orm, seed, fakeGoogle, fakeConnectors }, use) => {
+    await use(await scannedWorkspace(orm, seed, fakeGoogle.url, fakeConnectors.url));
   },
 });
 
@@ -22,11 +25,18 @@ export const inviteTest = test.extend<{ workspace: Awaited<ReturnType<typeof sca
 export async function linearInvitations(url: string, email: string) {
   const response = await fetch(`${url}/_fake/state`);
   assert.equal(response.status, 200);
-  const state = (await response.json()) as { invitations: { linear: Invitation[] } };
+  const state = (await response.json()) as {
+    invitations: { linear: (Invitation & { role: string })[] };
+  };
   return state.invitations.linear.filter((invite) => invite.email === email);
 }
 
-async function scannedWorkspace(orm: Orm, googleUrl: string, connectorsUrl: string) {
+async function scannedWorkspace(
+  orm: Orm,
+  seed: TestSeed,
+  googleUrl: string,
+  connectorsUrl: string,
+) {
   const google = await googleScanSetup(orm, googleUrl);
   await google.scans.runScan(SYSTEM, google.sourceId);
   const linear = await scannedLinear(orm, connectorsUrl);
@@ -50,13 +60,17 @@ async function scannedWorkspace(orm: Orm, googleUrl: string, connectorsUrl: stri
   const { jobs, sent } = recordingJobQueue();
   const service = accountChanges(orm, { connectorsUrl, jobs });
   const ivan = employee("ivan@acme.example");
+  const input = { employeeId: ivan.id, appId: linear.appId };
   return {
+    templates: templates(orm, { connectors: containerConnectors(connectorsUrl) }),
+    assignLinearRole: (role: string | null) =>
+      seed.assignedTemplateApp({ ...input, role, assignedBy: google.ownerUserId }),
     linear,
     owner,
     service,
     sent,
     employee,
     ivan,
-    input: { employeeId: ivan.id, appId: linear.appId },
+    input,
   };
 }

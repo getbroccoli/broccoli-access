@@ -39,7 +39,7 @@ Approve Slack again on its page, connect Linear as in [Connections settings](con
 Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page](app-page.md) says, and open Ivan Petrov's page: he is active in Google and has no Linear member.
 
 - [ ] The table lists Linear with "No account" and "Invite". Ana's and Ben's pages (suspended in Google) and Chloé's (a Linear member) list no such row.
-- [ ] "Invite" asks "Invite Ivan Petrov to Linear?" with Person (Ivan Petrov, ivan@acme.example), App (Linear) and Workspace (Acme), "Linear sends Ivan an invitation to join this workspace as a regular member, unless they already have one or have joined. Their account shows here once Linear is scanned after they join.", "Cancel" and "Invite to Linear".
+- [ ] "Invite" asks "Invite Ivan Petrov to Linear?" with Person (Ivan Petrov, ivan@acme.example), App (Linear) and Workspace (Acme), "Linear sends Ivan an invitation to join this workspace, unless they already have one or have joined. Their account shows here once Linear is scanned after they join.", "Cancel" and "Invite to Linear".
 - [ ] Confirming shows "Inviting to Linear…", then "Invited on <today>" without a reload; `curl -s "$FAKE/_fake/state" | jq '.invitations.linear'` lists one invitation for ivan@acme.example. A reload keeps "Invited on <today>" and no "Invite".
 - [ ] After "Scan now" on Linear's page, his row still reads "Invited on <today>": the scan read the invitation in Linear.
 - [ ] After `curl -s -X POST "$FAKE/_fake/linear/invitations/ivan%40acme.example/expire"`, his row stays "Invited on <today>" until "Scan now" on Linear's page; then it offers "Invite" again.

@@ -12,6 +12,7 @@ import {
   createTemplateAssignmentService,
   type TemplateAssignmentService,
 } from "./templateAssignmentService";
+import { createTemplateRoles, type TemplateRoles } from "./templateRoles";
 import { lockTemplate } from "./lockTemplate";
 import { reviewLostApps } from "./reviewLostApps";
 
@@ -21,7 +22,7 @@ const recordHistory = createRecordHistoryService();
  * Templates, the named lists of apps the owner assigns to people: each change in one transaction
  * with its history line. Every operation needs MANAGE_WORKSPACE.
  */
-export interface TemplateService extends TemplateAssignmentService {
+export interface TemplateService extends TemplateAssignmentService, TemplateRoles {
   /** The templates, by name ignoring case. */
   listTemplates: (
     ctx: SecurityContext,
@@ -74,6 +75,7 @@ export function createTemplateService({
   employees,
 }: TemplateDependencies): TemplateService {
   return {
+    ...createTemplateRoles({ transact, logger, apps, employees }),
     ...createTemplateAssignmentService({ orm, transact, logger, apps, employees }),
     async listTemplates(ctx, { assignableTo, ...pageArgs }) {
       ctx.require("MANAGE_WORKSPACE");
@@ -162,6 +164,7 @@ export function createTemplateService({
         if (!app || !isApproved) {
           throw invalidInput([{ field: "appId", code: "invalid" }]);
         }
+        await apps.lockAppsForReview(tx, [app.id]);
         const member = await templateRepository(tx).insertApp(before.id, app.id);
         const added = { field: "app", oldValue: null, newValue: app.id, newLabel: app.name };
         await appendHistory(ctx, tx, {
