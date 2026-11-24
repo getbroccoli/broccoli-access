@@ -50,8 +50,6 @@ function showRequest(origin: string, request: AppSessionRequest): void {
     app.textContent = request.name;
   }
   element("[data-origin]").textContent = shownOrigin(origin);
-  element("[data-storage]").hidden = request.storageKeys.length === 0;
-  element("[data-storage-keys]").textContent = request.storageKeys.join(", ");
   element("[data-domains]").replaceChildren(
     ...request.domains.map((domain) => {
       const item = document.createElement("li");
