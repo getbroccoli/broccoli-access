@@ -177,7 +177,7 @@ type AppInvite {
   "Unique per employee and app."
   id: ID!
   app: App!
-  "Whether Invite is offered now: the employee is active in the directory, the app's connection is connected, no invite runs and they are not invited; after a failed invite, that is Try again."
+  "Whether an invite is accepted now: the employee is active in the directory, the app's connection is connected, no invite runs and they are not invited. After a failed invite, the row shows Try again only where trying again can help."
   offered: Boolean!
   "Whether its row shows Reconnect instead of Invite: it would offer one, but the app's connection needs reconnecting."
   offersReconnect: Boolean!
