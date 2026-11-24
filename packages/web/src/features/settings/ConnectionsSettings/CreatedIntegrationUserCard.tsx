@@ -1,6 +1,7 @@
 import { ArrowUpRight } from "@phosphor-icons/react";
 
 import {
+  ConnectionsSettingsDocument,
   type ConnectionsSettingsQuery,
   type IntegrationUserSignInFailure,
   type IntegrationUserSignInStatus,
@@ -28,7 +29,7 @@ const FAILURE_MESSAGES: Record<IntegrationUserSignInFailure, MessageKey> = {
   BLOCKED_BY_CHECK: "settings.integrationUser.blockedByCheck",
   AUTHENTICATION_FAILED: "settings.integrationUser.authenticationFailed",
   CONNECTORS_CONTAINER_UNAVAILABLE: "settings.integrationUser.connectorsUnavailable",
-  SETUP_DID_NOT_FINISH: "settings.integrationUser.setupDidNotFinish",
+  SIGN_IN_DID_NOT_FINISH: "settings.integrationUser.signInDidNotFinish",
 };
 
 type Props = {
@@ -37,8 +38,10 @@ type Props = {
 
 /** The created integration user: whether Broccoli Access signs in to Google as it, or why not. */
 export function CreatedIntegrationUserCard({ integrationUser }: Props) {
+  // The page's query, asked again after the retry: an answer read before it would undo "Setting up".
   const [signIn, { loading: isStarting, error: startError }] = usePayloadMutation(
     SignInAsIntegrationUserDocument,
+    { refetch: [ConnectionsSettingsDocument] },
   );
   const { signInStatus, signInFailure } = integrationUser;
   const needsOwner = signInStatus === "SIGN_IN_NEEDS_OWNER";
@@ -70,7 +73,7 @@ export function CreatedIntegrationUserCard({ integrationUser }: Props) {
         </div>
         <p className="text-sm text-foreground/80" aria-live="polite">
           {needsOwner
-            ? t(FAILURE_MESSAGES[signInFailure ?? "SETUP_DID_NOT_FINISH"])
+            ? t(FAILURE_MESSAGES[signInFailure ?? "SIGN_IN_DID_NOT_FINISH"])
             : t(SUMMARIES[signInStatus])}
         </p>
         {startError && (

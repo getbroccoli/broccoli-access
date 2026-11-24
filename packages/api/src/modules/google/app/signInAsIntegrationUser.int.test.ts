@@ -10,7 +10,6 @@ import {
   failIntegrationUserSetup,
   integrationUsers,
   integrationUserTest as test,
-  postFakeControl,
   serveConnectorRoutes,
   storedIntegrationUsers,
   storedRecordHistory,
@@ -33,16 +32,24 @@ test("creation sets up two-step sign-in and stores its secret encrypted with the
 });
 
 test("creation returns while two-step sign-in is being set up", async ({
-  signInWorkspace: workspace,
+  workspace,
   fakeConnectors,
+  fakeGoogle,
+  orm,
 }) => {
-  await postFakeControl(fakeConnectors.url, "delay", { milliseconds: 750 });
+  const container = await holdSignIn(fakeConnectors.url);
+  const users = integrationUsers(orm, { googleUrl: fakeGoogle.url, connectorsUrl: container.url });
 
-  await workspace.createUser();
-
-  expect(await workspace.readSignIn()).toEqual(SETTING_UP);
-  await postFakeControl(fakeConnectors.url, "delay", { milliseconds: 0 });
-  await expect.poll(workspace.readSignIn, { timeout: 5_000 }).toEqual(READY);
+  try {
+    await users.finishCreation(workspace.owner, await workspace.allowCreation());
+    await container.received;
+    expect((await users.readIntegrationUser(workspace.owner))?.signIn).toEqual(SETTING_UP);
+  } finally {
+    container.release();
+  }
+  await expect
+    .poll(() => users.readIntegrationUser(workspace.owner))
+    .toMatchObject({ signIn: READY });
 });
 
 test("the owner can retry a Google check with the original password", async ({
@@ -65,7 +72,7 @@ test("the owner can retry a Google check with the original password", async ({
 test.for([
   ["authentication_failed", "authentication_failed"],
   ["app_unavailable", "connectors_container_unavailable"],
-  ["unexpected_response", "setup_did_not_finish"],
+  ["unexpected_response", "sign_in_did_not_finish"],
 ] as const)(
   "reports %s to the owner as %s",
   async ([error, failure], { signInWorkspace: workspace, fakeConnectors }) => {
@@ -77,7 +84,7 @@ test.for([
   },
 );
 
-test("a restart without a stored two-step secret reports unfinished setup", async ({
+test("a restart without a stored two-step secret reports unfinished sign-in", async ({
   signInWorkspace: workspace,
   fakeConnectors,
   fakeGoogle,
@@ -94,11 +101,11 @@ test("a restart without a stored two-step secret reports unfinished setup", asyn
 
   expect((await restarted.readIntegrationUser(workspace.owner))?.signIn).toEqual({
     status: "sign_in_needs_owner",
-    failure: "setup_did_not_finish",
+    failure: "sign_in_did_not_finish",
   });
 });
 
-test("a second setup sends the stored password and two-step secret", async ({
+test("a retry sends the stored credentials and keeps them when the container answers a different secret", async ({
   signInWorkspace: workspace,
   fakeGoogle,
   fakeConnectors,
@@ -111,7 +118,11 @@ test("a second setup sends the stored password and two-step secret", async ({
   const rotatedSecret = "JBSWY3DPEHPK3PXQ";
   const app = express().post("/v1/integration-user/setup", express.json(), (request, response) => {
     requests.push(request.body);
-    response.json({ totpSecret: rotatedSecret });
+    response.json(
+      requests.length === 1
+        ? { totpSecret: rotatedSecret }
+        : { error: { code: "blocked_by_check" } },
+    );
   });
   const container = await serveConnectorRoutes(fakeConnectors.url, app);
   const restarted = integrationUsers(orm, {
@@ -122,8 +133,15 @@ test("a second setup sends the stored password and two-step secret", async ({
   await restarted.startSignIn(workspace.owner);
 
   expect((await restarted.readIntegrationUser(workspace.owner))?.signIn).toEqual(READY);
-  await expect.poll(async () => (await storedSecrets(orm)).totpSecret).toBe(rotatedSecret);
-  expect(requests).toEqual([{ integrationUser: { email: CREATION_START.email, ...secrets } }]);
+  // A ready user stays ready during a retry. The next accepted request proves the first one finished.
+  await expect
+    .poll(async () => {
+      if (requests.length < 2) await restarted.startSignIn(workspace.owner);
+      return requests.length;
+    })
+    .toBe(2);
+  expect(requests[0]).toEqual({ integrationUser: { email: CREATION_START.email, ...secrets } });
+  expect(await storedSecrets(orm)).toEqual(secrets);
 });
 
 test("two simultaneous retries start one sign-in attempt", async ({
@@ -134,22 +152,20 @@ test("two simultaneous retries start one sign-in attempt", async ({
 }) => {
   await workspace.createUser();
   await expect.poll(workspace.readSignIn).toEqual(UNAVAILABLE);
-  let attempts = 0;
-  const app = express().post("/v1/integration-user/setup", (_request, _response, next) => {
-    attempts++;
-    next();
-  });
-  const container = await serveConnectorRoutes(fakeConnectors.url, app);
+  const container = await holdSignIn(fakeConnectors.url);
   const users = integrationUsers(orm, { googleUrl: fakeGoogle.url, connectorsUrl: container.url });
   await failIntegrationUserSetup(fakeConnectors.url, "blocked_by_check");
-  await postFakeControl(fakeConnectors.url, "delay", { milliseconds: 500 });
-
-  await Promise.all([users.startSignIn(workspace.owner), users.startSignIn(workspace.owner)]);
-
   const read = async () => (await users.readIntegrationUser(workspace.owner))?.signIn;
-  expect(await read()).toEqual(SETTING_UP);
-  await expect.poll(read, { timeout: 5_000 }).toEqual(BLOCKED);
-  expect(attempts).toBe(1);
+
+  try {
+    await Promise.all([users.startSignIn(workspace.owner), users.startSignIn(workspace.owner)]);
+    await container.received;
+    expect(await read()).toEqual(SETTING_UP);
+  } finally {
+    container.release();
+  }
+  await expect.poll(read).toEqual(BLOCKED);
+  expect(container.attempts()).toBe(1);
 });
 
 test.for([
@@ -212,4 +228,18 @@ async function storedSecrets(orm: Orm) {
     password: string;
     totpSecret?: string;
   };
+}
+
+async function holdSignIn(fakeUrl: string) {
+  const received = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  let attempts = 0;
+  const app = express().post("/v1/integration-user/setup", async (_request, _response, next) => {
+    attempts++;
+    received.resolve();
+    await release.promise;
+    next();
+  });
+  const { url } = await serveConnectorRoutes(fakeUrl, app);
+  return { url, received: received.promise, release: release.resolve, attempts: () => attempts };
 }

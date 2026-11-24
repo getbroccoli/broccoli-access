@@ -45,13 +45,15 @@ export function createIntegrationUserSignInAttempts(
       });
     },
     async read() {
+      // Noted before the read: an attempt that ends during it must not read as failed.
+      const wasRunning = running !== undefined;
       const secrets = await readSecrets(dependencies);
       if (secrets?.totpSecret !== undefined) {
         return { status: "signs_in_with_two_step_sign_in", failure: null };
       }
-      return running
+      return wasRunning || running
         ? { status: "setting_up_two_step_sign_in", failure: null }
-        : { status: "sign_in_needs_owner", failure: lastFailure ?? "setup_did_not_finish" };
+        : { status: "sign_in_needs_owner", failure: lastFailure ?? "sign_in_did_not_finish" };
     },
   };
 }
@@ -85,10 +87,13 @@ async function signIn(
       { kind: error instanceof Error ? error.name : typeof error },
       "Integration user sign-in failed unexpectedly",
     );
-    return "setup_did_not_finish";
+    return "sign_in_did_not_finish";
   }
 }
 
+// shortcut: the container turns two-step sign-in on before the core stores the secret it answers,
+// so an answer lost on the way, or a restart then, leaves a user nobody holds the secret of; the
+// owner then resets its two-step sign-in in Google admin. Fix it in the contract if it happens.
 async function setUpTwoStepSignIn({
   orm,
   secretBox,
@@ -97,7 +102,7 @@ async function setUpTwoStepSignIn({
   const repository = integrationUserRepository(orm);
   const [user, secrets] = await Promise.all([repository.find(), readSecrets({ orm, secretBox })]);
   if (!user || !secrets) {
-    return { failure: "setup_did_not_finish" };
+    return { failure: "sign_in_did_not_finish" };
   }
   if (!connectorsContainer) {
     return { failure: "connectors_container_unavailable" };
@@ -108,13 +113,16 @@ async function setUpTwoStepSignIn({
   });
   if ("error" in setup) {
     return {
-      failure: SIGN_IN_FAILURES[setup.error] ?? "setup_did_not_finish",
+      failure: SIGN_IN_FAILURES[setup.error] ?? "sign_in_did_not_finish",
       connectorError: setup.error,
     };
   }
-  await repository.replaceEncryptedSecrets(
-    encryptIntegrationUserSecrets(secretBox, { password, totpSecret: setup.answer.totpSecret }),
-  );
+  // A stored secret works already, and the contract answers the same one: never replace it.
+  if (totpSecret === null) {
+    await repository.replaceEncryptedSecrets(
+      encryptIntegrationUserSecrets(secretBox, { password, totpSecret: setup.answer.totpSecret }),
+    );
+  }
   return undefined;
 }
 

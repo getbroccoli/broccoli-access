@@ -29,7 +29,7 @@ export type IntegrationUserSignInFailure =
   | "blocked_by_check"
   | "authentication_failed"
   | "connectors_container_unavailable"
-  | "setup_did_not_finish";
+  | "sign_in_did_not_finish";
 
 /** The integration user's secrets as stored, encrypted: the two-step secret joins once it is set up. */
 export const INTEGRATION_USER_SECRETS = z.object({

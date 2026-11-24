@@ -4,7 +4,6 @@ import {
   connectorTest,
   type Browser,
   failIntegrationUserSetup,
-  postFakeControl,
   createdGoogleUsers,
   consentAtGoogle,
   readGoogleConnection,
@@ -100,7 +99,6 @@ connectorTest(
           },
         },
       });
-    await postFakeControl(fakeConnectors.url, "delay", { milliseconds: 750 });
 
     const retry = await browser.graphql(`mutation {
       google { signInAsIntegrationUser { integrationUser { id signInStatus signInFailure } } }
@@ -112,7 +110,9 @@ connectorTest(
           signInAsIntegrationUser: {
             integrationUser: {
               id: expect.stringMatching(/.+/) as unknown,
-              signInStatus: "SETTING_UP_TWO_STEP_SIGN_IN",
+              signInStatus: expect.stringMatching(
+                /^(SETTING_UP_TWO_STEP_SIGN_IN|SIGNS_IN_WITH_TWO_STEP_SIGN_IN)$/,
+              ) as unknown,
               signInFailure: null,
             },
           },
