@@ -4,10 +4,10 @@ import type { SeedMember } from "../seed";
 import type { ConnectorsState } from "./connectorsState";
 import type { FakeConnector } from "./fakeConnector";
 
-/** What an invite found: the email's member, or its pending invitation and whether it was just sent. */
-export type InviteResult = { member: SeedMember } | { invitation: Invitation; sent: boolean };
+/** What an invite found: the email's member, or its invitation and whether it was just sent. */
+type InviteResult = { member: SeedMember } | { invitation: Invitation; sent: boolean };
 
-/** Invites the email as the app does: an email with a member or a pending invitation gets no second one. */
+/** Invites the email as the app does, unless it already has a member or an invitation. */
 export function invite(
   connector: FakeConnector,
   state: ConnectorsState,

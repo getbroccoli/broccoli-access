@@ -231,7 +231,7 @@ function containerSession(
     async runAction(action, account) {
       const answer = answerOf(await client.runAction({ ...request(), action, account }));
       keep(answer.connection);
-      // The connector checks the member before acting; an answer about another one, or none, is wrong.
+      // The connector checks the member before acting; an answer about another or none is wrong.
       if (answer.account?.sourceKey !== account.sourceKey) {
         throw new ConnectorError("unexpected_response");
       }

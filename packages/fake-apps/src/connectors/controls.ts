@@ -3,7 +3,7 @@ import express, { Router, type RequestHandler } from "express";
 import { z } from "zod";
 
 import { invalidBody, notFound, refuseBrowsers } from "../utils";
-import type { FakeConnectorsContext, FakeConnectorKey } from "./connectorsState";
+import type { ConnectorsState, FakeConnectorsContext, FakeConnectorKey } from "./connectorsState";
 import type { FakeConnector } from "./fakeConnector";
 import { findConnector } from "./fakeConnectorList";
 import { acceptInvitation, invite, removeInvitation } from "./invitations";
@@ -104,11 +104,7 @@ function sendInvitation(context: FakeConnectorsContext): RequestHandler<{ connec
 
 function changeInvitation(
   context: FakeConnectorsContext,
-  change: (
-    connector: FakeConnector,
-    state: FakeConnectorsContext["state"],
-    email: string,
-  ) => boolean,
+  change: (connector: FakeConnector, state: ConnectorsState, email: string) => boolean,
 ): RequestHandler<{ connector: string; email: string }> {
   return (request, response) => {
     const connector = findConnector(request.params.connector);

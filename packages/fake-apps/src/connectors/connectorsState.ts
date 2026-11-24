@@ -15,7 +15,7 @@ export interface FakeConnectorsContext {
   log: (line: string) => void;
 }
 
-/** The fake's memory: Acme's members and pending invitations in each app, and what the controls changed. */
+/** The fake's memory: Acme's members and invitations in each app, and what the controls changed. */
 export interface ConnectorsState {
   members: Record<FakeConnectorKey, SeedMember[]>;
   invitations: Record<FakeConnectorKey, Invitation[]>;
