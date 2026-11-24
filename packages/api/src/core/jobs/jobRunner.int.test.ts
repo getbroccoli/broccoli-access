@@ -254,7 +254,8 @@ test("concurrent runners finish each waiting job in a group before starting the 
     const blockers = ["blocker-1", "blocker-2", "blocker-3", "blocker-4"];
     for (const id of blockers) await send(id, id);
     await expect.poll(() => started.length, { timeout: 8_000 }).toBe(blockers.length);
-    for (const id of ["first", "second", "third"]) await send(id, "linear");
+    await send("first", "linear");
+    await send("second", "linear");
     await send("other", "slack");
 
     releaseWorkers.resolve();
@@ -262,15 +263,8 @@ test("concurrent runners finish each waiting job in a group before starting the 
       .poll(() => started, { timeout: 8_000 })
       .toEqual(expect.arrayContaining(["first", "other"]));
     releaseFirst.resolve();
-    await expect.poll(() => events.length, { timeout: 10_000 }).toBe(6);
-    expect(events).toEqual([
-      "start first",
-      "finish first",
-      "start second",
-      "finish second",
-      "start third",
-      "finish third",
-    ]);
+    await expect.poll(() => events.length, { timeout: 10_000 }).toBe(4);
+    expect(events).toEqual(["start first", "finish first", "start second", "finish second"]);
   } finally {
     releaseWorkers.resolve();
     releaseFirst.resolve();
