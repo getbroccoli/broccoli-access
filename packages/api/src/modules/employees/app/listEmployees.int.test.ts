@@ -3,6 +3,9 @@ import {
   employeeServices,
   EMPLOYEE,
   expect,
+  inviteTest,
+  postFakeControl,
+  SYSTEM,
   OWNER,
   test,
 } from "#test/support";
@@ -59,6 +62,25 @@ test("lists only employees suspended with access in name order", async ({ orm, f
     "ben@acme.example",
   ]);
 });
+
+inviteTest(
+  "excludes Ben from Suspended with access when Linear has only invited him",
+  async ({ workspace: { owner, service, employee, linear }, fakeConnectors, orm }) => {
+    const ben = employee("ben@acme.example");
+    await postFakeControl(fakeConnectors.url, "linear/invitations", { email: ben.email });
+    await linear.scans.scanNow(owner, linear.connectionId);
+    await linear.scans.runScan(SYSTEM, linear.sourceId);
+    expect(await service.readAppInvites(owner, [ben.id])).toMatchObject([
+      { invitedAt: expect.any(Date) as unknown },
+    ]);
+
+    const people = await employeeServices(orm).listEmployees(owner, {
+      filter: { suspendedWithAccess: true },
+    });
+
+    expect(people.edges.map(({ node }) => node.email)).toEqual(["ana@acme.example"]);
+  },
+);
 
 test("combines suspended with access and case-insensitive search", async ({ orm, fakeGoogle }) => {
   await approvedGoogleSetup(orm, fakeGoogle.url);

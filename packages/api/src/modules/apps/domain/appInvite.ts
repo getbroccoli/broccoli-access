@@ -8,11 +8,15 @@ export interface AppInviteFacts {
     status: "connected" | "reconnect";
     /** Whether its connector lists `invite`. */
     invites: boolean;
-    /** Whether it has finished a scan. */
-    scanned: boolean;
+    /** Whether its connector lists `list_invitations`, so its scans read the pending invitations. */
+    listsInvitations: boolean;
+    /** When its last scan finished; null before the first. */
+    scannedAt: Date | null;
   };
   /** Whether the connection's last scan returned a member with the employee's email. */
   hasMember: boolean;
+  /** The pending invitation of the employee's email that the connection's last scan read; null without one. */
+  invitation: { invitedAt: Date | null; firstSeenAt: Date } | null;
   /** The latest invite of the employee's email through the connection; null before the first. */
   latestInvite: Pick<AccountChange, "status" | "finishedAt"> | null;
 }
@@ -28,26 +32,24 @@ export interface AppInviteState {
 }
 
 /**
- * The row of an app whose connection invites and whose last finished scan found no member with the
- * employee's email: Invite for an employee active in the directory, unless an invite runs or they
- * are Invited, which a `succeeded` or `done_by_hand` latest invite makes them, dated by its finish;
- * Reconnect instead while the connection needs it. Null when no row shows: the connection cannot
- * tell or invite, the employee has a member, or nothing is offered and nothing was ever asked.
- * shortcut: Invited stays after a member the invite brought leaves the app, since only the latest
- * invite dates it; read the scan's invitations instead once scans list them.
+ * The row of an app whose connection's last finished scan found no member with the employee's
+ * email. Where the connection invites: Invite for an employee active in the directory, unless an
+ * invite runs or they are Invited (`invitedAtOf`); Reconnect instead while the connection needs
+ * it. Where it cannot invite, the row shows only while they are Invited. Null when no row shows:
+ * the connection cannot tell, the employee has a member, or nothing is offered, nothing was ever
+ * asked and they are not Invited.
  */
-export function inviteStateOf({
-  activeInDirectory,
-  connection,
-  hasMember,
-  latestInvite,
-}: AppInviteFacts): AppInviteState | null {
-  if (!connection.invites || !connection.scanned || hasMember) {
+export function inviteStateOf(facts: AppInviteFacts): AppInviteState | null {
+  const { activeInDirectory, connection, hasMember, latestInvite } = facts;
+  if (!connection.scannedAt || hasMember) {
     return null;
   }
-  const invitedAt = invitedAtOf(latestInvite);
+  const invitedAt = invitedAtOf(facts);
+  if (!connection.invites) {
+    return invitedAt && { offered: false, offersReconnect: false, invitedAt };
+  }
   const invitable = activeInDirectory && !invitedAt && latestInvite?.status !== "running";
-  if (!invitable && !latestInvite) {
+  if (!invitable && !latestInvite && !invitedAt) {
     return null;
   }
   const connected = connection.status === "connected";
@@ -58,7 +60,24 @@ export function inviteStateOf({
   };
 }
 
-function invitedAtOf(latestInvite: AppInviteFacts["latestInvite"]): Date | null {
+/**
+ * Since when the employee is Invited; null when they are not. A connection whose scans read the
+ * pending invitations dates it by the invitation its last scan read, as the app dates it, else
+ * since a scan first saw it; or by an invite done since that scan, which could not read it yet.
+ * Any other connection knows only its own invites: the latest one, once done.
+ * shortcut: compares the invite's finish with the scan's finish, so Invite shows again until the
+ * next scan for an invite that succeeded while a scan was between reading and saving, one done by
+ * hand after a scan that followed its failure, and one older than the last scan made before scans
+ * read invitations; a scan's read start and a confirmation time would close them if that matters.
+ */
+function invitedAtOf({ connection, invitation, latestInvite }: AppInviteFacts): Date | null {
   const done = latestInvite?.status === "succeeded" || latestInvite?.status === "done_by_hand";
-  return done ? latestInvite.finishedAt : null;
+  const doneAt = done ? latestInvite.finishedAt : null;
+  if (!connection.listsInvitations) {
+    return doneAt;
+  }
+  if (invitation) {
+    return invitation.invitedAt ?? invitation.firstSeenAt;
+  }
+  return doneAt && connection.scannedAt && doneAt > connection.scannedAt ? doneAt : null;
 }

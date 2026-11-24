@@ -22,8 +22,9 @@ type Props = {
 
 /**
  * An app the person has no account in: Invite, asked in a dialog; then the invite's progress, and
- * "Invited on <day>" once it succeeded or was done by hand, or Try again once it failed, where
- * trying again can help. Reconnect while the app's connection needs it.
+ * "Invited on <day>" while they are Invited, by this invite or an invitation sent in the app
+ * itself, or Try again once it failed, where trying again can help. Reconnect while the app's
+ * connection needs it.
  */
 export function InviteCell({ appInvite }: Props) {
   const fragment = useFragment({

@@ -14,7 +14,10 @@ type Props = {
   appInvite: FragmentType<InviteStatusCell_AppInviteFragment>;
 };
 
-/** "No account" in an app the person may be invited to, or "Couldn't invite" while their latest invite failed. */
+/**
+ * "No account" in an app the person may be invited to, or "Couldn't invite" while their latest
+ * invite failed and no invitation sent in the app itself makes them Invited.
+ */
 export function InviteStatusCell({ appInvite }: Props) {
   const fragment = useFragment({
     fragment: InviteStatusCell_AppInviteFragmentDoc,
@@ -25,7 +28,7 @@ export function InviteStatusCell({ appInvite }: Props) {
     return null;
   }
   const invite = fragment.data;
-  if (invite.latestInvite?.status === "FAILED") {
+  if (invite.latestInvite?.status === "FAILED" && !invite.invitedAt) {
     return (
       <CouldntChangeDialog
         change={invite.latestInvite}

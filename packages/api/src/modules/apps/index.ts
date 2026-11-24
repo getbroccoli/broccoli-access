@@ -9,6 +9,7 @@ export {
   createAccountChangeService,
   createAppAccountService,
   createAppConnectionService,
+  createAppInvitationService,
   createAppService,
   createAppUserService,
 } from "./app";
@@ -18,6 +19,7 @@ export type {
   AccountChangeService,
   AppAccountService,
   AppConnectionService,
+  AppInvitationService,
   AppService,
   AppUserService,
 } from "./app";

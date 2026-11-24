@@ -9,11 +9,11 @@ export async function findInAppFacts(
   db: Orm | Tx,
   { connectors, members }: { connectors: DirectoryConnectors; members: ConnectionMembers },
 ): Promise<InAppFacts> {
-  const [connections, scannedIds] = await Promise.all([
+  const [connections, lastScans] = await Promise.all([
     appConnectionRepository(db).findAll(),
-    members.findScannedConnectionIds(db),
+    members.findLastScans(db),
   ]);
-  const scanned = new Set(scannedIds);
+  const scanned = new Set(lastScans.map(({ connectionId }) => connectionId));
   return {
     scannedAppIds: connections.filter(({ id }) => scanned.has(id)).map(({ appId }) => appId),
     // Only the core's connectors find accounts in other apps; a container connector finds its own.

@@ -3,9 +3,11 @@ import {
   expect,
   failLinearCall,
   inviteTest as test,
+  linearInvitations,
   postFakeControl,
   SYSTEM,
 } from "#test/support";
+import { appInvitations } from "../db";
 
 test("offers Ivan an Invite in Linear and no row in Google Workspace", async ({ workspace }) => {
   const { service, owner, input, ivan } = workspace;
@@ -89,4 +91,85 @@ test("offers Try again with the failure's reason until done by hand dates Invite
       latestInvite: { id: latestInvite!.id, status: "done_by_hand" },
     },
   ]);
+});
+
+test("shows an invitation sent in Linear with Linear's date and no invite of ours", async ({
+  workspace: { service, owner, linear, ivan },
+  fakeConnectors,
+}) => {
+  await postFakeControl(fakeConnectors.url, "linear/invitations", { email: ivan.email });
+  const [invitation] = await linearInvitations(fakeConnectors.url, ivan.email);
+  const invitedAt = new Date(invitation!.invitedAt!);
+
+  await linear.scans.scanNow(owner, linear.connectionId);
+  await linear.scans.runScan(SYSTEM, linear.sourceId);
+
+  expect(await service.readAppInvites(owner, [ivan.id])).toMatchObject([
+    { employeeId: ivan.id, appId: linear.appId, offered: false, invitedAt, latestInvite: null },
+  ]);
+});
+
+test("offers Invite again after our invite succeeded and a scan finds it expired", async ({
+  workspace: { service, owner, linear, ivan, input },
+  fakeConnectors,
+}) => {
+  const { latestInvite } = await service.inviteEmployee(owner, input);
+  await service.runChange(SYSTEM, latestInvite!.id);
+  await postFakeControl(fakeConnectors.url, `linear/invitations/${ivan.email}/expire`);
+
+  await linear.scans.scanNow(owner, linear.connectionId);
+  await linear.scans.runScan(SYSTEM, linear.sourceId);
+
+  expect(await service.readAppInvites(owner, [ivan.id])).toMatchObject([
+    {
+      ...input,
+      offered: true,
+      invitedAt: null,
+      latestInvite: { id: latestInvite!.id, status: "succeeded" },
+    },
+  ]);
+});
+
+test("dates a successful invite by its finish until the next scan reads Linear's date", async ({
+  workspace: { service, owner, linear, ivan, input },
+  fakeConnectors,
+}) => {
+  const { latestInvite } = await service.inviteEmployee(owner, input);
+  await service.runChange(SYSTEM, latestInvite!.id);
+
+  const [before] = await service.readAppInvites(owner, [ivan.id]);
+  expect(before?.latestInvite).toMatchObject({
+    status: "succeeded",
+    finishedAt: expect.any(Date) as unknown,
+  });
+  expect(before!.invitedAt).toEqual(before!.latestInvite!.finishedAt);
+
+  await linear.scans.scanNow(owner, linear.connectionId);
+  await linear.scans.runScan(SYSTEM, linear.sourceId);
+
+  const [invitation] = await linearInvitations(fakeConnectors.url, ivan.email);
+  expect(await service.readAppInvites(owner, [ivan.id])).toMatchObject([
+    { ...input, offered: false, invitedAt: new Date(invitation!.invitedAt!) },
+  ]);
+});
+
+test("the database refuses a second invitation for the same connection and email", async ({
+  orm,
+  seed,
+}) => {
+  const app = await seed.app({ name: "Linear", domain: "linear.app", catalogKey: "linear" });
+  const connection = await seed.appConnection({ appId: app.id, connector: "linear" });
+  const invitation = {
+    appId: app.id,
+    connectionId: connection.id,
+    email: "ivan@acme.example",
+    firstSeenAt: new Date("2026-11-24T10:00:00Z"),
+    invitedAt: null,
+    expiresAt: null,
+  };
+  await orm.insert(appInvitations).values(invitation);
+
+  await expect(orm.insert(appInvitations).values(invitation)).rejects.toMatchObject({
+    cause: { code: "23505" },
+  });
 });

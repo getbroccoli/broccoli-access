@@ -17,7 +17,7 @@ export interface Connector {
   name: string;
   /**
    * What it can do with its app's accounts: `list_accounts`, plus `suspend` and `reactivate` to
-   * change them, and `invite` to invite an email.
+   * change them, `invite` to invite an email, and `list_invitations` to read the pending ones.
    */
   capabilities: readonly Capability[];
   /** Where its calls can run, in the order they are tried. */
@@ -93,6 +93,17 @@ export interface AccountPage {
   nextCursor: string | null;
   /** Renewed settings or secrets, saved before the page's accounts are used. */
   connection?: ConnectionUpdate;
+  /** Pending invitations, on any page; only from a connector that lists `list_invitations`. */
+  invitations?: PendingInvitation[];
+}
+
+/** An invitation to the app that nobody accepted yet; not a member. */
+export interface PendingInvitation {
+  /** Lowercased. */
+  email: string;
+  /** As the app gives it, as an ISO date-time; null when it does not. */
+  invitedAt: string | null;
+  expiresAt: string | null;
 }
 
 /** A member as read after an action. */
@@ -197,4 +208,9 @@ export function canInvite({
   runtimes,
 }: Pick<Connector, "capabilities" | "runtimes">): boolean {
   return capabilities.includes("invite") && runtimes.includes("server");
+}
+
+/** Whether its scans read the app's pending invitations: it lists `list_invitations`. */
+export function listsInvitations({ capabilities }: Pick<Connector, "capabilities">): boolean {
+  return capabilities.includes("list_invitations");
 }

@@ -6,6 +6,7 @@ export {
   canInvite,
   CONNECTOR_ERROR_CODES,
   ConnectorError,
+  listsInvitations,
 } from "./connector";
 export { withConnectorRetries } from "./connectorRetries";
 
@@ -24,4 +25,5 @@ export type {
   ConnectorRegistry,
   ConnectorSession,
   ImportedAccount,
+  PendingInvitation,
 } from "./connector";

@@ -1,4 +1,10 @@
-import type { AccountPhoto, Connector, ImportedAccount } from "../../../core/connectors";
+import {
+  type AccountPhoto,
+  type Connector,
+  type ImportedAccount,
+  listsInvitations,
+  type PendingInvitation,
+} from "../../../core/connectors";
 import type { Tx } from "../../../core/db";
 import type { HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
@@ -10,6 +16,8 @@ export interface ScanFindings {
   connection: { id: string; appId: string };
   connector: Connector;
   accounts: readonly ImportedAccount[];
+  /** The app's pending invitations, from every page. */
+  invitations: readonly PendingInvitation[];
   /** The directory's changed photos by source key; null for a removed one. */
   photos: ReadonlyMap<string, AccountPhoto | null>;
   /** When the scan began reading: an account changed in its app since keeps its status. */
@@ -24,14 +32,20 @@ export interface ScanFindings {
  * with their changed photos; another connector's link to the employee with the same email. They
  * become the connection's app accounts, found via the connector's own-app finding kind; the
  * accounts in other apps go to their matched apps, found via its other-app finding kind. Every
- * change is found by the scan of `sourceId`.
+ * change is found by the scan of `sourceId`. The pending invitations of a connector that lists
+ * them replace the connection's stored ones.
  */
 export async function syncAccounts(
   ctx: SecurityContext,
   tx: Tx,
-  { sourceId, connection, connector, accounts, photos, readStartedAt }: ScanFindings,
+  { sourceId, connection, connector, accounts, invitations, photos, readStartedAt }: ScanFindings,
   { apps, directory }: { apps: ScannedApps; directory: DirectoryPeople },
 ): Promise<void> {
+  // Before the accounts: a new invitation waits for its connection's row, which a change failing
+  // into Reconnect locks before its change rows; deleting an account locks its changes' rows.
+  if (listsInvitations(connector)) {
+    await apps.replaceInvitations(ctx, tx, { connection, invitations });
+  }
   const cause = { kind: "FOUND_BY_SCAN" as const, ref: sourceId };
   const ownAccounts = accounts.filter(({ values }) => values.appExternalId === null);
   const employeeIds = connector.isDirectory

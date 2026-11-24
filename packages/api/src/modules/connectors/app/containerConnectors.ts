@@ -226,6 +226,7 @@ function containerSession(
         accounts: page.accounts.map((account) => importedAccount(account, name)),
         nextCursor: page.nextCursor,
         connection: page.connection,
+        invitations: page.invitations,
       };
     },
     async runAction(action, account) {

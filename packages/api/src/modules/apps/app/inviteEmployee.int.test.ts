@@ -90,12 +90,7 @@ test("succeeds when Linear answers the invite with Ivan's existing member", asyn
   fakeConnectors,
 }) => {
   const { service, owner, input, ivan } = workspace;
-  const response = await fetch(`${fakeConnectors.url}/_fake/linear/invitations`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: ivan.email }),
-  });
-  expect(response.status).toBe(204);
+  await postFakeControl(fakeConnectors.url, "linear/invitations", { email: ivan.email });
   await postFakeControl(fakeConnectors.url, `linear/invitations/${ivan.email}/accept`);
   const { latestInvite } = await service.inviteEmployee(owner, input);
 

@@ -1,10 +1,12 @@
 import { ApplicationError } from "../../../core/applicationError";
 import {
+  type AccountPage,
   type ConnectionUpdate,
   type Connector,
   ConnectorError,
   type ConnectorErrorCode,
   type ImportedAccount,
+  type PendingInvitation,
   withConnectorRetries,
 } from "../../../core/connectors";
 import { createSetupStepService } from "../../../core/instance";
@@ -94,20 +96,17 @@ async function readAndSave(
   },
   progressBySource: Map<string, ScanProgress>,
 ): Promise<void> {
-  const { sourceId, connection, connector, used, revision } = target;
+  const { used, ...scanned } = target;
+  const { sourceId, connection, connector } = scanned;
+  const renewing = { connectionId: connection.id, used };
   const readStartedAt = new Date();
   const retrying = <T>(call: () => Promise<T>) => withRetries(dependencies, sourceId, call);
   const session = await retrying(() =>
     connector.openSession({ settings: connection.settings, secrets: used.secrets }),
   );
-  const accounts = await readAllAccounts(async (cursor) => {
+  const { accounts, invitations } = await readAllPages(async (cursor) => {
     const page = await retrying(() => session.listAccounts(cursor));
-    await saveConnectionUpdate(
-      ctx,
-      dependencies,
-      { connectionId: connection.id, used },
-      page.connection,
-    );
+    await saveConnectionUpdate(ctx, dependencies, renewing, page.connection);
     return page;
   });
   const found = foundCounts(accounts);
@@ -119,10 +118,17 @@ async function readAndSave(
     accounts,
     retrying,
   });
-  const findings = { sourceId, connection, connector, readStartedAt, revision, ...read };
+  const findings = { ...scanned, readStartedAt, invitations, ...read };
   const outcome = await saveScan(ctx, dependencies, findings);
   dependencies.logger.info(
-    { sourceId, accounts: accounts.length, ...found, photoChanges: read.photos.size, ...outcome },
+    {
+      sourceId,
+      accounts: accounts.length,
+      ...found,
+      invitations: invitations.length,
+      photoChanges: read.photos.size,
+      ...outcome,
+    },
     "Scan finished",
   );
 }
@@ -165,17 +171,18 @@ async function saveScan(
   });
 }
 
-async function readAllAccounts(
-  listAccounts: (
-    cursor: string | null,
-  ) => Promise<{ accounts: ImportedAccount[]; nextCursor: string | null }>,
-): Promise<ImportedAccount[]> {
+/** Every page's accounts, and the pending invitations any page carries. */
+async function readAllPages(
+  listAccounts: (cursor: string | null) => Promise<AccountPage>,
+): Promise<{ accounts: ImportedAccount[]; invitations: PendingInvitation[] }> {
   const accounts: ImportedAccount[] = [];
+  const invitations: PendingInvitation[] = [];
   const seenCursors = new Set<string>();
   let cursor: string | null = null;
   do {
     const page = await listAccounts(cursor);
     accounts.push(...page.accounts);
+    invitations.push(...(page.invitations ?? []));
     cursor = page.nextCursor;
     if (cursor !== null) {
       // A connector that pages in a circle would never end the scan.
@@ -189,7 +196,7 @@ async function readAllAccounts(
   if (new Set(accounts.map(({ sourceKey }) => sourceKey)).size !== accounts.length) {
     throw new ConnectorError("unexpected_response");
   }
-  return accounts;
+  return { accounts, invitations };
 }
 
 /** Runs `call`, trying it again after a rate-limited or unavailable answer until the attempts run out. */

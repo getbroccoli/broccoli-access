@@ -15,3 +15,9 @@ export {
 } from "./appAccountRepository";
 export { accountChanges } from "./accountChangesTable";
 export { ACCOUNT_CHANGE_SORT_VALUES, accountChangeRepository } from "./accountChangeRepository";
+export { appInvitations } from "./appInvitationsTable";
+export {
+  appInvitationRepository,
+  type AppInvitation,
+  type AppInvitationRepository,
+} from "./appInvitationRepository";

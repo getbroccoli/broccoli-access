@@ -14,6 +14,7 @@ import {
 import {
   createAppConnectionService,
   createAppAccountService,
+  createAppInvitationService,
   createAppService,
   createAppUserService,
   type AppService,
@@ -175,6 +176,7 @@ export function scans(
     apps: {
       ...createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
       ...createAppAccountService(),
+      ...createAppInvitationService(),
       ...apps(orm),
     },
     directory: createDirectorySyncService(),

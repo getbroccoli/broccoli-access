@@ -9,6 +9,7 @@ import {
   connectLinear,
   googleScanSetup,
   googleScanWithLinearGrant,
+  inviteTest,
   scannedLinear,
   serveAccountList,
   storedAppAccounts,
@@ -45,6 +46,31 @@ test("counts only the people Linear lists after its first scan", async ({
     since: { at: linear.account("ana@acme.example").firstSeenAt, before: false },
   });
 });
+
+inviteTest(
+  "excludes a pending invitation from Linear's users and the number who still have access",
+  async ({ workspace: { owner, service, linear }, orm, seed }) => {
+    const person = await seed.employee({ email: "new.hire@acme.example" });
+    await seed.appAccount({
+      appId: (await apps(orm).directoryAppId(orm))!,
+      employeeId: person.id,
+      email: person.email,
+      status: "suspended",
+      foundVia: ["google_directory"],
+    });
+    await linear.scans.scanNow(owner, linear.connectionId);
+    await linear.scans.runScan(SYSTEM, linear.sourceId);
+    expect(await service.readAppInvites(owner, [person.id])).toMatchObject([
+      { invitedAt: expect.any(Date) as unknown, latestInvite: null },
+    ]);
+
+    const users = await appUsers(orm).readUsersOfApps(owner, [linear.appId]);
+    const app = await apps(orm).readApp(owner, linear.appId);
+
+    expect(users.map(({ email }) => email)).not.toContain(person.email);
+    expect(app).toMatchObject({ peopleCount: 7, suspendedWithAccessCount: 1 });
+  },
+);
 
 test("lists Linear members first and the suspended person found only by Google last", async ({
   orm,

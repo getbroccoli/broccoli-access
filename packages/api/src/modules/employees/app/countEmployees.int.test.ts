@@ -3,6 +3,7 @@ import {
   approvedGoogleSetup,
   employeeServices,
   googleScanWithLinearGrant,
+  inviteTest,
   scannedLinear,
   EMPLOYEE,
   expect,
@@ -48,6 +49,27 @@ test("excludes a suspended employee whose only approved access is a Google-only 
 
   expect(counts.suspendedWithAccess).toBe(1);
 });
+
+inviteTest(
+  "excludes a suspended employee whose only invitation is pending from the People counts",
+  async ({ workspace: { owner, service }, seed, orm }) => {
+    const person = await seed.employee({ email: "new.hire@acme.example" });
+    await seed.appAccount({
+      appId: (await apps(orm).directoryAppId(orm))!,
+      employeeId: person.id,
+      email: person.email,
+      foundVia: ["google_directory"],
+      status: "suspended",
+    });
+    expect(await service.readAppInvites(owner, [person.id])).toMatchObject([
+      { invitedAt: expect.any(Date) as unknown, latestInvite: null },
+    ]);
+
+    const counts = await employeeServices(orm).countEmployees(owner);
+
+    expect(counts).toEqual({ all: 43, suspendedWithAccess: 1 });
+  },
+);
 
 test("refuses to count employees without MANAGE_WORKSPACE", async ({ orm }) => {
   await expect(employeeServices(orm).countEmployees(EMPLOYEE)).rejects.toMatchObject({

@@ -1,12 +1,14 @@
 import { ApplicationError } from "../../../core/applicationError";
-import { canInvite, type Connector } from "../../../core/connectors";
+import { canInvite, type Connector, listsInvitations } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
 import {
   type AppConnection,
+  type AppInvitation,
   accountChangeRepository,
   appConnectionRepository,
+  appInvitationRepository,
   appRepository,
 } from "../db";
 import { type AccountChange, type AppInviteState, inviteStateOf } from "../domain";
@@ -154,15 +156,23 @@ async function findConnectionOfApp(tx: Tx, appId: string): Promise<AppConnection
   return connection;
 }
 
-/** What the rows are decided from: who is active in the directory, the scans' members, the latest invites. */
+/**
+ * What the rows are decided from: who is active in the directory, the scans' members and pending
+ * invitations, the latest invites.
+ */
 interface StoredInviteFacts {
   activeInDirectory: Set<string>;
-  scannedConnectionIds: Set<string>;
+  /** When each connection's last scan finished, by connection id. */
+  scannedAt: Map<string, Date>;
   /** The keys (`inviteKey`) of the members the connections' last scans saw. */
   memberKeys: Set<string>;
+  /** The pending invitations the connections' last scans read, by key (`inviteKey`). */
+  invitations: Map<string, AppInvitation>;
   /** By key (`inviteKey`). */
   latestInvites: Map<string, AccountChange>;
   invitingConnectors: Set<string>;
+  /** The keys of the connectors whose scans read the pending invitations. */
+  invitationListingConnectors: Set<string>;
 }
 
 async function readInviteFacts(
@@ -180,23 +190,31 @@ async function readInviteFacts(
 ): Promise<StoredInviteFacts> {
   const connectionIds = connections.map(({ id }) => id);
   const emails = employees.map(({ email }) => email);
-  const [active, scanned, found, latest] = await Promise.all([
+  const [active, lastScans, found, pending, latest] = await Promise.all([
     findEmployeesInDirectory(db, connectors, {
       status: "active",
       among: employees.map(({ id }) => id),
     }),
-    members.findScannedConnectionIds(db),
+    members.findLastScans(db),
     members.findConnectionMembers(db, { connectionIds, emails }),
+    appInvitationRepository(db).findByEmails({ connectionIds, emails }),
     accountChangeRepository(db).findLatestInvites(connectionIds, emails),
   ]);
   return {
     activeInDirectory: new Set(active),
-    scannedConnectionIds: new Set(scanned),
+    scannedAt: new Map(lastScans.map(({ connectionId, scannedAt }) => [connectionId, scannedAt])),
     memberKeys: new Set(found.map(({ connectionId, email }) => inviteKey(connectionId, email))),
+    invitations: new Map(
+      pending.map((invitation) => [
+        inviteKey(invitation.connectionId, invitation.email),
+        invitation,
+      ]),
+    ),
     latestInvites: new Map(
       latest.map((change) => [inviteKey(change.connectionId, change.email), change]),
     ),
     invitingConnectors: new Set(connectors.filter(canInvite).map(({ key }) => key)),
+    invitationListingConnectors: new Set(connectors.filter(listsInvitations).map(({ key }) => key)),
   };
 }
 
@@ -213,9 +231,11 @@ function appInviteOf(
     connection: {
       status: connection.status,
       invites: facts.invitingConnectors.has(connection.connector),
-      scanned: facts.scannedConnectionIds.has(connection.id),
+      listsInvitations: facts.invitationListingConnectors.has(connection.connector),
+      scannedAt: facts.scannedAt.get(connection.id) ?? null,
     },
     hasMember: facts.memberKeys.has(key),
+    invitation: facts.invitations.get(key) ?? null,
     latestInvite,
   });
   return (
