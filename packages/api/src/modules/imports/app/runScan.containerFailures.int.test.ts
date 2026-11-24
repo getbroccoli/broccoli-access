@@ -49,7 +49,7 @@ test("a repeated cursor fails the scan and preserves its last snapshot", async (
   await linear.scans.runScan(SYSTEM, linear.sourceId);
   const records = await storedImportRecords(orm);
   const accounts = await storedAppAccounts(orm);
-  expect(records).toHaveLength(7);
+  expect(records).toHaveLength(8);
   let requests = 0;
   const server = await serveAccountList(fakeConnectors.url, (_request, response) => {
     // Bound a broken reader so the regression fails without leaving an endless scan.
@@ -80,7 +80,7 @@ test("a member repeated on the next page fails the scan and keeps its last snaps
   await linear.scans.runScan(SYSTEM, linear.sourceId);
   const records = await storedImportRecords(orm);
   const accounts = await storedAppAccounts(orm);
-  expect(records).toHaveLength(7);
+  expect(records).toHaveLength(8);
   const member = {
     sourceKey: "hannah",
     raw: {},

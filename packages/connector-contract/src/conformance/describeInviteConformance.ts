@@ -7,14 +7,19 @@ import {
   listAllInvitations,
   post,
   requestOf,
+  rolesOf,
   runtimesOf,
   send,
+  skipUnlessListed,
   startFlow,
   unlistedRuntimes,
   type Flow,
 } from "./flow.js";
 
-/** The invite checks of one connector; a connector that does not list `invite` skips them. */
+/**
+ * The invite checks of one connector; a connector that does not list `invite` skips them, and
+ * one that lists no `roles` skips the check of a role.
+ */
 export function describeInviteConformance(url: string, fixture: ConnectorFixture): void {
   it("sends one invitation when invite repeats, and reports the invitation read afterwards", async ({
     skip,
@@ -31,7 +36,20 @@ export function describeInviteConformance(url: string, fixture: ConnectorFixture
   });
   it("answers an invite on a runtime the connector does not list with HTTP 400", async ({ skip }) =>
     checkInviteOnUnlistedRuntimes(url, fixture, await inviteeOf(url, fixture, skip)));
+  it("answers an invite with a role the connector does not list with HTTP 400", async ({
+    skip,
+  }) => {
+    const invitee = await inviteeOf(url, fixture, skip);
+    const roles =
+      (await rolesOf(url, fixture.connector)) ?? skip(`${fixture.connector} lists no roles`);
+    // The manifest's schema allows one default only, so this fails only on a schema left behind.
+    expect(roles.filter((role) => role.isDefault)).toHaveLength(1);
+    return checkInviteWithUnlistedRole(url, fixture, invitee);
+  });
 }
+
+/** A role key no connector lists. */
+const UNLISTED_ROLE = "conformance_unlisted_role";
 
 type Invitee = NonNullable<ConnectorFixture["invitee"]>;
 
@@ -95,6 +113,22 @@ async function checkInviteOnUnlistedRuntimes(
   expect(answer.changed, "an invite after the refused ones").toBe(true);
 }
 
+/** A valid invite with only an unlisted role added, which must send nothing. */
+async function checkInviteWithUnlistedRole(
+  url: string,
+  fixture: ConnectorFixture,
+  invitee: Invitee,
+): Promise<void> {
+  const [flow] = await startFlow(url, fixture);
+  const account = { ...invitee, role: UNLISTED_ROLE };
+  const body = { ...requestOf(flow, "connections/test"), action: "invite", account };
+
+  expect((await post(url, "actions/run", body)).status).toBe(400);
+
+  const answer = await invite(flow, invitee);
+  expect(answer.changed, "an invite after the refused one").toBe(true);
+}
+
 /**
  * The fixture's invitee, which a connector that lists `invite` must have; skips the check for
  * any other connector.
@@ -104,8 +138,7 @@ async function inviteeOf(
   fixture: ConnectorFixture,
   skip: TestContext["skip"],
 ): Promise<Invitee> {
-  if (!(await capabilitiesOf(url, fixture.connector)).includes("invite"))
-    skip(`${fixture.connector} does not list invite`);
+  await skipUnlessListed(url, fixture, "invite", skip);
   const message = `${fixture.connector} lists invite, so its fixture needs an invitee`;
   expect(fixture.invitee, message).toBeDefined();
   return fixture.invitee!;

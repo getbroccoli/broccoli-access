@@ -30,7 +30,10 @@ export interface ConnectorsContainerClient {
  * A call's answer, or the connector error it stands for: the container failing is
  * `app_unavailable`, an answer nobody understands `unexpected_response`.
  */
-export type ContainerAnswer<T> = { answer: T } | { error: ConnectorErrorCode };
+export type ContainerAnswer<T> = { answer: T } | { error: CallErrorCode };
+
+/** The errors these calls give; `not_invited` comes only from signing in as the integration user. */
+type CallErrorCode = Exclude<ConnectorErrorCode, "not_invited">;
 
 export function createConnectorsContainerClient(url: string): ConnectorsContainerClient {
   return {
@@ -112,8 +115,8 @@ function parsedJson(bytes: Buffer): unknown {
   }
 }
 
-function knownErrorCode(code: string): ConnectorErrorCode {
-  return (CONNECTOR_ERROR_CODES as readonly string[]).includes(code)
-    ? (code as ConnectorErrorCode)
+function knownErrorCode(code: string): CallErrorCode {
+  return code !== "not_invited" && (CONNECTOR_ERROR_CODES as readonly string[]).includes(code)
+    ? (code as CallErrorCode)
     : "unexpected_response";
 }

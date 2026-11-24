@@ -14,7 +14,14 @@ test("lists the container's connectors with their manifest fields", async ({ fak
     notice: null,
     adminUrl: "https://linear.app/{urlKey}/settings/members",
     runtimes: ["server"],
-    capabilities: ["list_accounts", "suspend", "reactivate", "invite", "list_invitations"],
+    capabilities: [
+      "list_accounts",
+      "suspend",
+      "reactivate",
+      "invite",
+      "list_invitations",
+      "remove",
+    ],
     findingKinds: { ownAppAccounts: "linear_members" },
     isDirectory: false,
     connectionFields: [

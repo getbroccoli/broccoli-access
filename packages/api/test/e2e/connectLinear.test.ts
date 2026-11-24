@@ -10,7 +10,9 @@ import {
   TestEnv,
 } from "#test/support";
 
-test("the owner connects Linear and reads its seven members with their status", async ({ env }) => {
+test("the owner connects Linear and reads its seven employees with their status", async ({
+  env,
+}) => {
   const { browser } = await env.signInAsOwner();
   const list = await browser.graphql(
     "{ containerConnectors { id connectionFields { kind } connection { id } } }",
@@ -46,10 +48,12 @@ test("the owner connects Linear and reads its seven members with their status", 
     data: { apps: { edges: { node: { id: string; catalogKey: string | null } }[] } };
   };
   const app = body.data.apps.edges.find(({ node }) => node.catalogKey === "linear")!.node;
-  const expectedUsers = ACME_LINEAR.members.map((member) => ({
-    employee: { email: member.email },
-    status: member.status.toUpperCase(),
-  }));
+  const expectedUsers = ACME_LINEAR.members
+    .filter(({ email }) => email !== "deploys@acme.example")
+    .map((member) => ({
+      employee: { email: member.email },
+      status: member.status.toUpperCase(),
+    }));
   await expect
     .poll(
       async () => {

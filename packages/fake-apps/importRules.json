@@ -1,7 +1,7 @@
 {
   "elements": {
     "src/main": ["src/env", "src/google"],
-    "src/connectorsMain": ["src/connectors"],
+    "src/connectorsMain": ["src/connectors", "src/env"],
     "src/env": [],
     "src/index": ["src/connectors", "src/google", "src/seed"],
     "src/connectors": ["src/seed", "src/utils"],

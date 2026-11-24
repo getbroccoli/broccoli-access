@@ -21,7 +21,7 @@ The package is TypeScript source: Vitest runs it and `tsc` checks it as it is, w
 
 ## Schemas
 
-Zod schemas for each request and answer of the four calls, the manifest, the connection, the app session secret, runtimes and the error answer, with their types: `CONNECTOR_MANIFEST`, `CONNECTION_TEST_REQUEST`, `ACCOUNTS_LIST_ANSWER`, `CONNECTOR_ERROR_ANSWER`, `CONNECTOR_ERROR_CODES` and the rest in `src/index.ts`.
+Zod schemas for each request and answer of the calls, the two integration user calls among them, the manifest, the connection, the app session secret, runtimes and the error answer, with their types: `CONNECTOR_MANIFEST`, `CONNECTION_TEST_REQUEST`, `ACCOUNTS_LIST_ANSWER`, `CONNECTOR_ERROR_ANSWER`, `CONNECTOR_ERROR_CODES` and the rest in `src/index.ts`.
 
 ## Conformance suite
 
@@ -45,11 +45,12 @@ describeConnectorConformance({
       connection: async () => ({ settings: {}, secrets: { apiKey: "<key of the fake Linear>" } }),
       member: { sourceKey: "<an active member's id>", email: "<that member's email>" },
       invitee: { email: "<an email with no member or invitation>" },
+      memberToRemove: { sourceKey: "<another active member's id>", email: "<that member's email>" },
       causeError: async (url, code) => {
         /* make the next actions/run call through the container at url answer with code */
       },
       reset: async (url) => {
-        /* put the fake app back to its seed: the member active, the invitee not invited, the credentials working, no error waiting */
+        /* put the fake app back to its seed: the member active, the member to remove back, the invitee not invited, the credentials working, no error waiting */
       },
       cannotCause: {
         blocked_by_check: "an API connector meets no check",
@@ -64,4 +65,10 @@ It checks every item under "Conformance" in the contract: each answer matches it
 
 The fixture causes every error except those it lists in `cannotCause`, the errors its connector can never give, each with a one-line reason: `blocked_by_check`, which only a robot meets, and `owner_browser_lost`, for a connector without the `owner_browser` runtime. Their checks show as skipped, with the reason in the skip note (`vitest --reporter=verbose` prints it); the fixture's check of `cannotCause` fails for any other key, a blank or multi-line reason, or `owner_browser_lost` for a connector with that runtime. Since version 1.1.0.
 
-A connector that lists `invite` needs `invitee` in its fixture; the invite checks of any other connector show as skipped.
+A connector that lists `invite` needs `invitee` in its fixture; the invite checks of any other connector show as skipped. The same holds for the capabilities added later, so a fixture written before them still runs:
+
+- `remove` needs `memberToRemove`: the suite removes that member twice, checks the next list is without them, and that removing the connection's own member answers `not_allowed`.
+- `roles` in the manifest: an invite of `invitee` with a role the connector does not list must answer HTTP 400.
+- `sign_in` needs `signIn`: `integrationUser` (`email`, `password`, `totpSecret`), which `reset` leaves invited as an admin in the fake app, and `causeError(url, code)`, which makes the next `connections/sign-in` answer `not_invited`, `permission_missing` or `blocked_by_check`. The suite signs in and lists the members with the connection it gets.
+
+The fixture's own `causeError`, for `actions/run`, is never asked for `not_invited`; only `signIn.causeError` is.

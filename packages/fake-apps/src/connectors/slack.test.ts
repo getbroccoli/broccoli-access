@@ -1,8 +1,14 @@
-import { ACCOUNTS_LIST_ANSWER } from "@broccoli-access/connector-contract";
 import { expect } from "vitest";
 
-import { callConnector, control, signInToFakeSlack, test as it } from "#test/support";
-import { ACME, ACME_SLACK } from "../seed";
+import {
+  callConnector,
+  control,
+  listSlackPages,
+  slackOwnerRequest,
+  signInToFakeSlack,
+  test as it,
+} from "#test/support";
+import { ACME } from "../seed";
 
 it("offers Mia Novak's Slack sign-in with an HttpOnly cookie and local storage JSON", async ({
   connectors: { url },
@@ -30,21 +36,29 @@ it("discovers Acme's Slack settings from Mia's session", async ({ connectors: { 
   });
 });
 
-it("pages through Acme's 41 Slack members with Mia alone as the connection user", async ({
+it("pages through Acme's 44 Slack members with Mia alone as the connection user", async ({
   connectors: { url },
 }) => {
-  const pages = await listSlackPages(url);
+  const pages = await listSlackPages(url, (await slackOwnerRequest(url)).connection);
   const accounts = pages.flatMap((page) => page.accounts);
 
   const slack = ACME.apps.find((app) => app.name === "Slack")!;
   const emails = accounts.map(({ values }) => values.email);
-  expect(emails).toHaveLength(41);
+  expect(emails).toHaveLength(44);
   expect(emails.sort()).toEqual(
     ACME.grants
       .filter((grant) => grant.clientId === slack.clientId)
       .map((grant) => grant.email)
+      .concat(extraMembers.map(({ email }) => email))
       .sort(),
   );
+  for (const member of extraMembers) {
+    expect(accounts.map(({ values }) => values)).toContainEqual({
+      ...member,
+      status: "active",
+      isConnectionUser: false,
+    });
+  }
   expect(emails).not.toContain("new.hire@acme.example");
   expect(
     accounts.filter(({ values }) => values.isConnectionUser).map(({ values }) => values.email),
@@ -60,7 +74,7 @@ it("pages through Acme's 41 Slack members with Mia alone as the connection user"
 it("lists the seeded Slack invitation only on the first of three pages", async ({
   connectors: { url },
 }) => {
-  const pages = await listSlackPages(url);
+  const pages = await listSlackPages(url, (await slackOwnerRequest(url)).connection);
 
   expect(pages.map((page) => page.invitations)).toEqual([
     [{ email: "new.hire@acme.example", invitedAt: null, expiresAt: null }],
@@ -70,21 +84,19 @@ it("lists the seeded Slack invitation only on the first of three pages", async (
 });
 
 it("invites Ivan to Slack with no invitation dates", async ({ connectors: { url } }) => {
-  const appSession = await signInToFakeSlack(url);
+  const request = await slackOwnerRequest(url);
   const email = "ivan@acme.example";
 
   const result = await callConnector(url, "actions/run", {
-    connector: "slack",
-    runtime: { kind: "server" },
-    connection: { settings: ACME_SLACK.settings, secrets: { appSession } },
+    ...request,
     action: "invite",
     account: { email },
   });
 
-  expect(result.body).toMatchObject({
-    changed: true,
-    invitation: { email, invitedAt: null, expiresAt: null },
-  });
+  const invitation = { email, invitedAt: null, expiresAt: null };
+  expect(result.body).toEqual({ changed: true, invitation });
+  const list = await callConnector(url, "accounts/list", { ...request, cursor: null });
+  expect(list.body).toHaveProperty("invitations", expect.arrayContaining([invitation]));
 });
 
 it("answers authentication_failed for a changed Slack cookie", async ({ connectors: { url } }) => {
@@ -125,29 +137,6 @@ it("accepts a new Slack sign-in after sessions expire", async ({ connectors: { u
   });
 });
 
-async function listSlackPages(url: string) {
-  const appSession = await signInToFakeSlack(url);
-  const request = {
-    connector: "slack",
-    runtime: { kind: "server" },
-    connection: { settings: ACME_SLACK.settings, secrets: { appSession } },
-  };
-  const pages = [];
-  const cursors = new Set<string>();
-  let cursor: string | null = null;
-  do {
-    const result = await callConnector(url, "accounts/list", { ...request, cursor });
-    const page = ACCOUNTS_LIST_ANSWER.parse(result.body);
-    pages.push(page);
-    cursor = page.nextCursor;
-    if (cursor !== null) {
-      expect(cursors.has(cursor)).toBe(false);
-      cursors.add(cursor);
-    }
-  } while (cursor !== null);
-  return pages;
-}
-
 function testSession(url: string, secrets: Record<string, unknown>) {
   return callConnector(url, "connections/test", {
     connector: "slack",
@@ -155,3 +144,9 @@ function testSession(url: string, secrets: Record<string, unknown>) {
     connection: { settings: {}, secrets },
   });
 }
+
+const extraMembers = [
+  { email: "ana.ruiz@gmail.example", displayName: "Ana Ruiz" },
+  { email: "sam@agency.example", displayName: "Sam Lee" },
+  { email: "reports@acme.example", displayName: "Reports bot" },
+];

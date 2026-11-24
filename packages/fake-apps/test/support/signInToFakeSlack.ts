@@ -1,5 +1,18 @@
 import type { AppSession } from "@broccoli-access/connector-contract";
 
+import { ACME_SLACK } from "../../src/seed";
+
+export async function slackOwnerRequest(url: string) {
+  return {
+    connector: "slack",
+    runtime: { kind: "server" },
+    connection: {
+      settings: ACME_SLACK.settings,
+      secrets: { appSession: await signInToFakeSlack(url) },
+    },
+  } as const;
+}
+
 export async function signInToFakeSlack(url: string): Promise<AppSession> {
   const response = await fetch(`${url}/slack/signin`);
   const cookie = response.headers.getSetCookie().find((header) => header.startsWith("d="));

@@ -17,7 +17,7 @@ export {
   signIn,
   type TokenResponse,
 } from "./signIn";
-export { control } from "./control";
+export { control, readState } from "./control";
 export {
   eventClientId,
   type DirectoryTokens,
@@ -29,5 +29,7 @@ export {
   type GrantEvent,
 } from "./googleResponses";
 export { schemaViolations } from "./schemaViolations";
-export { callConnector, linearRequest, memberAccount } from "./callConnector";
-export { signInToFakeSlack } from "./signInToFakeSlack";
+export { callConnector, linearRequest, listSlackPages, memberAccount } from "./callConnector";
+export { signInToFakeSlack, slackOwnerRequest } from "./signInToFakeSlack";
+export { integrationUser, inviteSlackAdmin } from "./integrationUser";
+export { testWithCreatedGoogleUser } from "./createdGoogleUser";

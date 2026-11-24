@@ -91,7 +91,7 @@ test("connects Slack with the handed-over session, records the notice and queues
   await scans.runScan(SYSTEM, sourceId);
 
   const members = await storedAppAccounts(orm);
-  expect(members.filter((member) => member.appId === apps[0]!.id)).toHaveLength(41);
+  expect(members.filter((member) => member.appId === apps[0]!.id)).toHaveLength(44);
   expect(members.find((member) => member.email === "elif@acme.example")?.status).toBe("suspended");
   expect(await storedImportRecords(orm)).toContainEqual(
     expect.objectContaining({

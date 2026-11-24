@@ -68,6 +68,9 @@ services:
     <<: *dev-service
     working_dir: /repo/packages/fake-apps
     command: [node_modules/.bin/tsx, watch, src/connectorsMain.ts]
+    environment:
+      # Where integration-user/setup asks which users the fake Google created.
+      FAKE_GOOGLE_URL: http://fake-google:4000
     ports:
       # Localhost only: the control endpoints have no authentication. HOST_FAKE_CONNECTORS_PORT pins it.
       - 127.0.0.1:${HOST_FAKE_CONNECTORS_PORT:-0}:4000

@@ -69,6 +69,7 @@ The connectors container is faked in `packages/fake-apps` for `slack` and `linea
 - `pnpm dev` runs it as the Compose service `fake-connectors`. The API reaches it at `CONNECTORS_URL`, `http://fake-connectors:4000`; this machine reaches it on a free port of `127.0.0.1`, which `pnpm dev` prints as "Fake connectors (Acme)" with the Slack sign-in address. `HOST_FAKE_CONNECTORS_PORT` pins the port. Restarting `pnpm dev` resets it.
 - API tests use the `fakeConnectors` fixture, and tests in `packages/fake-apps` the `connectors` fixture: a fresh fake on a free local port for each test, answering without delay.
 - Each answer takes 250 ms by default, so a change's progress shows; `POST /_fake/delay` changes it.
+- `integration-user/setup` asks the fake Google at `FAKE_GOOGLE_URL` (the `googleUrl` option in tests) which users it created; `pnpm dev` sets it. Without it, every setup answers `authentication_failed`.
 
 Set `FAKE` to its address, such as `http://127.0.0.1:<printed port>`. The examples use Bash and `jq`.
 
@@ -123,6 +124,8 @@ curl -s -X POST "$FAKE/_fake/reset"
 curl -s "$FAKE/_fake/state"
 curl -s -X POST "$FAKE/_fake/linear/members/ana@acme.example/suspend"
 curl -s -X POST "$FAKE/_fake/slack/members/elif@acme.example/reactivate"
+curl -s -X POST "$FAKE/_fake/linear/members/chloe@acme.example/remove"
+curl -s -H 'content-type: application/json' -d '{"role": "admin"}' "$FAKE/_fake/linear/members/david@acme.example/role"
 curl -s -H 'content-type: application/json' "$FAKE/_fake/failures" \
   -d '{"connector": "slack", "call": "actions/run", "code": "not_allowed", "count": 1}'
 curl -s -X POST "$FAKE/_fake/slack/sessions/expire"
@@ -131,10 +134,23 @@ curl -s -H 'content-type: application/json' -d '{"milliseconds": 5000}' "$FAKE/_
 ```
 
 - `reset` puts back the seed: members, failures, the delay, the Linear key, and no Slack session.
-- `state` lists each workspace's members with their status; pending invitations are not members.
+- `state` lists each workspace's members with their status and role, its pending invitations with their role, and under `changes` the last 100 changes actions made, oldest first, with the member who made each (`madeBy`).
 - A member control changes the member as an admin would in the app.
-- `failures` makes the next `count` calls of that connector and `call` (`connections/test`, `accounts/list` or `actions/run`) answer the contract error `code`.
+- `failures` makes the next `count` calls of that connector and `call` (`connections/test`, `accounts/list`, `actions/run` or `connections/sign-in`) answer the contract error `code`. The call `integration-user/setup` takes no `connector`.
 - After `sessions/expire`, every Slack app session fails with `authentication_failed` until a new sign-in; after `keys/revoke`, the Linear key fails until `reset`.
+
+### The integration user
+
+The fake signs in from memory, with no browser. `integration-user/setup` answers a fixed two-step secret for a user the fake Google created, and keeps the first password it is set up with. `connections/sign-in` works for `slack`, for an integration user that Slack has invited: the invitations control invites with the default role, so invite an admin through the contract, with the owner's session in `$SLACK`:
+
+```bash
+curl -s -H 'content-type: application/json' "$FAKE/v1/actions/run" \
+  -d "$(jq -c '. + {action: "invite", account: {email: "broccoli@acme.example", role: "admin"}}' <<<"$SLACK")"
+curl -s -H 'content-type: application/json' "$FAKE/v1/connections/sign-in" \
+  -d '{"connector": "slack", "connection": null, "integrationUser": {"email": "broccoli@acme.example", "password": "demo-password", "totpSecret": "JBSWY3DPEHPK3PXP"}}'
+```
+
+Put the answer's `connection` in place of `$SLACK`'s `connection` and the calls above work the same; their changes show in the state with the integration user as `madeBy`.
 
 ### The conformance suite
 

@@ -1,7 +1,14 @@
 import { ACCOUNTS_LIST_ANSWER, ACTION_RUN_ANSWER } from "@broccoli-access/connector-contract";
 import { expect, onTestFinished, vi } from "vitest";
 
-import { callConnector, control, linearRequest, memberAccount, test as it } from "#test/support";
+import {
+  callConnector,
+  control,
+  linearRequest,
+  memberAccount,
+  readState,
+  test as it,
+} from "#test/support";
 import { ACME_LINEAR } from "../seed";
 
 it("discovers the Acme workspace with its Linear key", async ({ connectors: { url } }) => {
@@ -16,12 +23,15 @@ it("discovers the Acme workspace with its Linear key", async ({ connectors: { ur
   });
 });
 
-it("lists the seven Linear members and the connection user on one page", async ({
+it("lists the eight Linear members and the connection user on one page", async ({
   connectors: { url },
 }) => {
   const result = await callConnector(url, "accounts/list", { ...linearRequest, cursor: null });
   const { accounts, nextCursor } = ACCOUNTS_LIST_ANSWER.parse(result.body);
 
+  expect(
+    accounts.find(({ values }) => values.email === "deploys@acme.example")?.values.displayName,
+  ).toBe("Deploy bot");
   expect(nextCursor).toBeNull();
   expect(
     accounts
@@ -32,6 +42,7 @@ it("lists the seven Linear members and the connection user on one page", async (
     ["ana@acme.example", "active", false],
     ["chloe@acme.example", "active", false],
     ["david@acme.example", "active", false],
+    ["deploys@acme.example", "active", false],
     ["gabriel@acme.example", "active", false],
     ["hannah@acme.example", "suspended", false],
     ["jun@acme.example", "active", false],
@@ -62,16 +73,25 @@ it("lists Ivan's new Linear invitation with a 30-day expiry", async ({ connector
 
   const result = await callConnector(url, "actions/run", inviteIvan);
 
-  expect(result.body).toMatchObject({ changed: true, invitation });
+  expect(result.body).toEqual({ changed: true, invitation });
   const list = await callConnector(url, "accounts/list", { ...linearRequest, cursor: null });
-  expect(ACCOUNTS_LIST_ANSWER.parse(list.body).invitations).toContainEqual(invitation);
+  expect(list.body).toHaveProperty(
+    "invitations",
+    expect.arrayContaining([seededInvitation, invitation]),
+  );
+  expect(ACCOUNTS_LIST_ANSWER.parse(list.body).invitations).toHaveLength(2);
+  expect((await readState(url)).invitations.linear).toContainEqual({ ...invitation, role: "user" });
 });
 
 it("returns Ivan's same Linear invitation when invited twice", async ({ connectors: { url } }) => {
   const first = await callConnector(url, "actions/run", inviteIvan);
   const { invitation } = ACTION_RUN_ANSWER.parse(first.body);
 
-  const second = await callConnector(url, "actions/run", inviteIvan);
+  const second = await callConnector(url, "actions/run", {
+    ...inviteIvan,
+    account: { ...inviteIvan.account, role: "admin" },
+  });
+  expect((await readState(url)).invitations.linear).toContainEqual({ ...invitation, role: "user" });
 
   expect(second.body).toMatchObject({ changed: false, invitation });
   const list = await callConnector(url, "accounts/list", { ...linearRequest, cursor: null });
@@ -138,6 +158,34 @@ it("answers authentication_failed for a revoked Linear key", async ({ connectors
   const result = await callConnector(url, "connections/test", linearRequest);
 
   expect(result.body).toEqual({ error: { code: "authentication_failed" } });
+});
+
+it("keeps a guest invitation's role when the Linear member joins", async ({
+  connectors: { url },
+}) => {
+  const account = { ...inviteIvan.account, role: "guest" };
+  await callConnector(url, "actions/run", { ...inviteIvan, account });
+
+  expect((await readState(url)).invitations.linear).toContainEqual(
+    expect.objectContaining(account),
+  );
+  await control(url, `/linear/invitations/${account.email}/accept`);
+
+  expect((await readState(url)).linear).toContainEqual(
+    expect.objectContaining({ ...account, status: "active" }),
+  );
+});
+
+it("rejects an unlisted Linear role without sending an invitation", async ({
+  connectors: { url },
+}) => {
+  const account = { ...inviteIvan.account, role: "unlisted" };
+  const result = await callConnector(url, "actions/run", { ...inviteIvan, account });
+
+  expect(result.status).toBe(400);
+  expect((await readState(url)).invitations.linear.map(({ email }) => email)).not.toContain(
+    account.email,
+  );
 });
 
 const seededInvitation = { email: "new.hire@acme.example", invitedAt: null, expiresAt: null };

@@ -28,9 +28,27 @@ const envSchema = z
     redirectUris: variables.FAKE_GOOGLE_REDIRECT_URIS,
   }));
 
+/** The fake connectors container's settings under `pnpm dev`. */
+export interface ConnectorsEnv {
+  /** Where it reaches the fake Google, such as `http://fake-google:4000`; without it, no integration user can be set up. */
+  googleUrl?: string;
+}
+
+const connectorsEnvSchema = z
+  .object({ FAKE_GOOGLE_URL: httpUrl.optional() })
+  .transform((variables): ConnectorsEnv => ({ googleUrl: variables.FAKE_GOOGLE_URL }));
+
+export function loadConnectorsEnv(source: NodeJS.ProcessEnv = process.env): ConnectorsEnv {
+  return parsed(connectorsEnvSchema, source);
+}
+
 /** Reads and validates the environment; throws one error listing every problem. */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const result = envSchema.safeParse(source);
+  return parsed(envSchema, source);
+}
+
+function parsed<T>(schema: z.ZodType<T, unknown>, source: NodeJS.ProcessEnv): T {
+  const result = schema.safeParse(source);
   if (!result.success) {
     throw new Error(`Invalid environment:\n${z.prettifyError(result.error)}`);
   }
