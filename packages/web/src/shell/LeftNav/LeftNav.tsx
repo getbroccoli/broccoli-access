@@ -1,5 +1,5 @@
 import { useQuery } from "@apollo/client/react";
-import { CaretLeft, Pulse, SquaresFour, Users } from "@phosphor-icons/react";
+import { CaretLeft, ListChecks, Pulse, SquaresFour, Users } from "@phosphor-icons/react";
 import { Link, useRouteContext } from "@tanstack/react-router";
 
 import { NavCountsDocument } from "@/__generated__/graphql";
@@ -62,7 +62,7 @@ export function LeftNav() {
 }
 
 /**
- * The app's pages, with Applications and Activity for admins only; Applications shows how many
+ * The app's pages, with Applications, Templates and Activity for admins only; Applications shows how many
  * apps await their decision, and People how many people are suspended with access.
  */
 function useAppItems(): NavItem[] {
@@ -79,6 +79,7 @@ function useAppItems(): NavItem[] {
     icon: SquaresFour,
     badge: discovered > 0 ? discovered : undefined,
   };
+  const templates: NavItem = { to: "/templates", label: t("nav.templates"), icon: ListChecks };
   const activity: NavItem = { to: "/activity", label: t("nav.activity"), icon: Pulse };
   return [
     ...(canManage ? [applications] : []),
@@ -89,7 +90,7 @@ function useAppItems(): NavItem[] {
       badge: suspendedWithAccess > 0 ? suspendedWithAccess : undefined,
       badgeTone: "warning",
     },
-    ...(canManage ? [activity] : []),
+    ...(canManage ? [templates, activity] : []),
   ];
 }
 

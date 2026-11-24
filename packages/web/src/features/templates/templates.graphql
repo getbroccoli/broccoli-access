@@ -1,0 +1,149 @@
+# shortcut: reads up to 10,000 templates at once, by name; page with `after` once an instance
+# keeps more.
+query TemplatesPage {
+  templates(first: 10000) {
+    edges {
+      node {
+        id
+        name
+        peopleCount
+        apps {
+          id
+          app {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+}
+
+# shortcut: reads up to 10,000 approved apps at once for "Add app"; search them once a company
+# approves more.
+query TemplatePage($id: ID!) {
+  template(id: $id) {
+    id
+    name
+    peopleCount
+    apps {
+      id
+      app {
+        id
+        name
+        catalogKey
+      }
+    }
+  }
+  apps(status: APPROVED, first: 10000) {
+    edges {
+      node {
+        id
+        name
+        catalogKey
+      }
+    }
+  }
+}
+
+mutation CreateTemplate($input: TemplateCreateInput!) {
+  templates {
+    create(input: $input) {
+      template {
+        id
+        name
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+        ... on InvalidInputError {
+          fields {
+            field
+            code
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation RenameTemplate($input: TemplateUpdateInput!) {
+  templates {
+    update(input: $input) {
+      template {
+        id
+        name
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+        ... on InvalidInputError {
+          fields {
+            field
+            code
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation DeleteTemplate($input: TemplateDeleteInput!) {
+  templates {
+    delete(input: $input) {
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation AddTemplateApp($input: TemplateAddAppInput!) {
+  templates {
+    addApp(input: $input) {
+      template {
+        id
+        apps {
+          id
+          app {
+            id
+            name
+            catalogKey
+          }
+        }
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation TakeOutTemplateApp($input: TemplateTakeOutAppInput!) {
+  templates {
+    takeOutApp(input: $input) {
+      template {
+        id
+        apps {
+          id
+        }
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
