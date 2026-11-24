@@ -96,7 +96,9 @@ async function readAndSave(
   },
   progressBySource: Map<string, ScanProgress>,
 ): Promise<void> {
-  const { sourceId, connection, connector, used, revision } = target;
+  const { used, ...scanned } = target;
+  const { sourceId, connection, connector } = scanned;
+  const renewing = { connectionId: connection.id, used };
   const readStartedAt = new Date();
   const retrying = <T>(call: () => Promise<T>) => withRetries(dependencies, sourceId, call);
   const session = await retrying(() =>
@@ -104,12 +106,7 @@ async function readAndSave(
   );
   const { accounts, invitations } = await readAllPages(async (cursor) => {
     const page = await retrying(() => session.listAccounts(cursor));
-    await saveConnectionUpdate(
-      ctx,
-      dependencies,
-      { connectionId: connection.id, used },
-      page.connection,
-    );
+    await saveConnectionUpdate(ctx, dependencies, renewing, page.connection);
     return page;
   });
   const found = foundCounts(accounts);
@@ -121,15 +118,7 @@ async function readAndSave(
     accounts,
     retrying,
   });
-  const findings = {
-    sourceId,
-    connection,
-    connector,
-    readStartedAt,
-    revision,
-    invitations,
-    ...read,
-  };
+  const findings = { ...scanned, readStartedAt, invitations, ...read };
   const outcome = await saveScan(ctx, dependencies, findings);
   dependencies.logger.info(
     {
