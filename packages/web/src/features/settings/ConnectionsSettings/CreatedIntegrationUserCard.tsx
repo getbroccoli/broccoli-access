@@ -1,4 +1,5 @@
 import { ArrowUpRight } from "@phosphor-icons/react";
+import { useRef } from "react";
 
 import {
   ConnectionsSettingsDocument,
@@ -43,6 +44,7 @@ export function CreatedIntegrationUserCard({ integrationUser }: Props) {
     SignInAsIntegrationUserDocument,
     { refetch: [ConnectionsSettingsDocument] },
   );
+  const status = useRef<HTMLParagraphElement>(null);
   const { signInStatus, signInFailure } = integrationUser;
   const needsOwner = signInStatus === "SIGN_IN_NEEDS_OWNER";
 
@@ -71,7 +73,12 @@ export function CreatedIntegrationUserCard({ integrationUser }: Props) {
             {t(BADGES[signInStatus])}
           </span>
         </div>
-        <p className="text-sm text-foreground/80" aria-live="polite">
+        <p
+          ref={status}
+          tabIndex={-1}
+          className="text-sm text-foreground/80 outline-none"
+          aria-live="polite"
+        >
           {needsOwner
             ? t(FAILURE_MESSAGES[signInFailure ?? "SIGN_IN_DID_NOT_FINISH"])
             : t(SUMMARIES[signInStatus])}
@@ -90,7 +97,11 @@ export function CreatedIntegrationUserCard({ integrationUser }: Props) {
             className="px-4"
             disabled={isStarting}
             // `usePayloadMutation` keeps the failure for display.
-            onClick={() => void signIn().catch(() => undefined)}
+            onClick={() => {
+              // The button leaves while the attempt runs: keep the keyboard's place in the card.
+              status.current?.focus();
+              void signIn().catch(() => undefined);
+            }}
           >
             {t("settings.integrationUser.tryAgain")}
           </Button>
