@@ -33,6 +33,8 @@ export {
   scans,
   apps,
   appUsers,
+  templateReviewTransactor,
+  personPages,
   templates,
 } from "./services";
 export type { EmployeeServices } from "./services";
@@ -47,7 +49,7 @@ export {
 } from "./testServer";
 export { EXAMPLE_JOB } from "./exampleJob";
 export { EXAMPLE_RECORD, EXAMPLE_REGISTRATION } from "./exampleRecord";
-export { expectBlockedBy, holdBeforeCommit } from "./expectBlockedBy";
+export { expectBlockedBy, holdBeforeCommit, withLockTimeout } from "./expectBlockedBy";
 export { recordChangedEvents } from "./recordChangedEvents";
 export { signedIn } from "./signedIn";
 export { fakeMail } from "./fakeMail";
@@ -92,6 +94,7 @@ export {
   storedTemplates,
   storedTemplateApps,
   storedEmployeeTemplates,
+  storedEmployeeAppChoices,
 } from "./storedScan";
 export {
   SCAN_NOW,

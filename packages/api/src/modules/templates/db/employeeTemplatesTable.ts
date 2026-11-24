@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 import { user } from "../../../core/auth";
 import { templates } from "./templatesTable";
@@ -24,6 +24,7 @@ export const employeeTemplates = pgTable(
     assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("employee_templates_template_id_id").on(table.templateId, table.id),
     unique("employee_templates_employee_template").on(table.employeeId, table.templateId),
   ],
 );

@@ -11,6 +11,9 @@
       "src/core/security"
     ],
     "src/modules": [
+      "src/core/db",
+      "src/core/graphql",
+      "src/core/security",
       "src/core/instance",
       "src/core/moduleManifest",
       "src/core/records",

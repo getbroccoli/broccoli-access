@@ -5,7 +5,12 @@ import { recordHistory } from "../../src/core/records/db";
 import { apps, appAccounts } from "../../src/modules/apps/db";
 import { employees } from "../../src/modules/employees/db";
 import { importSources, importRecords } from "../../src/modules/imports/db";
-import { employeeTemplates, templateApps, templates } from "../../src/modules/templates/db";
+import {
+  employeeAppChoices,
+  employeeTemplates,
+  templateApps,
+  templates,
+} from "../../src/modules/templates/db";
 
 /** Stable raw reads to compare the complete persisted state before and after a scan. */
 export function storedApps(orm: Orm) {
@@ -32,6 +37,12 @@ export function storedTemplates(orm: Orm) {
 }
 export function storedTemplateApps(orm: Orm) {
   return orm.select().from(templateApps).orderBy(templateApps.id);
+}
+export function storedEmployeeAppChoices(orm: Orm) {
+  return orm
+    .select()
+    .from(employeeAppChoices)
+    .orderBy(employeeAppChoices.employeeId, employeeAppChoices.appId);
 }
 export function storedEmployeeTemplates(orm: Orm) {
   return orm.select().from(employeeTemplates).orderBy(employeeTemplates.id);

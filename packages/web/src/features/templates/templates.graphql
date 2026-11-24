@@ -26,6 +26,20 @@ query TemplatePage($id: ID!) {
     id
     name
     peopleCount
+    people(first: 6) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      edges {
+        node {
+          id
+          firstName
+          lastName
+          avatarUrl
+        }
+      }
+    }
     apps {
       id
       app {
@@ -142,6 +156,26 @@ mutation TakeOutTemplateApp($input: TemplateTakeOutAppInput!) {
         __typename
         ... on Error {
           message
+        }
+      }
+    }
+  }
+}
+
+query MoreTemplatePeople($id: ID!, $after: String!) {
+  template(id: $id) {
+    id
+    people(first: 6, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      edges {
+        node {
+          id
+          firstName
+          lastName
+          avatarUrl
         }
       }
     }

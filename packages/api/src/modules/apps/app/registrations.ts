@@ -1,3 +1,5 @@
+import type { HistoryAppend } from "../../../core/records";
+
 // What this module adds to core's shared registries.
 
 declare module "../../../core/records" {
@@ -21,6 +23,16 @@ declare module "../../../core/jobs" {
   interface Jobs {
     /** Runs one account change through its connector, one per connection at a time. */
     "apps.runAccountChange": { changeId: string };
+  }
+}
+
+declare module "../../../core/events" {
+  interface DomainEvents {
+    "apps.accountsChanged": {
+      appIds: string[];
+      cause: HistoryAppend["cause"];
+      requestedBy?: string;
+    };
   }
 }
 

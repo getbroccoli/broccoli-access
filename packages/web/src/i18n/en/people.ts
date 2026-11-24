@@ -30,7 +30,25 @@ export const peopleEn = {
   "people.person.disableWhereConnected":
     "Disable them here where the app is connected, and in the app itself where it isn’t.",
   "people.person.disableWhereConnectedOne": "Disable it here.",
-  "people.person.currentAccess": "Current access",
+  "people.person.assignTemplate": "+ Assign template",
+  "people.person.takeOff": "Take {template} off {person}",
+  "people.person.noTemplates": "No templates assigned.",
+  "people.person.noTemplatesToAssign": "No templates left to assign.",
+  "people.person.moreTemplates": "Show more templates",
+  "people.person.loadingTemplates": "Loading templates…",
+  "people.person.refreshFailed":
+    "Couldn’t refresh this person’s access. Any saved changes are kept.",
+  "people.person.ineligible": "Assigning {name} requires an active directory account.",
+  "people.person.suspendedTemplates":
+    "Only people active in the directory can be assigned templates.",
+  "people.person.moreApps": "Show more apps",
+  "people.person.moreFailed": "Couldn’t load more. Try again.",
+  "people.person.templateChangeFailed": "Couldn’t update {name}. Reload and try again.",
+  "people.person.role": "Role",
+  "people.person.from": "From",
+  "people.person.noTemplate": "No template",
+  "people.person.missing": "Missing",
+  "people.person.extra": "Extra",
   "people.person.column.inApp": "In the app",
-  "people.person.noAccess": "No accounts in approved apps.",
+  "people.person.noAccess": "No apps yet.",
 } as const;

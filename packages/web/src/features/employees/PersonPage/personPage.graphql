@@ -1,4 +1,4 @@
-query PersonPage($id: ID!) {
+query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
   employee(id: $id) {
     id
     firstName
@@ -8,7 +8,42 @@ query PersonPage($id: ID!) {
     status
     suspendedWithAccess
     approvedAppNames
+    templates(first: 30, after: $templatesAfter) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      edges {
+        node {
+          id
+          name
+        }
+      }
+    }
+    personApps(first: 30, after: $appsAfter) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      edges {
+        node {
+          accountStatus
+          app {
+            id
+            name
+            catalogKey
+          }
+          templates {
+            id
+            name
+          }
+          role
+          state
+        }
+      }
+    }
     appAccounts {
+      offeredChange
       id
       status
       foundVia
@@ -23,6 +58,7 @@ query PersonPage($id: ID!) {
         canChangeAccounts
       }
       latestChange {
+        action
         id
         status
       }
@@ -31,6 +67,7 @@ query PersonPage($id: ID!) {
     }
     appInvites {
       id
+      invitedAt
       app {
         id
         name
@@ -42,6 +79,55 @@ query PersonPage($id: ID!) {
       }
       ...InviteCell_appInvite
       ...InviteStatusCell_appInvite
+    }
+  }
+}
+
+query AssignableTemplates($employeeId: ID!, $after: String) {
+  templates(first: 12, after: $after, assignableTo: $employeeId) {
+    edges {
+      node {
+        id
+        name
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+mutation AssignTemplate($input: TemplateAssignInput!) {
+  templates {
+    assign(input: $input) {
+      template {
+        id
+        peopleCount
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation TakeOffTemplate($input: TemplateTakeOffInput!) {
+  templates {
+    takeOff(input: $input) {
+      template {
+        id
+        peopleCount
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
     }
   }
 }

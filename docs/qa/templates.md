@@ -25,6 +25,13 @@ A manual check of the Templates page and a template's page against a development
 - [ ] Templates shows "Developer" with "Slack" and 0.
 - [ ] "Delete" asks "Delete Developer?" and says no account changes; confirming opens Templates without it, and its old address shows the not-found page.
 
+## People with this template
+
+1. Create an Onboarding template and assign it to seven active people, one at a time. Open Onboarding. The count is seven, with the first six people visible in assignment order.
+2. In a second tab, take Onboarding off the first visible person and assign it to them again. Leave the original template page open.
+3. Record GraphQL requests in the Network panel. Fail the next people-page read once using a local test proxy, then choose the control to show more people. The first six chips stay visible. The message identifies that loading **more people with this template** failed and offers a retry.
+4. Restore the connection and retry. Inspect the continuation request. It uses the first page's end cursor and asks only for the template's people and their page information. It omits the template's apps and the approved-app catalog. The seventh person appears, the reassigned person has one chip, and all seven link to their own pages. The continuation control disappears after the final page.
+
 ## Robustness
 
 - [ ] `/templates/not-an-id` shows the not-found page.

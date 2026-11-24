@@ -42,6 +42,7 @@ export interface AppRepository {
   /** The app; null when there is none. */
   findById(id: string): Promise<App | null>;
   /** The apps with these ids; an unknown id is left out. */
+  lockForReview(ids: readonly string[]): Promise<{ id: string; name: string }[]>;
   findByIds(ids: readonly string[]): Promise<App[]>;
   /** The app, locked until the transaction ends; null when there is none. */
   lockById(id: string): Promise<App | null>;
@@ -104,6 +105,13 @@ export function appRepository(db: Orm | Tx): AppRepository {
           rows.find((row) => row.status === status)?.apps ?? 0,
         ]),
       ) as Record<AppStatus, number>;
+    },
+    async lockForReview(ids) {
+      // Metadata updates can already hold app rows in scan order. Review locks have their own namespace.
+      await orm()
+        .execute(sql`select pg_advisory_xact_lock(hashtextextended('template-review/' || id, 0))
+        from (select distinct id from unnest(${sql.param([...ids])}::uuid[]) as ids(id) order by id) as ordered`);
+      return orm().select({ id: apps.id, name: apps.name }).from(apps).where(anyOf(apps.id, ids));
     },
     findByIds: (ids) => orm().select().from(apps).where(anyOf(apps.id, ids)),
     findById: async (id) => {

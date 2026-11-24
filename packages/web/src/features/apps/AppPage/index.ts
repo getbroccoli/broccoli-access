@@ -1,3 +1,4 @@
+export { StatusBadge } from "./StatusBadge";
 export { AppAccountStatusCell } from "./AppAccountStatusCell";
 export { AppPage } from "./AppPage";
 export { InviteStatusCell } from "./InviteStatusCell";

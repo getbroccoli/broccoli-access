@@ -143,6 +143,14 @@ test.for([
     "templates.takeOutApp",
     'mutation { templates { takeOutApp(input: { id: "1", appId: "2" }) { template { id } } } }',
   ],
+  [
+    "templates.assign",
+    'mutation { templates { assign(input: { id: "1", employeeId: "2" }) { template { id } } } }',
+  ],
+  [
+    "templates.takeOff",
+    'mutation { templates { takeOff(input: { id: "1", employeeId: "2" }) { template { id } } } }',
+  ],
 ] as const)("refuses %s without a session", async ([, query], { env }) => {
   await env.signInAsOwner();
 
@@ -152,5 +160,24 @@ test.for([
   expect(await response.json()).toHaveProperty("errors.0.extensions", {
     code: "UNAUTHENTICATED",
     fieldErrors: [],
+  });
+});
+
+test("refuses an over-budget membership page even when the template has no people", async ({
+  env,
+}) => {
+  const { browser } = await env.signInAsOwner();
+  const template = await env.seed.template();
+
+  const response = await browser.graphql(
+    "query ($id: ID!) { template(id: $id) { people(first: 10001) { pageInfo { hasNextPage } } } }",
+    { id: template.id },
+  );
+
+  expect(await response.json()).toMatchObject({
+    data: { template: null },
+    errors: [
+      { path: ["template", "people"], message: "Request fewer template members at a time." },
+    ],
   });
 });

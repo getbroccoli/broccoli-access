@@ -1,14 +1,16 @@
 import { useQuery } from "@apollo/client/react";
 import { CaretLeft } from "@phosphor-icons/react";
 import { Link, useParams } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { useRef } from "react";
 
-import { TemplatePageDocument } from "@/__generated__/graphql";
+import { TemplatePageDocument, MoreTemplatePeopleDocument } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 
 import { AddAppMenu } from "./AddAppMenu";
 import { DeleteTemplateButton } from "./DeleteTemplateButton";
 import { RenameTemplateButton } from "./RenameTemplateButton";
+import { TemplatePeople } from "./TemplatePeople";
 import { TemplateAppsTable } from "./TemplateAppsTable";
 import { useTemplateAppChanges } from "./useTemplateAppChanges";
 
@@ -16,7 +18,9 @@ import { useTemplateAppChanges } from "./useTemplateAppChanges";
 export function TemplatePage() {
   const { templateId } = useParams({ from: "/_authenticated/templates_/$templateId" });
   // The route's loader has just read the page into the cache.
-  const { data } = useQuery(TemplatePageDocument, { variables: { id: templateId } });
+  const { data, fetchMore, loading } = useQuery(TemplatePageDocument, {
+    variables: { id: templateId },
+  });
   const template = data?.template;
   const { changing, add, takeOut } = useTemplateAppChanges(templateId);
   const appsHeading = useRef<HTMLHeadingElement>(null);
@@ -75,9 +79,38 @@ export function TemplatePage() {
           {t("templates.people.title")}{" "}
           <span className="font-medium text-muted-foreground">{template.peopleCount}</span>
         </h2>
-        {template.peopleCount === 0 && (
-          <p className="text-sm text-muted-foreground">{t("templates.people.empty")}</p>
-        )}
+        <TemplatePeople
+          key={template.id}
+          people={template.people}
+          loading={loading}
+          onMore={() =>
+            void fetchMore({
+              query: MoreTemplatePeopleDocument,
+              variables: { id: templateId, after: template.people.pageInfo.endCursor! },
+              updateQuery: (previous, { fetchMoreResult }) => {
+                if (!previous.template || !fetchMoreResult.template) return previous;
+                const next = fetchMoreResult.template.people;
+                return {
+                  ...previous,
+                  template: {
+                    ...previous.template,
+                    people: {
+                      ...next,
+                      edges: [
+                        ...new Map(
+                          [...previous.template.people.edges, ...next.edges].map((edge) => [
+                            edge.node.id,
+                            edge,
+                          ]),
+                        ).values(),
+                      ],
+                    },
+                  },
+                };
+              },
+            }).catch(() => toast.error(t("templates.people.moreFailed")))
+          }
+        />
       </section>
     </div>
   );

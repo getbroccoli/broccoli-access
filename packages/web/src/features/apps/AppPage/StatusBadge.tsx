@@ -2,7 +2,7 @@ import { cn } from "@/lib/class-names";
 
 type Props = {
   /** `warning` for a suspension in Google, `muted` for an account disabled in its app. */
-  tone: "active" | "warning" | "muted";
+  tone: keyof typeof TONES;
   children: string;
 };
 
@@ -20,5 +20,7 @@ export function StatusBadge({ tone, children }: Props) {
 const TONES = {
   active: "bg-brand-soft text-brand-deep",
   warning: "bg-amber-100 text-amber-900",
+  extra: "bg-purple-100 text-purple-900",
+  invited: "bg-blue-100 text-blue-900",
   muted: "bg-muted text-foreground/70",
 } as const;

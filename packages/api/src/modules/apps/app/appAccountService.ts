@@ -95,6 +95,12 @@ async function applyPlan(
     await repository.update(after);
   }
   await repository.deleteMany(deleted.map(({ id }) => id));
+  const appIds = new Set(
+    [...inserted, ...updated.map((change) => change.after), ...deleted].map(
+      (account) => account.appId,
+    ),
+  );
+  if (appIds.size) tx.publish("apps.accountsChanged", { appIds: [...appIds], cause });
   const history = [
     {
       operation: "CREATED" as const,

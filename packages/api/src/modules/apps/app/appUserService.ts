@@ -1,3 +1,4 @@
+import type { AccountChangeState } from "./accountChangeService";
 import type { AccountStatus } from "../../../core/connectors";
 import type { Orm } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
@@ -26,11 +27,14 @@ export interface AppUserService {
   readUsersOfEmployees: (
     ctx: SecurityContext,
     employeeIds: readonly string[],
+    db?: Orm,
   ) => Promise<AppUser[]>;
 }
 
 /** An account in an app that belongs to an employee. */
 export interface AppUser {
+  /** Its actions from the same read, when loaded for a person. */
+  changeState?: AccountChangeState;
   /** The account's id. */
   id: string;
   appId: string;
@@ -90,13 +94,13 @@ export function createAppUserService(dependencies: AppUserDependencies): AppUser
             nameRank(one) - nameRank(other),
         );
     },
-    async readUsersOfEmployees(ctx, employeeIds) {
+    async readUsersOfEmployees(ctx, employeeIds, db = orm) {
       ctx.require("MANAGE_WORKSPACE");
-      const inAppFacts = await findInAppFacts(orm, dependencies);
+      const inAppFacts = await findInAppFacts(db, dependencies);
       const [accounts, suspended, directoryAppId] = await Promise.all([
-        appAccountRepository(orm).findCurrentAccountsOfEmployees(employeeIds, inAppFacts),
-        findEmployeesInDirectory(orm, connectors, { status: "suspended" }),
-        findDirectoryAppId(orm, connectors),
+        appAccountRepository(db).findCurrentAccountsOfEmployees(employeeIds, inAppFacts),
+        findEmployeesInDirectory(db, connectors, { status: "suspended" }),
+        findDirectoryAppId(db, connectors),
       ]);
       const suspendedInDirectory = new Set(suspended);
       return accounts

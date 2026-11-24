@@ -1,14 +1,15 @@
-import { useQuery } from "@apollo/client/react";
+import { usePersonPage } from "./usePersonPage";
 import { CaretLeft } from "@phosphor-icons/react";
 import { Link, useParams } from "@tanstack/react-router";
 
-import { PersonPageDocument } from "@/__generated__/graphql";
+import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/Avatar";
 import { useRefreshAfterChanges } from "@/features/apps";
 import { t } from "@/i18n";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 
+import { PersonTemplates } from "./PersonTemplates";
 import { CurrentAccessTable } from "./CurrentAccessTable";
 
 /**
@@ -18,7 +19,7 @@ import { CurrentAccessTable } from "./CurrentAccessTable";
 export function PersonPage() {
   const { employeeId } = useParams({ from: "/_authenticated/people_/$employeeId" });
   // The route's loader has just read the page into the cache.
-  const pageQuery = useQuery(PersonPageDocument, { variables: { id: employeeId } });
+  const { pageQuery, more } = usePersonPage(employeeId);
   const person = pageQuery.data?.employee;
   // A connected app's scan, such as one started from a failed change's dialog or its first one,
   // moves their rows: poll the scans only, then read the person once.
@@ -31,17 +32,26 @@ export function PersonPage() {
   usePollWhileScanning(isChanging, pageQuery);
   useRefreshAfterChanges(isChanging, pageQuery.refetch);
   // The route's loader found the person, so they are missing only while a reload replaces them.
+  if (pageQuery.error)
+    return (
+      <div role="alert">
+        <p>{t("people.person.refreshFailed")}</p>
+        <Button variant="outline" onClick={() => void pageQuery.refetch().catch(() => undefined)}>
+          {t("templates.retry")}
+        </Button>
+      </div>
+    );
   if (!person) {
     return null;
   }
   const appCount = person.approvedAppNames.length;
   // Some of the apps they still have access to can be disabled from here.
   const canDisableHere = person.appAccounts.some(
-    ({ status, app }) => status === "ACTIVE" && app.canChangeAccounts,
+    ({ offeredChange }) => offeredChange === "SUSPEND",
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <Link
         to="/people"
         className="flex w-fit items-center gap-1.5 text-sm text-foreground/80 transition-colors hover:text-foreground"
@@ -61,6 +71,11 @@ export function PersonPage() {
             <h1 className="truncate text-2xl font-semibold tracking-tight">
               {person.firstName} {person.lastName}
             </h1>
+            {person.status === "ACTIVE" && (
+              <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep">
+                {t("people.status.active")}
+              </span>
+            )}
             {person.status === "SUSPENDED" && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
                 {t("people.person.suspendedInGoogle")}
@@ -85,9 +100,22 @@ export function PersonPage() {
             ` ${t(appCount === 1 ? "people.person.disableWhereConnectedOne" : "people.person.disableWhereConnected")}`}
         </p>
       )}
+      <PersonTemplates
+        person={{ ...person, templates: person.templates.edges.map((edge) => edge.node) }}
+      />
+      {person.templates.pageInfo.hasNextPage && (
+        <Button variant="link" disabled={pageQuery.loading} onClick={() => more("templates")}>
+          {t("people.person.moreTemplates")}
+        </Button>
+      )}
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold tracking-tight">{t("people.person.currentAccess")}</h2>
-        <CurrentAccessTable appAccounts={person.appAccounts} appInvites={person.appInvites} />
+        <h2 className="text-lg font-semibold tracking-tight">{t("templates.apps.title")}</h2>
+        <CurrentAccessTable person={person} />
+        {person.personApps.pageInfo.hasNextPage && (
+          <Button variant="link" disabled={pageQuery.loading} onClick={() => more("personApps")}>
+            {t("people.person.moreApps")}
+          </Button>
+        )}
       </section>
     </div>
   );

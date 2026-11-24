@@ -29,7 +29,8 @@ import {
 } from "./google";
 import { createImportRecordService, createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
-import { templatesModule } from "./templates";
+import { createPersonPageReader, personPageLoader } from "./personPageReader";
+import { createTemplateService, templatesModule } from "./templates";
 
 /** Settings that only some modules need, read from the environment by `main.ts`. */
 export interface ModuleSettings {
@@ -95,6 +96,26 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     scans,
   });
   const employees = createEmployeeReadService({ ...core, accounts: apps });
+  const changes = createAccountChangeService({
+    ...core,
+    connectors,
+    members: importRecords,
+    employees,
+  });
+  const users = createAppUserService({
+    ...core,
+    connectors: directoryConnectors,
+    members: importRecords,
+    employees,
+  });
+  const templates = createTemplateService({
+    ...core,
+    apps: { ...apps, readAppInvites: changes.readAppInvites },
+    employees,
+  });
+  const people = personPageLoader(
+    createPersonPageReader(core.orm, { ...users, ...changes, ...templates }),
+  );
   const manifests = [
     systemModule({
       ...core,
@@ -112,18 +133,9 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     }),
     importsModule(scans),
     connectorsModule(containerConnections),
-    appsModule({
-      ...apps,
-      ...createAppUserService({
-        ...core,
-        connectors: directoryConnectors,
-        members: importRecords,
-        employees,
-      }),
-      ...createAccountChangeService({ ...core, connectors, members: importRecords, employees }),
-    }),
+    appsModule({ ...apps, ...users, ...changes }, people),
     extensionModule({ ...core, appSessions: containerConnections }),
-    templatesModule({ ...core, apps }),
+    templatesModule(templates, employees.readEmployees, people),
   ];
   return {
     manifests: [...manifests, recordsManifest(core, manifests)],
@@ -146,3 +158,5 @@ function createConnectors(
   };
   return { directoryConnectors, containerConnectors, connectors };
 }
+
+export { createPersonPageReader, personPageLoader } from "./personPageReader";

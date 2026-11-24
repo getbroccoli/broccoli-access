@@ -1,3 +1,4 @@
+export { appsOfPerson, type EmployeeAppChoice, type PersonApp } from "./personApp";
 export {
   parseTemplateName,
   type Template,

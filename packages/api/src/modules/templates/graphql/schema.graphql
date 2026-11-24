@@ -8,6 +8,8 @@ type Template {
   apps: [TemplateApp!]!
   "How many people have it."
   peopleCount: Int!
+  "The employees who have this template, in assignment order."
+  people(first: Int, after: String): EmployeeConnection!
 }
 
 "One app in one template."
@@ -56,7 +58,66 @@ input TemplateTakeOutAppInput {
   appId: ID!
 }
 
+type Employee {
+  "Templates assigned to this person, in stable template ID order."
+  templates(first: Int, after: String): TemplateConnection!
+  "Every app given by a template or choice, every account, and the connected apps offering Invite."
+  personApps(first: Int, after: String): PersonAppConnection!
+}
+
+type PersonAppEdge {
+  cursor: String!
+  node: PersonApp!
+}
+type PersonAppConnection {
+  edges: [PersonAppEdge!]!
+  pageInfo: PageInfo!
+}
+
+type PersonApp {
+  "Active if any counted account is active, Suspended if every counted account is suspended, null if none counts."
+  accountStatus: AppAccountStatus
+  "The templates that list this app for this employee."
+  templates: [Template!]!
+  "The explicitly chosen role, or null before a role is chosen."
+  role: String
+  "Expected access compared with the held account: active access is Active or Extra, a pending invitation is Invited, and an expected app without either is Missing, even for a disabled account. Other disabled accounts are Suspended. Null for invitation controls alone. Employee.appAccounts supplies the underlying account status and actions."
+  state: PersonAppState
+}
+
+enum PersonAppState {
+  ACTIVE
+  SUSPENDED
+  MISSING
+  INVITED
+  EXTRA
+}
+
+input TemplateAssignInput {
+  id: ID!
+  employeeId: ID!
+}
+input TemplateTakeOffInput {
+  id: ID!
+  employeeId: ID!
+}
+
+type TemplateAssignPayload {
+  template: Template
+  error: TemplateAssignError
+}
+union TemplateAssignError = InvalidInputError | NotFoundError
+type TemplateTakeOffPayload {
+  template: Template
+  error: TemplateTakeOffError
+}
+union TemplateTakeOffError = NotFoundError
+
 type TemplatesMutations {
+  "Gives this template to a person active in the directory. Owner only."
+  assign(input: TemplateAssignInput!): TemplateAssignPayload!
+  "Takes this template off the employee. Owner only."
+  takeOff(input: TemplateTakeOffInput!): TemplateTakeOffPayload!
   "Adds a template without apps. Admins only."
   create(input: TemplateCreateInput!): TemplateCreatePayload!
   "Renames a template. Admins only."
@@ -113,7 +174,13 @@ type Query {
   "One template; null when there is none. Admins only."
   template(id: ID!): Template
   "Templates by name, one page at a time. Admins only."
-  templates("Page size, 1 to 10000." first: Int = 100, after: String): TemplateConnection!
+  templates(
+    "Page size, 1 to 10000."
+    first: Int = 100
+    after: String
+    "Exclude templates already assigned to this employee."
+    assignableTo: ID
+  ): TemplateConnection!
 }
 
 type Mutation {

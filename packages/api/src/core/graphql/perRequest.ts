@@ -17,3 +17,6 @@ export function perRequest<T extends object>(
     return value;
   };
 }
+
+/** A request-scoped batch shared by fields in different modules. */
+export type RequestLoader<T> = (ctx: GraphqlContext) => { load(id: string): Promise<T> };

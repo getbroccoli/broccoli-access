@@ -78,6 +78,13 @@
       "when": 1795533678239,
       "tag": "0010_create_integration_user",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795534372390,
+      "tag": "0011_employee_app_choices",
+      "breakpoints": true
     }
   ]
 }

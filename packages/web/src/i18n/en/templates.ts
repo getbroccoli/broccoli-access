@@ -36,6 +36,8 @@ export const templatesEn = {
   "templates.takeOut": "Take out",
   "templates.takeOutApp": "Take out {app}",
   "templates.takeOutFailed": "Couldn’t take out {app}. Try again.",
+  "templates.people.more": "Show more people",
+  "templates.people.moreFailed": "Couldn’t load more people with this template. Try again.",
   "templates.people.title": "People with this template",
   "templates.people.empty": "Nobody has this template yet.",
 } as const;

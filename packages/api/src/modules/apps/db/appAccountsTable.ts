@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { check, index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 import { ACCOUNT_STATUSES } from "../../../core/connectors";
 import { apps } from "./appsTable";
@@ -32,6 +32,7 @@ export const appAccounts = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("app_accounts_employee_app").on(table.employeeId, table.appId),
     unique("app_accounts_app_email").on(table.appId, table.email),
     check("app_accounts_status", sql`${table.status} in ('active', 'suspended')`),
   ],

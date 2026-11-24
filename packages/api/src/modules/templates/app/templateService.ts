@@ -1,13 +1,19 @@
-import { ApplicationError, invalidInput } from "../../../core/applicationError";
+import { invalidInput } from "../../../core/applicationError";
 import type { Tx } from "../../../core/db";
 import type { ModuleDependencies } from "../../../core/moduleManifest";
 import { type Connection, type PageArgs, paginate } from "../../../core/pagination";
 import { createRecordHistoryService, type FieldChange } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
-import { TEMPLATE_SORT_VALUES, templateRepository } from "../db";
+import { assignmentRepository, TEMPLATE_SORT_VALUES, templateRepository } from "../db";
 import { parseTemplateName, type Template, TemplateNameTakenError } from "../domain";
-import type { AppsById } from "../ports";
+import type { AppsById, EmployeeById, PersonAccess } from "../ports";
+import {
+  createTemplateAssignmentService,
+  type TemplateAssignmentService,
+} from "./templateAssignmentService";
+import { lockTemplate } from "./lockTemplate";
+import { reviewLostApps } from "./reviewLostApps";
 
 const recordHistory = createRecordHistoryService();
 
@@ -15,9 +21,12 @@ const recordHistory = createRecordHistoryService();
  * Templates, the named lists of apps the owner assigns to people: each change in one transaction
  * with its history line. Every operation needs MANAGE_WORKSPACE.
  */
-export interface TemplateService {
+export interface TemplateService extends TemplateAssignmentService {
   /** The templates, by name ignoring case. */
-  listTemplates: (ctx: SecurityContext, args: PageArgs) => Promise<Connection<Template>>;
+  listTemplates: (
+    ctx: SecurityContext,
+    args: PageArgs & { assignableTo?: string | null },
+  ) => Promise<Connection<Template>>;
   /** The template; null for an unknown or malformed id. */
   readTemplate: (ctx: SecurityContext, templateId: string) => Promise<Template | null>;
   /** Adds a template without apps; refuses a blank, too long or taken name as invalid `name`. */
@@ -53,7 +62,8 @@ interface TemplateAppInput {
 
 type TemplateDependencies = Pick<ModuleDependencies, "orm" | "transact" | "logger"> & {
   /** The apps module, which knows each app's name and whether the company uses it. */
-  apps: AppsById;
+  apps: AppsById & PersonAccess;
+  employees: EmployeeById;
 };
 
 export function createTemplateService({
@@ -61,14 +71,18 @@ export function createTemplateService({
   transact,
   logger,
   apps,
+  employees,
 }: TemplateDependencies): TemplateService {
   return {
-    async listTemplates(ctx, pageArgs) {
+    ...createTemplateAssignmentService({ orm, transact, logger, apps, employees }),
+    async listTemplates(ctx, { assignableTo, ...pageArgs }) {
       ctx.require("MANAGE_WORKSPACE");
+      if (assignableTo != null && !parseUuid(assignableTo))
+        throw invalidInput([{ field: "assignableTo", code: "invalid" }]);
       return paginate(pageArgs, {
         order: { field: "NAME", direction: "ASC" },
         keysetValues: TEMPLATE_SORT_VALUES,
-        fetch: (query) => templateRepository(orm).findPage(query),
+        fetch: (query) => templateRepository(orm).findPage(query, assignableTo),
       });
     },
     async readTemplate(ctx, templateId) {
@@ -117,7 +131,15 @@ export function createTemplateService({
       ctx.require("MANAGE_WORKSPACE");
       const deleted = await transact(async (tx) => {
         const template = await lockTemplate(tx, templateId);
-        await templateRepository(tx).delete(template.id);
+        await removeSources(
+          ctx,
+          tx,
+          template,
+          template.apps.map((row) => row.appId),
+          () => templateRepository(tx).delete(template.id),
+          apps,
+          employees,
+        );
         await appendHistory(ctx, tx, {
           templateId: template.id,
           operation: "DELETED",
@@ -163,15 +185,22 @@ export function createTemplateService({
         if (!app || !member) {
           return { template: before, changed: false };
         }
-        await templateRepository(tx).deleteApp(before.id, app.id);
-        const takenOut = { field: "app", oldValue: app.id, oldLabel: app.name, newValue: null };
+        await removeSources(
+          ctx,
+          tx,
+          before,
+          [app.id],
+          () => templateRepository(tx).deleteApp(before.id, app.id),
+          apps,
+          employees,
+        );
         await appendHistory(ctx, tx, {
           templateId: before.id,
           operation: "UPDATED",
-          change: takenOut,
+          change: { field: "app", oldValue: app.id, oldLabel: app.name, newValue: null },
         });
-        const apps = before.apps.filter(({ id }) => id !== member.id);
-        return { template: { ...before, apps }, changed: true };
+        const remaining = before.apps.filter(({ id }) => id !== member.id);
+        return { template: { ...before, apps: remaining }, changed: true };
       });
       if (changed) {
         logger.info({ templateId: template.id, appId: app?.id }, "App taken out of a template");
@@ -179,16 +208,6 @@ export function createTemplateService({
       return template;
     },
   };
-}
-
-/** The template, locked until the transaction ends; refuses an unknown or malformed id. */
-async function lockTemplate(tx: Tx, templateId: string): Promise<Template> {
-  const id = parseUuid(templateId);
-  const template = id && (await templateRepository(tx).lockById(id));
-  if (!template) {
-    throw new ApplicationError("NOT_FOUND", "No template has this id.");
-  }
-  return template;
 }
 
 /** The app with its name and status; null for an unknown or malformed id. */
@@ -225,4 +244,19 @@ async function appendHistory(
     cause: { kind: "EDITED_DIRECTLY" },
     records: [{ recordId: templateId, changes: [change] }],
   });
+}
+
+/** A template deletion cascades its assignments, so capture its people before removing either source. */
+async function removeSources(
+  ctx: SecurityContext,
+  tx: Tx,
+  template: Template,
+  appIds: string[],
+  remove: () => Promise<void>,
+  apps: PersonAccess,
+  employees: EmployeeById,
+) {
+  const people = await assignmentRepository(tx).employeeIds(template.id);
+  await remove();
+  await reviewLostApps(ctx, tx, apps, employees, people, appIds);
 }

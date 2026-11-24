@@ -1,4 +1,5 @@
-import type { Orm, Transact } from "../../src/core/db";
+import { createBeforeCommitBus, transactor, type Orm, type Transact } from "../../src/core/db";
+import { createEventBus } from "../../src/core/events";
 import type { ConnectorRegistry } from "../../src/core/connectors";
 import type { JobQueue } from "../../src/core/jobs";
 import { createMailSettingsService, type MailSettingsService } from "../../src/core/instance";
@@ -36,7 +37,9 @@ import {
   createGoogleWorkspaceConnector,
   type GoogleConnectionService,
 } from "../../src/modules/google";
-import { createTemplateService } from "../../src/modules/templates";
+import { createTemplateService, templatesModule } from "../../src/modules/templates";
+import { createPersonPageReader, personPageLoader } from "../../src/modules";
+import { accountChanges } from "./accountChanges";
 import { fakeMail } from "./fakeMail";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { testTransactor } from "./testTransactor";
@@ -148,13 +151,54 @@ export function apps(orm: Orm, transact: Transact = testTransactor(orm)): AppSer
   });
 }
 
-export function templates(orm: Orm) {
-  return createTemplateService({
-    orm,
-    transact: testTransactor(orm),
-    logger: createLogger("silent"),
-    apps: apps(orm),
+export function templates(
+  orm: Orm,
+  options: { connectors?: ConnectorRegistry; transact?: Transact } = {},
+) {
+  return createTemplateService(templateDependencies(orm, options));
+}
+
+export function templateReviewTransactor(orm: Orm) {
+  const before = createBeforeCommitBus();
+  const deps = templateDependencies(orm, {});
+  before.subscribe(
+    templatesModule(
+      createTemplateService(deps),
+      deps.employees.readEmployees,
+      personPageLoader(personPages(orm)),
+    ).eventsBeforeCommit!,
+  );
+  return transactor(orm, createEventBus(createLogger("silent")), before);
+}
+
+export function personPages(
+  orm: Orm,
+  options: { connectors?: ConnectorRegistry; afterAssignments?: () => Promise<void> } = {},
+) {
+  const service = templates(orm, options);
+  return createPersonPageReader(orm, {
+    ...service,
+    ...appUsers(orm),
+    ...accountChanges(orm, options),
+    async readEmployeeTemplates(ctx, ids, db) {
+      const assigned = await service.readEmployeeTemplates(ctx, ids, db);
+      await options.afterAssignments?.();
+      return assigned;
+    },
   });
+}
+
+function templateDependencies(
+  orm: Orm,
+  options: { connectors?: ConnectorRegistry; transact?: Transact },
+) {
+  return {
+    orm,
+    transact: options.transact ?? testTransactor(orm),
+    logger: createLogger("silent"),
+    apps: { ...apps(orm), readAppInvites: accountChanges(orm, options).readAppInvites },
+    employees: employeeServices(orm),
+  };
 }
 
 /** An app's users read with the real employees module, with Google Workspace as the directory. */
