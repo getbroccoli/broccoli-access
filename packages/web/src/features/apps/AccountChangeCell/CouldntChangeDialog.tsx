@@ -73,6 +73,7 @@ export function CouldntChangeDialog({ change: changeRef, row, triggerClassName =
     : NO_OPTIONS;
   const copy = COPY[change.action];
   const reason = couldntChangeReason(change.failure, {
+    action: change.action,
     app: app.name,
     workspace,
     person: { name, email: change.email },

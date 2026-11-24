@@ -58,9 +58,8 @@ export async function inviteEmployee(
   }
   // Read before the transaction: the container's list may take a while to answer.
   const connectors = await dependencies.connectors.list();
-  const invite = await dependencies.transact((tx) =>
-    askForInvite(dependencies, tx, { employee, appId, requestedBy, connectors }),
-  );
+  const request = { employee, appId, requestedBy, connectors };
+  const invite = await queueInvite(dependencies, request);
   const { id: changeId, connectionId } = invite.latestInvite!;
   dependencies.logger.info({ changeId, employeeId, connectionId }, "Invite requested");
   return invite;
@@ -109,14 +108,27 @@ interface InviteRequest {
   connectors: readonly Connector[];
 }
 
-/** Writes the running invite and queues its run, refusing an unknown app and what is not offered. */
+/** Wait for a template edit outside the account sync lock, then recheck all invite facts. */
+async function queueInvite(
+  deps: AccountChangeDependencies,
+  request: InviteRequest,
+): Promise<AppInvite> {
+  for (;;) {
+    const invite = await deps.transact((tx) => askForInvite(deps, tx, request));
+    if (invite) return invite;
+    await deps.transact((tx) => appRepository(tx).lockForReview([request.appId]));
+  }
+}
+
+/** Writes and queues the invite, or returns null if a template edit holds its app. */
 async function askForInvite(
   dependencies: AccountChangeDependencies,
   tx: Tx,
   { employee, appId, requestedBy, connectors }: InviteRequest,
-): Promise<AppInvite> {
+): Promise<AppInvite | null> {
   await appAccountRepository(tx).lockForSync();
   const connection = await findConnectionOfApp(tx, appId);
+  if (!(await appRepository(tx).tryLockForReview(connection.appId))) return null;
   const facts = await readInviteFacts(dependencies, tx, {
     employees: [employee],
     connections: [connection],
@@ -125,7 +137,6 @@ async function askForInvite(
   if (!appInviteOf(employee, connection, facts)?.offered) {
     throw new ApplicationError("CONFLICT", NOT_OFFERED);
   }
-  await appRepository(tx).lockForReview([appId]);
   const role = await dependencies.readInviteRole(tx, employee.id, appId);
   const connector = connectors.find(({ key }) => key === connection.connector);
   if (!offersInviteRole(connector?.roles, role)) {

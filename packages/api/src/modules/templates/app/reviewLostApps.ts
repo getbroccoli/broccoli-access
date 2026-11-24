@@ -22,12 +22,13 @@ export async function reviewLostApps(
   // A directory scan already holds its employees when it reaches the apps.
   await employees.holdForReference(tx, employeeIds);
   const names = await apps.lockAppsForReview(tx, lostAppIds);
-  await clearStaleRolePicks(ctx, tx, employeeIds, lostAppIds);
   const active = (await apps.findEmployeeAccounts(tx, employeeIds, lostAppIds)).filter(
     (account) => account.status === "active",
   );
-  if (!active.length) return;
-  const remaining = new Set((await repo.sources(employeeIds, lostAppIds)).map(pairKey));
+  const sources = active.length ? await repo.sources(employeeIds, lostAppIds) : undefined;
+  await clearStaleRolePicks(ctx, tx, employeeIds, lostAppIds, sources);
+  if (!sources) return;
+  const remaining = new Set(sources.map(pairKey));
   const lost = new Map(
     active
       .filter((pair) => !remaining.has(pairKey(pair)))

@@ -51,7 +51,7 @@ A manual check of the Templates page and a template's page against a development
 
 ## Invite with a template role
 
-- [ ] Add Linear to Engineer. Under Role, choose Admin. Reload Engineer and check that Admin is still selected. An app without a connection shows "By hand".
+- [ ] Create Engineer and Design if they are missing. Add Linear to Engineer. Under Role, choose Admin. Reload Engineer and check that Admin is still selected. An app without a connection shows "By hand".
 - [ ] Give Engineer to Ivan Petrov. His Linear row shows Admin from Engineer.
-- [ ] Add Linear to a second template, Design, leave its role at User and give Design to Ivan. His Linear row offers "Pick a role…" and names the source template for each option. Invite disappears until he has a role.
+- [ ] Add Linear to a second template, Design, leave its role at User and give Design to Ivan. His Linear row offers "Pick a role…" and names the source template for each option. Invite disappears until the owner picks a role.
 - [ ] Pick "Admin, from Engineer", then invite Ivan to Linear. His row shows Admin and becomes Invited. In the fake connectors' `GET /_fake/state`, Ivan's Linear invitation has the role `admin`.

@@ -11,7 +11,7 @@ type Props = {
   apps: readonly TemplateAppRow[];
   /** While another change of the template's apps runs. */
   disabled: boolean;
-  onSetRole: (app: TemplateAppRow["app"], role: string) => void;
+  onSetRole: (app: TemplateAppRow["app"], role: string | null) => void;
   onTakeOut: (app: TemplateAppRow["app"]) => void;
 };
 
@@ -35,19 +35,20 @@ export function TemplateAppsTable({ apps, disabled, onTakeOut, onSetRole }: Prop
       id: "role",
       header: t("people.person.role"),
       cell: ({ app, role }) =>
-        app.roles.length ? (
+        app.roles.length || role !== null ? (
           <select
             aria-label={t("templates.role.label", { app: app.name })}
             className="h-8 max-w-full rounded-lg border border-input bg-background px-2 text-sm"
             disabled={disabled}
             value={role ?? app.roles.find((option) => option.isDefault)?.key}
-            onChange={(event) => onSetRole(app, event.target.value)}
+            onChange={(event) => onSetRole(app, event.target.value || null)}
           >
             {role !== null && !app.roles.some((option) => option.key === role) && (
               <option disabled value={role}>
-                {role}
+                {t("templates.role.unavailable", { role })}
               </option>
             )}
+            {!app.roles.length && <option value="">{t("templates.role.default")}</option>}
             {app.roles.map((option) => (
               <option key={option.key} value={option.key}>
                 {option.name}

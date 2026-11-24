@@ -30,6 +30,7 @@ export function showsCouldntChange({
 export function couldntChangeReason(
   failure: AccountChangeFailure,
   about: {
+    action?: AccountChangeAction;
     app: string;
     workspace: string;
     person: { name: string; email: string };
@@ -166,6 +167,7 @@ function reasonOf(
     person,
     connectionUserEmail,
     credential,
+    action,
   }: Parameters<typeof couldntChangeReason>[1],
 ): string {
   const withSession = credential === "APP_SESSION";
@@ -174,8 +176,10 @@ function reasonOf(
       return t("apps.couldnt.unexpectedResponse", { app });
     case "BLOCKED_BY_CHECK":
       return t("apps.couldnt.blockedByCheck", { app });
-    case "RATE_LIMITED":
     case "APP_UNAVAILABLE":
+      if (action === "INVITE") return t("apps.couldnt.inviteUnavailable", { app });
+      return t("apps.couldnt.noAnswer", { app });
+    case "RATE_LIMITED":
       return t("apps.couldnt.noAnswer", { app });
     case "AUTHENTICATION_FAILED":
     case "PERMISSION_MISSING":

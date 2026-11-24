@@ -37,6 +37,8 @@ export function PersonAppRow({
   invite,
   showSources,
 }: Props) {
+  const retiredRole = row.role != null && !row.app.roles.some(({ key }) => key === row.role);
+  const roleBlocked = row.roleConflict || retiredRole;
   return (
     <TableRow className={row.roleConflict ? "bg-amber-50/70" : undefined}>
       <TableCell className="h-12 pl-4">
@@ -96,16 +98,14 @@ export function PersonAppRow({
         )}
         {invite &&
           (!row.state || (row.state !== "INVITED" && invite.latestInvite?.status === "FAILED")) && (
-            <InviteStatusCell appInvite={invite} />
+            <InviteStatusCell appInvite={invite} roleBlocked={roleBlocked} />
           )}
       </TableCell>
       <TableCell className="pr-4 text-right">
         {account && <AccountChangeCell appUser={account} />}
-        {invite &&
-          !row.roleConflict &&
-          (row.state !== "INVITED" || invite.latestInvite?.status === "RUNNING") && (
-            <InviteCell appInvite={invite} />
-          )}
+        {invite && (row.state !== "INVITED" || invite.latestInvite?.status === "RUNNING") && (
+          <InviteCell appInvite={invite} roleBlocked={roleBlocked} />
+        )}
       </TableCell>
     </TableRow>
   );

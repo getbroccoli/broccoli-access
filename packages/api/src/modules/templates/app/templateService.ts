@@ -164,6 +164,7 @@ export function createTemplateService({
         if (!app || !isApproved) {
           throw invalidInput([{ field: "appId", code: "invalid" }]);
         }
+        await apps.lockAppsForReview(tx, [app.id]);
         const member = await templateRepository(tx).insertApp(before.id, app.id);
         const added = { field: "app", oldValue: null, newValue: app.id, newLabel: app.name };
         await appendHistory(ctx, tx, {

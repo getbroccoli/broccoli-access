@@ -78,10 +78,15 @@ export function personAppRole(roles: ReadonlySet<string | null>, choice?: Employ
   if (choice?.choice === "added") return { role: choice.role, roleConflict: false };
   if (choice?.choice === "removed") return { role: null, roleConflict: false };
   if (roles.size < 2) return { role: roles.values().next().value ?? null, roleConflict: false };
-  if (choice?.choice === "role_picked" && roles.has(choice.role)) {
+  if (choice?.choice === "role_picked" && pickStillApplies(roles, choice.role)) {
     return { role: choice.role, roleConflict: false };
   }
   return { role: null, roleConflict: true };
+}
+
+/** A saved choice lasts only while its role belongs to a disagreement. */
+export function pickStillApplies(roles: ReadonlySet<string | null>, role: string | null) {
+  return roles.size > 1 && roles.has(role);
 }
 
 function appState({

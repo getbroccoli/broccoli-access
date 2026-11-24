@@ -235,10 +235,9 @@ export function createAccountChangeService(
     },
     async readAppRoles(ctx, appIds) {
       ctx.require("MANAGE_WORKSPACE");
-      const [connections, connectors] = await Promise.all([
-        appConnectionRepository(orm).findByApps(appIds),
-        dependencies.connectors.list(),
-      ]);
+      const connections = await appConnectionRepository(orm).findByApps(appIds);
+      if (!connections.length) return new Map();
+      const connectors = await dependencies.connectors.list();
       const byKey = new Map(connectors.map(({ key, roles }) => [key, roles ?? []]));
       return new Map(
         connections.map(({ appId, connector }) => [appId, byKey.get(connector) ?? []]),

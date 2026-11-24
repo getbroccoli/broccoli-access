@@ -5,7 +5,7 @@ import { createRecordHistoryService } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
 import { assignmentRepository, type EmployeeAppPair, templateRepository } from "../db";
-import { personAppRole, type Template } from "../domain";
+import { personAppRole, pickStillApplies, type Template } from "../domain";
 import type { AppsById, EmployeeById, PersonAccess } from "../ports";
 import { lockTemplate } from "./lockTemplate";
 
@@ -107,16 +107,20 @@ export async function clearStaleRolePicks(
   tx: Tx,
   employeeIds: string[],
   appIds: string[],
+  remainingSources?: (EmployeeAppPair & { role: string | null })[],
 ) {
   const repo = assignmentRepository(tx);
   const picks = (await repo.choicesFor(employeeIds, appIds)).filter(
     ({ choice }) => choice === "role_picked",
   );
   if (!picks.length) return;
-  const sources = Map.groupBy(await repo.sources(employeeIds, appIds), pairKey);
+  const sources = Map.groupBy(
+    remainingSources ?? (await repo.sources(employeeIds, appIds)),
+    pairKey,
+  );
   const stale = picks.filter((pick) => {
     const roles = new Set(sources.get(pairKey(pick))?.map(({ role }) => role));
-    return roles.size < 2 || !roles.has(pick.role);
+    return !pickStillApplies(roles, pick.role);
   });
   if (!stale.length) return;
   await repo.clearChoices(stale, "role_picked");

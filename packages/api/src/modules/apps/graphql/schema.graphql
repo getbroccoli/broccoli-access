@@ -119,7 +119,7 @@ enum AccountChangeAction {
   SUSPEND
   "Enable: make the account active again."
   REACTIVATE
-  "Invite: the app sends its own invitation to the employee's email, as a regular member."
+  "Invite: the app sends its own invitation to the employee's email with their template role, or the app's default."
   INVITE
 }
 

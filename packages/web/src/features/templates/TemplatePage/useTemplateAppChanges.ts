@@ -21,7 +21,7 @@ export function useTemplateAppChanges(templateId: string) {
   const input = (app: App) => ({ variables: { input: { id: templateId, appId: app.id } } });
   return {
     changing: adding.loading || takingOut.loading || settingRole.loading,
-    setRole: async (app: App, role: string) => {
+    setRole: async (app: App, role: string | null) => {
       try {
         await setRole({ variables: { input: { id: templateId, appId: app.id, role } } });
       } catch {
