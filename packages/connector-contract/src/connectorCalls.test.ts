@@ -116,6 +116,55 @@ it("requires changed in an action answer", () => {
   expect(ACTION_RUN_ANSWER.safeParse({ account: actionAnswer.account }).success).toBe(false);
 });
 
+it("parses an invite request with just the email as its account", () => {
+  const request = { ...actionRequest, action: "invite", account: { email: invitation.email } };
+
+  expect(ACTION_RUN_REQUEST.parse(request)).toEqual(request);
+});
+
+it.for(["suspend", "reactivate"])("requires a source key to %s a member", (action) => {
+  const request = { ...actionRequest, action, account: { email: invitation.email } };
+
+  expect(ACTION_RUN_REQUEST.safeParse(request).success).toBe(false);
+});
+
+it("rejects an invite request without an email", () => {
+  const request = { ...actionRequest, action: "invite", account: {} };
+
+  expect(ACTION_RUN_REQUEST.safeParse(request).success).toBe(false);
+});
+
+it.for([
+  { dates: "known", invitedAt: "2026-03-01T10:00:00+01:00", expiresAt: "2026-03-31T09:00:00Z" },
+  { dates: "null", invitedAt: null, expiresAt: null },
+])("parses an invite answer with $dates dates", ({ invitedAt, expiresAt }) => {
+  const answer = { changed: true, invitation: { email: invitation.email, invitedAt, expiresAt } };
+
+  expect(ACTION_RUN_ANSWER.parse(answer)).toEqual(answer);
+});
+
+it("rejects an action answer with both a member and an invitation", () => {
+  expect(ACTION_RUN_ANSWER.safeParse({ ...actionAnswer, invitation }).success).toBe(false);
+});
+
+it("rejects an action answer with neither a member nor an invitation", () => {
+  expect(ACTION_RUN_ANSWER.safeParse({ changed: false }).success).toBe(false);
+});
+
+it("rejects an invitation whose invitedAt lacks the time", () => {
+  const answer = { changed: true, invitation: { ...invitation, invitedAt: "2026-03-01" } };
+
+  expect(ACTION_RUN_ANSWER.safeParse(answer).success).toBe(false);
+});
+
+it("parses a list answer with pending invitations", () => {
+  const answer = { ...list, invitations: [invitation] };
+
+  expect(ACCOUNTS_LIST_ANSWER.parse(answer)).toEqual(answer);
+});
+
+const invitation = { email: "ivan@acme.example", invitedAt: null, expiresAt: null };
+
 const connection = {
   connector: "linear",
   connection: {

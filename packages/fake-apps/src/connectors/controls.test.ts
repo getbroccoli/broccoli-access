@@ -1,4 +1,4 @@
-import { ACCOUNTS_LIST_ANSWER } from "@broccoli-access/connector-contract";
+import { ACCOUNTS_LIST_ANSWER, type Invitation } from "@broccoli-access/connector-contract";
 import { expect } from "vitest";
 
 import { callConnector, control, linearRequest, memberAccount, test as it } from "#test/support";
@@ -127,7 +127,97 @@ it("refuses a member control with an Origin header and preserves the member", as
   );
 });
 
+it("shows an invitation added by the control in the next Linear list", async ({
+  connectors: { url },
+}) => {
+  const email = "ivan@acme.example";
+
+  await control(url, "/linear/invitations", { email });
+
+  const list = await callConnector(url, "accounts/list", { ...linearRequest, cursor: null });
+  const { invitations } = ACCOUNTS_LIST_ANSWER.parse(list.body);
+  const invitation = invitations?.find((pending) => pending.email === email);
+  expect(invitation?.invitedAt).toEqual(expect.any(String));
+  expect(invitation?.expiresAt).toEqual(expect.any(String));
+});
+
+it("accepts a Linear invitation as an active member with a new id", async ({
+  connectors: { url },
+}) => {
+  const email = seededInvitation.email;
+  const seedIds = ACME_LINEAR.members.map(({ sourceKey }) => sourceKey);
+
+  await control(url, `/linear/invitations/${email}/accept`);
+
+  const list = await callConnector(url, "accounts/list", { ...linearRequest, cursor: null });
+  const { accounts, invitations } = ACCOUNTS_LIST_ANSWER.parse(list.body);
+  const accepted = accounts.find(({ values }) => values.email === email);
+  expect(accepted?.values.status).toBe("active");
+  expect(seedIds).not.toContain(accepted!.sourceKey);
+  expect(invitations).toEqual([]);
+});
+
+it("removes an expired Linear invitation", async ({ connectors: { url } }) => {
+  await control(url, `/linear/invitations/${seededInvitation.email}/expire`);
+
+  const list = await callConnector(url, "accounts/list", { ...linearRequest, cursor: null });
+  const { accounts, invitations } = ACCOUNTS_LIST_ANSWER.parse(list.body);
+  expect(invitations).toEqual([]);
+  expect(accounts.map(({ values }) => values.email)).not.toContain(seededInvitation.email);
+});
+
+it.for(["accept", "expire"])(
+  "answers 404 for %s without a pending invitation",
+  async (action, { connectors: { url } }) => {
+    const response = await fetch(`${url}/_fake/linear/invitations/ivan@acme.example/${action}`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(404);
+  },
+);
+
+it("rejects an invitation control without an email", async ({ connectors: { url } }) => {
+  const response = await fetch(`${url}/_fake/linear/invitations`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+
+  expect(response.status).toBe(400);
+});
+
+it("shows each workspace's pending invitations", async ({ connectors: { url } }) => {
+  const { invitations } = await readState(url);
+
+  expect(invitations).toEqual({ slack: [seededInvitation], linear: [seededInvitation] });
+});
+
+it("resets a sent invitation and restores an accepted seeded invitation", async ({
+  connectors: { url },
+}) => {
+  const email = "ivan@acme.example";
+  await control(url, "/linear/invitations", { email });
+  await control(url, `/linear/invitations/${seededInvitation.email}/accept`);
+  const changed = await readState(url);
+  expect(changed.invitations.linear.map((invitation) => invitation.email)).toEqual([email]);
+
+  await control(url, "/reset");
+
+  const reset = await readState(url);
+  expect(reset.invitations.linear).toEqual([seededInvitation]);
+  expect(reset.linear).not.toContainEqual(
+    expect.objectContaining({ email: seededInvitation.email }),
+  );
+});
+
+const seededInvitation = { email: "new.hire@acme.example", invitedAt: null, expiresAt: null };
+
 async function readState(url: string) {
   const response = await fetch(`${url}/_fake/state`);
-  return response.json() as Promise<{ slack: unknown[]; linear: unknown[] }>;
+  return response.json() as Promise<{
+    slack: unknown[];
+    linear: unknown[];
+    invitations: { slack: Invitation[]; linear: Invitation[] };
+  }>;
 }

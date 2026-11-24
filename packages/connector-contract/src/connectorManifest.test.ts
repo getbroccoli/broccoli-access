@@ -15,6 +15,13 @@ it("leaves out a capability v1 does not list", () => {
   expect(parsed.connectors[0]!.capabilities).toEqual(["list_accounts", "suspend", "reactivate"]);
 });
 
+it("keeps invite and list_invitations in the connector's capabilities", () => {
+  const extended = structuredClone(manifest);
+  extended.connectors[0]!.capabilities.push("invite", "list_invitations");
+
+  expect(CONNECTOR_MANIFEST.parse(extended)).toEqual(extended);
+});
+
 it("rejects the robot runtime", () => {
   const invalid = structuredClone(manifest);
   invalid.connectors[0]!.runtimes = ["robot"];

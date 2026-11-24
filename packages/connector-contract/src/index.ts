@@ -32,6 +32,7 @@ export {
   type ConnectorCall,
   type ConnectorErrorAnswer,
   type ConnectorErrorCode,
+  type Invitation,
   type ListedAccount,
   type Runtime,
 } from "./connectorCalls.js";

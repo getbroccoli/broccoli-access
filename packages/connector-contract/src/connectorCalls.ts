@@ -20,8 +20,11 @@ export const CONNECTOR_ERROR_CODES = [
 /** Whether the member may use their account in the app; pending invitations are not members. */
 export const ACCOUNT_STATUSES = ["active", "suspended"] as const;
 
-/** The changes `actions/run` makes to one member. */
-export const ACCOUNT_ACTIONS = ["suspend", "reactivate"] as const;
+/** The changes `actions/run` makes: to one member, or an invitation of one email. */
+export const ACCOUNT_ACTIONS = ["suspend", "reactivate", "invite"] as const;
+
+/** The actions on an existing member, which name it by its `sourceKey` and email. */
+const MEMBER_ACTIONS = ["suspend", "reactivate"] as const satisfies readonly AccountAction[];
 
 /**
  * The longest screenshot an error carries: 1 MB of PNG as base64, which takes four characters
@@ -111,6 +114,13 @@ export const CONNECTION_TEST_ANSWER = z.object({
   appCalls: APP_CALLS,
 });
 
+/** A pending invitation; the dates are null when the app does not give them. */
+const INVITATION = z.object({
+  email: EMAIL,
+  invitedAt: z.iso.datetime({ offset: true }).nullable(),
+  expiresAt: z.iso.datetime({ offset: true }).nullable(),
+});
+
 export const ACCOUNTS_LIST_REQUEST = CALL.extend({ cursor: z.string().nullable() });
 
 export const ACCOUNTS_LIST_ANSWER = z.object({
@@ -122,23 +132,39 @@ export const ACCOUNTS_LIST_ANSWER = z.object({
       values: ACCOUNT_VALUES,
     }),
   ),
+  /** Only from a connector that lists `list_invitations`, on any page of the scan. */
+  invitations: z.array(INVITATION).optional(),
   nextCursor: z.string().nullable(),
   connection: CONNECTION_UPDATE.optional(),
   appCalls: APP_CALLS,
 });
 
-export const ACTION_RUN_REQUEST = CALL.extend({
-  action: z.enum(ACCOUNT_ACTIONS),
-  account: z.object({ sourceKey: z.string().min(1), email: EMAIL }),
-});
+/** An invite names its recipient by email only, whether or not a member has that email. */
+export const ACTION_RUN_REQUEST = z.discriminatedUnion("action", [
+  CALL.extend({
+    action: z.enum(MEMBER_ACTIONS),
+    account: z.object({ sourceKey: z.string().min(1), email: EMAIL }),
+  }),
+  CALL.extend({ action: z.literal("invite"), account: z.object({ email: EMAIL }) }),
+]);
 
-/** The member as read again after the change, and whether anything changed. */
-export const ACTION_RUN_ANSWER = z.object({
+const ACTION_ANSWER = z.object({
   changed: z.boolean(),
-  account: z.object({ sourceKey: z.string().min(1), values: ACCOUNT_VALUES }),
   connection: CONNECTION_UPDATE.optional(),
   appCalls: APP_CALLS,
 });
+
+/**
+ * Whether anything changed, and what the connector read again after the call: the member, or for
+ * an invite of an email without one, the pending invitation. Never both.
+ */
+export const ACTION_RUN_ANSWER = z.union([
+  ACTION_ANSWER.extend({
+    account: z.object({ sourceKey: z.string().min(1), values: ACCOUNT_VALUES }),
+    invitation: z.undefined().optional(),
+  }),
+  ACTION_ANSWER.extend({ invitation: INVITATION, account: z.undefined().optional() }),
+]);
 
 /** A connector error, answered with HTTP 200. */
 export const CONNECTOR_ERROR_ANSWER = z.object({
@@ -164,6 +190,7 @@ export type ConnectionTestAnswer = z.infer<typeof CONNECTION_TEST_ANSWER>;
 export type AccountsListRequest = z.infer<typeof ACCOUNTS_LIST_REQUEST>;
 export type AccountsListAnswer = z.infer<typeof ACCOUNTS_LIST_ANSWER>;
 export type ListedAccount = AccountsListAnswer["accounts"][number];
+export type Invitation = z.infer<typeof INVITATION>;
 export type AccountValues = ListedAccount["values"];
 export type ActionRunRequest = z.infer<typeof ACTION_RUN_REQUEST>;
 export type ActionRunAnswer = z.infer<typeof ACTION_RUN_ANSWER>;

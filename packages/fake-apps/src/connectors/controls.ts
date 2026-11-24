@@ -3,7 +3,10 @@ import express, { Router, type RequestHandler } from "express";
 import { z } from "zod";
 
 import { invalidBody, notFound, refuseBrowsers } from "../utils";
-import { membersOf, type FakeConnectorsContext, type FakeConnectorKey } from "./connectorsState";
+import type { ConnectorsState, FakeConnectorsContext, FakeConnectorKey } from "./connectorsState";
+import type { FakeConnector } from "./fakeConnector";
+import { findConnector } from "./fakeConnectorList";
+import { acceptInvitation, invite, removeInvitation } from "./invitations";
 
 /**
  * Endpoints only the fake has (docs/fake-apps.md, "Fake connectors container"), so tests and
@@ -21,10 +24,20 @@ export function controlRoutes(context: FakeConnectorsContext): Router {
       response.json({
         slack: memberStates(context, "slack"),
         linear: memberStates(context, "linear"),
+        invitations: context.state.invitations,
       });
     })
     .post("/_fake/:connector/members/:email/suspend", setStatus(context, "suspended"))
     .post("/_fake/:connector/members/:email/reactivate", setStatus(context, "active"))
+    .post("/_fake/:connector/invitations", sendInvitation(context))
+    .post(
+      "/_fake/:connector/invitations/:email/accept",
+      changeInvitation(context, acceptInvitation),
+    )
+    .post(
+      "/_fake/:connector/invitations/:email/expire",
+      changeInvitation(context, removeInvitation),
+    )
     .post("/_fake/failures", planFailure(context))
     .post("/_fake/slack/sessions/expire", (_request, response) => {
       context.state.slackSessions.clear();
@@ -51,8 +64,10 @@ const MAX_DELAY_MS = 2 ** 31 - 1;
 
 const DELAY = z.object({ milliseconds: z.int().min(0).max(MAX_DELAY_MS) });
 
+const INVITATION = z.object({ email: z.email().transform((email) => email.toLowerCase()) });
+
 function memberStates(context: FakeConnectorsContext, connector: FakeConnectorKey) {
-  return membersOf(context.state, connector).map(({ sourceKey, email, displayName, status }) => ({
+  return context.state.members[connector].map(({ sourceKey, email, displayName, status }) => ({
     sourceKey,
     email,
     displayName,
@@ -68,9 +83,35 @@ function setStatus(
     const connector = CONNECTOR_KEY.safeParse(request.params.connector);
     if (!connector.success) return notFound(response, "No connector has this key");
     const email = request.params.email.toLowerCase();
-    const member = membersOf(context.state, connector.data).find((each) => each.email === email);
+    const member = context.state.members[connector.data].find((each) => each.email === email);
     if (member === undefined) return notFound(response, "No member has this email");
     member.status = status;
+    response.sendStatus(204);
+  };
+}
+
+/** An invitation sent in the app itself, as an invite would send it. */
+function sendInvitation(context: FakeConnectorsContext): RequestHandler<{ connector: string }> {
+  return (request, response) => {
+    const connector = findConnector(request.params.connector);
+    if (connector === undefined) return notFound(response, "No connector has this key");
+    const body = INVITATION.safeParse(request.body);
+    if (!body.success) return invalidBody(response, body.error);
+    invite(connector, context.state, body.data.email);
+    response.sendStatus(204);
+  };
+}
+
+function changeInvitation(
+  context: FakeConnectorsContext,
+  change: (connector: FakeConnector, state: ConnectorsState, email: string) => boolean,
+): RequestHandler<{ connector: string; email: string }> {
+  return (request, response) => {
+    const connector = findConnector(request.params.connector);
+    if (connector === undefined) return notFound(response, "No connector has this key");
+    if (!change(connector, context.state, request.params.email.toLowerCase())) {
+      return notFound(response, "No invitation has this email");
+    }
     response.sendStatus(204);
   };
 }

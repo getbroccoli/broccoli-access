@@ -22,7 +22,7 @@ export const SLACK: FakeConnector = {
     name: "Slack",
     appDomain: "slack.com",
     runtimes: ["server"],
-    capabilities: ["list_accounts", "suspend", "reactivate"],
+    capabilities: ["list_accounts", "suspend", "reactivate", "invite", "list_invitations"],
     findingKind: "slack_members",
     connectionFields: [
       {
@@ -57,6 +57,7 @@ export const SLACK: FakeConnector = {
     is_primary_owner: member.isConnectionUser,
     profile: { email: member.email, real_name: member.displayName },
   }),
+  invitationDates: () => ({ invitedAt: null, expiresAt: null }),
 };
 
 /**

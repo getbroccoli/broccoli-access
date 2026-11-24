@@ -176,18 +176,6 @@ it("answers account_not_found for Chloé's source key with Ana's email", async (
   expect(result.body).toEqual({ error: { code: "account_not_found" } });
 });
 
-it("answers account_not_found for a pending invitation", async ({ connectors: { url } }) => {
-  const { sourceKey, email } = ACME_LINEAR.members.find((member) => member.status === "invited")!;
-
-  const result = await callConnector(url, "actions/run", {
-    ...linearRequest,
-    action: "suspend",
-    account: { sourceKey, email },
-  });
-
-  expect(result.body).toEqual({ error: { code: "account_not_found" } });
-});
-
 it("answers wrong_workspace for another Linear organisation ID", async ({
   connectors: { url },
 }) => {
@@ -211,7 +199,7 @@ const linearDescription = {
   name: "Linear",
   appDomain: "linear.app",
   runtimes: ["server"],
-  capabilities: ["list_accounts", "suspend", "reactivate"],
+  capabilities: ["list_accounts", "suspend", "reactivate", "invite", "list_invitations"],
   findingKind: "linear_members",
   connectionFields: [
     {
@@ -232,7 +220,7 @@ const slackDescription = {
   name: "Slack",
   appDomain: "slack.com",
   runtimes: ["server"],
-  capabilities: ["list_accounts", "suspend", "reactivate"],
+  capabilities: ["list_accounts", "suspend", "reactivate", "invite", "list_invitations"],
   findingKind: "slack_members",
   connectionFields: [
     {

@@ -1,22 +1,31 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import {
-  ACCOUNTS_LIST_ANSWER,
   ACTION_RUN_ANSWER,
-  CONNECTION_TEST_ANSWER,
-  CONNECTOR_CALLS,
   CONNECTOR_ERROR_ANSWER,
   CONNECTOR_ERROR_CODES,
-  CONNECTION_UPDATE,
+  CONNECTOR_CALLS,
   type AccountAction,
   type AccountStatus,
   type Connection,
-  type ConnectorCall,
   type ConnectorErrorCode,
-  type ListedAccount,
 } from "../connectorCalls.js";
-import { CONNECTOR_MANIFEST, RUNTIME_KINDS, type RuntimeKind } from "../connectorManifest.js";
+import { CONNECTOR_MANIFEST } from "../connectorManifest.js";
+import { describeInviteConformance } from "./describeInviteConformance.js";
+import {
+  actionFields,
+  getManifest,
+  listAll,
+  listPages,
+  post,
+  requestOf,
+  runtimesOf,
+  send,
+  startFlow,
+  withinDeadline,
+  unlistedRuntimes,
+  type Flow,
+} from "./flow.js";
 
 export interface ConformanceOptions {
   /**
@@ -35,11 +44,17 @@ export interface ConnectorFixture {
   connection: (url: string) => Promise<Connection>;
   /** An active member that the suite suspends and reactivates. */
   member: { sourceKey: string; email: string };
+  /**
+   * An email with no member and no pending invitation, which the suite invites; a connector that
+   * lists `invite` needs it.
+   */
+  invitee?: { email: string };
   /** Makes the next `actions/run` call through the container at `url` fail with `code`. */
   causeError: (url: string, code: ConnectorErrorCode) => Promise<void>;
   /**
    * Puts the fake app behind the container at `url` back to its seed before each check: the
-   * member active, the connection's credentials working, and no error waiting.
+   * member active, no invitation for the invitee, the connection's credentials working, and no
+   * error waiting.
    */
   reset: (url: string) => Promise<void>;
   /**
@@ -76,6 +91,7 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
           checkList(url, fixture));
         it("changes the member once when an action repeats, and reports the status read afterwards", () =>
           checkRepeatedActions(url, fixture));
+        describeInviteConformance(url, fixture);
         // A check, not a throw while collecting: Vitest would then skip the caller's afterAll(stop).
         if (fixture.cannotCause !== undefined)
           it("lists in cannotCause only errors its connector can never give, each with a one-line reason", () =>
@@ -98,19 +114,8 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
   }
 }
 
-/** A connector answers within 90 seconds (contract "Answers"). */
-const CALL_TIMEOUT_MS = 90_000;
-
 /** Each call and fixture step has its own deadline, so a check that makes many needs none. */
 const NO_CHECK_TIMEOUT = 0;
-
-/** A fixture talks to a fake app on the same machine, so it gets a connector call's time too. */
-const FIXTURE_TIMEOUT_MS = CALL_TIMEOUT_MS;
-
-/** A paging loop that never ends is a failure, not a hang. */
-const MAX_PAGES = 1_000;
-
-const SERVER = { kind: "server" } as const;
 
 /** The errors only some connectors meet: a check that only a robot's page shows, and a lost owner's browser. */
 const OPTIONAL_ERROR_CODES = [
@@ -120,25 +125,6 @@ const OPTIONAL_ERROR_CODES = [
 
 /** Any character that ends a line, which would break a one-line skip note. */
 const LINE_BREAK = /[\n\r\u2028\u2029]/;
-
-/** An address that answers nothing: the suite never drives an owner's browser. */
-const UNUSED_BROWSER_URL = "ws://127.0.0.1:9/conformance";
-
-const ANY_ANSWER = z.union([
-  CONNECTION_TEST_ANSWER,
-  ACCOUNTS_LIST_ANSWER,
-  ACTION_RUN_ANSWER,
-  CONNECTOR_ERROR_ANSWER,
-]);
-
-const UPDATING_ANSWER = z.object({ connection: CONNECTION_UPDATE.optional() });
-
-/** One connection used for a series of calls, as the core keeps it between them. */
-interface Flow {
-  url: string;
-  fixture: ConnectorFixture;
-  connection: Connection;
-}
 
 async function checkList(url: string, fixture: ConnectorFixture): Promise<void> {
   const [flow] = await startFlow(url, fixture);
@@ -226,8 +212,8 @@ async function expectAction(
     ({ sourceKey }) => sourceKey === flow.fixture.member.sourceKey,
   );
 
-  expect({ changed: answer.changed, status: answer.account.values.status }).toEqual(expected);
-  expect(answer.account.sourceKey).toBe(flow.fixture.member.sourceKey);
+  expect({ changed: answer.changed, status: answer.account?.values.status }).toEqual(expected);
+  expect(answer.account?.sourceKey).toBe(flow.fixture.member.sourceKey);
   expect(listed?.values.status).toBe(expected.status);
 }
 
@@ -240,134 +226,6 @@ async function answersOf(url: string, fixture: ConnectorFixture): Promise<unknow
   const action = await send(flow, "actions/run", actionFields(fixture, "suspend"));
   expect(ACTION_RUN_ANSWER.safeParse(action).error, "the action's answer").toBeUndefined();
   return [manifest, testAnswer, ...pages, action].map(withoutRenewedSecrets);
-}
-
-/** A connection that passed its test, with the settings the test found, and the test's answer. */
-async function startFlow(url: string, fixture: ConnectorFixture): Promise<[Flow, unknown]> {
-  const connection = await withinDeadline(fixture.connection(url), "the fixture's connection");
-  const flow = { url, fixture, connection };
-  const answer = await send(flow, "connections/test", {});
-  expect(CONNECTION_TEST_ANSWER.safeParse(answer).error, "the test's answer").toBeUndefined();
-  return [flow, answer];
-}
-
-async function listAll(flow: Flow): Promise<ListedAccount[]> {
-  const pages = await listPages(flow);
-  return pages.flatMap((page) => ACCOUNTS_LIST_ANSWER.parse(page).accounts);
-}
-
-async function listPages(flow: Flow): Promise<unknown[]> {
-  const pages: unknown[] = [];
-  const cursors = new Set<string>();
-  let cursor: string | null = null;
-  do {
-    const page = await send(flow, "accounts/list", { cursor });
-    pages.push(page);
-    cursor = ACCOUNTS_LIST_ANSWER.parse(page).nextCursor;
-    expect(cursors.has(cursor ?? ""), "a nextCursor seen before").toBe(false);
-    if (cursor !== null) cursors.add(cursor);
-  } while (cursor !== null && pages.length < MAX_PAGES);
-  expect(cursor, "the last page's nextCursor").toBeNull();
-  return pages;
-}
-
-/** Calls on the server runtime and keeps the connection update a successful answer carries. */
-async function send(flow: Flow, path: ConnectorCall, fields: object): Promise<unknown> {
-  const answer = await call(flow.url, path, { ...requestOf(flow, "connections/test"), ...fields });
-  const update = isError(answer) ? undefined : UPDATING_ANSWER.safeParse(answer).data?.connection;
-  // Each object an update carries replaces the stored one (contract "The connection").
-  if (update !== undefined) flow.connection = { ...flow.connection, ...update };
-  return answer;
-}
-
-/** A request for `path` that the connector would answer. */
-function requestOf(flow: Flow, path: ConnectorCall): object {
-  const request = {
-    connector: flow.fixture.connector,
-    connection: flow.connection,
-    runtime: SERVER,
-  };
-  if (path === "accounts/list") return { ...request, cursor: null };
-  if (path === "actions/run") return { ...request, ...actionFields(flow.fixture, "suspend") };
-  return request;
-}
-
-function actionFields(fixture: ConnectorFixture, action: AccountAction) {
-  return { action, account: fixture.member };
-}
-
-/** Every runtime the connector does not list, and one no version of the contract has. */
-function unlistedRuntimes(listed: readonly string[]): { kind: string; url?: string }[] {
-  const unlisted = RUNTIME_KINDS.filter((kind) => !listed.includes(kind));
-  return [
-    ...unlisted.map((kind) => (kind === "server" ? SERVER : { kind, url: UNUSED_BROWSER_URL })),
-    { kind: "unknown_runtime" },
-  ];
-}
-
-/**
- * A call's answer, which must come with HTTP 200 and match one of the contract's answers: an
- * error alone, with a listed code, or a success without an error.
- */
-async function call(url: string, path: string, body: object): Promise<unknown> {
-  const response = await post(url, path, body);
-  expect(response.status, `HTTP status of ${path}`).toBe(200);
-  const answer: unknown = await response.json();
-  expect(ANY_ANSWER.safeParse(answer).error, `answer of ${path}`).toBeUndefined();
-  // The suite never sends APP_CALLS_HEADER, so the app's calls must stay out of every answer.
-  expect(answer, `app calls in the answer of ${path}`).not.toHaveProperty("appCalls");
-  if (isError(answer)) {
-    expect(Object.keys(answer), `error answer of ${path}`).toEqual(["error"]);
-    expect(CONNECTOR_ERROR_CODES, `error code of ${path}`).toContain(answer.error.code);
-  }
-  return answer;
-}
-
-function isError(answer: unknown): answer is { error: { code: unknown } } {
-  return typeof answer === "object" && answer !== null && "error" in answer;
-}
-
-/** Fails a fixture step that never settles, as a call past its deadline fails. */
-async function withinDeadline<T>(step: Promise<T>, name: string): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const late = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`${name} took over ${FIXTURE_TIMEOUT_MS} ms`)),
-      FIXTURE_TIMEOUT_MS,
-    );
-  });
-  try {
-    return await Promise.race([step, late]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function runtimesOf(url: string, connector: string): Promise<RuntimeKind[]> {
-  const manifest = CONNECTOR_MANIFEST.parse(await getManifest(url));
-  return manifest.connectors.find(({ key }) => key === connector)?.runtimes ?? [];
-}
-
-async function getManifest(url: string): Promise<unknown> {
-  const response = await fetch(`${url}/v1/connectors`, {
-    redirect: "manual",
-    signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-  });
-  expect(response.status, "HTTP status of the manifest").toBe(200);
-  const manifest: unknown = await response.json();
-  expect(manifest, "app calls in the manifest").not.toHaveProperty("appCalls");
-  return manifest;
-}
-
-/** Never follows a redirect: it would leave the container, and the contract answers with 200. */
-function post(url: string, path: string, body: object): Promise<Response> {
-  return fetch(`${url}/v1/${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    redirect: "manual",
-    signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-  });
 }
 
 /** Two containers may renew a session differently; the answers about the app must still agree. */

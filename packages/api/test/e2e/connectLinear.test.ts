@@ -46,9 +46,10 @@ test("the owner connects Linear and reads its seven members with their status", 
     data: { apps: { edges: { node: { id: string; catalogKey: string | null } }[] } };
   };
   const app = body.data.apps.edges.find(({ node }) => node.catalogKey === "linear")!.node;
-  const expectedUsers = ACME_LINEAR.members
-    .filter((member) => member.status !== "invited")
-    .map((member) => ({ employee: { email: member.email }, status: member.status.toUpperCase() }));
+  const expectedUsers = ACME_LINEAR.members.map((member) => ({
+    employee: { email: member.email },
+    status: member.status.toUpperCase(),
+  }));
   await expect
     .poll(
       async () => {

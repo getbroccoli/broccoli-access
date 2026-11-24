@@ -41,7 +41,7 @@ test("links all seven Linear members to their employees with the status Linear r
   );
   const employees = await storedEmployees(orm);
   expect(members).toHaveLength(7);
-  for (const person of ACME_LINEAR.members.filter((member) => member.status !== "invited")) {
+  for (const person of ACME_LINEAR.members) {
     const employee = employees.find((employee) => employee.email === person.email)!;
     expect(members.find((member) => member.email === person.email)).toMatchObject({
       employeeId: employee.id,
@@ -62,7 +62,7 @@ test("stores version-two Linear records and identifies the admin who owns the ke
 
   const records = await storedImportRecords(orm);
   expect(records).toHaveLength(7);
-  for (const member of ACME_LINEAR.members.filter((member) => member.status !== "invited")) {
+  for (const member of ACME_LINEAR.members) {
     expect(records.find((record) => record.sourceKey === member.sourceKey)).toMatchObject({
       sourceId: linear.sourceId,
       type: "app_account",

@@ -102,7 +102,7 @@ What the container offers. The core shows connections and actions from this list
 ```
 
 - **`runtimes`:** where calls can run, in the order the core tries them: `server`, `owner_browser` or both. An API or SCIM connector lists `server` only, and so does Slack, which makes the calls Slack's own pages make. The core needs no other word for how a connector works.
-- **`capabilities`:** `list_accounts`, `suspend` and `reactivate` in v1.
+- **`capabilities`:** `list_accounts`, `suspend`, `reactivate`, `invite` and `list_invitations` in v1.
 - **`connectionFields`:**
   - kind `text`: a value the owner types or pastes, such as an API key, with `secret` set to true or false;
   - kind `app_session`: always secret, with its `domains` and optional `storageKeys`.
@@ -152,7 +152,8 @@ One page of the app's members. The core calls it in every scan, every day.
 ```
 
 - **`sourceKey`:** the app's own id for the member, unique within the workspace.
-- **`status`:** `active` or `suspended`. Pending invitations are not members, and connectors leave them out.
+- **`status`:** `active` or `suspended`. Pending invitations are not members, and connectors leave them out of `accounts`.
+- **`invitations`:** optional, only from a connector that lists `list_invitations`: the app's pending invitations, each `{ "email", "invitedAt", "expiresAt" }`, with `invitedAt` and `expiresAt` null when the app does not give them. All pages of one scan together hold every pending invitation in the workspace; a connector may give them all on one page.
 - **`isConnectionUser`:** true for the member whose key or session the connection uses. The core never offers Disable on that member.
 - **A robot:** may answer with every member on one page and `nextCursor` null.
 
@@ -170,7 +171,7 @@ Makes one change to one member, then reads the member again.
 }
 ```
 
-- **`action`:** `suspend` or `reactivate`.
+- **`action`:** `suspend`, `reactivate` or `invite`. For `invite`, `account` holds only `email`, and the app invites that email as a regular member, with the app's default channels or teams.
 - **`runtime`:** see [Runtimes](#runtimes).
 - **Answer:** the member as read after the change, and whether anything changed. An action on a member who is already in that status changes nothing and succeeds.
 
@@ -189,9 +190,10 @@ Makes one change to one member, then reads the member again.
 }
 ```
 
+- **`invite`'s answer:** `changed`, and either `invitation`, the pending invitation read after the call as `{ "email", "invitedAt", "expiresAt" }`, or `account`, when the email already has a member. An email that already has a member or a pending invitation succeeds with `changed: false`, and no second invitation is sent.
 - **Rules:**
-  - Before changing anything, the connector checks that the connection still reaches the same workspace and finds exactly one member with this `sourceKey` and email.
-  - After the change, it reads the member again. Success means it saw the new status, never that a click went through.
+  - Before changing anything, the connector checks that the connection still reaches the same workspace and finds exactly one member with this `sourceKey` and email. For `invite`, it checks the workspace only.
+  - After the change, it reads the member again. Success means it saw the new status, never that a click went through. For `invite`, it reads the invitation, or the member, back.
   - Repeating an action is always safe, so the core may retry it.
 
 ## Errors
@@ -261,13 +263,15 @@ To check a connector against the real app, a caller can ask for every call the c
 ## Conformance
 
 - `packages/connector-contract` exports a schema for every request and answer, and a suite that runs against any container's address.
-- The suite needs fixtures: for each connector, a connection to its fake app, a member to suspend and reactivate, and a way to make the fake show each error.
+- The suite needs fixtures: for each connector, a connection to its fake app, a member to suspend and reactivate, and a way to make the fake show each error, and, for a connector that lists `invite`, an email with no member.
 - **What it checks:**
   - every answer matches its schema;
   - every error uses a listed code;
   - a request without the debug header gets no `appCalls`;
   - an action repeated twice changes the member once;
   - an action reports the status read afterwards;
+  - `invite` repeated twice sends one invitation;
+  - for a connector that lists `list_invitations`, the next list returns the invitation `invite` just sent;
   - a runtime the connector does not list is answered with HTTP 400;
   - two containers started from the same image give the same answers;
   - the container works with a read-only file system.

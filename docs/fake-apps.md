@@ -295,14 +295,18 @@ Circle 2's core is built and checked against a fake of the connectors container,
 - **Linear:** the key `lin_api_acme_fake` reaches Acme's Linear; any other key fails with `authentication_failed`.
 - **Slack sign-in:** `GET /slack/signin` shows "Sign in as Mia Novak". It sets the cookie `d` on the fake's host and keeps a token in local storage, as Slack's page does; both are the session the extension hands over. The fake accepts only sessions it issued and has not expired.
 - **Changes:** the fake changes the member in memory and answers as the contract says, after a short delay that a control can lengthen.
+- **Invites:** `slack` and `linear` list `invite` and `list_invitations`. An invite adds a pending invitation for the email; Linear's has `invitedAt` now and `expiresAt` 30 days later, Slack's has both null. An email that already has a member or an invitation changes nothing. `accounts/list` returns the pending invitations in `invitations` on its first page.
 
 ### Control endpoints
 
 Under `/_fake`, as for the fake Google:
 
 - `POST /_fake/reset`: back to the seed.
-- `GET /_fake/state`: the members of each workspace, with their status.
+- `GET /_fake/state`: the members of each workspace, with their status, and each workspace's invitations.
 - `POST /_fake/{connector}/members/{email}/suspend` and `/reactivate`: change a member as an admin would in the app.
+- `POST /_fake/{connector}/invitations` with `email`: an invitation sent in the app itself.
+- `POST /_fake/{connector}/invitations/{email}/accept`: the invitation becomes an active member with a new member id.
+- `POST /_fake/{connector}/invitations/{email}/expire`: the invitation expires and is gone.
 - `POST /_fake/failures` with `connector`, `call` (`connections/test`, `accounts/list` or `actions/run`), an error code and a count: the next matching calls fail that way.
 - `POST /_fake/slack/sessions/expire`: every Slack session fails with `authentication_failed`, until the owner signs in again.
 - `POST /_fake/linear/keys/revoke`: the Linear key fails with `authentication_failed`.
@@ -315,10 +319,11 @@ Under `/_fake`, as for the fake Google:
   - Mia Novak is the primary owner, and the member the session belongs to.
   - Ana Ruiz and Ben Ito are active, so they show as suspended with access.
   - Elif Demir is deactivated, to show Enable.
-  - One pending invitation, `new.hire@acme.example`, which the list leaves out.
+  - One pending invitation, `new.hire@acme.example`, which the list returns in `invitations`, not as a member.
 - **Linear:** workspace "Acme", url key `acme`.
   - Members: Mia Novak (admin, owner of the key), Ana Ruiz, Chloé Martin, David Okafor, Gabriel Silva and Jun Park, all active; Hannah Weber, suspended.
-  - One pending invitation, which the list leaves out.
+  - One pending invitation, which the list returns in `invitations`, not as a member.
+- Ivan Petrov, active, has no Slack or Linear account: the invite journeys use him.
 
 ### Which tasks use what
 

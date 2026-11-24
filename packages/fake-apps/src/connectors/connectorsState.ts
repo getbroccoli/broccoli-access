@@ -1,4 +1,8 @@
-import type { ConnectorCall, ConnectorErrorCode } from "@broccoli-access/connector-contract";
+import type {
+  ConnectorCall,
+  ConnectorErrorCode,
+  Invitation,
+} from "@broccoli-access/connector-contract";
 
 import { ACME_LINEAR, ACME_SLACK, type SeedMember } from "../seed";
 
@@ -11,9 +15,10 @@ export interface FakeConnectorsContext {
   log: (line: string) => void;
 }
 
-/** The fake's memory: Acme's members in each app and what the controls changed. */
+/** The fake's memory: Acme's members and invitations in each app, and what the controls changed. */
 export interface ConnectorsState {
   members: Record<FakeConnectorKey, SeedMember[]>;
+  invitations: Record<FakeConnectorKey, Invitation[]>;
   /** Planned failures by connector and call; each matching call uses one. */
   failures: Map<`${FakeConnectorKey} ${ConnectorCall}`, PlannedFailure>;
   /** How long each call's answer takes. */
@@ -30,12 +35,16 @@ export interface PlannedFailure {
   remaining: number;
 }
 
-/** The seed's members, copied so changes never reach the seed. */
+/** The seed's members and invitations, copied so changes never reach the seed. */
 export function seededState(delayMs: number): ConnectorsState {
   return {
     members: {
       slack: ACME_SLACK.members.map((member) => ({ ...member })),
       linear: ACME_LINEAR.members.map((member) => ({ ...member })),
+    },
+    invitations: {
+      slack: ACME_SLACK.invitations.map(undatedInvitation),
+      linear: ACME_LINEAR.invitations.map(undatedInvitation),
     },
     failures: new Map(),
     delayMs,
@@ -44,7 +53,7 @@ export function seededState(delayMs: number): ConnectorsState {
   };
 }
 
-/** Members only: a pending invitation is not one. */
-export function membersOf(state: ConnectorsState, connector: FakeConnectorKey): SeedMember[] {
-  return state.members[connector].filter((member) => member.status !== "invited");
+/** The seed's invitations carry no dates, so two fakes started apart list them alike. */
+function undatedInvitation(email: string): Invitation {
+  return { email, invitedAt: null, expiresAt: null };
 }
