@@ -60,8 +60,8 @@ export const SLACK: FakeConnector = {
   connectionMember: (state, secrets) => {
     const session = sessionOf(secrets);
     const issued = session && state.slackSessions.get(session.d);
-    if (issued?.token !== session?.token) return undefined;
-    return state.members.slack.find((member) => member.sourceKey === issued?.memberKey);
+    if (issued === undefined || issued.token !== session?.token) return undefined;
+    return state.members.slack.find((member) => member.sourceKey === issued.memberKey);
   },
   raw: (member) => ({
     id: member.sourceKey,
