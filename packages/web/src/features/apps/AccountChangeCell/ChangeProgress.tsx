@@ -32,5 +32,11 @@ function progressText(app: string, { action, changesAhead }: Props["change"]): s
   if (ahead > 1) {
     return t("apps.change.waiting", { app, count: String(ahead) });
   }
-  return t(action === "SUSPEND" ? "apps.change.disabling" : "apps.change.enabling", { app });
+  return t(RUNNING[action], { app });
 }
+
+const RUNNING = {
+  SUSPEND: "apps.change.disabling",
+  REACTIVATE: "apps.change.enabling",
+  INVITE: "apps.change.inviting",
+} as const;

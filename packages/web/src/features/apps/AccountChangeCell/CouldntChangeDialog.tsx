@@ -29,16 +29,17 @@ import { dayAndTime } from "@/lib/dayAndTime";
 import { ReconnectButton } from "../ReconnectButton";
 import { couldntChangeHint, couldntChangeReason, failedChangeOptions } from "./couldntChange";
 import { DoneByHandDialog } from "./DoneByHandDialog";
-import { useChangeAccount } from "./useChangeAccount";
+import { type ChangeTarget, changeTargetOf, useChangeAccount } from "./useChangeAccount";
 
 type Props = {
   /** A failed account change. */
   change: FragmentType<CouldntChangeDialog_AccountChangeFragment>;
   /**
-   * The account whose latest change it is, which Try again and I did it by hand act on; absent where
-   * the change is history, as on Activity, which shows only why.
+   * The row whose latest change it is, which Try again and I did it by hand act on: the account, or
+   * the employee's invite row, offering INVITE while Invite is offered; absent where the change is
+   * history, as on Activity, which shows only why.
    */
-  account?: { id: string; offeredChange: AccountChangeAction | null };
+  row?: { id: string; offeredChange: AccountChangeAction | null };
   /** The trigger's look; the account row's chip by default. */
   triggerClassName?: string;
 };
@@ -48,11 +49,7 @@ type Props = {
  * admin page and, for an account, what helps now: Try again, I did it by hand (confirmed in its own
  * dialog), or a scan.
  */
-export function CouldntChangeDialog({
-  change: changeRef,
-  account,
-  triggerClassName = CHIP,
-}: Props) {
+export function CouldntChangeDialog({ change: changeRef, row, triggerClassName = CHIP }: Props) {
   const fragment = useFragment({
     fragment: CouldntChangeDialog_AccountChangeFragmentDoc,
     // The document also holds the fragments of the Reconnect button, which this one spreads.
@@ -71,8 +68,8 @@ export function CouldntChangeDialog({
   const name = employee ? `${employee.firstName} ${employee.lastName}` : change.email;
   const firstName = employee?.firstName ?? change.email;
   const workspace = connection?.scan?.sourceName ?? app.name;
-  const options = account
-    ? failedChangeOptions({ offeredChange: account.offeredChange, latestChange: change, app })
+  const options = row
+    ? failedChangeOptions({ offeredChange: row.offeredChange, latestChange: change, app })
     : NO_OPTIONS;
   const copy = COPY[change.action];
   const reason = couldntChangeReason(change.failure, {
@@ -80,14 +77,16 @@ export function CouldntChangeDialog({
     workspace,
     person: { name, email: change.email },
     // Today's connection user says nothing about who it was when a change in history failed.
-    connectionUserEmail: account ? (connection?.connectionUserEmail ?? null) : null,
+    connectionUserEmail: row ? (connection?.connectionUserEmail ?? null) : null,
     credential: connection?.connector.connectionFields.find(({ secret }) => secret)?.kind ?? "TEXT",
     toReconnect: options.reconnect,
   });
-  const tryAgain = (accountId: string) => {
+  const tryAgain = (target: ChangeTarget) => {
     setShown(null);
-    void changeAccount({ id: accountId, name, app: app.name }, change.action);
+    void changeAccount(target, change.action);
   };
+  // A row's change is its employee's, whose email it has; without them nothing can be asked again.
+  const target = row && employee && changeTargetOf({ id: row.id, employee, app }, change.action);
   const scan = (connectionId: string) => {
     setShown(null);
     scanNow({ variables: { connectionId } }).catch(() => toast.error(t("scans.scanNowFailed")));
@@ -110,7 +109,7 @@ export function CouldntChangeDialog({
             </DialogTitle>
             <DialogDescription>
               {askedBy(change)}
-              {account &&
+              {row &&
                 stillHasAccess(change) &&
                 ` ${t("apps.couldnt.stillHasAccess", { firstName, workspace })}`}
             </DialogDescription>
@@ -118,7 +117,7 @@ export function CouldntChangeDialog({
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
             {reason}
           </p>
-          {account && (
+          {row && (
             <p className="text-sm text-muted-foreground">
               {couldntChangeHint(change.failure, change.action, options, {
                 firstName,
@@ -151,8 +150,8 @@ export function CouldntChangeDialog({
                 </a>
               )}
             </div>
-            {account && options.tryAgain && (
-              <Button type="button" size="lg" className="px-4" onClick={() => tryAgain(account.id)}>
+            {target && options.tryAgain && (
+              <Button type="button" size="lg" className="px-4" onClick={() => tryAgain(target)}>
                 {t("apps.couldnt.tryAgain")}
               </Button>
             )}
@@ -200,7 +199,7 @@ const CHIP = cn(
 /** History offers no action: Try again and I did it by hand act on an account's latest change. */
 const NO_OPTIONS = { tryAgain: false, byHand: false, scanNow: false, reconnect: false };
 
-/** The words of a failed Disable or Enable, which mirror each other. */
+/** The words of a failed Disable, Enable or Invite, which mirror each other. */
 const COPY = {
   SUSPEND: {
     chip: "apps.couldnt.disable",
@@ -209,6 +208,10 @@ const COPY = {
   REACTIVATE: {
     chip: "apps.couldnt.enable",
     title: "apps.couldnt.enableTitle",
+  },
+  INVITE: {
+    chip: "apps.couldnt.invite",
+    title: "apps.couldnt.inviteTitle",
   },
 } as const;
 

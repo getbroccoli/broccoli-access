@@ -1,0 +1,10 @@
+fragment InviteStatusCell_appInvite on AppInvite {
+  id
+  offered
+  latestInvite {
+    id
+    action
+    status
+    ...CouldntChangeDialog_accountChange
+  }
+}

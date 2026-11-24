@@ -28,7 +28,7 @@ const APP: DataTableColumn<AccountChangeRow> = {
 const CHANGE: DataTableColumn<AccountChangeRow> = {
   id: "change",
   header: t("apps.activity.column.change"),
-  cell: ({ action }) => t(action === "SUSPEND" ? "apps.change.disable" : "apps.change.enable"),
+  cell: ({ action }) => t(ACTIONS[action]),
 };
 
 const ASKED: DataTableColumn<AccountChangeRow> = {
@@ -55,5 +55,12 @@ const OUTCOME: DataTableColumn<AccountChangeRow> = {
   cell: (change) => <ChangeOutcome change={change} />,
 };
 
-/** Who and which app, Disable or Enable, who asked and when, and how it ended. */
+/** Who and which app, Disable, Enable or Invite, who asked and when, and how it ended. */
 export const ACTIVITY_COLUMNS = [PERSON, APP, CHANGE, ASKED, OUTCOME];
+
+/** Disable, Enable or Invite, as the buttons name them. */
+const ACTIONS = {
+  SUSPEND: "apps.change.disable",
+  REACTIVATE: "apps.change.enable",
+  INVITE: "apps.change.invite",
+} as const;

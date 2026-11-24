@@ -58,6 +58,19 @@ mutation MarkAccountChangeDoneByHand($input: AccountChangeMarkDoneByHandInput!) 
           suspendedWithAccessCount
         }
       }
+      # For an invite: the employee's invite rows, which now show Invited.
+      accountChange {
+        id
+        status
+        employee {
+          id
+          appInvites {
+            id
+            ...InviteCell_appInvite
+            ...InviteStatusCell_appInvite
+          }
+        }
+      }
       error {
         __typename
         ... on Error {

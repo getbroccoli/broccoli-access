@@ -29,5 +29,19 @@ query PersonPage($id: ID!) {
       ...AccountChangeCell_appUser
       ...AppAccountStatusCell_appUser
     }
+    appInvites {
+      id
+      app {
+        id
+        name
+        catalogKey
+      }
+      latestInvite {
+        id
+        status
+      }
+      ...InviteCell_appInvite
+      ...InviteStatusCell_appInvite
+    }
   }
 }

@@ -65,19 +65,24 @@ export const appsEn = {
   "apps.change.enable": "Enable",
   "apps.change.disableName": "Disable {name} in {app}",
   "apps.change.enableName": "Enable {name} in {app}",
+  "apps.change.invite": "Invite",
+  "apps.change.inviteName": "Invite {name} to {app}",
+  "apps.change.noAccount": "No account",
+  "apps.change.invitedOn": "Invited on {day}",
   "apps.change.connectionUser": "Connected as you",
   "apps.change.noConnection": "No connection",
   "apps.change.waitingOne": "Waiting for 1 change in {app}…",
   "apps.change.waiting": "Waiting for {count} changes in {app}…",
   "apps.change.disabling": "Disabling in {app}…",
   "apps.change.enabling": "Enabling in {app}…",
+  "apps.change.inviting": "Inviting to {app}…",
   "apps.change.disabledJustNow": "Disabled just now",
   "apps.change.enabledJustNow": "Enabled just now",
   "apps.change.disabledToast": "{name} is disabled in {app}.",
   "apps.change.enabledToast": "{name} is enabled in {app}.",
   "apps.change.viewInActivity": "View in Activity",
   "apps.activity.title": "Activity",
-  "apps.activity.description": "Every Disable and Enable, newest first.",
+  "apps.activity.description": "Every Disable, Enable and Invite, newest first.",
   "apps.activity.column.person": "Person",
   "apps.activity.column.app": "App",
   "apps.activity.column.change": "Change",
@@ -94,13 +99,16 @@ export const appsEn = {
   "apps.activity.reason.scanNow": "Scan {app} now",
   "apps.activity.reason.securityCheck": "{app} asked for a security check",
   "apps.activity.reason.notAllowed": "{app} doesn’t allow this change",
-  "apps.activity.empty": "No Disable or Enable yet.",
+  "apps.activity.empty": "No Disable, Enable or Invite yet.",
   "apps.activity.error": "Couldn’t load Activity",
   "apps.activity.retry": "Try again",
   "apps.change.refused":
     "Couldn’t ask to change {name} in {app}. Reload the page to see the account’s status.",
+  "apps.change.inviteRefused":
+    "Couldn’t ask to invite {name} to {app}. Reload the page to see whether they’re invited.",
   "apps.change.disableTitle": "Disable {name} in {app}?",
   "apps.change.enableTitle": "Enable {name} in {app}?",
+  "apps.change.inviteTitle": "Invite {name} to {app}?",
   "apps.change.person": "Person",
   "apps.change.app": "App",
   "apps.change.workspace": "Workspace",
@@ -108,15 +116,22 @@ export const appsEn = {
     "{firstName} can no longer sign in to this workspace. You can enable the account again later.",
   "apps.change.enableEffect":
     "{firstName}’s account in this workspace becomes active again. You can disable it again later.",
+  "apps.change.inviteEffect":
+    "{app} emails {firstName} an invitation to join this workspace as a regular member. Their account shows here once they accept and {app} is scanned.",
   "apps.change.howItWorks":
     "Broccoli Access makes the change with your {field}, then reads the account back from {app}.",
+  "apps.change.howInviteWorks":
+    "Broccoli Access asks {app} to send the invitation with your {field}, then reads it back from {app}.",
   "apps.change.cancel": "Cancel",
   "apps.change.confirmDisable": "Disable in {app}",
   "apps.change.confirmEnable": "Enable in {app}",
+  "apps.change.confirmInvite": "Invite to {app}",
   "apps.couldnt.disable": "Couldn’t disable",
   "apps.couldnt.enable": "Couldn’t enable",
+  "apps.couldnt.invite": "Couldn’t invite",
   "apps.couldnt.disableTitle": "Couldn’t disable {name} in {app}",
   "apps.couldnt.enableTitle": "Couldn’t enable {name} in {app}",
+  "apps.couldnt.inviteTitle": "Couldn’t invite {name} to {app}",
   "apps.couldnt.askedToday": "Asked by {name} today at {time}.",
   "apps.couldnt.askedOn": "Asked by {name} on {day} at {time}.",
   "apps.couldnt.stillHasAccess": "{firstName} still has access to the {workspace} workspace.",
@@ -144,6 +159,10 @@ export const appsEn = {
     "Deactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
   "apps.couldnt.hintEnableByHand":
     "Reactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
+  "apps.couldnt.hintInvite":
+    "Try again in a while, or invite {firstName} in {app}’s admin yourself and tell Broccoli Access.",
+  "apps.couldnt.hintInviteByHand":
+    "Invite {firstName} in {app}’s admin yourself and tell Broccoli Access.",
   "apps.couldnt.hintByHandOnly":
     "Trying again won’t help. If someone with more rights in {app} makes the change there, tell Broccoli Access.",
   "apps.couldnt.hintScan":
@@ -157,18 +176,24 @@ export const appsEn = {
     "After you reconnect, this row shows Try again. Or deactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
   "apps.couldnt.hintEnableAfterReconnect":
     "After you reconnect, this row shows Try again. Or reactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
+  "apps.couldnt.hintInviteAfterReconnect":
+    "After you reconnect, this row shows Try again. Or invite {firstName} in {app}’s admin yourself and tell Broccoli Access.",
   "apps.couldnt.byHand": "I did it by hand",
   "apps.couldnt.tryAgain": "Try again",
   "apps.couldnt.tryAgainDisable": "Try again to disable {name} in {app}",
   "apps.couldnt.tryAgainEnable": "Try again to enable {name} in {app}",
+  "apps.couldnt.tryAgainInvite": "Try again to invite {name} to {app}",
   "apps.couldnt.scanNow": "Scan {app} now",
   "apps.couldnt.close": "Close",
   "apps.byHand.disableTitle": "Did you deactivate {name} in {app} yourself?",
   "apps.byHand.enableTitle": "Did you reactivate {name} in {app} yourself?",
+  "apps.byHand.inviteTitle": "Did you invite {name} to {app} yourself?",
   "apps.byHand.disableEffect":
     "Broccoli Access marks {firstName}’s {app} account as disabled, done by hand by you. The next scan checks it.",
   "apps.byHand.enableEffect":
     "Broccoli Access marks {firstName}’s {app} account as enabled, done by hand by you. The next scan checks it.",
+  "apps.byHand.inviteEffect":
+    "Broccoli Access marks {firstName} as invited to {app}, done by hand by you. The next scan finds their account once they accept.",
   "apps.byHand.notYet": "Not yet",
   "apps.byHand.confirm": "Yes, I did it",
   "apps.byHand.refused":
@@ -182,6 +207,7 @@ export const appsEn = {
   "apps.reconnect.foundByScan": "Found by a scan {when}.",
   "apps.reconnect.foundByDisable": "Found when you disabled {name} {when}.",
   "apps.reconnect.foundByEnable": "Found when you enabled {name} {when}.",
+  "apps.reconnect.foundByInvite": "Found when you invited {name} {when}.",
   "apps.reconnect.failsUntilReconnect": "Changes in {app} fail until you reconnect.",
   "apps.reconnect.failsUntilNewKey": "Changes in {app} fail until you paste a new key.",
   "apps.reconnect.signInHint": "Sign in to {app} in Chrome, then Reconnect.",

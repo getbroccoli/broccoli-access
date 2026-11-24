@@ -1,6 +1,6 @@
-export { AccountChangeCell } from "./AccountChangeCell";
+export { AccountChangeCell, InviteCell } from "./AccountChangeCell";
 export { ActivityPage } from "./ActivityPage";
-export { AppAccountStatusCell, AppPage, loadAppPage } from "./AppPage";
+export { AppAccountStatusCell, AppPage, InviteStatusCell, loadAppPage } from "./AppPage";
 export { AppsPage } from "./AppsPage";
 export { appsSearch } from "./appsSearch";
 export { forgetAppLists } from "./cache";

@@ -31,7 +31,7 @@ type Props = {
 
 /**
  * "I did it by hand", confirmed: the change becomes done by hand and the account takes its new
- * status at once, which changes the "still have access" counts elsewhere.
+ * status at once, which changes the "still have access" counts elsewhere; an invite shows Invited.
  */
 export function DoneByHandDialog({ open, onClose, change, person, app }: Props) {
   const cache = useCache();
@@ -77,8 +77,9 @@ export function DoneByHandDialog({ open, onClose, change, person, app }: Props) 
   );
 }
 
-/** The words for a Disable or an Enable done by hand. */
+/** The words for a Disable, an Enable or an Invite done by hand. */
 const COPY = {
   SUSPEND: { title: "apps.byHand.disableTitle", effect: "apps.byHand.disableEffect" },
   REACTIVATE: { title: "apps.byHand.enableTitle", effect: "apps.byHand.enableEffect" },
+  INVITE: { title: "apps.byHand.inviteTitle", effect: "apps.byHand.inviteEffect" },
 } as const;

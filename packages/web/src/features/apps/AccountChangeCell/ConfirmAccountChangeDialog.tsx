@@ -21,27 +21,28 @@ import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 
 import { connectingFieldName } from "../connectingFieldName";
-import { useChangeAccount } from "./useChangeAccount";
+import { changeTargetOf, useChangeAccount } from "./useChangeAccount";
 
 type Props = {
-  user: AccountChangeCell_AppUserFragment;
+  /** The account for Disable and Enable, or the employee's invite row for Invite. */
+  row: Pick<AccountChangeCell_AppUserFragment, "id" | "employee" | "app">;
   action: AccountChangeAction;
 };
 
 /**
- * Disable or Enable, confirmed in a dialog naming the person, the app and the workspace; the
- * dialog closes on confirm and the row then follows the change.
+ * Disable, Enable or Invite, confirmed in a dialog naming the person, the app and the workspace;
+ * the dialog closes on confirm and the row then follows the change.
  */
-export function ConfirmAccountChangeDialog({ user, action }: Props) {
+export function ConfirmAccountChangeDialog({ row, action }: Props) {
   const [open, setOpen] = useState(false);
   const { changeAccount, loading } = useChangeAccount();
-  const { employee, app } = user;
+  const { employee, app } = row;
   const connector = app.containerConnection?.connector;
   const name = `${employee.firstName} ${employee.lastName}`;
   const copy = COPY[action];
   const confirm = () => {
     setOpen(false);
-    void changeAccount({ id: user.id, name, app: app.name }, action);
+    void changeAccount(changeTargetOf(row, action), action);
   };
 
   return (
@@ -81,10 +82,10 @@ export function ConfirmAccountChangeDialog({ user, action }: Props) {
           </dd>
         </dl>
         <AlertDialogDescription className="flex flex-col gap-3">
-          <span>{t(copy.effect, { firstName: employee.firstName })}</span>
+          <span>{t(copy.effect, { firstName: employee.firstName, app: app.name })}</span>
           {connector && (
             <span className="text-xs">
-              {t("apps.change.howItWorks", {
+              {t(copy.howItWorks, {
                 field: connectingFieldName(connector.connectionFields),
                 app: app.name,
               })}
@@ -102,13 +103,14 @@ export function ConfirmAccountChangeDialog({ user, action }: Props) {
   );
 }
 
-/** Disable's and Enable's words, which mirror each other. */
+/** Disable's, Enable's and Invite's words, which mirror each other. */
 const COPY = {
   SUSPEND: {
     button: "apps.change.disable",
     label: "apps.change.disableName",
     title: "apps.change.disableTitle",
     effect: "apps.change.disableEffect",
+    howItWorks: "apps.change.howItWorks",
     confirm: "apps.change.confirmDisable",
   },
   REACTIVATE: {
@@ -116,6 +118,15 @@ const COPY = {
     label: "apps.change.enableName",
     title: "apps.change.enableTitle",
     effect: "apps.change.enableEffect",
+    howItWorks: "apps.change.howItWorks",
     confirm: "apps.change.confirmEnable",
+  },
+  INVITE: {
+    button: "apps.change.invite",
+    label: "apps.change.inviteName",
+    title: "apps.change.inviteTitle",
+    effect: "apps.change.inviteEffect",
+    howItWorks: "apps.change.howInviteWorks",
+    confirm: "apps.change.confirmInvite",
   },
 } as const;

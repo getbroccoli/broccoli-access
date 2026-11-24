@@ -12,6 +12,7 @@ import { ChangeProgress } from "./ChangeProgress";
 import { ConfirmAccountChangeDialog } from "./ConfirmAccountChangeDialog";
 import { failedChangeOptions, showsCouldntChange } from "./couldntChange";
 import { TryAgainButton } from "./TryAgainButton";
+import { changeTargetOf } from "./useChangeAccount";
 import { useJustNow } from "./useJustNow";
 import { useToastWhenChangeSucceeds } from "./useToastWhenChangeSucceeds";
 
@@ -60,14 +61,9 @@ export function AccountChangeCell({ appUser }: Props) {
     return <ChangeProgress app={user.app.name} change={change} />;
   }
   if (change && showsCouldntChange(user)) {
-    const target = {
-      id: user.id,
-      name: `${user.employee.firstName} ${user.employee.lastName}`,
-      app: user.app.name,
-    };
     return failedChangeOptions(user).tryAgain ? (
       <span className="flex justify-end">
-        <TryAgainButton target={target} action={change.action} />
+        <TryAgainButton target={changeTargetOf(user, change.action)} action={change.action} />
       </span>
     ) : null;
   }
@@ -82,7 +78,7 @@ export function AccountChangeCell({ appUser }: Props) {
           )}
         </span>
       )}
-      {user.offeredChange && <ConfirmAccountChangeDialog user={user} action={user.offeredChange} />}
+      {user.offeredChange && <ConfirmAccountChangeDialog row={user} action={user.offeredChange} />}
     </span>
   );
 }
