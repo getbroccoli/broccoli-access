@@ -3,6 +3,7 @@ services:
   broccoli-access:
     # `docker compose up` pulls the published image; `--build` builds this checkout instead.
     image: ghcr.io/getbroccoli/broccoli-access:latest
+    pull_policy: always
     build:
       context: .
       dockerfile: packages/api/Dockerfile
@@ -54,6 +55,7 @@ services:
   # The connectors for other apps, such as Slack and Linear; the image has its own healthcheck.
   connectors:
     image: ghcr.io/getbroccoli/broccoli-access-connectors:latest
+    pull_policy: always
     # It writes nothing outside /tmp.
     read_only: true
     tmpfs:
