@@ -32,6 +32,7 @@ export const templatesEn = {
   "templates.addApp": "Add app",
   "templates.addApp.none": "Every approved app is in this template.",
   "templates.addAppFailed": "Couldn’t add {app}. Try again.",
+  "templates.addAppUnavailable": "{app} is no longer an approved app. Reload the page.",
   "templates.takeOut": "Take out",
   "templates.takeOutApp": "Take out {app}",
   "templates.takeOutFailed": "Couldn’t take out {app}. Try again.",

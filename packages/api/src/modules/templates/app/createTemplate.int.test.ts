@@ -33,6 +33,16 @@ test("creates a template with its trimmed name and records who created it", asyn
   ]);
 });
 
+test("replaces a lone surrogate in the created template's name and history", async ({ orm }) => {
+  const created = await templates(orm).createTemplate(OWNER, { name: "\ud800" });
+
+  expect(created.name).toBe("�");
+  expect(await storedTemplates(orm)).toMatchObject([{ id: created.id, name: "�" }]);
+  expect(await storedRecordHistory(orm)).toMatchObject([
+    { recordId: created.id, changes: [{ field: "name", oldValue: null, newValue: "�" }] },
+  ]);
+});
+
 test.for([
   ["blank", "   ", "required"],
   ["too long", "a".repeat(101), "too_long"],

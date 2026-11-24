@@ -40,4 +40,8 @@ export function parseTemplateName(name: string | null): string {
 
 const NAME_MAX_LENGTH = 100;
 
-const templateName = z.string().trim().min(1).max(NAME_MAX_LENGTH);
+const templateName = z
+  .string()
+  // As Postgres stores it, so the name returned and its history line are the name stored.
+  .transform((name) => name.toWellFormed())
+  .pipe(z.string().trim().min(1).max(NAME_MAX_LENGTH));

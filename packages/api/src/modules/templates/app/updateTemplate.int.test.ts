@@ -31,6 +31,21 @@ test("renames the template and records the caller's change", async ({ orm, seed 
   ]);
 });
 
+test("replaces a lone surrogate in the renamed template's name and history", async ({
+  orm,
+  seed,
+}) => {
+  const template = await seed.template({ name: "Engineer" });
+
+  const renamed = await templates(orm).updateTemplate(OWNER, { id: template.id, name: "\ud800" });
+
+  expect(renamed.name).toBe("�");
+  expect(await storedTemplates(orm)).toEqual([{ ...template, name: "�" }]);
+  expect(await storedRecordHistory(orm)).toMatchObject([
+    { recordId: template.id, changes: [{ field: "name", oldValue: "Engineer", newValue: "�" }] },
+  ]);
+});
+
 test.for([{ name: "Engineer" }, {}])(
   "keeps an unchanged name without adding history (%j)",
   async (input, { orm, seed }) => {

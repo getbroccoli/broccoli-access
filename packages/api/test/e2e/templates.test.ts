@@ -86,6 +86,11 @@ test("the owner creates a template, changes its apps and name, lists it and dele
     { input: { id } },
   );
   expect(await deleted.json()).toEqual({ data: { templates: { delete: { error: null } } } });
+
+  const afterDelete = await browser.graphql("query ($id: ID!) { template(id: $id) { id } }", {
+    id,
+  });
+  expect(await afterDelete.json()).toEqual({ data: { template: null } });
 });
 
 test("returns the taken name in the create template error payload", async ({ env }) => {

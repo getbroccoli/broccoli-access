@@ -134,11 +134,11 @@ export function createTemplateService({
       const isApproved = app?.status === "approved";
       const { template, changed } = await transact(async (tx) => {
         const before = await lockTemplate(tx, id);
+        if (before.apps.some((member) => member.appId === app?.id)) {
+          return { template: before, changed: false };
+        }
         if (!app || !isApproved) {
           throw invalidInput([{ field: "appId", code: "invalid" }]);
-        }
-        if (before.apps.some((member) => member.appId === app.id)) {
-          return { template: before, changed: false };
         }
         const member = await templateRepository(tx).insertApp(before.id, app.id);
         const added = { field: "app", oldValue: null, newValue: app.id, newLabel: app.name };

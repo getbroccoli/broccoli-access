@@ -3,6 +3,7 @@ import {
   test,
   OWNER,
   EMPLOYEE,
+  apps,
   templates,
   storedTemplateApps,
   storedRecordHistory,
@@ -54,6 +55,27 @@ test("adding an app twice keeps the first membership and its single history line
   expect(await storedRecordHistory(orm)).toEqual(history);
 });
 
+test("adding an existing app after it was ignored preserves the template and history", async ({
+  orm,
+  seed,
+}) => {
+  const app = await seed.app({ status: "approved" });
+  const template = await seed.template({ appIds: [app.id] });
+  await apps(orm).ignoreApp(OWNER, app.id);
+  const memberships = await storedTemplateApps(orm);
+  const history = await storedRecordHistory(orm);
+
+  const unchanged = await templates(orm).addApp(OWNER, { id: template.id, appId: app.id });
+
+  expect(unchanged).toEqual({
+    ...template,
+    apps: [{ id: memberships[0]!.id, appId: app.id }],
+    peopleCount: 0,
+  });
+  expect(await storedTemplateApps(orm)).toEqual(memberships);
+  expect(await storedRecordHistory(orm)).toEqual(history);
+});
+
 test.for(["discovered", "ignored"] as const)(
   "refuses to add a %s app",
   async (status, { orm, seed }) => {
@@ -90,12 +112,22 @@ test("takes out an app and records its former name in the template history", asy
   seed,
 }) => {
   const app = await seed.app({ status: "approved" });
-  const template = await seed.template({ appIds: [app.id] });
+  const figma = await seed.app({
+    name: "Figma",
+    domain: "figma.com",
+    catalogKey: "figma",
+    status: "approved",
+  });
+  const template = await seed.template({ appIds: [app.id, figma.id] });
+  const other = await seed.template({ appIds: [app.id] });
 
   const updated = await templates(orm).takeOutApp(OWNER, { id: template.id, appId: app.id });
 
-  expect(updated).toMatchObject({ id: template.id, apps: [] });
-  expect(await storedTemplateApps(orm)).toEqual([]);
+  expect(updated).toMatchObject({ id: template.id, apps: [{ appId: figma.id }] });
+  expect(await storedTemplateApps(orm)).toMatchObject([
+    { templateId: template.id, appId: figma.id },
+    { templateId: other.id, appId: app.id },
+  ]);
   expect(await storedRecordHistory(orm)).toMatchObject([
     {
       recordType: "template",

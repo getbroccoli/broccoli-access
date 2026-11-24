@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 
 import { AddTemplateAppDocument, TakeOutTemplateAppDocument } from "@/__generated__/graphql";
-import { usePayloadMutation } from "@/apollo";
+import { PayloadFailure, usePayloadMutation } from "@/apollo";
 import { t } from "@/i18n";
 
 type App = { id: string; name: string };
@@ -20,7 +20,13 @@ export function useTemplateAppChanges(templateId: string) {
     add: (app: App) =>
       addApp(input(app)).then(
         () => undefined,
-        () => void toast.error(t("templates.addAppFailed", { app: app.name })),
+        (error: unknown) =>
+          void toast.error(
+            // Refused input: the app stopped being approved after the menu was read.
+            t(isRefusedInput(error) ? "templates.addAppUnavailable" : "templates.addAppFailed", {
+              app: app.name,
+            }),
+          ),
       ),
     /** Takes the app out and resolves to whether it left; a failure shows as a toast. */
     takeOut: (app: App) =>
@@ -32,4 +38,11 @@ export function useTemplateAppChanges(templateId: string) {
         },
       ),
   };
+}
+
+function isRefusedInput(error: unknown): boolean {
+  return (
+    error instanceof PayloadFailure &&
+    (error.payloadError as { __typename?: string }).__typename === "InvalidInputError"
+  );
 }

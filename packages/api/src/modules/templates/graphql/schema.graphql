@@ -27,14 +27,14 @@ type TemplateConnection {
 }
 
 input TemplateCreateInput {
-  "Unique, compared without case; at most 100 characters."
+  "Unique, compared without case; 1 to 100 characters once trimmed."
   name: String!
 }
 
 "The fields to change; a field left out stays as it is, and null clears a field that may be empty."
 input TemplateUpdateInput {
   id: ID!
-  "Unique, compared without case; at most 100 characters. It cannot be empty, so null is refused."
+  "Unique, compared without case; 1 to 100 characters once trimmed. It cannot be empty, so null is refused."
   name: String
 }
 
@@ -61,7 +61,7 @@ type TemplatesMutations {
   create(input: TemplateCreateInput!): TemplateCreatePayload!
   "Renames a template. Admins only."
   update(input: TemplateUpdateInput!): TemplateUpdatePayload!
-  "Deletes a template with its apps and its assignments to people; it changes no account. Admins only."
+  "Deletes a template, its list of apps and its assignments to people; the apps themselves and every account stay. Admins only."
   delete(input: TemplateDeleteInput!): TemplateDeletePayload!
   "Adds an approved app to a template; an app already in it changes nothing. Admins only."
   addApp(input: TemplateAddAppInput!): TemplateAddAppPayload!

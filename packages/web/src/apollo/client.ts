@@ -39,6 +39,7 @@ export function createApolloClient({ onUnauthenticated }: ApolloClientOptions): 
 function withLiveEdges(policies: TypePolicies): TypePolicies {
   return {
     ...policies,
+    ...REPLACED_LISTS,
     ...Object.fromEntries(
       connectionTypes.map((name) => [
         name,
@@ -47,6 +48,11 @@ function withLiveEdges(policies: TypePolicies): TypePolicies {
     ),
   };
 }
+
+/** Lists a mutation's payload replaces whole: the newer list wins, also when it is shorter. */
+const REPLACED_LISTS: TypePolicies = {
+  Template: { fields: { apps: { merge: false } } },
+};
 
 const liveEdges: FieldReadFunction<readonly StoreObject[]> = (edges, { canRead, readField }) =>
   edges?.filter((edge) => canRead(readField("node", edge)));
