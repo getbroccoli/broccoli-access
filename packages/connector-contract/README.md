@@ -44,11 +44,12 @@ describeConnectorConformance({
       connector: "linear",
       connection: async () => ({ settings: {}, secrets: { apiKey: "<key of the fake Linear>" } }),
       member: { sourceKey: "<an active member's id>", email: "<that member's email>" },
+      invitee: { email: "<an email with no member or invitation>" },
       causeError: async (url, code) => {
         /* make the next actions/run call through the container at url answer with code */
       },
       reset: async (url) => {
-        /* put the fake app back to its seed: the member active, the credentials working, no error waiting */
+        /* put the fake app back to its seed: the member active, the invitee not invited, the credentials working, no error waiting */
       },
       cannotCause: {
         blocked_by_check: "an API connector meets no check",
@@ -59,6 +60,8 @@ describeConnectorConformance({
 });
 ```
 
-It checks every item under "Conformance" in the contract: each answer matches its schema, each error the fixture causes comes back with its listed code (a check of the answer, not of how the connector meets that failure), a repeated action changes the member once, an action reports the status read afterwards, an unlisted runtime gets HTTP 400, and both containers give the same answers apart from renewed secrets. Like the core, it starts each series of calls with a connection test and applies the connection updates answers carry.
+It checks every item under "Conformance" in the contract: each answer matches its schema, each error the fixture causes comes back with its listed code (a check of the answer, not of how the connector meets that failure), a repeated action changes the member once, an action reports the status read afterwards, a repeated invite sends one invitation, which the next list returns, an unlisted runtime gets HTTP 400, and both containers give the same answers apart from renewed secrets. Like the core, it starts each series of calls with a connection test and applies the connection updates answers carry.
 
 The fixture causes every error except those it lists in `cannotCause`, the errors its connector can never give, each with a one-line reason: `blocked_by_check`, which only a robot meets, and `owner_browser_lost`, for a connector without the `owner_browser` runtime. Their checks show as skipped, with the reason in the skip note (`vitest --reporter=verbose` prints it); the fixture's check of `cannotCause` fails for any other key, a blank or multi-line reason, or `owner_browser_lost` for a connector with that runtime. Since version 1.1.0.
+
+A connector that lists `invite` needs `invitee` in its fixture; the invite checks of any other connector show as skipped.
