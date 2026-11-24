@@ -63,6 +63,10 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
           ["INVALID_INPUT", "NOT_FOUND"],
         ),
     },
+    AccountWithoutPerson: {
+      suggestedEmployee: ({ suggestedEmployeeId }, _args, context) =>
+        suggestedEmployeeId ? employeesById(context).load(suggestedEmployeeId) : null,
+    },
     AppUser: {
       employee: (user, _args, context) => employeesById(context).load(user.employeeId),
     },

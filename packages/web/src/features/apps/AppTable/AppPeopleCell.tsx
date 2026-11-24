@@ -17,9 +17,7 @@ const NARROW_AVATARS = 2;
  * keyboard focus, then how many more; screen readers hear the exact total. Below the `sm`
  * breakpoint it shows fewer avatars and counts the rest, so the group fits a phone's width.
  */
-export function AppPeopleCell({ users: accounts, peopleCount }: Props) {
-  // An account not in its app is no access, so it gets no avatar.
-  const users = accounts.filter(({ inApp }) => inApp !== false);
+export function AppPeopleCell({ users, peopleCount }: Props) {
   if (users.length === 0) {
     return <span className="tabular-nums">{peopleCount}</span>;
   }

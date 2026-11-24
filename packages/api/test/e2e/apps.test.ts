@@ -1,4 +1,52 @@
-import { expect, test, scannedApps } from "#test/support";
+import { connectedLinear, connectorTest, expect, test, scannedApps } from "#test/support";
+
+connectorTest(
+  "a second account stays in Linear's users without taking another avatar slot",
+  async ({ env }) => {
+    const { browser, appId } = await connectedLinear(env);
+    const person = await env.seed.employee({ firstName: "Aaron", lastName: "Dale" });
+    const work = await env.seed.appAccount({
+      appId,
+      employeeId: person.id,
+      email: person.email,
+      foundVia: ["linear_members"],
+    });
+    const personal = await env.seed.appAccount({
+      appId,
+      employeeId: person.id,
+      employeeLinkedBy: "owner",
+      foundVia: ["linear_members"],
+    });
+
+    const response = await browser.graphql(
+      `query ($id: ID!) {
+    app(id: $id) {
+      users { id employee { id } }
+      peoplePreview(first: 4) { id employee { id } }
+    }
+  }`,
+      { id: appId },
+    );
+
+    type Row = { id: string; employee: { id: string } };
+    const body = (await response.json()) as {
+      data: { app: { users: Row[]; peoplePreview: Row[] } };
+    };
+    expect(body).not.toHaveProperty("errors");
+    const { users, peoplePreview } = body.data.app;
+    expect(
+      users
+        .filter(({ employee }) => employee.id === person.id)
+        .map(({ id }) => id)
+        .sort(),
+    ).toEqual([work.id, personal.id].sort());
+    expect(peoplePreview).toHaveLength(4);
+    const people = peoplePreview.map(({ employee }) => employee.id);
+    expect(people).toContain(person.id);
+    expect(new Set(people).size).toBe(4);
+  },
+  90_000,
+);
 
 test("lists app catalog keys and the first four users beside the full people count", async ({
   env,

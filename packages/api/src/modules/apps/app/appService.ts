@@ -305,12 +305,13 @@ async function summarize(
   const suspendedInDirectory = new Set(suspended);
   return apps.map((app) => {
     const appUsers = usersByApp.get(app.id) ?? [];
+    const peopleCount = new Set(appUsers.map(({ employeeId }) => employeeId)).size;
     return {
       ...app,
-      peopleCount: appUsers.length,
+      peopleCount,
       foundVia: [...new Set(appUsers.flatMap(({ foundVia }) => foundVia))].sort(),
       since: appSince(appUsers),
-      preselected: isPreselected(appUsers.length, directoryPeople),
+      preselected: isPreselected(peopleCount, directoryPeople),
       suspendedWithAccessCount: countSuspendedWithAccess(appUsers, suspendedInDirectory),
       connected: connectedAppIds.has(app.id),
     };

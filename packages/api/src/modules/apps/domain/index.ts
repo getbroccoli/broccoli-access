@@ -1,3 +1,4 @@
+export { suggestEmployee } from "./suggestEmployee";
 export {
   APP_STATUSES,
   appChanges,

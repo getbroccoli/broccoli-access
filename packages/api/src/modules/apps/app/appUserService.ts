@@ -110,7 +110,10 @@ export function createAppUserService(dependencies: AppUserDependencies): AppUser
   };
 }
 
-function toAppUser(account: AppUserAccount, suspendedInDirectory: ReadonlySet<string>): AppUser {
+export function toAppUser(
+  account: AppUserAccount,
+  suspendedInDirectory: ReadonlySet<string>,
+): AppUser {
   const { id, appId, employeeId, email, status, foundVia, inApp } = account;
   return {
     id,

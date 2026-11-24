@@ -8,5 +8,5 @@ export interface EmployeesByName {
     ctx: SecurityContext,
     ids: readonly string[],
     db?: Orm,
-  ): Promise<{ id: string; email: string }[]>;
+  ): Promise<{ id: string; email: string; firstName: string; lastName: string }[]>;
 }

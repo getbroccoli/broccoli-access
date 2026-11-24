@@ -19,8 +19,13 @@ export const appAccounts = pgTable(
       .references(() => apps.id),
     /** Lowercased. */
     email: text("email").notNull(),
-    /** The employee with this email; null when it matches nobody. */
+    /** The employee matched by email or chosen by the owner. */
     employeeId: uuid("employee_id"),
+    employeeLinkedBy: text("employee_linked_by", { enum: ["email", "owner"] }),
+    kind: text("kind", { enum: ["personal", "service", "external"] })
+      .notNull()
+      .default("personal"),
+    note: text("note"),
     status: text("status", { enum: ACCOUNT_STATUSES }).notNull(),
     /** The finding kinds whose last scan saw the account, such as `google_directory`. */
     foundVia: text("found_via").array().notNull(),
@@ -34,6 +39,13 @@ export const appAccounts = pgTable(
   (table) => [
     index("app_accounts_employee_app").on(table.employeeId, table.appId),
     unique("app_accounts_app_email").on(table.appId, table.email),
+    check("app_accounts_kind", sql`${table.kind} in ('personal', 'service', 'external')`),
+    check(
+      "app_accounts_employee_link",
+      sql`(${table.employeeId} is null) = (${table.employeeLinkedBy} is null)
+      and (${table.employeeLinkedBy} is null or (${table.kind} = 'personal' and ${table.employeeLinkedBy} in ('email','owner')))`,
+    ),
+    check("app_accounts_note", sql`${table.kind} <> 'personal' or ${table.note} is null`),
     check("app_accounts_status", sql`${table.status} in ('active', 'suspended')`),
   ],
 );

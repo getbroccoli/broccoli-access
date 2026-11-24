@@ -1,7 +1,12 @@
+import { toast } from "sonner";
 import { useQuery } from "@apollo/client/react";
-import { useNavigate, useRouter, useSearch } from "@tanstack/react-router";
+import { useNavigate, useRouteContext, useRouter, useSearch } from "@tanstack/react-router";
 
-import { PeoplePageDocument } from "@/__generated__/graphql";
+import {
+  AccountsWithoutPersonDocument,
+  PeopleDirectoryScanDocument,
+  PeoplePageDocument,
+} from "@/__generated__/graphql";
 import { TableSearchField } from "@/components/dataTable";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,43 +16,57 @@ import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterCon
 import { useRefetchAfterScan } from "@/lib/useRefetchAfterScan";
 
 import { SEARCH_MAX_LENGTH } from "../peopleSearch";
+import { AccountsWithoutPersonTable } from "./AccountsWithoutPersonTable";
 import { PeopleHeader } from "./PeopleHeader";
 import { PeopleTable } from "./PeopleTable";
 import { PeopleTabs } from "./PeopleTabs";
 
 /** People: everyone in the directory with their status and apps, and who is suspended with access. */
 export function PeoplePage() {
-  const { view = "all", q } = useSearch({ from: "/_authenticated/people" });
+  const { me } = useRouteContext({ from: "/_authenticated" });
+  const { view: requestedView = "all", q } = useSearch({ from: "/_authenticated/people" });
   const navigate = useNavigate({ from: "/people" });
   const router = useRouter();
+  const view = !me.isOwner && requestedView === "accountsWithoutPerson" ? "all" : requestedView;
+  const showAccounts = view === "accountsWithoutPerson";
   const suspendedOnly = view === "suspendedWithAccess";
   // The suspended tab shows no search field, so it never searches.
-  const { data, error, refetch, startPolling, stopPolling } = useQuery(PeoplePageDocument, {
-    variables: { filter: suspendedOnly ? { suspendedWithAccess: true } : { search: q } },
+  const { data, error, refetch } = useQuery(PeoplePageDocument, {
+    variables: {
+      showAccounts,
+      isOwner: me.isOwner,
+      filter: suspendedOnly ? { suspendedWithAccess: true } : { search: q },
+    },
     fetchPolicy: "cache-and-network",
   });
-  const connection = data?.setup.googleWorkspace;
+  const directory = useQuery(PeopleDirectoryScanDocument, { fetchPolicy: "cache-and-network" });
+  const accounts = useQuery(AccountsWithoutPersonDocument, {
+    skip: !showAccounts,
+    fetchPolicy: "cache-and-network",
+  });
+  const connection = directory.data?.setup.googleWorkspace;
   const isScanning = connection?.scan?.status === "SCANNING";
-  usePollWhileScanning(isScanning, { startPolling, stopPolling });
-  // The read that saw the scan end may have read the people before the scan saved them.
-  useRefetchAfterScan(isScanning, refetch);
-  // A connected app's scan changes people's apps, such as the first one after it is connected.
-  useRefetchAfterContainerConnectorScans(refetch);
-  const people = data?.employees.edges.map(({ node }) => node);
+  usePollWhileScanning(isScanning, directory);
+  const refresh = () => Promise.all([refetch(), ...(showAccounts ? [accounts.refetch()] : [])]);
+  useRefetchAfterScan(isScanning, refresh);
+  useRefetchAfterContainerConnectorScans(refresh);
+  const people = data?.employees?.edges.map(({ node }) => node);
 
   return (
     <div className="flex flex-col">
-      <PeopleHeader connection={connection} loaded={data !== undefined} />
+      <PeopleHeader connection={connection} loaded={directory.data !== undefined} />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <PeopleTabs
           view={view}
+          isOwner={me.isOwner}
+          accountCount={data?.accountsWithoutPersonCount}
           counts={data?.employeeCounts}
           // All is the default, so its URL holds no view.
           onViewChange={(next) =>
             void navigate({ search: { view: next === "all" ? undefined : next } })
           }
         />
-        {!suspendedOnly && (
+        {view === "all" && (
           <TableSearchField
             query={q}
             onQueryChange={(next) => {
@@ -66,16 +85,42 @@ export function PeoplePage() {
           {t("people.suspendedWithAccess.description")}
         </p>
       )}
-      {error && !data && (
+      {((error && !data) || (showAccounts && accounts.error && !accounts.data)) && (
         <div role="alert" className="flex flex-col items-start gap-3">
           <p className="text-sm text-destructive">{t("people.error.title")}</p>
-          <Button type="button" variant="outline" onClick={() => void refetch()}>
+          <Button type="button" variant="outline" onClick={() => void refresh()}>
             {t("people.error.retry")}
           </Button>
         </div>
       )}
-      {!data && !error && <Skeleton className="h-[300px] rounded-xl" />}
-      {people && (
+      {((!data && !error) || (showAccounts && accounts.loading && !accounts.data)) && (
+        <Skeleton className="h-[300px] rounded-xl" />
+      )}
+      {showAccounts && accounts.data && (
+        <AccountsWithoutPersonTable
+          accounts={accounts.data.accountsWithoutPerson}
+          loading={accounts.loading}
+          refresh={refresh}
+          loadMore={() =>
+            void accounts
+              .fetchMore({
+                variables: { after: accounts.data?.accountsWithoutPerson.pageInfo.endCursor },
+                updateQuery: (previous, { fetchMoreResult: next }) => ({
+                  ...next,
+                  accountsWithoutPerson: {
+                    ...next.accountsWithoutPerson,
+                    edges: [
+                      ...previous.accountsWithoutPerson.edges,
+                      ...next.accountsWithoutPerson.edges,
+                    ],
+                  },
+                }),
+              })
+              .catch(() => toast.error(t("people.error.title")))
+          }
+        />
+      )}
+      {!showAccounts && people && (
         <PeopleTable
           // A new tab or search starts with its first people only.
           key={`${view} ${q ?? ""}`}

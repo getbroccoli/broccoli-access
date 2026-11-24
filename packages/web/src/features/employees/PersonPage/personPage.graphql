@@ -43,6 +43,7 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
       }
     }
     appAccounts {
+      email
       offeredChange
       id
       status

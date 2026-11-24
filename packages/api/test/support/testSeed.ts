@@ -167,6 +167,9 @@ export class TestSeed {
     appId,
     email = `account${++this.#count}@example.com`,
     employeeId = null,
+    employeeLinkedBy = employeeId ? "email" : null,
+    kind = "personal",
+    note = null,
     status = "active",
     foundVia = ["google_sign_in"],
     grantedAt = null,
@@ -174,7 +177,19 @@ export class TestSeed {
     firstSeenAt = new Date("2026-01-01T00:00:00Z"),
   }: Pick<SeedAppAccount, "appId"> & Partial<SeedAppAccount>) {
     const [account] = await appAccountRepository(this.orm).insertMany([
-      { appId, email, employeeId, status, foundVia, grantedAt, grantedBefore, firstSeenAt },
+      {
+        appId,
+        email,
+        employeeId,
+        employeeLinkedBy,
+        kind,
+        note,
+        status,
+        foundVia,
+        grantedAt,
+        grantedBefore,
+        firstSeenAt,
+      },
     ]);
     return account!;
   }

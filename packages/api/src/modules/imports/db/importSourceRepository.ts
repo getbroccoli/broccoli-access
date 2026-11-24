@@ -34,12 +34,12 @@ export interface ImportSourceRepository {
   /** Makes the source's records exactly `accounts`. */
   replaceRecords(id: string, accounts: readonly ImportedAccount[]): Promise<void>;
   /** The accounts the source's last saved scan found. */
-  findRecords(id: string): Promise<ImportedAccount[]>;
+  findRecords(id: string): Promise<Pick<ImportedAccount, "sourceKey" | "raw">[]>;
   /**
    * The source's account of the member whose key or session the connection uses; null without
    * one, as a version 1 record, which predates the flag, reads.
    */
-  findConnectionUser(id: string): Promise<ImportedAccount | null>;
+  findConnectionUserEmail(id: string): Promise<string | null>;
   /**
    * The members with one of `emails` that the last saved scan of one of `connectionIds` found; a
    * version 1 record, which predates the flag, reads as not the connection's user.
@@ -56,6 +56,7 @@ export interface ImportSourceRepository {
 
 /** A member of a connected app as its connection's last saved scan found it. */
 export interface ConnectionMember {
+  displayName: string | null;
   connectionId: string;
   /** Lowercased. */
   email: string;
@@ -105,16 +106,13 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
         .select({
           sourceKey: importRecords.sourceKey,
           raw: importRecords.raw,
-          values: importRecords.values,
         })
         .from(importRecords)
         .where(eq(importRecords.sourceId, id)),
-    findConnectionUser: async (id) => {
+    findConnectionUserEmail: async (id) => {
       const [record] = await orm()
         .select({
-          sourceKey: importRecords.sourceKey,
-          raw: importRecords.raw,
-          values: importRecords.values,
+          email: sql<string>`${importRecords.values} ->> 'email'`,
         })
         .from(importRecords)
         .where(
@@ -125,7 +123,7 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
           ),
         )
         .limit(1);
-      return record ?? null;
+      return record?.email ?? null;
     },
     findConnectionMembers: ({ connectionIds, emails }) =>
       orm()
@@ -133,6 +131,7 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
           connectionId: importSources.connectionId,
           // The builder has no JSON operators; the keys are constants.
           email: sql<string>`${importRecords.values} ->> 'email'`,
+          displayName: sql<string | null>`${importRecords.values} ->> 'displayName'`,
           sourceKey: importRecords.sourceKey,
           isConnectionUser: sql<boolean>`coalesce((${importRecords.values} ->> 'isConnectionUser')::boolean, false)`,
         })

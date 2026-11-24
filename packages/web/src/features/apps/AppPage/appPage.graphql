@@ -40,6 +40,7 @@ query AppPage($id: ID!) {
       }
     }
     users {
+      email
       id
       status
       inApp

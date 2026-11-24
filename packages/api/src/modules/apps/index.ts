@@ -1,11 +1,12 @@
 import { readSdl } from "../../core/graphql";
 import type { ModuleManifest } from "../../core/moduleManifest";
 import { PrincipalSecurityContext } from "../../core/security";
-import type { AccountChangeService, AppService, AppUserService } from "./app";
+import type { AccountLinkService, AccountChangeService, AppService, AppUserService } from "./app";
 import { createResolvers } from "./graphql";
 
 // Public values.
 export {
+  createAccountLinkService,
   createAccountChangeService,
   createAppAccountService,
   createAppConnectionService,
@@ -16,6 +17,7 @@ export {
 
 // Public types.
 export type {
+  AccountLinkService,
   AccountChangeService,
   AppAccountService,
   AppConnectionService,
@@ -29,7 +31,7 @@ export type {
  * owner, and their accounts disabled and enabled.
  */
 export function appsModule(
-  services: AppService & AppUserService & AccountChangeService,
+  services: AppService & AppUserService & AccountChangeService & AccountLinkService,
   people: Parameters<typeof createResolvers>[1],
 ): ModuleManifest {
   return {

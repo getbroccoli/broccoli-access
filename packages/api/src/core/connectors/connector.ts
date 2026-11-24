@@ -135,6 +135,8 @@ export interface ImportedAccount {
 }
 
 export interface AccountValues {
+  /** The member's name in a container app; null for Google and older import records. */
+  displayName: string | null;
   /** Lowercased. */
   email: string;
   status: AccountStatus;
@@ -169,7 +171,7 @@ export interface AccountPhoto {
 }
 
 /** The version of `AccountValues` the import records store. */
-export const ACCOUNT_VALUES_VERSION = 2;
+export const ACCOUNT_VALUES_VERSION = 3;
 
 /**
  * Why a connector failed; it never passes on the app's raw answer. The connectors container's own

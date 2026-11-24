@@ -171,8 +171,7 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
       ctx.require("MANAGE_WORKSPACE");
       const sources = importSourceRepository(orm);
       const source = await sources.findByConnection(connectionId);
-      const record = source && (await sources.findConnectionUser(source.id));
-      return record?.values.email ?? null;
+      return source ? sources.findConnectionUserEmail(source.id) : null;
     },
   };
   return service;

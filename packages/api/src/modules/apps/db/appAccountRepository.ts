@@ -1,7 +1,29 @@
-import { and, arrayContains, countDistinct, eq, isNotNull, or, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  arrayContains,
+  count,
+  countDistinct,
+  eq,
+  isNotNull,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 
+import { z } from "zod";
+import type { KeysetQuery, KeysetRow } from "../../../core/pagination";
 import type { AccountStatus } from "../../../core/connectors";
-import { anyOf, insertBatches, type Orm, ormOf, type Tx } from "../../../core/db";
+import {
+  afterKeyset,
+  anyOf,
+  keysetOrder,
+  orderByKeyset,
+  insertBatches,
+  type Orm,
+  ormOf,
+  type Tx,
+} from "../../../core/db";
 import type { AppAccount, AppStatus, InAppFacts } from "../domain";
 import { appAccounts } from "./appAccountsTable";
 import { appConnections } from "./appConnectionsTable";
@@ -17,9 +39,22 @@ export interface AppAccountRepository {
   /** The accounts with these ids; an unknown id is left out. */
   findByIds(ids: readonly string[]): Promise<AppAccount[]>;
   /** The account, locked until the transaction ends; null for an unknown id. */
-  lockById(id: string): Promise<AppAccount | null>;
+  lockById(
+    id: string,
+    facts?: InAppFacts,
+  ): Promise<(AppAccount & { inApp: boolean | null }) | null>;
   /** The accounts in `appIds`, and those `findingKind` saw, whatever their app. */
   findInAppsOrFoundVia(appIds: readonly string[], findingKind: string): Promise<AppAccount[]>;
+  /** One page of personal accounts in approved apps with no employee, by email and id. */
+  findWithoutPerson(
+    query: KeysetQuery<"EMAIL", unknown[]>,
+    facts: InAppFacts,
+  ): Promise<KeysetRow<UnlinkedAccount, unknown[]>[]>;
+  /** The accounts the owner linked to these employees, including private email addresses. */
+  findOwnerLinks(
+    employeeIds: readonly string[],
+  ): Promise<{ employeeId: string; email: string; appId: string }[]>;
+  countWithoutPerson(facts: InAppFacts): Promise<number>;
   insertMany(accounts: readonly Omit<AppAccount, "id">[]): Promise<AppAccount[]>;
   update(account: AppAccount): Promise<void>;
   deleteMany(ids: readonly string[]): Promise<void>;
@@ -56,6 +91,13 @@ export interface AppAccountRepository {
   ): Promise<EmployeeAppAccount[]>;
 }
 
+export type UnlinkedAccount = Pick<AppAccount, "id" | "appId" | "email"> & {
+  connectionId: string | null;
+};
+export const UNLINKED_SORT_VALUES: Record<"EMAIL", z.ZodType<unknown[]>> = {
+  EMAIL: z.tuple([z.string(), z.uuid()]),
+};
+
 /** What the app list and an app's page read of a user's account. */
 export interface AppUserAccount extends Pick<
   AppAccount,
@@ -86,9 +128,9 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
       await orm().execute(sql`lock table ${appAccounts} in share row exclusive mode`);
     },
     findByIds: (ids) => orm().select(columns).from(appAccounts).where(anyOf(appAccounts.id, ids)),
-    lockById: async (id) => {
+    lockById: async (id, facts) => {
       const [account] = await orm()
-        .select(columns)
+        .select({ ...columns, inApp: facts ? inApp(facts) : sql<null>`null` })
         .from(appAccounts)
         .where(eq(appAccounts.id, id))
         .for("update");
@@ -101,6 +143,44 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .where(
           or(anyOf(appAccounts.appId, appIds), arrayContains(appAccounts.foundVia, [findingKind])),
         ),
+    findWithoutPerson: async ({ after, limit }, facts) => {
+      const rows = await orm()
+        .select({
+          id: appAccounts.id,
+          email: appAccounts.email,
+          appId: appAccounts.appId,
+          connectionId: appConnections.id,
+        })
+        .from(appAccounts)
+        .innerJoin(apps, eq(apps.id, appAccounts.appId))
+        .leftJoin(appConnections, eq(appConnections.appId, apps.id))
+        .where(and(withoutPerson(facts), after ? afterKeyset(EMAIL_ORDER, after) : undefined))
+        .orderBy(...orderByKeyset(EMAIL_ORDER))
+        .limit(limit);
+      return rows.map((node) => ({ node, values: [node.email, node.id] }));
+    },
+    findOwnerLinks: (employeeIds) =>
+      orm()
+        .select({
+          employeeId: sql<string>`${appAccounts.employeeId}`,
+          email: appAccounts.email,
+          appId: appAccounts.appId,
+        })
+        .from(appAccounts)
+        .where(
+          and(
+            anyOf(appAccounts.employeeId, employeeIds),
+            eq(appAccounts.employeeLinkedBy, "owner"),
+          ),
+        ),
+    countWithoutPerson: async (facts) => {
+      const [row] = await orm()
+        .select({ total: count() })
+        .from(appAccounts)
+        .innerJoin(apps, eq(apps.id, appAccounts.appId))
+        .where(withoutPerson(facts));
+      return row!.total;
+    },
     insertMany: async (accounts) => {
       const inserted: AppAccount[] = [];
       for (const batch of insertBatches(accounts)) {
@@ -118,11 +198,17 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
     },
     countPeople: async (appId) => {
       const people = and(eq(appAccounts.appId, appId), isNotNull(appAccounts.employeeId));
-      const [total, suspended] = await Promise.all([
-        orm().$count(appAccounts, people),
-        orm().$count(appAccounts, and(people, eq(appAccounts.status, "suspended"))),
-      ]);
-      return { people: total, suspended };
+      const [row] = await orm()
+        .select({
+          people: countDistinct(appAccounts.employeeId),
+          suspended:
+            sql<number>`count(distinct ${appAccounts.employeeId}) filter (where ${appAccounts.status} = 'suspended')`.mapWith(
+              Number,
+            ),
+        })
+        .from(appAccounts)
+        .where(people);
+      return row!;
     },
     countAppsFoundVia: async (findingKind) => {
       const [row] = await orm()
@@ -214,11 +300,28 @@ function inApp({ scannedAppIds, otherAppKinds }: InAppFacts): SQL<boolean | null
   >`case when ${anyOf(appAccounts.appId, scannedAppIds)} then not (${appAccounts.foundVia} <@ ${sql.param([...otherAppKinds])}::text[]) end`;
 }
 
+function withoutPerson(facts: InAppFacts) {
+  return and(
+    eq(apps.status, "approved"),
+    eq(appAccounts.kind, "personal"),
+    isNull(appAccounts.employeeId),
+    isAccess(facts),
+  );
+}
+const EMAIL_ORDER = keysetOrder(
+  [{ expression: sql`${appAccounts.email}`, descending: false }],
+  sql`${appAccounts.id}`,
+  false,
+);
+
 const columns = {
   id: appAccounts.id,
   appId: appAccounts.appId,
   email: appAccounts.email,
   employeeId: appAccounts.employeeId,
+  employeeLinkedBy: appAccounts.employeeLinkedBy,
+  kind: appAccounts.kind,
+  note: appAccounts.note,
   status: appAccounts.status,
   foundVia: appAccounts.foundVia,
   grantedAt: appAccounts.grantedAt,

@@ -3,6 +3,7 @@ import type { AccountStatus } from "../../../core/connectors";
 /** One of an employee's accounts, as the apps module reads it. */
 export interface EmployeeAccount {
   employeeId: string;
+  appId: string;
   appName: string;
   /** The app's key in the built-in catalog, such as `slack`; null for another app. */
   catalogKey: string | null;
@@ -46,14 +47,19 @@ export function accessOfEmployees(
 
 function accessOf(accounts: readonly EmployeeAccount[]): EmployeeAccess {
   const status = accounts.find(({ inDirectory }) => inDirectory)?.status ?? null;
-  const currentAccess = accounts
-    .filter(givesAccess)
-    .map(({ appName, catalogKey, foundVia, since }) => ({
-      appName,
-      catalogKey,
-      foundVia: foundVia.toSorted(),
-      since,
-    }))
+  const byApp = Map.groupBy(accounts.filter(givesAccess), ({ appId }) => appId);
+  const currentAccess = [...byApp.values()]
+    .map((members) => {
+      const earliest = members.reduce((one, other) =>
+        one.since.at <= other.since.at ? one : other,
+      );
+      return {
+        appName: earliest.appName,
+        catalogKey: earliest.catalogKey,
+        since: earliest.since,
+        foundVia: [...new Set(members.flatMap(({ foundVia }) => foundVia))].sort(),
+      };
+    })
     .sort((a, b) => a.appName.localeCompare(b.appName));
   return {
     status,

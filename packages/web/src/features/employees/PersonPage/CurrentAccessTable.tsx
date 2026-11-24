@@ -61,15 +61,21 @@ export function CurrentAccessTable({ person }: { person: Person }) {
               </TableCell>
             </TableRow>
           )}
-          {rows.map((row) => (
-            <PersonAppRow
-              key={row.app.id}
-              row={row}
-              held={accounts.get(row.app.id) ?? []}
-              invite={invites.get(row.app.id)}
-              showSources={showSources}
-            />
-          ))}
+          {rows.map((row) => {
+            const held = accounts.get(row.app.id) ?? [];
+            return (held.length ? held : [undefined]).map((account, index) => (
+              <PersonAppRow
+                key={account?.id ?? row.app.id}
+                row={row}
+                account={account}
+                showEmail={!!account && (held.length > 1 || account.email !== person.email)}
+                first={index === 0}
+                span={held.length || 1}
+                invite={index === 0 ? invites.get(row.app.id) : undefined}
+                showSources={showSources}
+              />
+            ));
+          })}
         </TableBody>
       </Table>
     </div>

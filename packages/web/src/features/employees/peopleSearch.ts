@@ -4,7 +4,7 @@ import { z } from "zod";
 export const SEARCH_MAX_LENGTH = 100;
 
 /** The tabs of the People page. */
-export const PEOPLE_VIEWS = ["all", "suspendedWithAccess"] as const;
+export const PEOPLE_VIEWS = ["all", "suspendedWithAccess", "accountsWithoutPerson"] as const;
 
 export type PeopleView = (typeof PEOPLE_VIEWS)[number];
 

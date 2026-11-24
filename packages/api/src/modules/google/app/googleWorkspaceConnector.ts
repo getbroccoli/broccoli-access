@@ -188,6 +188,7 @@ function grantAccount(user: GoogleUser, token: GoogleToken, log: GrantLog): Impo
       appExternalId: `google:${token.clientId}`,
       grantedAt: grantedAt?.toISOString() ?? null,
       grantedBefore: grantedAt ? null : log.start.toISOString(),
+      displayName: null,
       isConnectionUser: false,
     },
   };
@@ -213,6 +214,7 @@ function directoryAccount(user: GoogleUser): ImportedAccount {
       grantedAt: null,
       grantedBefore: null,
       // Google Workspace never offers Disable, so no member needs telling apart.
+      displayName: null,
       isConnectionUser: false,
     },
   };

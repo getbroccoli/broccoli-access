@@ -18,6 +18,8 @@ import {
   createAppInvitationService,
   createAppService,
   createAppUserService,
+  createAccountLinkService,
+  type AccountLinkService,
   type AppService,
   type AppUserService,
 } from "../../src/modules/apps";
@@ -199,6 +201,18 @@ function templateDependencies(
     apps: { ...apps(orm), readAppInvites: accountChanges(orm, options).readAppInvites },
     employees: employeeServices(orm),
   };
+}
+
+/** The owner's account links with the real employees and scan records. */
+export function accountLinks(orm: Orm): AccountLinkService {
+  return createAccountLinkService({
+    orm,
+    transact: testTransactor(orm),
+    logger: createLogger("silent"),
+    connectors: GOOGLE_DIRECTORY,
+    members: createImportRecordService(),
+    employees: createEmployeeReadService({ orm, accounts: apps(orm) }),
+  });
 }
 
 /** An app's users read with the real employees module, with Google Workspace as the directory. */

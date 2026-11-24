@@ -7,6 +7,7 @@ import {
   type AppConnection,
   type AppInvitation,
   accountChangeRepository,
+  appAccountRepository,
   appConnectionRepository,
   appInvitationRepository,
   appRepository,
@@ -190,20 +191,20 @@ async function readInviteFacts(
 ): Promise<StoredInviteFacts> {
   const connectionIds = connections.map(({ id }) => id);
   const emails = employees.map(({ email }) => email);
-  const [active, lastScans, found, pending, latest] = await Promise.all([
+  const [active, lastScans, memberKeys, pending, latest] = await Promise.all([
     findEmployeesInDirectory(db, connectors, {
       status: "active",
       among: employees.map(({ id }) => id),
     }),
     members.findLastScans(db),
-    members.findConnectionMembers(db, { connectionIds, emails }),
+    readMemberKeys(db, members, employees, connections),
     appInvitationRepository(db).findByEmails({ connectionIds, emails }),
     accountChangeRepository(db).findLatestInvites(connectionIds, emails),
   ]);
   return {
     activeInDirectory: new Set(active),
     scannedAt: new Map(lastScans.map(({ connectionId, scannedAt }) => [connectionId, scannedAt])),
-    memberKeys: new Set(found.map(({ connectionId, email }) => inviteKey(connectionId, email))),
+    memberKeys,
     invitations: new Map(
       pending.map((invitation) => [
         inviteKey(invitation.connectionId, invitation.email),
@@ -216,6 +217,33 @@ async function readInviteFacts(
     invitingConnectors: new Set(connectors.filter(canInvite).map(({ key }) => key)),
     invitationListingConnectors: new Set(connectors.filter(listsInvitations).map(({ key }) => key)),
   };
+}
+
+/** Keys the scanned members by the employee's work email, including a member the owner linked. */
+async function readMemberKeys(
+  db: Orm | Tx,
+  members: AccountChangeDependencies["members"],
+  employees: readonly InvitedEmployee[],
+  connections: readonly AppConnection[],
+) {
+  const links = await appAccountRepository(db).findOwnerLinks(employees.map(({ id }) => id));
+  const emails = [...new Set([...employees, ...links].map(({ email }) => email))];
+  const found = await members.findConnectionMembers(db, {
+    connectionIds: connections.map(({ id }) => id),
+    emails,
+  });
+  const memberKeys = new Set(
+    found.map(({ connectionId, email }) => inviteKey(connectionId, email)),
+  );
+  const connectionOfApp = new Map(connections.map(({ appId, id }) => [appId, id]));
+  const workEmails = new Map(employees.map(({ id, email }) => [id, email]));
+  const linkedKeys = links.flatMap((link) => {
+    const connectionId = connectionOfApp.get(link.appId);
+    return connectionId && memberKeys.has(inviteKey(connectionId, link.email))
+      ? [inviteKey(connectionId, workEmails.get(link.employeeId)!)]
+      : [];
+  });
+  return new Set([...memberKeys, ...linkedKeys]);
 }
 
 /** The employee's row for the connection's app, its latest invite not yet placed; null when none shows. */
