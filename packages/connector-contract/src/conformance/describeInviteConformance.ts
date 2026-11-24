@@ -19,7 +19,7 @@ export function describeInviteConformance(url: string, fixture: ConnectorFixture
   it("sends one invitation when invite repeats, and reports the invitation read afterwards", async ({
     skip,
   }) => checkRepeatedInvite(url, fixture, await inviteeOf(url, fixture, skip)));
-  it("lists the one invitation that a repeated invite sent", async ({ skip }) => {
+  it("lists the invitation that invite just sent, once even after a retry", async ({ skip }) => {
     const invitee = await inviteeOf(url, fixture, skip);
     if (!(await capabilitiesOf(url, fixture.connector)).includes("list_invitations"))
       skip(`${fixture.connector} does not list list_invitations`);
@@ -47,7 +47,7 @@ async function checkRepeatedInvite(
 
   expect([first.changed, second.changed]).toEqual([true, false]);
   expect(invitationReadBack(first).email).toBe(invitee.email);
-  // The same invitation read back, so no second one went out.
+  // The retry reads back the invitation the first call sent.
   expect(invitationReadBack(second)).toEqual(invitationReadBack(first));
 }
 
@@ -59,10 +59,12 @@ async function checkListedInvitation(
   const [flow] = await startFlow(url, fixture);
 
   const sent = invitationReadBack(await invite(flow, invitee));
+  const listedAfterInvite = await listedInvitationsOf(flow, invitee);
   await invite(flow, invitee);
-  const listed = (await listAllInvitations(flow)).filter(({ email }) => email === invitee.email);
+  const listedAfterRetry = await listedInvitationsOf(flow, invitee);
 
-  expect(listed.map(withInstants)).toEqual([sent]);
+  expect(listedAfterInvite).toEqual([sent]);
+  expect(listedAfterRetry).toEqual([sent]);
 }
 
 async function checkInviteOfMember(url: string, fixture: ConnectorFixture): Promise<void> {
@@ -75,7 +77,7 @@ async function checkInviteOfMember(url: string, fixture: ConnectorFixture): Prom
   expect(answer.account?.values.status).toBe("active");
 }
 
-/** A valid invite with only its runtime changed. */
+/** A valid invite with only its runtime changed, which must send nothing. */
 async function checkInviteOnUnlistedRuntimes(
   url: string,
   fixture: ConnectorFixture,
@@ -85,9 +87,12 @@ async function checkInviteOnUnlistedRuntimes(
   const [flow] = await startFlow(url, fixture);
 
   for (const runtime of unlistedRuntimes(listed)) {
-    const body = { ...requestOf(flow, "actions/run"), action: "invite", account: invitee, runtime };
+    const body = { ...requestOf(flow, "connections/test"), ...inviteFields(invitee), runtime };
     expect((await post(url, "actions/run", body)).status, `invite on ${runtime.kind}`).toBe(400);
   }
+
+  const answer = await invite(flow, invitee);
+  expect(answer.changed, "an invite after the refused ones").toBe(true);
 }
 
 /**
@@ -107,8 +112,16 @@ async function inviteeOf(
 }
 
 async function invite(flow: Flow, invitee: Invitee): Promise<ActionRunAnswer> {
-  const answer = await send(flow, "actions/run", { action: "invite", account: invitee });
-  return ACTION_RUN_ANSWER.parse(answer);
+  return ACTION_RUN_ANSWER.parse(await send(flow, "actions/run", inviteFields(invitee)));
+}
+
+function inviteFields(invitee: Invitee) {
+  return { action: "invite", account: invitee };
+}
+
+async function listedInvitationsOf(flow: Flow, invitee: Invitee) {
+  const invitations = await listAllInvitations(flow);
+  return invitations.filter(({ email }) => email === invitee.email).map(withInstants);
 }
 
 function invitationReadBack(answer: ActionRunAnswer) {

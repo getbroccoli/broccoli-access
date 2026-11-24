@@ -139,7 +139,7 @@ export const ACCOUNTS_LIST_ANSWER = z.object({
   appCalls: APP_CALLS,
 });
 
-/** An invite names only the email, which has no member yet. */
+/** An invite names its recipient by email only, whether or not a member has that email. */
 export const ACTION_RUN_REQUEST = z.discriminatedUnion("action", [
   CALL.extend({
     action: z.enum(MEMBER_ACTIONS),
