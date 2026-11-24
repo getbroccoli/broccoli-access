@@ -31,14 +31,15 @@ export interface TemplateRepository {
   lockById(id: string): Promise<Template | null>;
   /** One page of the templates, by name ignoring case. */
   findPage(query: TemplatePageQuery): Promise<KeysetRow<Template, unknown[]>[]>;
-  /** Adds the app to the template; an app already in it stays as it is. */
-  insertApp(templateId: string, appId: string): Promise<void>;
+  /** Adds the app to the template, which must not list it yet. */
+  insertApp(templateId: string, appId: string): Promise<TemplateApp>;
   deleteApp(templateId: string, appId: string): Promise<void>;
 }
 
 /** The template list's one order: its sort values are the lowercased name and the id. */
 export const TEMPLATE_SORT_VALUES: Record<"NAME", z.ZodType<unknown[]>> = {
-  NAME: z.tuple([z.string(), z.uuid()]),
+  // Postgres text cannot hold NUL, so a cursor with one is no cursor this API issued.
+  NAME: z.tuple([z.string().refine((name) => !name.includes("\0")), z.uuid()]),
 };
 
 export type TemplatePageQuery = KeysetQuery<keyof typeof TEMPLATE_SORT_VALUES, unknown[]>;
@@ -83,7 +84,11 @@ export function templateRepository(db: Orm | Tx): TemplateRepository {
       return page.map((node, index) => ({ node, values: [rows[index]!.name, node.id] }));
     },
     insertApp: async (templateId, appId) => {
-      await orm().insert(templateApps).values({ templateId, appId }).onConflictDoNothing();
+      const [app] = await orm()
+        .insert(templateApps)
+        .values({ templateId, appId })
+        .returning({ id: templateApps.id, appId: templateApps.appId });
+      return app!;
     },
     deleteApp: async (templateId, appId) => {
       await orm()

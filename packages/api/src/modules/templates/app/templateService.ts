@@ -45,7 +45,7 @@ export interface TemplateService {
 }
 
 /** A template and an app to add to it or take out of it. */
-export interface TemplateAppInput {
+interface TemplateAppInput {
   /** The template's id. */
   id: string;
   appId: string;
@@ -140,14 +140,14 @@ export function createTemplateService({
         if (before.apps.some((member) => member.appId === app.id)) {
           return { template: before, changed: false };
         }
-        await templateRepository(tx).insertApp(before.id, app.id);
+        const member = await templateRepository(tx).insertApp(before.id, app.id);
         const added = { field: "app", oldValue: null, newValue: app.id, newLabel: app.name };
         await appendHistory(ctx, tx, {
           templateId: before.id,
           operation: "UPDATED",
           change: added,
         });
-        return { template: await lockTemplate(tx, before.id), changed: true };
+        return { template: { ...before, apps: [...before.apps, member] }, changed: true };
       });
       if (changed) {
         logger.info({ templateId: template.id, appId: app?.id }, "App added to a template");

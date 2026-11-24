@@ -1,7 +1,4 @@
-import { toast } from "sonner";
-
-import { type TemplatePageQuery, TakeOutTemplateAppDocument } from "@/__generated__/graphql";
-import { usePayloadMutation } from "@/apollo";
+import type { TemplatePageQuery } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
 import type { DataTableColumn } from "@/components/dataTable";
 import { Button } from "@/components/ui/button";
@@ -11,21 +8,17 @@ import { t } from "@/i18n";
 type TemplateAppRow = NonNullable<TemplatePageQuery["template"]>["apps"][number];
 
 type Props = {
-  templateId: string;
   apps: readonly TemplateAppRow[];
+  /** While another change of the template's apps runs. */
+  disabled: boolean;
+  onTakeOut: (app: TemplateAppRow["app"]) => void;
 };
 
 /** How many apps show before "Show n more": more than a template usually lists. */
 const FIRST_APPS = 50;
 
 /** A template's apps in the order added, each with "Take out". */
-export function TemplateAppsTable({ templateId, apps }: Props) {
-  // The payload carries the template's apps, so the row leaves.
-  const [takeOutApp, { loading }] = usePayloadMutation(TakeOutTemplateAppDocument);
-  const takeOut = ({ id, name }: TemplateAppRow["app"]) =>
-    takeOutApp({ variables: { input: { id: templateId, appId: id } } }).catch(() =>
-      toast.error(t("templates.takeOutFailed", { app: name })),
-    );
+export function TemplateAppsTable({ apps, disabled, onTakeOut }: Props) {
   const columns: DataTableColumn<TemplateAppRow>[] = [
     {
       id: "app",
@@ -46,9 +39,9 @@ export function TemplateAppsTable({ templateId, apps }: Props) {
           type="button"
           variant="outline"
           className="px-3"
-          disabled={loading}
+          disabled={disabled}
           aria-label={t("templates.takeOutApp", { app: app.name })}
-          onClick={() => void takeOut(app)}
+          onClick={() => onTakeOut(app)}
         >
           {t("templates.takeOut")}
         </Button>

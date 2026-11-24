@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteTemplateDocument } from "@/__generated__/graphql";
-import { evictRecord, useCache, usePayloadMutation } from "@/apollo";
+import { evictRecord, PayloadFailure, useCache, usePayloadMutation } from "@/apollo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,9 +31,12 @@ export function DeleteTemplateButton({ template }: Props) {
   const confirm = async () => {
     try {
       await deleteTemplate({ variables: { input: { id: template.id } } });
-    } catch {
-      toast.error(t("templates.deleteFailed", { name: template.name }));
-      return;
+    } catch (error) {
+      // Deleted elsewhere already, such as in another tab: it is gone all the same.
+      if (!isNotFound(error)) {
+        toast.error(t("templates.deleteFailed", { name: template.name }));
+        return;
+      }
     }
     // Left first, so the page never renders the template it no longer has.
     await navigate({ to: "/templates" });
@@ -41,7 +44,11 @@ export function DeleteTemplateButton({ template }: Props) {
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog
+      open={open}
+      // Stays open while the delete runs, so it never looks cancelled.
+      onOpenChange={(next) => !loading && setOpen(next)}
+    >
       <AlertDialogTrigger
         render={
           <Button
@@ -60,12 +67,19 @@ export function DeleteTemplateButton({ template }: Props) {
           <AlertDialogDescription>{t("templates.deleteDescription")}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{t("templates.cancel")}</AlertDialogCancel>
+          <AlertDialogCancel disabled={loading}>{t("templates.cancel")}</AlertDialogCancel>
           <AlertDialogAction type="button" disabled={loading} onClick={() => void confirm()}>
             {t("templates.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+function isNotFound(error: unknown): boolean {
+  return (
+    error instanceof PayloadFailure &&
+    (error.payloadError as { __typename?: string }).__typename === "NotFoundError"
   );
 }

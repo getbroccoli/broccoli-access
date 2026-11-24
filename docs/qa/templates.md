@@ -14,7 +14,7 @@ A manual check of the Templates page and a template's page against a development
 - [ ] "New template" opens a dialog with the field "Name". "Create template" with an empty name shows "Give the template a name."; Cancel closes it.
 - [ ] Creating "Engineer" opens its page, `/templates/<id>`. Back on Templates, the row shows "Engineer", "No apps yet" and 0.
 - [ ] Creating "engineer" shows "Another template already has this name." and the dialog stays open.
-- [ ] Templates are listed by name, ignoring case; a name opens its page.
+- [ ] After creating "analyst" too, Templates lists "analyst" before "Engineer": by name, ignoring case. A name opens its page.
 
 ## A template's page
 

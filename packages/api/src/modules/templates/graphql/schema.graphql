@@ -12,6 +12,7 @@ type Template {
 
 "One app in one template."
 type TemplateApp {
+  "This listing's own id, not the app's."
   id: ID!
 }
 
@@ -33,7 +34,7 @@ input TemplateCreateInput {
 "The fields to change; a field left out stays as it is, and null clears a field that may be empty."
 input TemplateUpdateInput {
   id: ID!
-  "Unique, compared without case; at most 100 characters."
+  "Unique, compared without case; at most 100 characters. It cannot be empty, so null is refused."
   name: String
 }
 
@@ -44,13 +45,14 @@ input TemplateDeleteInput {
 input TemplateAddAppInput {
   "The template."
   id: ID!
-  "One of the company's approved apps."
+  "The id of one of the company's approved apps."
   appId: ID!
 }
 
 input TemplateTakeOutAppInput {
   "The template."
   id: ID!
+  "The app's own id (`TemplateApp.app.id`)."
   appId: ID!
 }
 

@@ -22,6 +22,30 @@ test("lists templates by name ignoring case and shows their apps in the order ad
   ]);
 });
 
+test("pages through three templates in name order", async ({ orm, seed }) => {
+  await seed.template({ name: "Sales" });
+  await seed.template({ name: "design" });
+  await seed.template({ name: "Engineering" });
+  const service = templates(orm);
+
+  const first = await service.listTemplates(OWNER, { first: 1 });
+  const second = await service.listTemplates(OWNER, { first: 1, after: first.pageInfo.endCursor });
+  const third = await service.listTemplates(OWNER, { first: 1, after: second.pageInfo.endCursor });
+
+  expect(first).toMatchObject({
+    edges: [{ node: { name: "design" } }],
+    pageInfo: { hasNextPage: true },
+  });
+  expect(second).toMatchObject({
+    edges: [{ node: { name: "Engineering" } }],
+    pageInfo: { hasNextPage: true },
+  });
+  expect(third).toMatchObject({
+    edges: [{ node: { name: "Sales" } }],
+    pageInfo: { hasNextPage: false },
+  });
+});
+
 test("counts only the people assigned to each template", async ({ orm, seed }) => {
   const design = await seed.template({ name: "Design" });
   const sales = await seed.template({ name: "Sales" });

@@ -66,7 +66,7 @@ export function TemplateNameDialog({
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger render={trigger} />
-      <DialogContent className="gap-5 p-6 sm:max-w-md">
+      <DialogContent showCloseButton={false} className="gap-5 p-6 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
         </DialogHeader>

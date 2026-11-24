@@ -16,7 +16,8 @@ export function NewTemplateButton() {
   const save = async (name: string) => {
     const { template } = await create({ variables: { input: { name } } });
     if (template) {
-      await navigate({ to: "/templates/$templateId", params: { templateId: template.id } });
+      // Not awaited: the dialog closes at once, so the name is never sent twice while the page loads.
+      void navigate({ to: "/templates/$templateId", params: { templateId: template.id } });
     }
   };
 

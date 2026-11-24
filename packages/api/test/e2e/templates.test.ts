@@ -88,6 +88,33 @@ test("the owner creates a template, changes its apps and name, lists it and dele
   expect(await deleted.json()).toEqual({ data: { templates: { delete: { error: null } } } });
 });
 
+test("returns the taken name in the create template error payload", async ({ env }) => {
+  const { browser } = await env.signInAsOwner();
+  const create = `mutation ($name: String!) {
+    templates { create(input: { name: $name }) {
+      template { name }
+      error { __typename ... on InvalidInputError { fields { field code } } }
+    } }
+  }`;
+  const first = await browser.graphql(create, { name: "Engineer" });
+  expect(await first.json()).toEqual({
+    data: { templates: { create: { template: { name: "Engineer" }, error: null } } },
+  });
+
+  const duplicate = await browser.graphql(create, { name: "engineer" });
+
+  expect(await duplicate.json()).toEqual({
+    data: {
+      templates: {
+        create: {
+          template: null,
+          error: { __typename: "InvalidInputError", fields: [{ field: "name", code: "taken" }] },
+        },
+      },
+    },
+  });
+});
+
 test.for([
   ["template", '{ template(id: "1") { id } }'],
   ["templates", "{ templates { edges { node { id } } } }"],

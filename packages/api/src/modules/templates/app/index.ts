@@ -1,5 +1,1 @@
-export {
-  createTemplateService,
-  type TemplateAppInput,
-  type TemplateService,
-} from "./templateService";
+export { createTemplateService, type TemplateService } from "./templateService";

@@ -1,6 +1,7 @@
 import { useQuery } from "@apollo/client/react";
 import { CaretLeft } from "@phosphor-icons/react";
 import { Link, useParams } from "@tanstack/react-router";
+import { useRef } from "react";
 
 import { TemplatePageDocument } from "@/__generated__/graphql";
 import { t } from "@/i18n";
@@ -9,6 +10,7 @@ import { AddAppMenu } from "./AddAppMenu";
 import { DeleteTemplateButton } from "./DeleteTemplateButton";
 import { RenameTemplateButton } from "./RenameTemplateButton";
 import { TemplateAppsTable } from "./TemplateAppsTable";
+import { useTemplateAppChanges } from "./useTemplateAppChanges";
 
 /** A template: its name with Rename and Delete, its apps, and how many people have it. */
 export function TemplatePage() {
@@ -16,6 +18,8 @@ export function TemplatePage() {
   // The route's loader has just read the page into the cache.
   const { data } = useQuery(TemplatePageDocument, { variables: { id: templateId } });
   const template = data?.template;
+  const { changing, add, takeOut } = useTemplateAppChanges(templateId);
+  const appsHeading = useRef<HTMLHeadingElement>(null);
   // The route's loader found the template, so it is missing only once it is deleted.
   if (!template) {
     return null;
@@ -47,12 +51,24 @@ export function TemplatePage() {
       </header>
       <section aria-labelledby="template-apps" className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 id="template-apps" className="text-lg font-semibold tracking-tight">
+          <h2
+            id="template-apps"
+            ref={appsHeading}
+            tabIndex={-1}
+            className="text-lg font-semibold tracking-tight outline-none"
+          >
             {t("templates.apps.title")}
           </h2>
-          <AddAppMenu templateId={template.id} apps={appsToAdd} />
+          <AddAppMenu apps={appsToAdd} disabled={changing} onAdd={(app) => void add(app)} />
         </div>
-        <TemplateAppsTable templateId={template.id} apps={template.apps} />
+        <TemplateAppsTable
+          apps={template.apps}
+          disabled={changing}
+          // The row leaves with its button, so focus moves to the section it was in.
+          onTakeOut={(app) =>
+            void takeOut(app).then((left) => left && appsHeading.current?.focus())
+          }
+        />
       </section>
       <section aria-labelledby="template-people" className="flex flex-col gap-3">
         <h2 id="template-people" className="text-lg font-semibold tracking-tight">
