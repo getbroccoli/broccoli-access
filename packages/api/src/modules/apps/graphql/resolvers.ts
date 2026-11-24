@@ -79,6 +79,9 @@ export function createResolvers(
     AppInvite: {
       app: (invite, _args, context) => loaders.appsById(context).load(invite.appId),
     },
+    TemplateApp: {
+      app: (templateApp, _args, context) => loaders.appsById(context).load(templateApp.appId),
+    },
     ContainerConnection: {
       app: async ({ id }, _args, context) =>
         loaders.appsById(context).load((await loaders.connectionStates(context).load(id)).appId),

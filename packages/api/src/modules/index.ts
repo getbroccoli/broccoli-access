@@ -25,6 +25,7 @@ import { extensionModule } from "./extension";
 import { createGoogleWorkspaceConnector, googleModule } from "./google";
 import { createImportRecordService, createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
+import { templatesModule } from "./templates";
 
 /** Settings that only some modules need, read from the environment by `main.ts`. */
 export interface ModuleSettings {
@@ -110,6 +111,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       ...createAccountChangeService({ ...core, connectors, members: importRecords, employees }),
     }),
     extensionModule({ ...core, appSessions: containerConnections }),
+    templatesModule({ ...core, apps }),
   ];
   return {
     manifests: [...manifests, recordsManifest(core, manifests)],

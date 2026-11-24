@@ -1,0 +1,124 @@
+import { expect, test } from "#test/support";
+
+test("the owner creates a template, changes its apps and name, lists it and deletes it", async ({
+  env,
+}) => {
+  const { browser } = await env.signInAsOwner();
+  const approved = await browser.graphql(
+    "{ apps(status: APPROVED) { edges { node { id name } } } }",
+  );
+  const { data } = (await approved.json()) as {
+    data: { apps: { edges: { node: { id: string; name: string } }[] } };
+  };
+  const { node: google } = data.apps.edges.find(({ node }) => node.name === "Google Workspace")!;
+
+  const created = await browser.graphql(
+    'mutation { templates { create(input: { name: "Engineer" }) { template { id name } error { __typename } } } }',
+  );
+  const body = (await created.json()) as {
+    data: { templates: { create: { template: { id: string } } } };
+  };
+  expect(body).toEqual({
+    data: {
+      templates: {
+        create: { template: { id: expect.any(String) as unknown, name: "Engineer" }, error: null },
+      },
+    },
+  });
+  const { id } = body.data.templates.create.template;
+
+  const added = await browser.graphql(
+    "mutation ($input: TemplateAddAppInput!) { templates { addApp(input: $input) { template { apps { id app { id name } } } error { __typename } } } }",
+    { input: { id, appId: google.id } },
+  );
+  expect(await added.json()).toEqual({
+    data: {
+      templates: {
+        addApp: {
+          template: { apps: [{ id: expect.any(String) as unknown, app: google }] },
+          error: null,
+        },
+      },
+    },
+  });
+
+  const renamed = await browser.graphql(
+    "mutation ($input: TemplateUpdateInput!) { templates { update(input: $input) { template { name } error { __typename } } } }",
+    { input: { id, name: "Developer" } },
+  );
+  expect(await renamed.json()).toEqual({
+    data: { templates: { update: { template: { name: "Developer" }, error: null } } },
+  });
+
+  const removed = await browser.graphql(
+    "mutation ($input: TemplateTakeOutAppInput!) { templates { takeOutApp(input: $input) { template { apps { id } } error { __typename } } } }",
+    { input: { id, appId: google.id } },
+  );
+  expect(await removed.json()).toEqual({
+    data: { templates: { takeOutApp: { template: { apps: [] }, error: null } } },
+  });
+
+  const listed = await browser.graphql(
+    "query ($id: ID!) { template(id: $id) { id name } templates { edges { node { id name createdAt peopleCount apps { id } } } } }",
+    { id },
+  );
+  expect(await listed.json()).toEqual({
+    data: {
+      template: { id, name: "Developer" },
+      templates: {
+        edges: [
+          {
+            node: {
+              id,
+              name: "Developer",
+              createdAt: expect.any(String) as unknown,
+              peopleCount: 0,
+              apps: [],
+            },
+          },
+        ],
+      },
+    },
+  });
+
+  const deleted = await browser.graphql(
+    "mutation ($input: TemplateDeleteInput!) { templates { delete(input: $input) { error { __typename } } } }",
+    { input: { id } },
+  );
+  expect(await deleted.json()).toEqual({ data: { templates: { delete: { error: null } } } });
+});
+
+test.for([
+  ["template", '{ template(id: "1") { id } }'],
+  ["templates", "{ templates { edges { node { id } } } }"],
+  [
+    "templates.create",
+    'mutation { templates { create(input: { name: "Engineer" }) { template { id } } } }',
+  ],
+  [
+    "templates.update",
+    'mutation { templates { update(input: { id: "1", name: "Developer" }) { template { id } } } }',
+  ],
+  [
+    "templates.delete",
+    'mutation { templates { delete(input: { id: "1" }) { error { __typename } } } }',
+  ],
+  [
+    "templates.addApp",
+    'mutation { templates { addApp(input: { id: "1", appId: "2" }) { template { id } } } }',
+  ],
+  [
+    "templates.takeOutApp",
+    'mutation { templates { takeOutApp(input: { id: "1", appId: "2" }) { template { id } } } }',
+  ],
+] as const)("refuses %s without a session", async ([, query], { env }) => {
+  await env.signInAsOwner();
+
+  const response = await env.browser().graphql(query);
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toHaveProperty("errors.0.extensions", {
+    code: "UNAUTHENTICATED",
+    fieldErrors: [],
+  });
+});

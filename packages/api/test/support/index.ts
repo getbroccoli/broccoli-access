@@ -32,6 +32,7 @@ export {
   scans,
   apps,
   appUsers,
+  templates,
 } from "./services";
 export type { EmployeeServices } from "./services";
 export { fileStorage, instances, owners, recordHistory, setupSessions } from "./statelessServices";
@@ -83,6 +84,9 @@ export {
   storedImportSources,
   storedImportRecords,
   storedRecordHistory,
+  storedTemplates,
+  storedTemplateApps,
+  storedEmployeeTemplates,
 } from "./storedScan";
 export { readGoogleConnection, finishSetupWithPreselectedApps, scannedApps } from "./scannedGoogle";
 export {
