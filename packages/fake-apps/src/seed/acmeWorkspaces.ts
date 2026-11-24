@@ -8,6 +8,10 @@ export interface SeedWorkspace {
   /** The settings a connection test returns, which later calls check. */
   settings: Record<string, string>;
   members: SeedMember[];
+  /** The emails of its pending invitations, which are not members. */
+  invitations: string[];
+  /** The app's id for the member at this position, so one who joins later gets the next. */
+  memberId: (index: number) => string;
 }
 
 export interface SeedMember {
@@ -15,22 +19,23 @@ export interface SeedMember {
   sourceKey: string;
   email: string;
   displayName: string;
-  /** `invited` is a pending invitation: not a member yet, so lists leave it out. */
-  status: "active" | "suspended" | "invited";
+  status: "active" | "suspended";
   /** The member whose session or key the seeded connection uses. */
   isConnectionUser: boolean;
 }
+
+/** Someone Acme invited to Slack and Linear who has not joined yet. */
+const NEW_HIRE_EMAIL = `new.hire@${ACME.customer.domain}`;
 
 /** Acme's Slack: the people the fake Google gives Slack, plus one pending invitation. */
 export const ACME_SLACK: SeedWorkspace = {
   name: ACME.customer.organizationName,
   settings: { teamId: "T04ACME", teamDomain: "acme", teamName: ACME.customer.organizationName },
-  members: [
-    ...slackPeople().map((person, index) =>
-      member(person, slackMemberId(index), person.email === `elif@${ACME.customer.domain}`),
-    ),
-    invitation(slackMemberId(slackPeople().length)),
-  ],
+  members: slackPeople().map((person, index) =>
+    member(person, slackMemberId(index), person.email === `elif@${ACME.customer.domain}`),
+  ),
+  invitations: [NEW_HIRE_EMAIL],
+  memberId: slackMemberId,
 };
 
 /** Acme's Linear: seven people, Hannah suspended, plus one pending invitation. */
@@ -41,12 +46,11 @@ export const ACME_LINEAR: SeedWorkspace & { apiKey: string } = {
     urlKey: "acme",
     organizationName: ACME.customer.organizationName,
   },
-  members: [
-    ...["admin", "ana", "chloe", "david", "gabriel", "jun", "hannah"].map((localPart, index) =>
-      member(personWithLocalPart(localPart), linearUserId(index), localPart === "hannah"),
-    ),
-    invitation(linearUserId(7)),
-  ],
+  members: ["admin", "ana", "chloe", "david", "gabriel", "jun", "hannah"].map((localPart, index) =>
+    member(personWithLocalPart(localPart), linearUserId(index), localPart === "hannah"),
+  ),
+  invitations: [NEW_HIRE_EMAIL],
+  memberId: linearUserId,
   apiKey: "lin_api_acme_fake",
 };
 
@@ -58,16 +62,6 @@ function member(person: SeedPerson, sourceKey: string, suspended: boolean): Seed
     displayName: `${person.givenName} ${person.familyName}`,
     status: suspended ? "suspended" : "active",
     isConnectionUser: person.isSuperAdmin,
-  };
-}
-
-function invitation(sourceKey: string): SeedMember {
-  return {
-    sourceKey,
-    email: `new.hire@${ACME.customer.domain}`,
-    displayName: "",
-    status: "invited",
-    isConnectionUser: false,
   };
 }
 

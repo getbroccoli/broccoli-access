@@ -19,9 +19,10 @@ import { z } from "zod";
 
 import type { SeedMember } from "../seed";
 import { pageOf, pageTokenOffset } from "../utils";
-import { membersOf, type ConnectorsState, type FakeConnectorsContext } from "./connectorsState";
+import type { ConnectorsState, FakeConnectorsContext } from "./connectorsState";
 import type { FakeConnector } from "./fakeConnector";
 import { FAKE_CONNECTORS, findConnector } from "./fakeConnectorList";
+import { invite } from "./invitations";
 
 /** The connector contract's calls, answered from the fake's memory (docs/connector-contract.md). */
 export function connectorCallRoutes(context: FakeConnectorsContext): Router {
@@ -122,26 +123,29 @@ function listAccounts(
   state: ConnectorsState,
   request: ListRequest,
 ): AccountsListAnswer {
-  const members = membersOf(state, connector.description.key);
-  const page = pageOf(members, { maxResults: PAGE_SIZE, offset: request.cursor ?? 0 });
+  const { key } = connector.description;
+  const page = pageOf(state.members[key], { maxResults: PAGE_SIZE, offset: request.cursor ?? 0 });
   return {
     accounts: page.items.map((member) => ({
       sourceKey: member.sourceKey,
       raw: connector.raw(member),
       values: valuesOf(member),
     })),
+    // Every pending invitation fits on the first page.
+    ...(request.cursor === null ? { invitations: state.invitations[key] } : {}),
     nextCursor: page.nextPageToken ?? null,
   };
 }
 
-/** Changes exactly one matching member; the answer reads it from memory after the change. */
+/** Changes exactly one matching member, or invites an email; the answer reads memory after it. */
 function runAction(
   connector: FakeConnector,
   state: ConnectorsState,
   request: ActionRunRequest,
 ): ActionRunAnswer | ConnectorErrorAnswer {
+  if (request.action === "invite") return inviteAnswer(connector, state, request.account.email);
   const { sourceKey, email } = request.account;
-  const matches = membersOf(state, connector.description.key).filter(
+  const matches = state.members[connector.description.key].filter(
     (member) => member.sourceKey === sourceKey && member.email === email,
   );
   const [member] = matches;
@@ -150,6 +154,19 @@ function runAction(
   const changed = member.status !== status;
   member.status = status;
   return { changed, account: { sourceKey, values: valuesOf(member) } };
+}
+
+function inviteAnswer(
+  connector: FakeConnector,
+  state: ConnectorsState,
+  email: string,
+): ActionRunAnswer {
+  const result = invite(connector, state, email);
+  if ("member" in result) {
+    const { sourceKey } = result.member;
+    return { changed: false, account: { sourceKey, values: valuesOf(result.member) } };
+  }
+  return { changed: result.sent, invitation: result.invitation };
 }
 
 function takePlannedFailure(
@@ -177,7 +194,7 @@ function reachesOtherWorkspace(
 function valuesOf(member: SeedMember): AccountValues {
   return {
     email: member.email,
-    status: member.status === "suspended" ? "suspended" : "active",
+    status: member.status,
     displayName: member.displayName,
     isConnectionUser: member.isConnectionUser,
   };

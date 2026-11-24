@@ -26,6 +26,7 @@ describeConnectorConformance({
         settings: {},
         secrets: { appSession: await signInToFakeSlack(url) },
       }),
+      invitee: { email: "ivan@acme.example" },
       member: memberAccount(ACME_SLACK, "ana@acme.example"),
       causeError: failNextAction("slack"),
       reset,
@@ -33,6 +34,7 @@ describeConnectorConformance({
     {
       connector: "linear",
       connection: () => Promise.resolve({ settings: {}, secrets: { apiKey: ACME_LINEAR.apiKey } }),
+      invitee: { email: "ivan@acme.example" },
       member: memberAccount(ACME_LINEAR, "chloe@acme.example"),
       causeError: failNextAction("linear"),
       reset,

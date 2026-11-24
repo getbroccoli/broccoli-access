@@ -9,7 +9,7 @@ export const LINEAR: FakeConnector = {
     name: "Linear",
     appDomain: "linear.app",
     runtimes: ["server"],
-    capabilities: ["list_accounts", "suspend", "reactivate"],
+    capabilities: ["list_accounts", "suspend", "reactivate", "invite", "list_invitations"],
     findingKind: "linear_members",
     connectionFields: [
       {
@@ -35,4 +35,11 @@ export const LINEAR: FakeConnector = {
     active: member.status === "active",
     admin: member.isConnectionUser,
   }),
+  invitationDates: (sentAt) => ({
+    invitedAt: sentAt.toISOString(),
+    expiresAt: new Date(sentAt.getTime() + INVITATION_LIFETIME_MS).toISOString(),
+  }),
 };
+
+/** Linear's invitations expire 30 days after they are sent. */
+const INVITATION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;

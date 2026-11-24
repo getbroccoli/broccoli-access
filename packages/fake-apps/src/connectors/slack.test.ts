@@ -33,24 +33,8 @@ it("discovers Acme's Slack settings from Mia's session", async ({ connectors: { 
 it("pages through Acme's 41 Slack members with Mia alone as the connection user", async ({
   connectors: { url },
 }) => {
-  const appSession = await signInToFakeSlack(url);
-  const request = {
-    connector: "slack",
-    runtime: { kind: "server" },
-    connection: { settings: ACME_SLACK.settings, secrets: { appSession } },
-  };
-  const first = await callConnector(url, "accounts/list", { ...request, cursor: null });
-  let page = ACCOUNTS_LIST_ANSWER.parse(first.body);
-  expect(page.nextCursor).not.toBeNull();
-  const accounts = [...page.accounts];
-  const cursors = new Set<string>();
-  while (page.nextCursor !== null) {
-    expect(cursors.has(page.nextCursor)).toBe(false);
-    cursors.add(page.nextCursor);
-    const next = await callConnector(url, "accounts/list", { ...request, cursor: page.nextCursor });
-    page = ACCOUNTS_LIST_ANSWER.parse(next.body);
-    accounts.push(...page.accounts);
-  }
+  const pages = await listSlackPages(url);
+  const accounts = pages.flatMap((page) => page.accounts);
 
   const slack = ACME.apps.find((app) => app.name === "Slack")!;
   const emails = accounts.map(({ values }) => values.email);
@@ -70,6 +54,36 @@ it("pages through Acme's 41 Slack members with Mia alone as the connection user"
     "elif@acme.example": "suspended",
     "ana@acme.example": "active",
     "ben@acme.example": "active",
+  });
+});
+
+it("lists the seeded Slack invitation only on the first of three pages", async ({
+  connectors: { url },
+}) => {
+  const pages = await listSlackPages(url);
+
+  expect(pages.map((page) => page.invitations)).toEqual([
+    [{ email: "new.hire@acme.example", invitedAt: null, expiresAt: null }],
+    undefined,
+    undefined,
+  ]);
+});
+
+it("invites Ivan to Slack with no invitation dates", async ({ connectors: { url } }) => {
+  const appSession = await signInToFakeSlack(url);
+  const email = "ivan@acme.example";
+
+  const result = await callConnector(url, "actions/run", {
+    connector: "slack",
+    runtime: { kind: "server" },
+    connection: { settings: ACME_SLACK.settings, secrets: { appSession } },
+    action: "invite",
+    account: { email },
+  });
+
+  expect(result.body).toMatchObject({
+    changed: true,
+    invitation: { email, invitedAt: null, expiresAt: null },
   });
 });
 
@@ -110,6 +124,29 @@ it("accepts a new Slack sign-in after sessions expire", async ({ connectors: { u
     details: { organizationName: "Acme", domain: "acme.slack.com" },
   });
 });
+
+async function listSlackPages(url: string) {
+  const appSession = await signInToFakeSlack(url);
+  const request = {
+    connector: "slack",
+    runtime: { kind: "server" },
+    connection: { settings: ACME_SLACK.settings, secrets: { appSession } },
+  };
+  const pages = [];
+  const cursors = new Set<string>();
+  let cursor: string | null = null;
+  do {
+    const result = await callConnector(url, "accounts/list", { ...request, cursor });
+    const page = ACCOUNTS_LIST_ANSWER.parse(result.body);
+    pages.push(page);
+    cursor = page.nextCursor;
+    if (cursor !== null) {
+      expect(cursors.has(cursor)).toBe(false);
+      cursors.add(cursor);
+    }
+  } while (cursor !== null);
+  return pages;
+}
 
 function testSession(url: string, secrets: Record<string, unknown>) {
   return callConnector(url, "connections/test", {

@@ -1,4 +1,4 @@
-import type { ConnectorDescription } from "@broccoli-access/connector-contract";
+import type { ConnectorDescription, Invitation } from "@broccoli-access/connector-contract";
 
 import type { SeedMember, SeedWorkspace } from "../seed";
 import type { ConnectorsState, FakeConnectorKey } from "./connectorsState";
@@ -16,4 +16,6 @@ export interface FakeConnector {
   authenticates: (state: ConnectorsState, secrets: Record<string, unknown>) => boolean;
   /** The member as the app's own API shows it. */
   raw: (member: SeedMember) => Record<string, unknown>;
+  /** The dates the app gives an invitation sent at `sentAt`; null where it gives none. */
+  invitationDates: (sentAt: Date) => Pick<Invitation, "invitedAt" | "expiresAt">;
 }
