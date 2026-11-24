@@ -72,7 +72,7 @@ export function createAppUserService(dependencies: AppUserDependencies): AppUser
       const inAppFacts = await findInAppFacts(orm, dependencies);
       const [accounts, suspended] = await Promise.all([
         appAccountRepository(orm).findUsersOfApps(appIds, inAppFacts),
-        findEmployeesInDirectory(orm, connectors, "suspended"),
+        findEmployeesInDirectory(orm, connectors, { status: "suspended" }),
       ]);
       const byName = await employees.readEmployees(ctx, [
         ...new Set(accounts.map(({ employeeId }) => employeeId)),
@@ -95,7 +95,7 @@ export function createAppUserService(dependencies: AppUserDependencies): AppUser
       const inAppFacts = await findInAppFacts(orm, dependencies);
       const [accounts, suspended, directoryAppId] = await Promise.all([
         appAccountRepository(orm).findCurrentAccountsOfEmployees(employeeIds, inAppFacts),
-        findEmployeesInDirectory(orm, connectors, "suspended"),
+        findEmployeesInDirectory(orm, connectors, { status: "suspended" }),
         findDirectoryAppId(orm, connectors),
       ]);
       const suspendedInDirectory = new Set(suspended);

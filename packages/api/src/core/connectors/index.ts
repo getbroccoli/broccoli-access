@@ -24,5 +24,4 @@ export type {
   ConnectorRegistry,
   ConnectorSession,
   ImportedAccount,
-  InviteResult,
 } from "./connector";

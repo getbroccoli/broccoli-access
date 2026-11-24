@@ -190,7 +190,7 @@ export function createAppService(dependencies: AppDependencies): AppService {
     },
     directoryAppId: (db) => findDirectoryAppId(db, connectors),
     findEmployeesSuspendedInDirectory: (db) =>
-      findEmployeesInDirectory(db, connectors, "suspended"),
+      findEmployeesInDirectory(db, connectors, { status: "suspended" }),
     async findEmployeeAccounts(db) {
       const inAppFacts = await findInAppFacts(db, dependencies);
       const [accounts, directoryAppId] = await Promise.all([
@@ -289,7 +289,7 @@ async function summarize(
     // Every employee holds a directory account, so they are the directory's people.
     accounts.countEmployeesWithAccounts(),
     appConnectionRepository(orm).findByApps(appIds),
-    findEmployeesInDirectory(orm, connectors, "suspended"),
+    findEmployeesInDirectory(orm, connectors, { status: "suspended" }),
   ]);
   const users = accountsOfUsers.filter(({ inApp }) => inApp !== false);
   const usersByApp = Map.groupBy(users, ({ appId }) => appId);

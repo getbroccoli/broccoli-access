@@ -39,8 +39,12 @@ export interface AppAccountRepository {
   ): Promise<AppUserAccount[]>;
   /** How many employees hold an account in any app. */
   countEmployeesWithAccounts(): Promise<number>;
-  /** The employees whose account in the app has `status`. */
-  findEmployeeIdsWithStatus(appId: string, status: AccountStatus): Promise<string[]>;
+  /** The employees whose account in the app has `status`; only those of `among` when given. */
+  findEmployeeIdsWithStatus(
+    appId: string,
+    status: AccountStatus,
+    among?: readonly string[],
+  ): Promise<string[]>;
   /**
    * Every account with an employee that is access as `facts` say, with its app's name and status
    * and its dates.
@@ -149,7 +153,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .from(appAccounts);
       return row!.employees;
     },
-    findEmployeeIdsWithStatus: async (appId, status) => {
+    findEmployeeIdsWithStatus: async (appId, status, among) => {
       const rows = await orm()
         .selectDistinct({ employeeId: appAccounts.employeeId })
         .from(appAccounts)
@@ -157,7 +161,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
           and(
             eq(appAccounts.appId, appId),
             eq(appAccounts.status, status),
-            isNotNull(appAccounts.employeeId),
+            among ? anyOf(appAccounts.employeeId, among) : isNotNull(appAccounts.employeeId),
           ),
         );
       return rows.map(({ employeeId }) => employeeId!);

@@ -22,12 +22,12 @@ export async function findDirectoryAppId(
   return connection?.appId ?? null;
 }
 
-/** The employees whose account in the directory's app has `status`. */
+/** The employees whose account in the directory's app has `status`; only those of `among` when given. */
 export async function findEmployeesInDirectory(
   db: Orm | Tx,
   connectors: DirectoryConnectors,
-  status: AccountStatus,
+  { status, among }: { status: AccountStatus; among?: readonly string[] },
 ): Promise<string[]> {
   const appId = await findDirectoryAppId(db, connectors);
-  return appId ? appAccountRepository(db).findEmployeeIdsWithStatus(appId, status) : [];
+  return appId ? appAccountRepository(db).findEmployeeIdsWithStatus(appId, status, among) : [];
 }

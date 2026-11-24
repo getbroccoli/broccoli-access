@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { t } from "@/i18n";
 
-import { forgetAppLists } from "./cache";
+import { forgetAppLists, REFETCH_AFTER_RECONNECT } from "./cache";
 import { inSentence } from "./connectingFieldName";
 
 type Props = {
@@ -61,7 +61,9 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
     },
   );
   // The payload carries the connection's new status and its app's users' offers.
-  const [reconnect, reconnecting] = usePayloadMutation(ReconnectContainerConnectorDocument);
+  const [reconnect, reconnecting] = usePayloadMutation(ReconnectContainerConnectorDocument, {
+    refetch: REFETCH_AFTER_RECONNECT,
+  });
   if (!complete) {
     return null;
   }

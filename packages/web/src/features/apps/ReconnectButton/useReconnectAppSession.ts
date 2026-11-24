@@ -5,6 +5,7 @@ import { ReconnectContainerConnectorDocument } from "@/__generated__/graphql";
 import { usePayloadMutation } from "@/apollo";
 import { t } from "@/i18n";
 
+import { REFETCH_AFTER_RECONNECT } from "../cache";
 import { useAppSessionHandOver } from "../ConnectAppSessionDialog";
 
 /**
@@ -14,7 +15,9 @@ import { useAppSessionHandOver } from "../ConnectAppSessionDialog";
 export function useReconnectAppSession(connector: { id: string; name: string }) {
   const handOver = useAppSessionHandOver(connector.id);
   // The payload carries the connection's new status and its app's users' offers.
-  const [reconnect, reconnecting] = usePayloadMutation(ReconnectContainerConnectorDocument);
+  const [reconnect, reconnecting] = usePayloadMutation(ReconnectContainerConnectorDocument, {
+    refetch: REFETCH_AFTER_RECONNECT,
+  });
   const appSession = handOver.handOver?.appSession ?? null;
   const { reset } = handOver;
   // The session comes back from the server once the extension's window has closed.

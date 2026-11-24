@@ -117,7 +117,7 @@ export const appsEn = {
   "apps.change.enableEffect":
     "{firstName}’s account in this workspace becomes active again. You can disable it again later.",
   "apps.change.inviteEffect":
-    "{app} emails {firstName} an invitation to join this workspace as a regular member. Their account shows here once they accept and {app} is scanned.",
+    "{app} sends {firstName} an invitation to join this workspace as a regular member, unless one is already pending. Their account shows here once they accept and {app} is scanned.",
   "apps.change.howItWorks":
     "Broccoli Access makes the change with your {field}, then reads the account back from {app}.",
   "apps.change.howInviteWorks":
@@ -198,6 +198,8 @@ export const appsEn = {
   "apps.byHand.confirm": "Yes, I did it",
   "apps.byHand.refused":
     "Couldn’t mark the change of {name} in {app} as done by hand. Reload the page to see the account’s status.",
+  "apps.byHand.inviteRefused":
+    "Couldn’t mark the invite of {name} to {app} as done by hand. Reload the page to see whether they’re invited.",
   "apps.reconnect.badge": "Reconnect",
   "apps.reconnect.button": "Reconnect",
   "apps.reconnect.appButton": "Reconnect {app}",

@@ -248,8 +248,11 @@ async function finishSucceeded(
   change: AccountChange,
 ): Promise<boolean> {
   return transact(async (tx) => {
-    // The lock scans take first: a scan deleting the account also locks this change.
-    await appAccountRepository(tx).lockForSync();
+    // The lock scans take first: a scan deleting the account also locks this change. An invite,
+    // or a change whose account a scan deleted, has no account to wait for.
+    if (change.appAccountId) {
+      await appAccountRepository(tx).lockForSync();
+    }
     const changes = accountChangeRepository(tx);
     if ((await changes.lockById(change.id))?.status !== "running") {
       return false;

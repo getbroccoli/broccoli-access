@@ -181,12 +181,15 @@ const STATUSES = { DISCOVERED: "discovered", APPROVED: "approved", IGNORED: "ign
 
 const ACTIONS = { SUSPEND: "suspend", REACTIVATE: "reactivate", INVITE: "invite" } as const;
 
-/** The change's account as its app's users list it; null once it belongs to no employee. */
+/** The change's account as its app's users list it; null for an invite, or once it belongs to no employee. */
 async function appUserOf(
   services: Parameters<typeof createResolvers>[0],
   ctx: SecurityContext,
   change: AccountChange,
 ): Promise<AppUser | null> {
+  if (!change.appAccountId) {
+    return null;
+  }
   const users = await services.readUsersOfApps(ctx, [change.appId]);
   return users.find(({ id }) => id === change.appAccountId) ?? null;
 }
