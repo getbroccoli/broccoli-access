@@ -2,8 +2,7 @@ import type { Tx } from "../../../core/db";
 import { createRecordHistoryService } from "../../../core/records";
 import { PrincipalSecurityContext, type SecurityContext } from "../../../core/security";
 import { assignmentRepository, type EmployeeAppPair } from "../db";
-import type { PersonAccess } from "../ports";
-import { employeeTemplatesOf } from "./employeeTemplates";
+import type { PersonAccess, EmployeeById } from "../ports";
 
 const history = createRecordHistoryService();
 
@@ -12,60 +11,65 @@ export async function reviewLostApps(
   ctx: SecurityContext,
   tx: Tx,
   apps: PersonAccess,
+  employees: EmployeeById,
   employeeIds: string[],
   lostAppIds: string[],
 ) {
   if (!employeeIds.length || !lostAppIds.length) return;
   const repo = assignmentRepository(tx);
-  await repo.lockChoices();
-  const remaining = await employeeTemplatesOf(tx, employeeIds);
-  const accounts = await apps.findEmployeeAccounts(tx, employeeIds);
-  const lost = new Set(lostAppIds);
-  const active = Map.groupBy(
-    accounts.filter((a) => a.status === "active" && lost.has(a.appId)),
-    (a) => a.employeeId,
+  // A directory scan already holds its employees when it reaches the apps.
+  await employees.holdForReference(tx, employeeIds);
+  const names = await apps.lockAppsForReview(tx, lostAppIds);
+  const active = (await apps.findEmployeeAccounts(tx, employeeIds, lostAppIds)).filter(
+    (account) => account.status === "active",
   );
-  const pairs = employeeIds.flatMap((employeeId, index) => {
-    const given = new Set(
-      remaining[index]!.flatMap((template) => template.apps.map((app) => app.appId)),
-    );
-    const held = new Set(active.get(employeeId)?.map((account) => account.appId));
-    return [...held].filter((appId) => !given.has(appId)).map((appId) => ({ employeeId, appId }));
-  });
-  // An added or removed choice stays the owner's decision; only new review choices have history.
-  const marked = await repo.markForReview(pairs);
-  await recordChoiceChanges(ctx, tx, marked, "marked");
+  if (!active.length) return;
+  const remaining = new Set((await repo.sources(employeeIds, lostAppIds)).map(pairKey));
+  const lost = new Map(
+    active
+      .filter((pair) => !remaining.has(pairKey(pair)))
+      .map((pair) => [pairKey(pair), { employeeId: pair.employeeId, appId: pair.appId }]),
+  );
+  const marked = await repo.markForReview([...lost.values()]);
+  await recordChoiceChanges(
+    ctx,
+    tx,
+    marked,
+    new Map(names.map((app) => [app.id, app.name])),
+    "marked",
+  );
 }
 
-/** An account change or scan that ends the access also ends its review, in the same transaction. */
-export async function clearInactiveReviews(tx: Tx, apps: PersonAccess) {
+/** Checks reviews in the apps whose effective access just changed, after the scan or status update. */
+export async function clearInactiveReviews(tx: Tx, apps: PersonAccess, appIds: readonly string[]) {
   const repo = assignmentRepository(tx);
-  await repo.lockChoices();
-  const byPerson = Map.groupBy(await repo.reviews(), (pair) => pair.employeeId);
-  if (!byPerson.size) return;
-  const accounts = await apps.findEmployeeAccounts(tx, [...byPerson.keys()]);
-  const active = Map.groupBy(
-    accounts.filter((account) => account.status === "active"),
-    (account) => account.employeeId,
+  const names = await apps.lockAppsForReview(tx, appIds);
+  const reviews = await repo.reviews(appIds);
+  if (!reviews.length) return;
+  const employeeIds = [...new Set(reviews.map((pair) => pair.employeeId))];
+  const accounts = await apps.findEmployeeAccounts(tx, employeeIds, appIds);
+  const active = new Set(accounts.filter((account) => account.status === "active").map(pairKey));
+  const ended = reviews.filter((pair) => !active.has(pairKey(pair)));
+  if (!ended.length) return;
+  const cleared = await repo.clearReviews(ended);
+  await recordChoiceChanges(
+    PrincipalSecurityContext.system(),
+    tx,
+    cleared,
+    new Map(names.map((app) => [app.id, app.name])),
+    "cleared",
   );
-  const cleared: EmployeeAppPair[] = [];
-  for (const [employeeId, reviews] of byPerson) {
-    const held = new Set(active.get(employeeId)?.map((account) => account.appId));
-    const ended = reviews.filter((pair) => !held.has(pair.appId));
-    if (!ended.length) continue;
-    await repo.clearReviews(
-      employeeId,
-      ended.map((pair) => pair.appId),
-    );
-    cleared.push(...ended);
-  }
-  await recordChoiceChanges(PrincipalSecurityContext.system(), tx, cleared, "cleared");
+}
+
+function pairKey({ employeeId, appId }: EmployeeAppPair) {
+  return employeeId + "/" + appId;
 }
 
 async function recordChoiceChanges(
   ctx: SecurityContext,
   tx: Tx,
   pairs: EmployeeAppPair[],
+  names: ReadonlyMap<string, string>,
   action: "marked" | "cleared",
 ) {
   if (!pairs.length) return;
@@ -78,8 +82,18 @@ async function recordChoiceChanges(
       recordId,
       changes: apps.map(({ appId }) =>
         action === "marked"
-          ? { field: "appChoice", oldValue: null, newValue: appId, newLabel: "To review" }
-          : { field: "appChoice", oldValue: appId, oldLabel: "To review", newValue: null },
+          ? {
+              field: "appChoice",
+              oldValue: null,
+              newValue: appId,
+              newLabel: names.get(appId) + " — to review",
+            }
+          : {
+              field: "appChoice",
+              oldValue: appId,
+              oldLabel: names.get(appId) + " — to review",
+              newValue: null,
+            },
       ),
     })),
   });

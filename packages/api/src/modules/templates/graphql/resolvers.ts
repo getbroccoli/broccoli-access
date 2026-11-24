@@ -4,6 +4,7 @@ import {
   mutationPayload,
   perRequest,
   toEnum,
+  type GraphqlContext,
   type Resolvers,
   type ResolversTypes,
 } from "../../../core/graphql";
@@ -15,9 +16,13 @@ export type ReadTemplateEmployees = (
   ids: readonly string[],
 ) => Promise<Awaited<ResolversTypes["Employee"]>[]>;
 
+export type InviteLoader = (ctx: GraphqlContext) => {
+  load(id: string): Promise<{ employeeId: string; appId: string; invitedAt: Date | null }[]>;
+};
 export function createResolvers(
   services: TemplateService,
   readEmployees: ReadTemplateEmployees,
+  invites: InviteLoader,
 ): Resolvers {
   const assigned = perRequest(
     (ctx) =>
@@ -27,29 +32,41 @@ export function createResolvers(
   );
   const apps = perRequest(
     (ctx) =>
-      new DataLoader((ids: readonly string[]) => services.readEmployeeApps(ctx.getActor(), ids)),
-  );
-  const people = perRequest(
-    (ctx) =>
-      new DataLoader(async (ids: readonly string[]) => {
-        const actor = ctx.getActor();
-        const assignedPeople = await services.readTemplatePeople(actor, ids);
-        const employees = await readEmployees(actor, [...new Set(assignedPeople.flat())]);
-        const rank = new Map(employees.map((employee, index) => [employee.id, index]));
-        return assignedPeople.map((group) =>
-          group
-            .flatMap((id) => rank.get(id) ?? [])
-            .sort((a, b) => a - b)
-            .map((index) => employees[index]!),
-        );
-      }),
+      new DataLoader((ids: readonly string[]) =>
+        services.readEmployeeApps(ctx.getActor(), ids, {
+          templates: Promise.all(ids.map((id) => assigned(ctx).load(id))),
+          invites: Promise.all(ids.map((id) => invites(ctx).load(id))).then((groups) =>
+            groups.flat(),
+          ),
+        }),
+      ),
   );
   return {
     Employee: {
       templates: (employee, _args, ctx) => assigned(ctx).load(employee.id),
-      templateApps: (employee, _args, ctx) => apps(ctx).load(employee.id),
+      personApps: (employee, _args, ctx) => apps(ctx).load(employee.id),
     },
-    Template: { people: (template, _args, ctx) => people(ctx).load(template.id) },
+    Template: {
+      async people(template, { first, after }, ctx) {
+        const actor = ctx.getActor();
+        const page = await services.readTemplatePeople(actor, template.id, {
+          first: first ?? undefined,
+          after,
+        });
+        const people = await readEmployees(
+          actor,
+          page.edges.map((edge) => edge.node),
+        );
+        const byId = new Map(people.map((person) => [person.id, person]));
+        return {
+          ...page,
+          edges: page.edges.flatMap((edge) => {
+            const node = byId.get(edge.node);
+            return node ? [{ ...edge, node }] : [];
+          }),
+        };
+      },
+    },
     PersonApp: { state: ({ state }) => state && toEnum(state) },
     Query: {
       template: (_parent, { id }, context) => services.readTemplate(context.getActor(), id),

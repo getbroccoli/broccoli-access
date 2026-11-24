@@ -1,6 +1,7 @@
 import { useQuery } from "@apollo/client/react";
 import { CaretLeft } from "@phosphor-icons/react";
 import { Link, useParams } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { useRef } from "react";
 
 import { TemplatePageDocument } from "@/__generated__/graphql";
@@ -17,7 +18,9 @@ import { useTemplateAppChanges } from "./useTemplateAppChanges";
 export function TemplatePage() {
   const { templateId } = useParams({ from: "/_authenticated/templates_/$templateId" });
   // The route's loader has just read the page into the cache.
-  const { data } = useQuery(TemplatePageDocument, { variables: { id: templateId } });
+  const { data, fetchMore, loading } = useQuery(TemplatePageDocument, {
+    variables: { id: templateId },
+  });
   const template = data?.template;
   const { changing, add, takeOut } = useTemplateAppChanges(templateId);
   const appsHeading = useRef<HTMLHeadingElement>(null);
@@ -76,7 +79,28 @@ export function TemplatePage() {
           {t("templates.people.title")}{" "}
           <span className="font-medium text-muted-foreground">{template.peopleCount}</span>
         </h2>
-        <TemplatePeople key={template.id} people={template.people} />
+        <TemplatePeople
+          key={template.id}
+          people={template.people}
+          count={template.peopleCount}
+          loading={loading}
+          onMore={() =>
+            void fetchMore({
+              variables: { after: template.people.pageInfo.endCursor },
+              updateQuery: (previous, { fetchMoreResult }) => {
+                if (!previous.template || !fetchMoreResult.template) return previous;
+                const next = fetchMoreResult.template.people;
+                return {
+                  ...previous,
+                  template: {
+                    ...previous.template,
+                    people: { ...next, edges: [...previous.template.people.edges, ...next.edges] },
+                  },
+                };
+              },
+            }).catch(() => toast.error(t("people.error.title")))
+          }
+        />
       </section>
     </div>
   );

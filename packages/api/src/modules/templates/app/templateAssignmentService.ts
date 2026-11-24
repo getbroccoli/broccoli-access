@@ -1,4 +1,6 @@
-import { ApplicationError, invalidInput } from "../../../core/applicationError";
+import { z } from "zod";
+import { paginate, type PageArgs, type Connection } from "../../../core/pagination";
+import { ApplicationError } from "../../../core/applicationError";
 import type { Tx } from "../../../core/db";
 import type { ModuleDependencies } from "../../../core/moduleManifest";
 import { createRecordHistoryService } from "../../../core/records";
@@ -13,17 +15,25 @@ import { clearInactiveReviews, reviewLostApps } from "./reviewLostApps";
 /** Changes to a person's templates and the reads that show what those templates give. */
 export interface TemplateAssignmentService {
   /** Ends reviews whose account just stopped being active, inside the account change or scan. */
-  clearInactiveReviews: (tx: Tx) => Promise<void>;
+  clearInactiveReviews: (tx: Tx, appIds: readonly string[]) => Promise<void>;
   assign: (ctx: SecurityContext, input: AssignmentInput) => Promise<Template>;
   takeOff: (ctx: SecurityContext, input: AssignmentInput) => Promise<Template>;
   readEmployeeTemplates: (
     ctx: SecurityContext,
     employeeIds: readonly string[],
   ) => Promise<Template[][]>;
-  readTemplatePeople: (ctx: SecurityContext, templateIds: readonly string[]) => Promise<string[][]>;
+  readTemplatePeople: (
+    ctx: SecurityContext,
+    id: string,
+    args: PageArgs,
+  ) => Promise<Connection<string>>;
   readEmployeeApps: (
     ctx: SecurityContext,
     employeeIds: readonly string[],
+    shared?: {
+      templates: Promise<Template[][]>;
+      invites: ReturnType<PersonAccess["readAppInvites"]>;
+    },
   ) => Promise<PersonApp[][]>;
 }
 
@@ -40,27 +50,32 @@ const history = createRecordHistoryService();
 export function createTemplateAssignmentService(deps: Dependencies): TemplateAssignmentService {
   const { orm, apps } = deps;
   return {
-    clearInactiveReviews: (tx) => clearInactiveReviews(tx, apps),
+    clearInactiveReviews: (tx, appIds) => clearInactiveReviews(tx, apps, appIds),
     assign: (ctx, input) => changeAssignment(deps, ctx, input, "assign"),
     takeOff: (ctx, input) => changeAssignment(deps, ctx, input, "takeOff"),
     readEmployeeTemplates(ctx, employeeIds) {
       ctx.require("MANAGE_WORKSPACE");
       return employeeTemplatesOf(orm, employeeIds);
     },
-    async readTemplatePeople(ctx, templateIds) {
+    async readTemplatePeople(ctx, id, args) {
       ctx.require("MANAGE_WORKSPACE");
-      const rows = await assignmentRepository(orm).forTemplates(templateIds);
-      const groups = Map.groupBy(rows, (row) => row.templateId);
-      return templateIds.map((id) => groups.get(id)?.map((row) => row.employeeId) ?? []);
+      return paginate(args, {
+        order: { field: "ASSIGNED", direction: "ASC" },
+        keysetValues: { ASSIGNED: z.tuple([z.uuid()]) },
+        fetch: async ({ after, limit }) =>
+          (await assignmentRepository(orm).peoplePage(id, after?.[0] ?? null, limit)).map(
+            (row) => ({ node: row.employeeId, values: [row.id] }),
+          ),
+      });
     },
-    async readEmployeeApps(ctx, employeeIds) {
+    async readEmployeeApps(ctx, employeeIds, shared) {
       ctx.require("MANAGE_WORKSPACE");
       const repo = assignmentRepository(orm);
       const [templates, choices, accounts, invites] = await Promise.all([
-        employeeTemplatesOf(orm, employeeIds),
+        shared?.templates ?? employeeTemplatesOf(orm, employeeIds),
         repo.choicesFor(employeeIds),
         apps.findEmployeeAccounts(orm, employeeIds),
-        apps.readAppInvites(ctx, employeeIds),
+        shared?.invites ?? apps.readAppInvites(ctx, employeeIds),
       ]);
       const listedApps = await repo.listedApps(accounts.map((account) => account.appId));
       const choicesByPerson = Map.groupBy(choices, (choice) => choice.employeeId);
@@ -97,9 +112,12 @@ async function changeAssignment(
     const repo = assignmentRepository(tx);
     const assignment = { employeeId, templateId: template.id };
     if (action === "assign") {
-      const accounts = await apps.findEmployeeAccounts(tx, [employeeId]);
-      if (!accounts.some((a) => a.inDirectory && a.status === "active")) {
-        throw invalidInput([{ field: "employeeId", code: "invalid" }]);
+      if (!(await apps.activeInDirectory(tx, employeeId))) {
+        throw new ApplicationError(
+          "INVALID_INPUT",
+          "Only a person active in the directory can be assigned a template.",
+          [{ field: "employeeId", code: "invalid" }],
+        );
       }
     }
     const changed =
@@ -113,6 +131,7 @@ async function changeAssignment(
         ctx,
         tx,
         apps,
+        employees,
         [employeeId],
         template.apps.map((app) => app.appId),
       );

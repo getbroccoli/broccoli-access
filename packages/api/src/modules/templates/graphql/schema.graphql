@@ -8,8 +8,8 @@ type Template {
   apps: [TemplateApp!]!
   "How many people have it."
   peopleCount: Int!
-  "The employees who have this template, by name."
-  people: [Employee!]!
+  "The employees who have this template, in assignment order."
+  people(first: Int, after: String): EmployeeConnection!
 }
 
 "One app in one template."
@@ -62,14 +62,14 @@ type Employee {
   "Templates assigned to this person, in assignment order."
   templates: [Template!]!
   "Every app given by a template or choice, every account, and the connected apps offering Invite."
-  templateApps: [PersonApp!]!
+  personApps: [PersonApp!]!
 }
 
 type PersonApp {
   "The templates that list this app for this employee."
   templates: [Template!]!
   role: String
-  "Null for an app that only offers Invite."
+  "Null when an app has invitation controls but no account, requirement or pending invitation."
   state: PersonAppState
 }
 

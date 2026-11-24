@@ -1,25 +1,25 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
 import type { TemplatePageQuery } from "@/__generated__/graphql";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 
-/** The first six people fit beside the template's count; the rest are one click away. */
-const FIRST_PEOPLE = 6;
-
 export function TemplatePeople({
   people,
+  count,
+  loading,
+  onMore,
 }: {
+  count: number;
+  loading: boolean;
+  onMore: () => void;
   people: NonNullable<TemplatePageQuery["template"]>["people"];
 }) {
-  const [expanded, setExpanded] = useState(false);
-  if (!people.length)
+  if (!people.edges.length)
     return <p className="text-sm text-muted-foreground">{t("templates.people.empty")}</p>;
-  const visible = expanded ? people : people.slice(0, FIRST_PEOPLE);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {visible.map((person) => (
+      {people.edges.map(({ node: person }) => (
         <Link
           key={person.id}
           to="/people/$employeeId"
@@ -35,9 +35,9 @@ export function TemplatePeople({
           {person.firstName} {person.lastName}
         </Link>
       ))}
-      {visible.length < people.length && (
-        <Button variant="link" onClick={() => setExpanded(true)}>
-          {t("templates.showMore", { count: String(people.length - visible.length) })}
+      {people.pageInfo.hasNextPage && (
+        <Button variant="link" disabled={loading} onClick={onMore}>
+          {t("templates.showMore", { count: String(Math.min(6, count - people.edges.length)) })}
         </Button>
       )}
     </div>

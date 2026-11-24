@@ -3,6 +3,7 @@ import type { ModuleDependencies, Modules } from "../core/moduleManifest";
 import { recordsManifest } from "../core/records";
 import {
   appsModule,
+  createInviteLoader,
   createAccountChangeService,
   createAppAccountService,
   createAppInvitationService,
@@ -101,6 +102,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     members: importRecords,
     employees,
   });
+  const invites = createInviteLoader(changes.readAppInvites);
   const manifests = [
     systemModule({
       ...core,
@@ -118,18 +120,22 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     }),
     importsModule(scans),
     connectorsModule(containerConnections),
-    appsModule({
-      ...apps,
-      ...createAppUserService({
-        ...core,
-        connectors: directoryConnectors,
-        members: importRecords,
-        employees,
-      }),
-      ...changes,
-    }),
+    appsModule(
+      {
+        ...apps,
+        ...createAppUserService({
+          ...core,
+          connectors: directoryConnectors,
+          members: importRecords,
+          employees,
+        }),
+        ...changes,
+      },
+      invites,
+    ),
     extensionModule({ ...core, appSessions: containerConnections }),
     templatesModule({
+      invites,
       ...core,
       apps: { ...apps, readAppInvites: changes.readAppInvites },
       employees,

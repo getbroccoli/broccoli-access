@@ -15,6 +15,12 @@ test("taking a template off keeps the other sources and records each new review 
   const ivan = await seed.employee();
   const ana = await seed.employee();
   const active = await seed.app({ status: "approved" });
+  const notion = await seed.app({
+    name: "Notion",
+    domain: "notion.so",
+    catalogKey: "notion",
+    status: "approved",
+  });
   const shared = await seed.app({
     name: "Linear",
     domain: "linear.app",
@@ -27,7 +33,7 @@ test("taking a template off keeps the other sources and records each new review 
     catalogKey: "figma",
     status: "approved",
   });
-  const engineer = await seed.template({ appIds: [active.id, shared.id, suspended.id] });
+  const engineer = await seed.template({ appIds: [active.id, notion.id, shared.id, suspended.id] });
   const everyone = await seed.template({ appIds: [shared.id] });
   const assignment = {
     employeeId: ivan.id,
@@ -39,6 +45,7 @@ test("taking a template off keeps the other sources and records each new review 
   await seed.employeeTemplate({ ...assignment, employeeId: ana.id });
   await seed.appAccount({ employeeId: ivan.id, appId: active.id });
   await seed.appAccount({ employeeId: ana.id, appId: active.id });
+  await seed.appAccount({ employeeId: ivan.id, appId: notion.id });
   await seed.appAccount({ employeeId: ivan.id, appId: suspended.id, status: "suspended" });
   await seed.appAccount({ employeeId: ivan.id, appId: shared.id });
   const service = templates(orm);
@@ -50,12 +57,22 @@ test("taking a template off keeps the other sources and records each new review 
 
   expect(await storedEmployeeAppChoices(orm)).toMatchObject([
     { employeeId: ivan.id, appId: active.id, choice: "to_review", role: null },
+    { employeeId: ivan.id, appId: notion.id, choice: "to_review", role: null },
   ]);
   const changes = (await storedRecordHistory(orm))
     .filter((line) => line.recordType === "employee" && line.recordId === ivan.id)
     .flatMap((line) => line.changes)
     .filter((change) => change.field === "appChoice");
-  expect(changes).toMatchObject([{ oldValue: null, newValue: active.id, newLabel: "To review" }]);
+  expect(changes).toHaveLength(2);
+  for (const app of [active, notion]) {
+    expect(changes).toContainEqual(
+      expect.objectContaining({
+        oldValue: null,
+        newValue: app.id,
+        newLabel: `${app.name} — to review`,
+      }),
+    );
+  }
 });
 
 test.for(["taking out the app", "deleting the template"] as const)(
@@ -118,8 +135,8 @@ test.for(["taking out the app", "deleting the template"] as const)(
     expect(history).toHaveLength(2);
     expect(history).toEqual(
       expect.arrayContaining([
-        { employeeId: ivan.id, appId: app.id, label: "To review" },
-        { employeeId: ana.id, appId: app.id, label: "To review" },
+        { employeeId: ivan.id, appId: app.id, label: `${app.name} — to review` },
+        { employeeId: ana.id, appId: app.id, label: `${app.name} — to review` },
       ]),
     );
   },

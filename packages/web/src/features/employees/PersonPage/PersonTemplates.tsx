@@ -7,26 +7,24 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { TemplateOptions } from "./TemplateOptions";
 import { t } from "@/i18n";
 
 type Template = { id: string; name: string };
 type Props = {
   person: { id: string; firstName: string; status?: string | null; templates: readonly Template[] };
-  available: readonly Template[];
   refresh: () => Promise<unknown>;
 };
 
 /** The person's assigned templates. Removing a chip returns focus to the section. */
-export function PersonTemplates({ person, available, refresh }: Props) {
+export function PersonTemplates({ person, refresh }: Props) {
   const [assign] = usePayloadMutation(AssignTemplateDocument);
   const [takeOff] = usePayloadMutation(TakeOffTemplateDocument);
   const [busy, setBusy] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const assigned = new Set(person.templates.map((template) => template.id));
-  const remaining = available.filter((template) => !assigned.has(template.id));
+  const [open, setOpen] = useState(false);
 
   async function change(template: Template, action: "assign" | "takeOff") {
     setBusy(true);
@@ -34,7 +32,7 @@ export function PersonTemplates({ person, available, refresh }: Props) {
       const mutate = action === "assign" ? assign : takeOff;
       await mutate({ variables: { input: { id: template.id, employeeId: person.id } } });
       // The server recomputes app states, including those that just lost their last source.
-      await refresh();
+      await refresh().catch(() => toast.error(t("people.person.templateRefreshFailed")));
       if (action === "takeOff") heading.current?.focus();
     } catch {
       toast.error(t("people.person.templateChangeFailed", { name: template.name }));
@@ -77,7 +75,7 @@ export function PersonTemplates({ person, available, refresh }: Props) {
           </span>
         ))}
         {person.status === "ACTIVE" && (
-          <DropdownMenu>
+          <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger
               render={
                 <Button
@@ -91,16 +89,12 @@ export function PersonTemplates({ person, available, refresh }: Props) {
               {t("people.person.assignTemplate")}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="max-h-80 overflow-y-auto">
-              {remaining.length === 0 && (
-                <DropdownMenuItem disabled>
-                  {t("people.person.noTemplatesToAssign")}
-                </DropdownMenuItem>
+              {open && (
+                <TemplateOptions
+                  assigned={person.templates}
+                  onAssign={(template) => void change(template, "assign")}
+                />
               )}
-              {remaining.map((template) => (
-                <DropdownMenuItem key={template.id} onClick={() => void change(template, "assign")}>
-                  {template.name}
-                </DropdownMenuItem>
-              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

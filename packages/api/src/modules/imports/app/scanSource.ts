@@ -164,6 +164,7 @@ async function saveScan(
     await sources.replaceRecords(sourceId, accounts);
     await syncAccounts(ctx, tx, findings, dependencies);
     await sources.markScanned(sourceId, new Date());
+    tx.publish("imports.appScanned", { appId: findings.connection.appId });
     // Setup waits for the directory's people; another app's scan never ends its scan step.
     const finishedSetupScan =
       findings.connector.isDirectory && (await setupSteps.finishScanStep(ctx, tx));

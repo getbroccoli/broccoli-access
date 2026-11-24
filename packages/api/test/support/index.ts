@@ -33,6 +33,7 @@ export {
   scans,
   apps,
   appUsers,
+  templateReviewTransactor,
   templates,
 } from "./services";
 export type { EmployeeServices } from "./services";

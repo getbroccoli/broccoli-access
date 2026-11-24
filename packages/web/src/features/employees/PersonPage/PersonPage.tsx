@@ -38,7 +38,7 @@ export function PersonPage() {
   const appCount = person.approvedAppNames.length;
   // Some of the apps they still have access to can be disabled from here.
   const canDisableHere = person.appAccounts.some(
-    ({ status, app }) => status === "ACTIVE" && app.canChangeAccounts,
+    ({ offeredChange }) => offeredChange === "SUSPEND",
   );
 
   return (
@@ -91,11 +91,7 @@ export function PersonPage() {
             ` ${t(appCount === 1 ? "people.person.disableWhereConnectedOne" : "people.person.disableWhereConnected")}`}
         </p>
       )}
-      <PersonTemplates
-        person={person}
-        available={pageQuery.data!.templates.edges.map(({ node }) => node)}
-        refresh={pageQuery.refetch}
-      />
+      <PersonTemplates person={person} refresh={pageQuery.refetch} />
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold tracking-tight">{t("templates.apps.title")}</h2>
         <CurrentAccessTable person={person} />

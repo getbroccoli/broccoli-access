@@ -27,7 +27,7 @@ test("an account marked Extra after take-off stays cleared when the owner disabl
   const assigned = await browser.graphql(
     `mutation ($input: TemplateAssignInput!) {
       templates { assign(input: $input) {
-        template { id peopleCount people { id templates { id } } } error { __typename }
+        template { id peopleCount people(first: 6) { edges { node { id templates { id } } } } } error { __typename }
       } }
     }`,
     { input },
@@ -39,7 +39,9 @@ test("an account marked Extra after take-off stays cleared when the owner disabl
           template: {
             id: template.id,
             peopleCount: 1,
-            people: [{ id: chloe.employee.id, templates: [{ id: template.id }] }],
+            people: {
+              edges: [{ node: { id: chloe.employee.id, templates: [{ id: template.id }] } }],
+            },
           },
           error: null,
         },
@@ -64,7 +66,7 @@ test("an account marked Extra after take-off stays cleared when the owner disabl
 
   const removed = await browser.graphql(
     `mutation ($input: TemplateTakeOffInput!) {
-      templates { takeOff(input: $input) { template { id peopleCount people { id } } error { __typename } } }
+      templates { takeOff(input: $input) { template { id peopleCount people(first: 6) { edges { node { id } } } } error { __typename } } }
     }`,
     { input },
   );
@@ -72,7 +74,7 @@ test("an account marked Extra after take-off stays cleared when the owner disabl
     data: {
       templates: {
         takeOff: {
-          template: { id: template.id, peopleCount: 0, people: [] },
+          template: { id: template.id, peopleCount: 0, people: { edges: [] } },
           error: null,
         },
       },
@@ -91,14 +93,14 @@ test("an account marked Extra after take-off stays cleared when the owner disabl
 async function employeeApps(browser: Browser, id: string) {
   const response = await browser.graphql(
     `query ($id: ID!) {
-      employee(id: $id) { templateApps { app { id catalogKey } templates { id } role state } }
+      employee(id: $id) { personApps { app { id catalogKey } templates { id } role state } }
     }`,
     { id },
   );
   const body = (await response.json()) as {
     data: {
       employee: {
-        templateApps: {
+        personApps: {
           app: { id: string; catalogKey: string | null };
           templates: { id: string }[];
           role: string | null;
@@ -108,5 +110,5 @@ async function employeeApps(browser: Browser, id: string) {
     };
   };
   expect(body).not.toHaveProperty("errors");
-  return body.data.employee.templateApps;
+  return body.data.employee.personApps;
 }

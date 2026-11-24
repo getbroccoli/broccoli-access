@@ -8,5 +8,6 @@ CREATE TABLE "employee_app_choices" (
 	CONSTRAINT "employee_app_choices_role" CHECK ("employee_app_choices"."choice" in ('added','role_picked') or "employee_app_choices"."role" is null)
 );
 --> statement-breakpoint
+CREATE INDEX "employee_templates_template_id_id" ON "employee_templates" USING btree ("template_id","id");--> statement-breakpoint
 ALTER TABLE "employee_app_choices" ADD CONSTRAINT "employee_app_choices_employee_fk" FOREIGN KEY ("employee_id") REFERENCES "public"."employees"("id") ON DELETE cascade;--> statement-breakpoint
 ALTER TABLE "employee_app_choices" ADD CONSTRAINT "employee_app_choices_app_fk" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("id") ON DELETE cascade;

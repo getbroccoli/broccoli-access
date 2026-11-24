@@ -58,6 +58,7 @@ export interface EmployeeRepository {
   /** The employees with these lowercased emails. */
   findByEmails(emails: readonly string[]): Promise<Employee[]>;
   /** The employees with these lowercased emails, locked until the transaction ends. */
+  holdForReference(ids: readonly string[]): Promise<void>;
   lockByEmails(emails: readonly string[]): Promise<Employee[]>;
   /** The employees whose avatar is this file. */
   findIdsByAvatar(fileId: string): Promise<string[]>;
@@ -168,8 +169,21 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
 
     findByEmails: (emails) => orm().select().from(employees).where(anyOf(employees.email, emails)),
 
+    async holdForReference(ids) {
+      await orm()
+        .select({ id: employees.id })
+        .from(employees)
+        .where(anyOf(employees.id, ids))
+        .orderBy(employees.id)
+        .for("key share");
+    },
     lockByEmails: (emails) =>
-      orm().select().from(employees).where(anyOf(employees.email, emails)).for("update"),
+      orm()
+        .select()
+        .from(employees)
+        .where(anyOf(employees.email, emails))
+        .orderBy(employees.id)
+        .for("update"),
 
     findIdsByAvatar: async (fileId) => {
       const rows = await orm()

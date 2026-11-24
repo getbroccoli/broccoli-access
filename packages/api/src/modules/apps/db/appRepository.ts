@@ -42,6 +42,7 @@ export interface AppRepository {
   /** The app; null when there is none. */
   findById(id: string): Promise<App | null>;
   /** The apps with these ids; an unknown id is left out. */
+  lockForReview(ids: readonly string[]): Promise<{ id: string; name: string }[]>;
   findByIds(ids: readonly string[]): Promise<App[]>;
   /** The app, locked until the transaction ends; null when there is none. */
   lockById(id: string): Promise<App | null>;
@@ -105,6 +106,13 @@ export function appRepository(db: Orm | Tx): AppRepository {
         ]),
       ) as Record<AppStatus, number>;
     },
+    lockForReview: (ids) =>
+      orm()
+        .select({ id: apps.id, name: apps.name })
+        .from(apps)
+        .where(anyOf(apps.id, ids))
+        .orderBy(apps.id)
+        .for("no key update"),
     findByIds: (ids) => orm().select().from(apps).where(anyOf(apps.id, ids)),
     findById: async (id) => {
       const [app] = await orm().select().from(apps).where(eq(apps.id, id));

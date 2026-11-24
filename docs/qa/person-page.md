@@ -28,6 +28,11 @@ Approve Slack again on its page, connect Linear as in [Connections settings](con
 - [ ] "Enable" brings Linear back to "Active" with "Disable".
 - [ ] After `fail unexpected_response` (see [the app page](app-page.md#when-a-change-fails)) and a Disable of Linear here, the Linear row reads "Couldn’t disable" with "Try again" and opens the same dialog; "I did it by hand" turns it to "Disabled" with "Enable", and the amber box to "… accounts in 3 approved apps." at once.
 
+### Account actions with templates
+
+- [ ] Create a template named Linear users with Linear as its only app. Assign it to Chloé, then take it off. Her Linear row shows **Extra** and still offers **Disable**. Disable it from that row. Progress gives way to **Disabled** and **Enable**, and Extra clears.
+- [ ] Assign Linear users to Chloé again. The row shows both **Disabled** and **Missing**. Set `fail unexpected_response` as described above, then choose **Enable**. Open the failure, choose **I did it by hand** and confirm. Without reloading, the row shows **Active** and **Disable**, and Missing clears.
+
 ## Invite
 
 Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page](app-page.md) says, and open Ivan Petrov's page: he is active in Google and has no Linear member.
@@ -41,8 +46,8 @@ Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page
 - [ ] With Slack connected (see [Connections settings](connections-settings.md#apps)), Ivan's page offers "Invite" on Slack too.
 - [ ] An invitation sent in Slack itself shows: after `curl -s -H 'content-type: application/json' -d '{"email": "ivan@acme.example"}' "$FAKE/_fake/slack/invitations"` and "Scan now" on Slack's page, his Slack row reads "Invited on <today>", the day the scan first saw it, with no "Invite". People still counts no Slack account for him.
 - [ ] After `curl -s -X POST "$FAKE/_fake/slack/invitations/ivan%40acme.example/expire"` and "Scan now" on Slack's page, his Slack row offers "Invite" again, and inviting him puts one invitation for ivan@acme.example in `.invitations.slack`.
-- [ ] After `fail unexpected_response` (see [the app page](app-page.md#when-a-change-fails)), inviting Elif Demir to Linear ends with "Couldn’t invite" in red and "Try again". The dialog reads "Couldn’t invite Elif Demir to Linear", the reason ending "Nothing changed in Linear.", "Try again in a while, or invite Elif in Linear’s admin yourself and tell Broccoli Access.", "I did it by hand", "Open Linear admin" and "Try again".
-- [ ] "I did it by hand" asks "Did you invite Elif Demir to Linear yourself?"; "Yes, I did it" turns her row to "No account" and "Invited on <today>" at once.
+- [ ] Assign Linear users to Elif Demir. Her Linear row shows **Missing** and still offers **Invite**. After `fail unexpected_response` (see [the app page](app-page.md#when-a-change-fails)), inviting her to Linear ends with "Couldn’t invite" in red and "Try again". The dialog reads "Couldn’t invite Elif Demir to Linear", the reason ending "Nothing changed in Linear.", "Try again in a while, or invite Elif in Linear’s admin yourself and tell Broccoli Access.", "I did it by hand", "Open Linear admin" and "Try again".
+- [ ] "I did it by hand" asks "Did you invite Elif Demir to Linear yourself?"; "Yes, I did it" shows "Invited on <today>" on the same row. Missing and Invite disappear without a reload.
 - [ ] With Linear in Reconnect (`curl -s -X POST "$FAKE/_fake/linear/keys/revoke"`, then "Scan now" on Linear's page), Lena Fischer's Linear row shows "Reconnect" instead of "Invite".
 
 ## Assign templates
@@ -50,7 +55,12 @@ Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page
 1. In Templates, create Everyone with Google Workspace and Miro, and Engineer with Figma. Open Ivan Petrov from People.
 2. Choose **+ Assign template**, then Everyone. Repeat for Engineer. Both chips show their names and a take-off button. Each app appears once, with its template in **From**. Apps Ivan lacks show **Missing**.
 3. Open Engineer. Follow Ivan's link under **People with this template** back to his page. Take Engineer off and check that Ivan leaves its people list and the count drops by one.
-4. Give the same app through both templates. Removing either source keeps one row and the other source. Taking the last source off an active account shows **Extra**.
+4. Add Notion to Everyone and Engineer, then assign Engineer to Ivan again. Ivan already has an active Notion account. His single Notion row lists both templates. Take off Engineer. Notion stays active with Everyone as its only source. Take off Everyone. Notion now shows **Extra**.
+
+### Picker requests and interrupted refresh
+
+- [ ] Open the browser's Network panel before loading an active person's page. Inspect the GraphQL operations on load and while an account change is running. The closed picker makes no request for the template catalog. Open **+ Assign template** and check that it requests a bounded page of options. Close it and check that account polling leaves the catalog alone. Opening suspended Ana's page also leaves the catalog alone.
+- [ ] Open Ivan's picker. Use a local HTTP test proxy to let **Assign template** succeed and fail the next person-page read. Assign Engineer. Verify the mutation response contains the saved template and a null error. The page does not report that the assignment failed. If it reports a refresh error, retry the read. Restore the connection and reopen Ivan. Engineer appears once and its people count includes Ivan once.
 
 ## No delete
 

@@ -28,6 +28,7 @@ export async function setAccountStatus(
   }
   const after = { ...before, status };
   await accounts.update(after);
+  tx.publish("apps.accountsChanged", { appIds: [after.appId] });
   await recordHistory.append(ctx, tx, {
     ...line,
     recordType: "app_account",

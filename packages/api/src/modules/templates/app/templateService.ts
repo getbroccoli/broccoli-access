@@ -132,6 +132,7 @@ export function createTemplateService({
           ctx,
           tx,
           apps,
+          employees,
           assigned.map((row) => row.employeeId),
           template.apps.map((row) => row.appId),
         );
@@ -186,6 +187,7 @@ export function createTemplateService({
           ctx,
           tx,
           apps,
+          employees,
           assigned.map((row) => row.employeeId),
           [app.id],
         );

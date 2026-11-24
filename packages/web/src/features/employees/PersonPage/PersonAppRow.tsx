@@ -14,7 +14,7 @@ import { formatSince } from "@/lib/since";
 
 type Person = NonNullable<PersonPageQuery["employee"]>;
 type Props = {
-  row: Person["templateApps"][number];
+  row: Person["personApps"][number];
   held: Person["appAccounts"];
   invite: Person["appInvites"][number] | undefined;
   showSources: boolean;
@@ -61,7 +61,8 @@ export function PersonAppRow({ row, held, invite, showSources }: Props) {
         )}
         {held.map(
           (account) =>
-            (account.latestChange?.status === "FAILED" ||
+            (account.status === "SUSPENDED" ||
+              account.latestChange?.status === "FAILED" ||
               row.state === "ACTIVE" ||
               row.state === "SUSPENDED") && (
               <AppAccountStatusCell key={account.id} appUser={account} />
@@ -79,8 +80,9 @@ export function PersonAppRow({ row, held, invite, showSources }: Props) {
           )}
       </TableCell>
       <TableCell className="pr-4 text-right">
-        {row.state !== "EXTRA" &&
-          held.map((account) => <AccountChangeCell key={account.id} appUser={account} />)}
+        {held.map((account) => (
+          <AccountChangeCell key={account.id} appUser={account} />
+        ))}
         {invite && (row.state !== "INVITED" || invite.latestInvite?.status === "RUNNING") && (
           <InviteCell appInvite={invite} />
         )}

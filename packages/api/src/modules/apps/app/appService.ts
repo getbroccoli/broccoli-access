@@ -29,6 +29,7 @@ import {
 import type { ConnectionMembers } from "../ports";
 import {
   type DirectoryConnectors,
+  activeInDirectory,
   findDirectoryAppId,
   findEmployeesInDirectory,
 } from "./directory";
@@ -80,6 +81,9 @@ export interface AppService {
     ctx: SecurityContext,
     selection: { approvedAppIds: readonly string[] },
   ) => Promise<void>;
+  /** Serializes source loss and access changes per affected app. */
+  lockAppsForReview: (tx: Tx, ids: readonly string[]) => Promise<{ id: string; name: string }[]>;
+  activeInDirectory: (db: Orm | Tx, employeeId: string) => Promise<boolean>;
   /**
    * The directory's app: the app of the connection whose connector is the directory; null before
    * it is connected. Trusted read: no `ctx`.
@@ -94,6 +98,7 @@ export interface AppService {
   findEmployeeAccounts: (
     db: Orm | Tx,
     employeeIds?: readonly string[],
+    appIds?: readonly string[],
   ) => Promise<EmployeeAccountInApp[]>;
 }
 
@@ -188,13 +193,15 @@ export function createAppService(dependencies: AppDependencies): AppService {
       });
       logger.info({ approved, ignored }, "Setup finished: the selected apps are approved");
     },
+    lockAppsForReview: (tx, ids) => appRepository(tx).lockForReview(ids),
+    activeInDirectory: (db, employeeId) => activeInDirectory(db, connectors, employeeId),
     directoryAppId: (db) => findDirectoryAppId(db, connectors),
     findEmployeesSuspendedInDirectory: (db) =>
       findEmployeesInDirectory(db, connectors, { status: "suspended" }),
-    async findEmployeeAccounts(db, employeeIds) {
+    async findEmployeeAccounts(db, employeeIds, appIds) {
       const inAppFacts = await findInAppFacts(db, dependencies);
       const [accounts, directoryAppId] = await Promise.all([
-        appAccountRepository(db).findEmployeeAccounts(inAppFacts, employeeIds),
+        appAccountRepository(db).findEmployeeAccounts(inAppFacts, employeeIds, appIds),
         findDirectoryAppId(db, connectors),
       ]);
       return accounts.map(({ appId, grantedAt, grantedBefore, firstSeenAt, ...account }) => ({

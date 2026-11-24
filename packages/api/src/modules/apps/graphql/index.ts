@@ -1,1 +1,1 @@
-export { createResolvers } from "./resolvers";
+export { createResolvers, createInviteLoader } from "./resolvers";

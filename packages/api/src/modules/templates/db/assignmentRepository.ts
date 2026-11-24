@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { anyOf, insertBatches, type Orm, ormOf, type Tx } from "../../../core/db";
 import type { EmployeeAppChoice } from "../domain";
 import { employeeAppChoices } from "./employeeAppChoicesTable";
@@ -13,11 +13,15 @@ export interface AssignmentRepository {
   takeOff(assignment: Assignment): Promise<boolean>;
   choicesFor(ids: readonly string[]): Promise<EmployeeAppChoice[]>;
   listedApps(ids: readonly string[]): Promise<Set<string>>;
-  /** Serialises last-source decisions across different templates and account status changes. */
-  lockChoices(): Promise<void>;
+  sources(employeeIds: readonly string[], appIds: readonly string[]): Promise<EmployeeAppPair[]>;
+  peoplePage(
+    templateId: string,
+    after: string | null,
+    limit: number,
+  ): Promise<{ id: string; employeeId: string }[]>;
   markForReview(pairs: EmployeeAppPair[]): Promise<EmployeeAppPair[]>;
-  reviews(): Promise<EmployeeAppPair[]>;
-  clearReviews(employeeId: string, appIds: string[]): Promise<void>;
+  reviews(appIds: readonly string[]): Promise<EmployeeAppPair[]>;
+  clearReviews(pairs: EmployeeAppPair[]): Promise<EmployeeAppPair[]>;
 }
 
 interface Assignment {
@@ -69,10 +73,26 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
         .where(anyOf(templateApps.appId, ids));
       return new Set(listed.map(({ appId }) => appId));
     },
-    async lockChoices() {
-      // No row exists to lock before the last source goes away.
-      await orm.execute(sql`lock table ${employeeAppChoices} in share row exclusive mode`);
-    },
+    sources: (employeeIds, appIds) =>
+      orm
+        .selectDistinct({ employeeId: employeeTemplates.employeeId, appId: templateApps.appId })
+        .from(employeeTemplates)
+        .innerJoin(templateApps, eq(templateApps.templateId, employeeTemplates.templateId))
+        .where(
+          and(anyOf(employeeTemplates.employeeId, employeeIds), anyOf(templateApps.appId, appIds)),
+        ),
+    peoplePage: (templateId, after, limit) =>
+      orm
+        .select({ id: employeeTemplates.id, employeeId: employeeTemplates.employeeId })
+        .from(employeeTemplates)
+        .where(
+          and(
+            eq(employeeTemplates.templateId, templateId),
+            after ? gt(employeeTemplates.id, after) : undefined,
+          ),
+        )
+        .orderBy(employeeTemplates.id)
+        .limit(limit),
     async markForReview(pairs) {
       const inserted: EmployeeAppPair[] = [];
       for (const batch of insertBatches(pairs)) {
@@ -89,19 +109,24 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
       }
       return inserted;
     },
-    reviews: () =>
-      orm.select(PAIR).from(employeeAppChoices).where(eq(employeeAppChoices.choice, "to_review")),
-    async clearReviews(employeeId, appIds) {
-      await orm
+    reviews: (appIds) =>
+      orm
+        .select(PAIR)
+        .from(employeeAppChoices)
+        .where(
+          and(eq(employeeAppChoices.choice, "to_review"), anyOf(employeeAppChoices.appId, appIds)),
+        ),
+    clearReviews: (pairs) =>
+      orm
         .delete(employeeAppChoices)
         .where(
           and(
-            eq(employeeAppChoices.employeeId, employeeId),
-            anyOf(employeeAppChoices.appId, appIds),
             eq(employeeAppChoices.choice, "to_review"),
+            // Bind each column once; the two arrays pair up by position.
+            sql`(${PAIR.employeeId},${PAIR.appId}) in (select * from unnest(${sql.param(pairs.map((p) => p.employeeId))}::uuid[],${sql.param(pairs.map((p) => p.appId))}::uuid[]))`,
           ),
-        );
-    },
+        )
+        .returning(PAIR),
   };
 }
 

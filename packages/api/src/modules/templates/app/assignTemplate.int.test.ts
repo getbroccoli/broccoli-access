@@ -72,6 +72,7 @@ test.for(["suspended", "absent"] as const)(
       templates(orm).assign(owner, { id: next.id, employeeId: employee.id }),
     ).rejects.toMatchObject({
       code: "INVALID_INPUT",
+      message: "Only a person active in the directory can be assigned a template.",
       fieldErrors: [{ field: "employeeId", code: "invalid" }],
     });
     expect(await storedEmployeeTemplates(orm)).toEqual([kept]);
@@ -111,7 +112,7 @@ test.for(["assign", "takeOff"] as const)(
   },
 );
 
-test("reads assignments in the requested employee and template order, including empty groups", async ({
+test("reads templates in the requested employee order, including empty groups", async ({
   orm,
   seed,
 }) => {
@@ -121,7 +122,6 @@ test("reads assignments in the requested employee and template order, including 
   const ben = await seed.employee();
   const engineer = await seed.template({ name: "Engineer" });
   const design = await seed.template({ name: "Design" });
-  const empty = await seed.template();
   const assignedBy = owner.user!.userId;
   await seed.employeeTemplate({ employeeId: ivan.id, templateId: engineer.id, assignedBy });
   await seed.employeeTemplate({ employeeId: ana.id, templateId: design.id, assignedBy });
@@ -132,11 +132,37 @@ test("reads assignments in the requested employee and template order, including 
     [],
     [{ id: engineer.id, peopleCount: 1 }],
   ]);
-  expect(await service.readTemplatePeople(OWNER, [engineer.id, empty.id, design.id])).toEqual([
-    [ivan.id],
-    [],
-    [ana.id],
-  ]);
+});
+
+test("pages a template's people in assignment order across the first six", async ({
+  orm,
+  seed,
+}) => {
+  const owner = await seed.owner();
+  const engineer = await seed.template();
+  const everyone = await seed.template();
+  const assignedBy = owner.user!.userId;
+  const employeeIds: string[] = [];
+  for (const firstName of ["Ana", "Ben", "Chloé", "David", "Elif", "Gabriel", "Ivan"]) {
+    employeeIds.push((await seed.employee({ firstName })).id);
+  }
+  const outsider = await seed.employee();
+  await seed.employeeTemplate({ templateId: everyone.id, employeeId: outsider.id, assignedBy });
+  const assigned = employeeIds.toReversed();
+  for (const employeeId of assigned) {
+    await seed.employeeTemplate({ templateId: engineer.id, employeeId, assignedBy });
+  }
+  const service = templates(orm);
+
+  const first = await service.readTemplatePeople(OWNER, engineer.id, { first: 6 });
+  expect(first.edges.map(({ node }) => node)).toEqual(assigned.slice(0, 6));
+  expect(first.pageInfo.hasNextPage).toBe(true);
+  const last = await service.readTemplatePeople(OWNER, engineer.id, {
+    first: 6,
+    after: first.pageInfo.endCursor,
+  });
+  expect(last.edges.map(({ node }) => node)).toEqual(assigned.slice(6));
+  expect(last.pageInfo.hasNextPage).toBe(false);
 });
 
 async function directoryEmployee(seed: TestSeed, status: "active" | "suspended") {

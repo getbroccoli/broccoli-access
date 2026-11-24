@@ -11,7 +11,7 @@ import {
 import { createRecordHistoryReaderService, type HistoryLine } from "../../../core/records";
 import { isInRecordScope, type SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
-import type { Orm } from "../../../core/db";
+import type { Orm, Tx } from "../../../core/db";
 import { EMPLOYEE_SORT_VALUES, employeeRepository } from "../db";
 import {
   accessOfEmployees,
@@ -33,6 +33,8 @@ export interface EmployeeListArgs extends ListArgs<EmployeeOrderField> {
 
 /** Reads employees, their history and avatars, as far as the caller may read them. */
 export interface EmployeeReadService {
+  /** Hold the referenced people before taking app locks, in directory sync order. */
+  holdForReference(tx: Tx, ids: readonly string[]): Promise<void>;
   /** The employee with this id, or null when there is none. */
   readEmployee: (ctx: SecurityContext, id: string) => Promise<Employee | null>;
   /** The employees with these ids the caller may read, sorted by name; an unknown id is left out. */
@@ -71,6 +73,7 @@ export function createEmployeeReadService({
   const readAccess = (ctx: SecurityContext) => readAccessOfEveryone(ctx, orm, accounts);
   const history = createRecordHistoryReaderService(orm, { employee: employeeRecordType(orm) });
   return {
+    holdForReference: (tx, ids) => employeeRepository(tx).holdForReference(ids),
     async readEmployee(ctx, id) {
       const employeeId = parseUuid(id);
       if (!employeeId) {

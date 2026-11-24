@@ -1,4 +1,5 @@
-import type { Orm, Transact } from "../../src/core/db";
+import { createBeforeCommitBus, transactor, type Orm, type Transact } from "../../src/core/db";
+import { createEventBus } from "../../src/core/events";
 import type { ConnectorRegistry } from "../../src/core/connectors";
 import type { JobQueue } from "../../src/core/jobs";
 import { createMailSettingsService, type MailSettingsService } from "../../src/core/instance";
@@ -14,6 +15,7 @@ import {
 import {
   createAppConnectionService,
   createAppAccountService,
+  createInviteLoader,
   createAppInvitationService,
   createAppService,
   createAppUserService,
@@ -36,7 +38,7 @@ import {
   createGoogleWorkspaceConnector,
   type GoogleConnectionService,
 } from "../../src/modules/google";
-import { createTemplateService } from "../../src/modules/templates";
+import { createTemplateService, templatesModule } from "../../src/modules/templates";
 import { accountChanges } from "./accountChanges";
 import { fakeMail } from "./fakeMail";
 import { TEST_SECRET_BOX } from "./testSecretBox";
@@ -149,14 +151,34 @@ export function apps(orm: Orm, transact: Transact = testTransactor(orm)): AppSer
   });
 }
 
-export function templates(orm: Orm, options: { connectors?: ConnectorRegistry } = {}) {
-  return createTemplateService({
+export function templates(
+  orm: Orm,
+  options: { connectors?: ConnectorRegistry; transact?: Transact } = {},
+) {
+  return createTemplateService(templateDependencies(orm, options));
+}
+
+export function templateReviewTransactor(orm: Orm) {
+  const before = createBeforeCommitBus();
+  const deps = templateDependencies(orm, {});
+  before.subscribe(
+    templatesModule({ ...deps, invites: createInviteLoader(deps.apps.readAppInvites) })
+      .eventsBeforeCommit!,
+  );
+  return transactor(orm, createEventBus(createLogger("silent")), before);
+}
+
+function templateDependencies(
+  orm: Orm,
+  options: { connectors?: ConnectorRegistry; transact?: Transact },
+) {
+  return {
     orm,
-    transact: testTransactor(orm),
+    transact: options.transact ?? testTransactor(orm),
     logger: createLogger("silent"),
     apps: { ...apps(orm), readAppInvites: accountChanges(orm, options).readAppInvites },
     employees: employeeServices(orm),
-  });
+  };
 }
 
 /** An app's users read with the real employees module, with Google Workspace as the directory. */

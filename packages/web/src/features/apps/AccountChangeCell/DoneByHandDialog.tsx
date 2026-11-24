@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import {
   type AccountChangeAction,
   MarkAccountChangeDoneByHandDocument,
+  PersonPageDocument,
 } from "@/__generated__/graphql";
 import { useCache, usePayloadMutation } from "@/apollo";
 import {
@@ -35,7 +36,9 @@ type Props = {
  */
 export function DoneByHandDialog({ open, onClose, change, person, app }: Props) {
   const cache = useCache();
-  const [markDoneByHand, { loading }] = usePayloadMutation(MarkAccountChangeDoneByHandDocument);
+  const [markDoneByHand, { loading }] = usePayloadMutation(MarkAccountChangeDoneByHandDocument, {
+    refetch: [PersonPageDocument],
+  });
   const copy = COPY[change.action];
   const confirm = async () => {
     try {

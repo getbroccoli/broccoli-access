@@ -1,1 +1,1 @@
-export { createResolvers, type ReadTemplateEmployees } from "./resolvers";
+export { createResolvers, type ReadTemplateEmployees, type InviteLoader } from "./resolvers";

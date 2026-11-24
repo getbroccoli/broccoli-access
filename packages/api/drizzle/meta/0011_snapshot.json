@@ -1,5 +1,5 @@
 {
-  "id": "75cc9bba-c70d-4ff0-8ceb-33f0d27401e8",
+  "id": "de5a41db-67f6-40d6-9c17-a9884ad3126c",
   "prevId": "fafd8645-58f6-4100-902f-01bcf63aa4fb",
   "version": "7",
   "dialect": "postgresql",
@@ -1728,7 +1728,29 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "employee_templates_template_id_id": {
+          "name": "employee_templates_template_id_id",
+          "columns": [
+            {
+              "expression": "template_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "employee_templates_template_id_templates_id_fk": {
           "name": "employee_templates_template_id_templates_id_fk",

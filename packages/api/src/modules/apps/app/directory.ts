@@ -31,3 +31,9 @@ export async function findEmployeesInDirectory(
   const appId = await findDirectoryAppId(db, connectors);
   return appId ? appAccountRepository(db).findEmployeeIdsWithStatus(appId, status, among) : [];
 }
+
+/** Whether this person has an active directory account, using the directory's membership index. */
+export async function activeInDirectory(db: Orm | Tx, connectors: DirectoryConnectors, id: string) {
+  const active = await findEmployeesInDirectory(db, connectors, { status: "active", among: [id] });
+  return active.length > 0;
+}

@@ -52,6 +52,7 @@ export interface AppAccountRepository {
   findEmployeeAccounts(
     facts: InAppFacts,
     employeeIds?: readonly string[],
+    appIds?: readonly string[],
   ): Promise<EmployeeAppAccount[]>;
 }
 
@@ -169,7 +170,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         );
       return rows.map(({ employeeId }) => employeeId!);
     },
-    findEmployeeAccounts: (facts, employeeIds) =>
+    findEmployeeAccounts: (facts, employeeIds, appIds) =>
       orm()
         .select({
           employeeId: sql<string>`${appAccounts.employeeId}`,
@@ -190,6 +191,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
             employeeIds
               ? anyOf(appAccounts.employeeId, employeeIds)
               : isNotNull(appAccounts.employeeId),
+            appIds ? anyOf(appAccounts.appId, appIds) : undefined,
             isAccess(facts),
           ),
         ),

@@ -12,7 +12,7 @@ query PersonPage($id: ID!) {
       id
       name
     }
-    templateApps {
+    personApps {
       app {
         id
         name
@@ -26,6 +26,7 @@ query PersonPage($id: ID!) {
       state
     }
     appAccounts {
+      offeredChange
       id
       status
       foundVia
@@ -62,13 +63,19 @@ query PersonPage($id: ID!) {
       ...InviteStatusCell_appInvite
     }
   }
-  # As on the Templates page, the selector lists up to 10,000 templates by name.
-  templates(first: 10000) {
+}
+
+query AssignableTemplates($after: String) {
+  templates(first: 12, after: $after) {
     edges {
       node {
         id
         name
       }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }

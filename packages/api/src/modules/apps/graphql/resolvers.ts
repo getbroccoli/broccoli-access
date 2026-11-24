@@ -43,6 +43,7 @@ export function createResolvers(
     | "inviteEmployee"
     | "readAppInvites"
   >,
+  invitesOfEmployees: ReturnType<typeof createInviteLoader>,
 ): Resolvers {
   const loaders = createLoaders(services);
   return {
@@ -125,8 +126,7 @@ export function createResolvers(
     Employee: {
       appAccounts: (employee, _args, context) =>
         loaders.accountsOfEmployees(context).load(employee.id),
-      appInvites: (employee, _args, context) =>
-        loaders.invitesOfEmployees(context).load(employee.id),
+      appInvites: (employee, _args, context) => invitesOfEmployees(context).load(employee.id),
     },
   };
 }
@@ -219,14 +219,6 @@ function createLoaders(services: Parameters<typeof createResolvers>[0]) {
           return employeeIds.map((employeeId) => byEmployee.get(employeeId) ?? []);
         }),
     ),
-    invitesOfEmployees: perRequest(
-      (context) =>
-        new DataLoader<string, AppInvite[]>(async (employeeIds) => {
-          const invites = await services.readAppInvites(context.getActor(), employeeIds);
-          const byEmployee = Map.groupBy(invites, ({ employeeId }) => employeeId);
-          return employeeIds.map((employeeId) => byEmployee.get(employeeId) ?? []);
-        }),
-    ),
     appsById: perRequest(
       (context) =>
         new DataLoader<string, AppSummary>(async (appIds) => {
@@ -277,4 +269,16 @@ function createChangeLoaders(services: Parameters<typeof createResolvers>[0]) {
         }),
     ),
   };
+}
+
+/** A request reads each person’s invite facts once for rows and actions. */
+export function createInviteLoader(read: AccountChangeService["readAppInvites"]) {
+  return perRequest(
+    (context) =>
+      new DataLoader<string, AppInvite[]>(async (employeeIds) => {
+        const invites = await read(context.getActor(), employeeIds);
+        const byEmployee = Map.groupBy(invites, ({ employeeId }) => employeeId);
+        return employeeIds.map((employeeId) => byEmployee.get(employeeId) ?? []);
+      }),
+  );
 }
