@@ -18,6 +18,7 @@ import { changeTargetOf } from "./useChangeAccount";
 type Props = {
   /** Prevents starting another invite while the template role needs attention. */
   roleBlocked?: boolean;
+  expectedRole?: string;
   /** The person's invite row, whose row selects this cell's fragment. */
   appInvite: FragmentType<InviteCell_AppInviteFragment>;
 };
@@ -28,7 +29,7 @@ type Props = {
  * itself, or Try again once it failed, where trying again can help. Reconnect while the app's
  * connection needs it.
  */
-export function InviteCell({ appInvite, roleBlocked }: Props) {
+export function InviteCell({ appInvite, roleBlocked, expectedRole }: Props) {
   const fragment = useFragment({
     fragment: InviteCell_AppInviteFragmentDoc,
     // The document also holds the fragments of the Reconnect button, which this one spreads.
@@ -70,7 +71,11 @@ export function InviteCell({ appInvite, roleBlocked }: Props) {
   return (
     offeredChange && (
       <span className="flex justify-end">
-        <ConfirmAccountChangeDialog row={invite} action={offeredChange} />
+        <ConfirmAccountChangeDialog
+          row={invite}
+          action={offeredChange}
+          expectedRole={expectedRole}
+        />
       </span>
     )
   );

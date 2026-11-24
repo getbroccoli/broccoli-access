@@ -51,7 +51,20 @@ A manual check of the Templates page and a template's page against a development
 
 ## Invite with a template role
 
-- [ ] Create Engineer and Design if they are missing. Add Linear to Engineer. Under Role, choose Admin. Reload Engineer and check that Admin is still selected. An app without a connection shows "By hand".
-- [ ] Give Engineer to Ivan Petrov. His Linear row shows Admin from Engineer.
-- [ ] Add Linear to a second template, Design, leave its role at User and give Design to Ivan. His Linear row offers "Pick a role…" and names the source template for each option. Invite disappears until the owner picks a role.
-- [ ] Pick "Admin, from Engineer", then invite Ivan to Linear. His row shows Admin and becomes Invited. In the fake connectors' `GET /_fake/state`, Ivan's Linear invitation has the role `admin`.
+- [ ] Create Engineer and Design if they are missing. Add Linear and disconnected Slack to Engineer. Slack’s Role cell reads “Not connected”. Choose Admin for Linear, reload Engineer, and check that Admin is still selected.
+- [ ] Give Engineer to Ivan Petrov. Under **Expected role**, his Linear row shows Admin from Engineer. Open Invite, check that the confirmation names Ivan, Linear and Admin, then cancel.
+- [ ] Give Ivan Design with Linear set to its default. The conflict names both source templates and blocks Invite. Choose Default and open Invite again. The confirmation identifies the app default. Cancel.
+- [ ] Take Design off Ivan. Open Invite, confirm Admin, and check Ivan’s Linear invitation in the fake connectors’ `GET /_fake/state` for the role `admin`.
+- [ ] Repeat the conflict with Chloé, who already has a Linear account. At the picker, check that the guidance explains that the choice applies to future invites. Pick Admin. Her expected role changes, and her member role in the fake stays the same. On a person with a queued invite, changing the expected role also preserves the role on that invitation when it arrives.
+
+## Role changes across tabs and connector updates
+
+Use a local test proxy for the delayed responses below. Hold only the named response so other requests can finish. For a changed manifest, restart the development API to clear its manifest cache while leaving the browser tab open. Restore the original manifest after each case.
+
+- [ ] Give Ivan three Linear sources granting Default, Guest and Admin. Submit Admin and hold the successful pick response after the server commits. In another tab take off the Admin template. Refetch Ivan’s apps in the first tab. Once it shows the Default/Guest conflict, release the old response. The conflict stays visible and Invite stays blocked.
+- [ ] With Default and Admin sources, open the conflict picker while User is the manifest default. Change the manifest so Admin is the default and User is non-default. Pick Admin in the still-open picker. Check the saved role in the response and the row before reloading. A saved null appears as the app default and agrees with a fresh read.
+- [ ] With Default and Admin sources and no saved pick, remove Linear’s role list from the manifest, keeping Invite available. As owner, open Ivan’s conflict, pick Default, and reload. The conflict clears and the expected role stays Default.
+- [ ] With Admin and Guest sources and no saved pick, remove Linear’s role list. As a non-owner workspace admin, open the conflict. The row directs you to ask an owner to update one of the assigned templates. As owner, confirm the guidance identifies a template edit as the way to restore an available role.
+- [ ] Put connected Linear in Engineer and take Slack out. Hold the first connector manifest response. Open Engineer. Its name and Linear row appear while role options are pending. Add disconnected Slack and check its row appears before releasing the response. Release it and check Linear’s role options load.
+- [ ] Open Engineer in two tabs with Linear present and Slack absent. Add Slack in the second tab, then save Linear’s role in the first. Check the first tab still renders usable app rows with names and controls. Reload and verify both Slack and the saved Linear role.
+- [ ] Fail a queued Linear invite by retiring its role before the worker runs. Remove the source template, then open that failure in Activity. The reason describes what happened to the recorded invite. It neither attributes the failure to the person’s current templates nor promises a retry.

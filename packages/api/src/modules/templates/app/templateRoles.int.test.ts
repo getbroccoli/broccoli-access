@@ -3,6 +3,7 @@ import {
   containerConnectors,
   expect,
   inviteTest as test,
+  recordHistory,
   serveManifest,
   storedEmployeeAppChoices,
   storedRecordHistory,
@@ -147,4 +148,47 @@ test("asks again when a template stops granting the picked role and its replacem
   expect((await employeeHistory()).slice(before.length)).toMatchObject([{ operation: "updated" }]);
   const [apps] = await templates.readEmployeeApps(owner, [input.employeeId]);
   expect(apps!.find(({ appId }) => appId === input.appId)).toMatchObject({ roleConflict: true });
+});
+
+test("sets a template role using an uppercase app ID", async ({
+  workspace: { owner, templates, input, assignLinearRole },
+}) => {
+  const { id } = await assignLinearRole(null);
+  const updated = await templates.setAppRole(owner, {
+    id,
+    appId: input.appId.toUpperCase(),
+    role: "guest",
+  });
+  expect(updated.apps).toMatchObject([{ appId: input.appId, role: "guest" }]);
+});
+
+test("picks an explicit role using an uppercase app ID", async ({
+  workspace: { owner, templates, input, assignLinearRole },
+}) => {
+  await assignLinearRole(null);
+  await assignLinearRole("guest");
+  await templates.pickRole(owner, { ...input, appId: input.appId.toUpperCase(), role: "guest" });
+  const [apps] = await templates.readEmployeeApps(owner, [input.employeeId]);
+  expect(apps!.find(({ appId }) => appId === input.appId)).toMatchObject({
+    role: "guest",
+    roleConflict: false,
+  });
+});
+
+test("a role picked with an uppercase employee ID appears in that person's history", async ({
+  workspace: { owner, templates, input, assignLinearRole },
+  orm,
+}) => {
+  await assignLinearRole(null);
+  await assignLinearRole("guest");
+  await templates.pickRole(owner, {
+    ...input,
+    employeeId: input.employeeId.toUpperCase(),
+    role: "guest",
+  });
+  const history = await recordHistory.read(orm, "employee", input.employeeId, { first: 1 });
+  expect(history.edges[0]?.node).toMatchObject({
+    author: { id: owner.user!.userId },
+    changes: [{ field: "appChoice", newValue: input.appId, newLabel: "guest" }],
+  });
 });

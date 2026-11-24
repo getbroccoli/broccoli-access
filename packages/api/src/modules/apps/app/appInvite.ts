@@ -50,15 +50,9 @@ export async function inviteEmployee(
     throw new ApplicationError("FORBIDDEN", "Only a signed-in user can ask for an invite.");
   }
   const requestedBy = ctx.user.userId;
-  const [employee] = parseUuid(employeeId)
-    ? await dependencies.employees.readEmployees(ctx, [employeeId])
-    : [];
-  if (!employee) {
-    throw new ApplicationError("NOT_FOUND", "No employee has this id.");
-  }
   // Read before the transaction: the container's list may take a while to answer.
   const connectors = await dependencies.connectors.list();
-  const request = { employee, appId, requestedBy, connectors };
+  const request = { ctx, employeeId, appId, requestedBy, connectors };
   const invite = await queueInvite(dependencies, request);
   const { id: changeId, connectionId } = invite.latestInvite!;
   dependencies.logger.info({ changeId, employeeId, connectionId }, "Invite requested");
@@ -102,7 +96,8 @@ interface InvitedEmployee {
 }
 
 interface InviteRequest {
-  employee: InvitedEmployee;
+  ctx: SecurityContext;
+  employeeId: string;
   appId: string;
   requestedBy: string;
   connectors: readonly Connector[];
@@ -124,11 +119,14 @@ async function queueInvite(
 async function askForInvite(
   dependencies: AccountChangeDependencies,
   tx: Tx,
-  { employee, appId, requestedBy, connectors }: InviteRequest,
+  { ctx, employeeId, appId, requestedBy, connectors }: InviteRequest,
 ): Promise<AppInvite | null> {
   await appAccountRepository(tx).lockForSync();
   const connection = await findConnectionOfApp(tx, appId);
   if (!(await appRepository(tx).tryLockForReview(connection.appId))) return null;
+  const id = parseUuid(employeeId);
+  const [employee] = id ? await dependencies.employees.readEmployees(ctx, [id], tx) : [];
+  if (!employee) throw new ApplicationError("NOT_FOUND", "No employee has this id.");
   const facts = await readInviteFacts(dependencies, tx, {
     employees: [employee],
     connections: [connection],

@@ -94,7 +94,7 @@ test("refuses a retired template role before queuing an invite", async ({
   const service = accountChangeService(orm, { connectorsUrl: server.url, jobs });
 
   await expect(service.inviteEmployee(owner, input)).rejects.toMatchObject({
-    code: expect.stringMatching(/^(CONFLICT|INVALID_INPUT)$/) as unknown,
+    code: "CONFLICT",
   });
   expect(sent).toEqual([]);
   expect(await orm.select().from(accountChanges)).toEqual([]);

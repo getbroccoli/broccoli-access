@@ -16,7 +16,10 @@ export interface TemplateRoles {
     ctx: SecurityContext,
     input: { id: string; appId: string; role: string | null },
   ): Promise<Template>;
-  pickRole(ctx: SecurityContext, input: EmployeeAppPair & { role: string | null }): Promise<void>;
+  pickRole(
+    ctx: SecurityContext,
+    input: EmployeeAppPair & { role: string | null },
+  ): Promise<string | null>;
 }
 
 type Dependencies = Pick<ModuleDependencies, "transact" | "logger"> & {
@@ -31,8 +34,9 @@ export function createTemplateRoles({
   logger,
 }: Dependencies): TemplateRoles {
   return {
-    async setAppRole(ctx, { id, appId, role: requested }) {
+    async setAppRole(ctx, { id, appId: inputAppId, role: requested }) {
       ctx.require("MANAGE_WORKSPACE");
+      const appId = checkedAppId(inputAppId);
       const role = await checkedRole(ctx, apps, appId, requested);
       const { template, changed } = await transact(async (tx) => {
         const template = await lockTemplate(tx, id);
@@ -43,14 +47,16 @@ export function createTemplateRoles({
         await employees.holdForReference(tx, people);
         const [app] = await apps.lockAppsForReview(tx, [appId]);
         await templateRepository(tx).setAppRole(member.id, role);
-        await clearStaleRolePicks(ctx, tx, people, [appId]);
+        const repo = assignmentRepository(tx);
+        const picks = await repo.choicesFor(people, [appId], "role_picked");
+        if (picks.length) await clearStaleRolePicks(ctx, tx, picks, await repo.sources(picks));
         await history.append(ctx, tx, {
           recordType: "template",
           operation: "UPDATED",
           cause: { kind: "EDITED_DIRECTLY" },
           records: [
             {
-              recordId: id,
+              recordId: template.id,
               changes: [
                 {
                   field: "appRole",
@@ -69,13 +75,15 @@ export function createTemplateRoles({
       if (changed) logger.info({ templateId: id, appId }, "Template app role changed");
       return template;
     },
-    async pickRole(ctx, { employeeId, appId, role: requested }) {
+    async pickRole(ctx, { employeeId: inputEmployeeId, appId: inputAppId, role: requested }) {
       ctx.require("MANAGE_WORKSPACE");
       if (!ctx.user?.isOwner)
         throw new ApplicationError("FORBIDDEN", "Only the owner can pick a person's role.");
-      if (!(await employees.readEmployee(ctx, employeeId)))
-        throw new ApplicationError("NOT_FOUND", "No employee has this id.");
+      const employee = await employees.readEmployee(ctx, inputEmployeeId);
+      if (!employee) throw new ApplicationError("NOT_FOUND", "No employee has this id.");
+      const appId = checkedAppId(inputAppId);
       const role = await checkedRole(ctx, apps, appId, requested);
+      const employeeId = employee.id;
       await transact(async (tx) => {
         await employees.holdForReference(tx, [employeeId]);
         await apps.lockAppsForReview(tx, [appId]);
@@ -88,6 +96,7 @@ export function createTemplateRoles({
         await recordRolePicks(ctx, tx, [{ ...pair, role }], "picked");
       });
       logger.info({ employeeId, appId }, "Employee app role picked");
+      return role;
     },
   };
 }
@@ -105,25 +114,17 @@ export async function readInviteRole(tx: Tx, employeeId: string, appId: string) 
 export async function clearStaleRolePicks(
   ctx: SecurityContext,
   tx: Tx,
-  employeeIds: string[],
-  appIds: string[],
-  remainingSources?: (EmployeeAppPair & { role: string | null })[],
+  picks: (EmployeeAppPair & { role: string | null })[],
+  remainingSources: (EmployeeAppPair & { role: string | null })[],
 ) {
-  const repo = assignmentRepository(tx);
-  const picks = (await repo.choicesFor(employeeIds, appIds)).filter(
-    ({ choice }) => choice === "role_picked",
-  );
   if (!picks.length) return;
-  const sources = Map.groupBy(
-    remainingSources ?? (await repo.sources(employeeIds, appIds)),
-    pairKey,
-  );
+  const sources = Map.groupBy(remainingSources, pairKey);
   const stale = picks.filter((pick) => {
     const roles = new Set(sources.get(pairKey(pick))?.map(({ role }) => role));
     return !pickStillApplies(roles, pick.role);
   });
   if (!stale.length) return;
-  await repo.clearChoices(stale, "role_picked");
+  await assignmentRepository(tx).clearChoices(stale, "role_picked");
   await recordRolePicks(ctx, tx, stale, "cleared");
 }
 
@@ -133,9 +134,15 @@ function pairKey({ employeeId, appId }: EmployeeAppPair) {
 
 async function roleFacts(tx: Tx, employeeId: string, appId: string) {
   const repo = assignmentRepository(tx);
-  const sources = await repo.sources([employeeId], [appId]);
+  const sources = await repo.sources([{ employeeId, appId }]);
   const [choice] = await repo.choicesFor([employeeId], [appId]);
   return { roles: new Set(sources.map(({ role }) => role)), choice };
+}
+
+function checkedAppId(input: string) {
+  const appId = parseUuid(input);
+  if (!appId) throw invalidInput([{ field: "appId", code: "invalid" }]);
+  return appId;
 }
 
 async function checkedRole(
@@ -144,7 +151,6 @@ async function checkedRole(
   appId: string,
   role: string | null,
 ) {
-  if (!parseUuid(appId)) throw invalidInput([{ field: "appId", code: "invalid" }]);
   if (role === null) return null;
   const listed = (await apps.readAppRoles(ctx, [appId]))
     .get(appId)

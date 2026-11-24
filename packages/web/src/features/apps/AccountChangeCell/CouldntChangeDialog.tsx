@@ -39,7 +39,7 @@ type Props = {
    * the employee's invite row, offering INVITE while Invite is offered; absent where the change is
    * history, as on Activity, which shows only why.
    */
-  row?: { id: string; offeredChange: AccountChangeAction | null };
+  row?: { id: string; roleConflict?: boolean; offeredChange: AccountChangeAction | null };
   /** The trigger's look; the account row's chip by default. */
   triggerClassName?: string;
 };
@@ -81,6 +81,7 @@ export function CouldntChangeDialog({ change: changeRef, row, triggerClassName =
     connectionUserEmail: row ? (connection?.connectionUserEmail ?? null) : null,
     credential: connection?.connector.connectionFields.find(({ secret }) => secret)?.kind ?? "TEXT",
     toReconnect: options.reconnect,
+    historical: !row,
   });
   const tryAgain = (target: ChangeTarget) => {
     setShown(null);
@@ -122,6 +123,7 @@ export function CouldntChangeDialog({ change: changeRef, row, triggerClassName =
             <p className="text-sm text-muted-foreground">
               {couldntChangeHint(change.failure, change.action, options, {
                 firstName,
+                roleConflict: row.roleConflict,
                 app: app.name,
               })}
             </p>

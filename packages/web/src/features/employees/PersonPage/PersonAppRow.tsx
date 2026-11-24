@@ -104,7 +104,15 @@ export function PersonAppRow({
       <TableCell className="pr-4 text-right">
         {account && <AccountChangeCell appUser={account} />}
         {invite && (row.state !== "INVITED" || invite.latestInvite?.status === "RUNNING") && (
-          <InviteCell appInvite={invite} roleBlocked={roleBlocked} />
+          <InviteCell
+            appInvite={invite}
+            roleBlocked={roleBlocked}
+            expectedRole={
+              row.role
+                ? row.app.roles.find(({ key }) => key === row.role)?.name
+                : t("apps.change.appDefault")
+            }
+          />
         )}
       </TableCell>
     </TableRow>

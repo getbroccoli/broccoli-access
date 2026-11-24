@@ -126,10 +126,15 @@ export function createResolvers(
           ["INVALID_INPUT", "NOT_FOUND"],
         ),
       pickRole: (_parent, { input }, context) =>
-        mutationPayload<ResolversTypes["TemplatePickRolePayload"]>(async () => {
-          await services.pickRole(context.getActor(), { ...input, role: input.role ?? null });
-          return {};
-        }, ["CONFLICT", "INVALID_INPUT", "NOT_FOUND"]),
+        mutationPayload<ResolversTypes["TemplatePickRolePayload"]>(
+          async () => ({
+            role: await services.pickRole(context.getActor(), {
+              ...input,
+              role: input.role ?? null,
+            }),
+          }),
+          ["CONFLICT", "INVALID_INPUT", "NOT_FOUND"],
+        ),
       assign: (_parent, { input }, context) =>
         mutationPayload<ResolversTypes["TemplateAssignPayload"]>(
           async () => ({ template: await services.assign(context.getActor(), input) }),

@@ -48,11 +48,6 @@ query TemplatePage($id: ID!) {
         name
         catalogKey
         connected
-        roles {
-          key
-          name
-          isDefault
-        }
       }
     }
   }
@@ -62,6 +57,23 @@ query TemplatePage($id: ID!) {
         id
         name
         catalogKey
+      }
+    }
+  }
+}
+
+query TemplateRoleOptions {
+  containerConnectors {
+    id
+    connection {
+      id
+      app {
+        id
+        roles {
+          key
+          name
+          isDefault
+        }
       }
     }
   }
@@ -139,11 +151,6 @@ mutation AddTemplateApp($input: TemplateAddAppInput!) {
             name
             catalogKey
             connected
-            roles {
-              key
-              name
-              isDefault
-            }
           }
         }
       }
@@ -204,6 +211,12 @@ mutation SetTemplateAppRole($input: TemplateSetAppRoleInput!) {
         apps {
           id
           role
+          app {
+            id
+            name
+            catalogKey
+            connected
+          }
         }
       }
       error {

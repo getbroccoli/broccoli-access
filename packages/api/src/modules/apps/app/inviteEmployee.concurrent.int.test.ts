@@ -1,5 +1,7 @@
 import {
   accountChanges,
+  containerConnectors,
+  employeeServices,
   expect,
   expectBlockedBy,
   holdBeforeCommit,
@@ -105,5 +107,65 @@ test("Slack's account sync finishes while a Linear invite waits for a template c
   } finally {
     held.release();
     await Promise.all([takingOff, invite]);
+  }
+  expect((await invite).latestInvite).toMatchObject({ role: null });
+});
+
+test("an invite waiting on Linear uses the employee's current email when it queues", async ({
+  workspace: { owner, service, input, assignLinearRole, employee },
+  orm,
+  seed,
+  transact,
+}) => {
+  const { id } = await assignLinearRole("admin");
+  const ana = employee("ana@acme.example");
+  await seed.employeeTemplate({
+    templateId: id,
+    employeeId: ana.id,
+    assignedBy: owner.user!.userId,
+  });
+  const held = holdBeforeCommit(transact);
+  const editing = templates(orm, { transact: held.transact }).takeOff(owner, {
+    id,
+    employeeId: ana.id,
+  });
+  const pid = await held.ready;
+  const inviting = service.inviteEmployee(owner, input);
+  const email = "ivan.petrov@acme.example";
+  try {
+    await expectBlockedBy(orm, pid);
+    await employeeServices(orm).updateEmployee(owner, { id: input.employeeId, email });
+  } finally {
+    held.release();
+    await Promise.all([editing, inviting]);
+  }
+
+  expect((await inviting).latestInvite).toMatchObject({ email, role: "admin" });
+});
+
+test("resubmitting an assignment finishes while another template holds its app for a role change", async ({
+  workspace: { owner, input, assignLinearRole },
+  orm,
+  seed,
+  transact,
+  fakeConnectors,
+}) => {
+  const existing = await assignLinearRole("admin");
+  const other = await seed.template({ appIds: [input.appId] });
+  const held = holdBeforeCommit(transact);
+  const editing = templates(orm, {
+    connectors: containerConnectors(fakeConnectors.url),
+    transact: held.transact,
+  }).setAppRole(owner, { id: other.id, appId: input.appId, role: "guest" });
+  await held.ready;
+  try {
+    const assigned = await templates(orm, { transact: withLockTimeout(transact) }).assign(owner, {
+      id: existing.id,
+      employeeId: input.employeeId,
+    });
+    expect(assigned).toMatchObject({ id: existing.id, peopleCount: 1 });
+  } finally {
+    held.release();
+    await editing;
   }
 });

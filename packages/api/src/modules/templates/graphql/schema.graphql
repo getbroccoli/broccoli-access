@@ -145,6 +145,8 @@ type TemplateSetAppRolePayload {
 union TemplateSetAppRoleError = InvalidInputError | NotFoundError
 
 type TemplatePickRolePayload {
+  "The saved role key, or null for the app default."
+  role: String
   error: TemplatePickRoleError
 }
 union TemplatePickRoleError = InvalidInputError | NotFoundError | ConflictError

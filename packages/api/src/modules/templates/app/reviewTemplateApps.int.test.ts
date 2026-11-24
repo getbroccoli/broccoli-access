@@ -171,3 +171,44 @@ test.for([
     ).toEqual(["template"]);
   },
 );
+
+test("deleting a shared template reviews only the account that lost its source and clears only the stale pick", async ({
+  seed,
+  orm,
+}) => {
+  const owner = await seed.owner();
+  const assignedBy = owner.user!.userId;
+  const ana = await seed.employee();
+  const ivan = await seed.employee();
+  const slack = await seed.app({ status: "approved" });
+  const linear = await seed.app({
+    name: "Linear",
+    domain: "linear.app",
+    catalogKey: "linear",
+    status: "approved",
+  });
+  await seed.appConnection({ appId: slack.id, connector: "slack" });
+  await seed.appConnection({ appId: linear.id, connector: "linear" });
+  const everyone = await seed.template({ appIds: [slack.id, linear.id] });
+  for (const employeeId of [ana.id, ivan.id])
+    await seed.employeeTemplate({ employeeId, templateId: everyone.id, assignedBy });
+  const anaSlack = { employeeId: ana.id, appId: slack.id };
+  const ivanLinear = { employeeId: ivan.id, appId: linear.id };
+  await seed.assignedTemplateApp({ ...anaSlack, role: "admin", assignedBy });
+  await seed.assignedTemplateApp({ ...anaSlack, role: null, assignedBy });
+  await seed.assignedTemplateApp({ ...ivanLinear, role: "admin", assignedBy });
+  const kept = { ...anaSlack, choice: "role_picked" as const, role: "admin" };
+  await seed.employeeAppChoice(kept);
+  await seed.employeeAppChoice({ ...ivanLinear, choice: "role_picked", role: null });
+  const ivanSlack = { employeeId: ivan.id, appId: slack.id };
+  await seed.appAccount(ivanSlack);
+  await seed.appAccount(anaSlack);
+
+  await templates(orm).deleteTemplate(owner, everyone.id);
+
+  const choices = await storedEmployeeAppChoices(orm);
+  expect(choices).toHaveLength(2);
+  expect(choices).toEqual(
+    expect.arrayContaining([kept, { ...ivanSlack, choice: "to_review", role: null }]),
+  );
+});

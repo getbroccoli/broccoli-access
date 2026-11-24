@@ -139,6 +139,11 @@ export const appsEn = {
   "apps.couldnt.unexpectedResponse":
     "{app} gave an answer Broccoli Access doesn’t recognise. {app} may have changed how its admin pages work.",
   "apps.couldnt.blockedByCheck": "{app} asked for a check that Broccoli Access never gets past.",
+  "apps.change.appDefault": "App default",
+  "apps.couldnt.inviteWasUnavailable":
+    "{app} or the requested role was unavailable when Broccoli Access tried to invite this person.",
+  "apps.couldnt.hintInviteRole":
+    "Reconnect {app} and resolve the template role before trying the invite again.",
   "apps.couldnt.inviteUnavailable":
     "Check the connection to {app} and the role on this person’s templates before trying again.",
   "apps.couldnt.noAnswer": "{app} didn’t answer after three tries.",

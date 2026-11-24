@@ -25,9 +25,11 @@ export async function reviewLostApps(
   const active = (await apps.findEmployeeAccounts(tx, employeeIds, lostAppIds)).filter(
     (account) => account.status === "active",
   );
-  const sources = active.length ? await repo.sources(employeeIds, lostAppIds) : undefined;
-  await clearStaleRolePicks(ctx, tx, employeeIds, lostAppIds, sources);
-  if (!sources) return;
+  const picks = await repo.choicesFor(employeeIds, lostAppIds, "role_picked");
+  if (!active.length && !picks.length) return;
+  const sources = await repo.sources([...active, ...picks]);
+  await clearStaleRolePicks(ctx, tx, picks, sources);
+  if (!active.length) return;
   const remaining = new Set(sources.map(pairKey));
   const lost = new Map(
     active

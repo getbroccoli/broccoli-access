@@ -16,51 +16,57 @@ export function PersonAppRole({ row, employeeId }: Props) {
   const [pick, { loading }] = usePayloadMutation(PickPersonAppRoleDocument);
   const { app, role, roleConflict } = row;
   if (!roleConflict) {
-    if (!row.templates.length && !role) return "—";
+    if ((!row.templates.length || !app.connected) && !role) return "—";
     const listed = app.roles.find((option) =>
       role === null ? option.isDefault : option.key === role,
     );
-    return listed?.name ?? (role == null ? "—" : t("templates.role.updateSource"));
+    return (
+      listed?.name ??
+      (role == null ? t("templates.role.default") : t("templates.role.updateSource"))
+    );
   }
-  if (!me.isOwner) return t("templates.role.ownerPicks");
   const sources = Map.groupBy(row.roleSources, (source) => source.role);
-  const options = app.roles.filter((option) => sources.has(option.isDefault ? null : option.key));
-  if (!options.length) return t("templates.role.updateSource");
+  const options = [...sources].flatMap(([role, giving]) => {
+    const name =
+      role === null
+        ? (app.roles.find((option) => option.isDefault)?.name ?? t("templates.role.default"))
+        : app.roles.find((option) => option.key === role && !option.isDefault)?.name;
+    return name ? [{ role, name, giving }] : [];
+  });
+  if (!options.length)
+    return t(me.isOwner ? "templates.role.updateSource" : "templates.role.ownerUpdates");
+  if (!me.isOwner) return t("templates.role.ownerPicks");
 
-  async function choose(key: string) {
-    const chosen = options.find((option) => option.key === key)!;
-    const role = chosen.isDefault ? null : chosen.key;
+  async function choose(role: string | null) {
     try {
-      await pick({ variables: { input: { employeeId, appId: app.id, role } } });
-      storePickedRole(cache, employeeId, app.id, role);
+      const saved = await pick({ variables: { input: { employeeId, appId: app.id, role } } });
+      storePickedRole(cache, employeeId, row, saved.role ?? null);
     } catch {
       toast.error(t("templates.role.failed", { app: app.name }));
     }
   }
   return (
-    <select
-      aria-label={t("templates.role.label", { app: app.name })}
-      value=""
-      disabled={loading}
-      className="h-8 max-w-full rounded-lg border border-amber-700 bg-background px-2 text-sm"
-      onChange={(event) => void choose(event.target.value)}
-    >
-      <option value="" disabled>
-        {t("people.person.pickRole")}
-      </option>
-      {options.map((option) => {
-        const giving = sources.get(option.isDefault ? null : option.key);
-        return (
-          giving && (
-            <option key={option.key} value={option.key}>
-              {t("people.person.roleFrom", {
-                role: option.name,
-                templates: giving.map((source) => source.template.name).join(", "),
-              })}
-            </option>
-          )
-        );
-      })}
-    </select>
+    <div className="flex flex-col gap-1">
+      <select
+        aria-label={t("templates.role.label", { app: app.name })}
+        value=""
+        disabled={loading}
+        className="h-8 max-w-full rounded-lg border border-amber-700 bg-background px-2 text-sm"
+        onChange={(event) => void choose(options[Number(event.target.value)]!.role)}
+      >
+        <option value="" disabled>
+          {t("people.person.pickRole")}
+        </option>
+        {options.map(({ role, name, giving }, index) => (
+          <option key={role ?? ""} value={index}>
+            {t("people.person.roleFrom", {
+              role: name,
+              templates: giving.map((source) => source.template.name).join(", "),
+            })}
+          </option>
+        ))}
+      </select>
+      <span className="text-xs text-muted-foreground">{t("templates.role.nextInvite")}</span>
+    </div>
   );
 }

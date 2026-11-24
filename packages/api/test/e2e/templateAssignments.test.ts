@@ -130,27 +130,35 @@ test("the owner sets a template role from the connected app's roles", async ({ e
   });
 });
 
-test("the owner's pick resolves a role conflict on the person's page", async ({ env }) => {
-  const { browser, appId, owner } = await connectedLinear(env);
-  const person = await env.seed.employee();
-  const assignment = { employeeId: person.id, appId, assignedBy: owner.id };
-  await env.seed.assignedTemplateApp({ ...assignment, role: null });
-  await env.seed.assignedTemplateApp({ ...assignment, role: "guest" });
+test.for([
+  { pick: "guest", saved: "guest" },
+  { pick: "user", saved: null },
+])(
+  "picking $pick returns the saved role and resolves the conflict on the person's page",
+  async ({ pick, saved }, { env }) => {
+    const { browser, appId, owner } = await connectedLinear(env);
+    const person = await env.seed.employee();
+    const assignment = { employeeId: person.id, appId, assignedBy: owner.id };
+    await env.seed.assignedTemplateApp({ ...assignment, role: null });
+    await env.seed.assignedTemplateApp({ ...assignment, role: "guest" });
 
-  const response = await browser.graphql(
-    `mutation ($input: TemplatePickRoleInput!) {
-      templates { pickRole(input: $input) { error { __typename } } }
+    const response = await browser.graphql(
+      `mutation ($input: TemplatePickRoleInput!) {
+      templates { pickRole(input: $input) { role error { __typename } } }
     }`,
-    { input: { employeeId: person.id, appId, role: "guest" } },
-  );
+      { input: { employeeId: person.id, appId, role: pick } },
+    );
 
-  expect(await response.json()).toEqual({ data: { templates: { pickRole: { error: null } } } });
-  const apps = await employeeApps(browser, person.id);
-  expect(apps.find(({ app }) => app.id === appId)).toMatchObject({
-    role: "guest",
-    roleConflict: false,
-  });
-});
+    expect(await response.json()).toEqual({
+      data: { templates: { pickRole: { role: saved, error: null } } },
+    });
+    const apps = await employeeApps(browser, person.id);
+    expect(apps.find(({ app }) => app.id === appId)).toMatchObject({
+      role: saved,
+      roleConflict: false,
+    });
+  },
+);
 
 async function employeeApps(browser: Browser, id: string) {
   const response = await browser.graphql(

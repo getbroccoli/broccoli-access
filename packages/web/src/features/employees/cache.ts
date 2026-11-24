@@ -3,6 +3,7 @@ import {
   AccountsWithoutPersonDocument,
   PersonPageDocument,
   type AccountsWithoutPersonQuery,
+  type PersonPageQuery,
 } from "@/__generated__/graphql";
 import { evictRecord } from "@/apollo";
 
@@ -41,7 +42,7 @@ export function storeAccountWindow(
 export function storePickedRole(
   cache: ApolloCache,
   employeeId: string,
-  appId: string,
+  pickedFrom: NonNullable<PersonPageQuery["employee"]>["personApps"]["edges"][number]["node"],
   role: string | null,
 ) {
   cache.updateQuery({ query: PersonPageDocument, variables: { id: employeeId } }, (previous) => {
@@ -54,7 +55,14 @@ export function storePickedRole(
         personApps: {
           ...employee.personApps,
           edges: employee.personApps.edges.map((edge) =>
-            edge.node.app.id === appId
+            edge.node.app.id === pickedFrom.app.id &&
+            edge.node.roleConflict &&
+            edge.node.roleSources.length === pickedFrom.roleSources.length &&
+            edge.node.roleSources.every(
+              (source, i) =>
+                source.role === pickedFrom.roleSources[i]?.role &&
+                source.template.id === pickedFrom.roleSources[i]?.template.id,
+            )
               ? {
                   ...edge,
                   node: { ...edge.node, role, roleConflict: false, roleSources: [] },

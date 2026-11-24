@@ -34,7 +34,11 @@ export function InviteStatusCell({ appInvite, roleBlocked }: Props) {
     return (
       <CouldntChangeDialog
         change={invite.latestInvite}
-        row={{ id: invite.id, offeredChange: invite.offered && !roleBlocked ? "INVITE" : null }}
+        row={{
+          id: invite.id,
+          roleConflict: roleBlocked,
+          offeredChange: invite.offered && !roleBlocked ? "INVITE" : null,
+        }}
       />
     );
   }

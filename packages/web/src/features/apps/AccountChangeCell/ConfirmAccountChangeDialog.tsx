@@ -27,6 +27,7 @@ type Props = {
   /** The account for Disable and Enable, or the employee's invite row for Invite. */
   row: Pick<AccountChangeCell_AppUserFragment, "id" | "employee" | "app">;
   accountEmail?: string;
+  expectedRole?: string;
   action: AccountChangeAction;
 };
 
@@ -34,7 +35,7 @@ type Props = {
  * Disable, Enable or Invite, confirmed in a dialog naming the person, the app and the workspace;
  * the dialog closes on confirm and the row then follows the change.
  */
-export function ConfirmAccountChangeDialog({ row, action, accountEmail }: Props) {
+export function ConfirmAccountChangeDialog({ row, action, accountEmail, expectedRole }: Props) {
   const [open, setOpen] = useState(false);
   const { changeAccount, loading } = useChangeAccount();
   const { employee, app } = row;
@@ -85,6 +86,12 @@ export function ConfirmAccountChangeDialog({ row, action, accountEmail }: Props)
             <AppMark name={app.name} catalogKey={app.catalogKey} className="size-6" />
             {app.name}
           </dd>
+          {expectedRole && (
+            <>
+              <dt className="text-muted-foreground">{t("templates.role.expected")}</dt>
+              <dd className="text-right font-medium">{expectedRole}</dd>
+            </>
+          )}
           <dt className="text-muted-foreground">{t("apps.change.workspace")}</dt>
           <dd className="text-right font-medium">
             {app.containerConnection?.scan?.sourceName ?? app.name}
