@@ -3,6 +3,9 @@ import {
   EMPLOYEE,
   expect,
   failedDisable,
+  failLinearCall,
+  holdBeforeCommit,
+  inviteTest,
   linearMemberStatus,
   OWNER,
   pendingDisable,
@@ -55,6 +58,34 @@ test("marks Chloé's failed Disable done by hand and records her suspension unde
   ]);
   expect(await linearMemberStatus(fakeConnectors.url, chloe.email)).toBe("active");
 });
+
+inviteTest(
+  "marks a failed invite done by hand while a failing run holds its connection",
+  async ({ workspace, orm, transact, fakeConnectors, signal }) => {
+    const { service, owner, input, employee } = workspace;
+    const connectorsUrl = fakeConnectors.url;
+    const ivan = await service.inviteEmployee(owner, input);
+    await failLinearCall(connectorsUrl, "actions/run", "unexpected_response");
+    await service.runChange(SYSTEM, ivan.latestInvite!.id);
+    const lena = await service.inviteEmployee(owner, {
+      employeeId: employee("lena@acme.example").id,
+      appId: input.appId,
+    });
+    await failLinearCall(connectorsUrl, "actions/run", "authentication_failed");
+    const held = holdBeforeCommit(transact);
+    const runner = accountChanges(orm, { connectorsUrl, transact: held.transact });
+    signal.addEventListener("abort", () => held.release(), { once: true });
+    const run = runner.runChange(SYSTEM, lena.latestInvite!.id);
+    try {
+      await held.ready;
+      const done = await service.markChangeDoneByHand(owner, ivan.latestInvite!.id);
+      expect(done).toMatchObject({ id: ivan.latestInvite!.id, status: "done_by_hand" });
+    } finally {
+      held.release();
+      await run;
+    }
+  },
+);
 
 test.for(["running", "succeeded", "done_by_hand"] as const)(
   "refuses to mark a %s change done by hand and preserves the account, change and history",

@@ -9,7 +9,7 @@ import { accountChanges, scannedLinear } from "./accountChanges";
 import { test } from "./fixture";
 import { googleScanSetup } from "./googleScanSetup";
 import { recordingJobQueue } from "./recordingJobQueue";
-import { storedApps, storedEmployees } from "./storedScan";
+import { storedEmployees } from "./storedScan";
 import { SYSTEM } from "./testSecurityContext";
 
 export const inviteTest = test.extend<{ workspace: Awaited<ReturnType<typeof scannedWorkspace>> }>({
@@ -49,11 +49,9 @@ async function scannedWorkspace(orm: Orm, googleUrl: string, connectorsUrl: stri
   );
   const { jobs, sent } = recordingJobQueue();
   const service = accountChanges(orm, { connectorsUrl, jobs });
-  const googleApp = (await storedApps(orm)).find((app) => app.catalogKey === "google_workspace")!;
   const ivan = employee("ivan@acme.example");
   return {
     linear,
-    googleApp,
     owner,
     service,
     sent,

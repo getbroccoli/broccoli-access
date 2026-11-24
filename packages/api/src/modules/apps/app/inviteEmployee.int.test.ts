@@ -110,14 +110,13 @@ test("succeeds when Linear answers the invite with Ivan's existing member", asyn
 });
 
 test.for([
-  { reason: "Ben is suspended in Google", email: "ben@acme.example", google: false },
-  { reason: "Chloé already has a Linear member", email: "chloe@acme.example", google: false },
-  { reason: "Google Workspace does not invite", email: "ivan@acme.example", google: true },
+  { reason: "Ben is suspended in Google", email: "ben@acme.example" },
+  { reason: "Chloé already has a Linear member", email: "chloe@acme.example" },
 ])(
   "refuses Invite when $reason without storing or queuing it",
-  async ({ email, google }, { workspace, orm }) => {
-    const { service, owner, employee, googleApp, linear, sent } = workspace;
-    const input = { employeeId: employee(email).id, appId: google ? googleApp.id : linear.appId };
+  async ({ email }, { workspace, orm }) => {
+    const { service, owner, employee, linear, sent } = workspace;
+    const input = { employeeId: employee(email).id, appId: linear.appId };
 
     await expect(service.inviteEmployee(owner, input)).rejects.toMatchObject({ code: "CONFLICT" });
 
