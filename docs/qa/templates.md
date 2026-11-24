@@ -28,5 +28,16 @@ A manual check of the Templates page and a template's page against a development
 ## Robustness
 
 - [ ] `/templates/not-an-id` shows the not-found page.
-- [ ] With the API failing, Templates shows "Couldn’t load templates" and "Try again" reloads it once the API is back.
+- [ ] With the whole API down, opening Templates shows the app-wide "Couldn’t reach Broccoli Access" with "Try again", as every page does.
+- [ ] When only the templates request fails, the page shows "Couldn’t load templates" under its title, and "Try again" loads the list. To fail that request once, open People, run this in the browser's console, then open Templates from the menu:
+
+  ```js
+  const send = window.fetch;
+  window.fetch = (url, options) => {
+    if (!String(options?.body).includes("TemplatesPage")) return send(url, options);
+    window.fetch = send;
+    return Promise.reject(new TypeError("Failed for QA"));
+  };
+  ```
+
 - [ ] At 390 px wide the buttons wrap under the title and the tables stay inside their frames.
