@@ -29,6 +29,21 @@ export const settingsEn = {
   "settings.integrationUser.create": "Create integration user",
   "settings.integrationUser.created": "Created",
   "settings.integrationUser.openInGoogleAdmin": "Open in Google admin",
+  "settings.integrationUser.settingUp": "Setting up",
+  "settings.integrationUser.needsYou": "Needs you",
+  "settings.integrationUser.settingUpSummary":
+    "Broccoli Access is signing in to Google as this user and setting up its two-step sign-in.",
+  "settings.integrationUser.signedInSummary": "Signed in to Google · Two-step sign-in on",
+  "settings.integrationUser.blockedByCheck":
+    "Google showed a check that needs a person, so Broccoli Access stopped signing in. It never gets around a check. Try again later.",
+  "settings.integrationUser.authenticationFailed":
+    "Google refused this user’s password or two-step code. Check in Google admin that the user is active, then try again.",
+  "settings.integrationUser.connectorsUnavailable":
+    "Broccoli Access couldn’t sign in through the connectors container. Check that it is set up and running, then try again.",
+  "settings.integrationUser.signInDidNotFinish":
+    "Broccoli Access couldn’t finish signing in to Google as this user. Try again.",
+  "settings.integrationUser.tryAgain": "Try again",
+  "settings.integrationUser.tryAgainFailed": "Couldn’t start signing in. Try again.",
   "settings.integrationUser.dialogTitle": "Create the integration user",
   "settings.integrationUser.address": "Its email address",
   "settings.integrationUser.dialogNote":

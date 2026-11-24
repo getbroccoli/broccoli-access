@@ -25,6 +25,7 @@
       "src/core/*",
       "!src/core/server",
       "src/integrations/google",
+      "src/integrations/connectorsContainer",
       "src/utils"
     ],
     "src/modules/imports": ["src/core/*", "!src/core/server"],

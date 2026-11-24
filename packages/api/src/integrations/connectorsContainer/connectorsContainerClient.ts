@@ -12,6 +12,9 @@ import {
   CONNECTOR_MANIFEST,
   type ConnectorDescription,
   type ConnectorErrorCode,
+  INTEGRATION_USER_SETUP_ANSWER,
+  type IntegrationUserSetupAnswer,
+  type IntegrationUserSetupRequest,
 } from "@broccoli-access/connector-contract";
 import { z } from "zod";
 
@@ -24,6 +27,10 @@ export interface ConnectorsContainerClient {
   testConnection(request: ConnectionTestRequest): Promise<ContainerAnswer<ConnectionTestAnswer>>;
   listAccounts(request: AccountsListRequest): Promise<ContainerAnswer<AccountsListAnswer>>;
   runAction(request: ActionRunRequest): Promise<ContainerAnswer<ActionRunAnswer>>;
+  /** Sets up the integration user's two-step sign-in in the container's browser, and answers its secret. */
+  setUpIntegrationUser(
+    request: IntegrationUserSetupRequest,
+  ): Promise<ContainerAnswer<IntegrationUserSetupAnswer>>;
 }
 
 /**
@@ -52,11 +59,21 @@ export function createConnectorsContainerClient(url: string): ConnectorsContaine
     listAccounts: (request) =>
       call(urlUnder(url, "v1/accounts/list"), request, ACCOUNTS_LIST_ANSWER),
     runAction: (request) => call(urlUnder(url, "v1/actions/run"), request, ACTION_RUN_ANSWER),
+    setUpIntegrationUser: (request) =>
+      call(
+        urlUnder(url, "v1/integration-user/setup"),
+        request,
+        INTEGRATION_USER_SETUP_ANSWER,
+        SIGN_IN_TIMEOUT_MS,
+      ),
   };
 }
 
 /** The contract's wait for any call: no answer by then is the container failing. */
 const CALL_TIMEOUT_MS = 120_000;
+
+/** The contract's wait for a call that signs in through several pages, which may take 180 seconds. */
+const SIGN_IN_TIMEOUT_MS = 240_000;
 
 /** The list is fixed when the container starts, so a slower answer means it is down. */
 const LIST_TIMEOUT_MS = 10_000;
@@ -71,8 +88,9 @@ async function call<T>(
   url: URL,
   request: unknown,
   schema: z.ZodType<T>,
+  timeoutMs = CALL_TIMEOUT_MS,
 ): Promise<ContainerAnswer<T>> {
-  const bytes = await postJson(url, request);
+  const bytes = await postJson(url, request, timeoutMs);
   if (bytes === null) {
     return { error: "app_unavailable" };
   }
@@ -86,10 +104,10 @@ async function call<T>(
 }
 
 /** The answer's body; null when the container did not answer 200 in time. */
-async function postJson(url: URL, request: unknown): Promise<Buffer | null> {
+async function postJson(url: URL, request: unknown, timeoutMs: number): Promise<Buffer | null> {
   try {
     return await fetchBytes(url, {
-      timeoutMs: CALL_TIMEOUT_MS,
+      timeoutMs,
       maxBytes: MAX_ANSWER_BYTES,
       init: {
         method: "POST",

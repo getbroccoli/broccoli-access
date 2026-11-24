@@ -12,7 +12,7 @@ export const integrationUser = pgTable(
     email: text("email").notNull(),
     /** The directory's id for it; the sync knows it by this id, never by its email. */
     googleUserId: text("google_user_id").notNull(),
-    /** Its secrets as one JSON object, its password for now, encrypted. */
+    /** Its secrets as one JSON object, its password and its two-step secret once set up, encrypted. */
     encryptedSecrets: text("encrypted_secrets").notNull(),
     createdBy: text("created_by")
       .notNull()

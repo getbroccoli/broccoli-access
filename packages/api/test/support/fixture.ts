@@ -62,9 +62,8 @@ export const test = baseTest.extend<{
   transact: async ({ orm }, use) => {
     await use(testTransactor(orm));
   },
-  // eslint-disable-next-line no-empty-pattern -- Vitest reads fixture dependencies from this pattern.
-  fakeConnectors: async ({}, use) => {
-    const fake = await startFakeConnectors({ delayMs: 0 });
+  fakeConnectors: async ({ fakeGoogle }, use) => {
+    const fake = await startFakeConnectors({ delayMs: 0, googleUrl: fakeGoogle.url });
     try {
       await use(fake);
     } finally {

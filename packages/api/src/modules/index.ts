@@ -69,6 +69,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     ...core,
     ...googleAddresses,
     connectedApps,
+    connectorsUrl: settings.connectorsUrl,
   });
   const importRecords = createImportRecordService();
   const apps = createAppService({

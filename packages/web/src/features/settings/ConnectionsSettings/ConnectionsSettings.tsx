@@ -24,7 +24,9 @@ export function ConnectionsSettings({ integrationUserError }: Props) {
   const query = useQuery(ConnectionsSettingsDocument, { fetchPolicy: "cache-and-network" });
   const { data, error, refetch } = query;
   const connection = data?.setup.googleWorkspace;
-  usePollWhileScanning(connection?.scan?.status === "SCANNING", query);
+  const isSettingUpSignIn =
+    data?.setup.integrationUser?.signInStatus === "SETTING_UP_TWO_STEP_SIGN_IN";
+  usePollWhileScanning(connection?.scan?.status === "SCANNING" || isSettingUpSignIn, query);
 
   return (
     <div className="flex max-w-4xl flex-col">

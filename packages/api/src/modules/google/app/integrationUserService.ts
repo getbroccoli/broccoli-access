@@ -3,32 +3,35 @@ import { randomBytes } from "node:crypto";
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
 import type { Orm, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
+import { createConnectorsContainerClient } from "../../../integrations/connectorsContainer";
 import { createGoogleClient, type GoogleClient } from "../../../integrations/google";
-import { UnsuccessfulAnswerError } from "../../../utils";
 import { integrationUserRepository } from "../db";
 import {
-  EmailTakenError,
   GOOGLE_USER_WRITE_SCOPE,
   GOOGLE_WORKSPACE,
   GOOGLE_WORKSPACE_SECRETS,
   googleRedirectAddress,
   type GoogleWorkspaceSettings,
-  INTEGRATION_USER_NAME,
   type IntegrationUser,
+  type IntegrationUserSignIn,
   parseGoogleWorkspaceSettings,
   parseIntegrationUserEmail,
-  requireSameWorkspace,
-  UserWriteRefusedError,
 } from "../domain";
 import { openConsentState, randomConsentToken, sealConsentState } from "../helpers";
 import type { ConnectedApps } from "../ports";
 import { consentUrl } from "./consentUrl";
 import type { GoogleConnectionDependencies } from "./googleConnectionService";
-import { readSuperAdmin, verifyIdentity } from "./googleConsent";
+import { createDirectoryUser, verifyWriteGrant, type WriteGrant } from "./integrationUserDirectory";
+import {
+  createIntegrationUserSignInAttempts,
+  encryptIntegrationUserSecrets,
+} from "./integrationUserSignIn";
 
 /**
  * The integration user: the Google Workspace user Broccoli Access creates for itself, once the
- * owner allows it to create users. Its password never leaves this service.
+ * owner allows it to create users, and signs in to Google as it by itself. It sends the
+ * password to Google to create the user, and its secrets to the connectors container to sign in;
+ * no caller reads them.
  */
 export interface IntegrationUserService {
   /**
@@ -49,11 +52,21 @@ export interface IntegrationUserService {
    * transaction. Refuses a consent without the scope with `UserWriteRefusedError`, a taken address
    * with `EmailTakenError`, a consent from elsewhere like a Google app change does, an answer it
    * cannot trust with INVALID_INPUT, and with CONFLICT once the integration user exists or while
-   * another answer creates it; nothing is created or stored then.
+   * another answer creates it; nothing is created or stored then. Once stored, it starts signing
+   * in as the user, like `startSignIn`, without waiting for it.
    */
   finishCreation: (ctx: SecurityContext, answer: IntegrationUserAnswer) => Promise<void>;
+  /**
+   * For the owner: starts signing in to Google as the integration user through the connectors
+   * container, which sets up its two-step sign-in, unless an attempt runs; `readIntegrationUser`
+   * tells how it ended. Refuses another caller with FORBIDDEN, and with CONFLICT before the
+   * integration user exists.
+   */
+  startSignIn: (ctx: SecurityContext) => Promise<void>;
   /** The integration user as Settings shows it, its id the directory's; null before it exists. Owner only. */
-  readIntegrationUser: (ctx: SecurityContext) => Promise<{ id: string; email: string } | null>;
+  readIntegrationUser: (
+    ctx: SecurityContext,
+  ) => Promise<{ id: string; email: string; signIn: IntegrationUserSignIn } | null>;
   /** The directory's id of the integration user, which the sync skips; null before it exists. System only. */
   readGoogleUserId: (ctx: SecurityContext, db: Orm | Tx) => Promise<string | null>;
 }
@@ -87,13 +100,22 @@ export type IntegrationUserDependencies = Pick<
   | "openIdConfigurationUrl"
   | "adminApiUrl"
   | "connectedApps"
->;
+> & {
+  /** `CONNECTORS_URL`: the connectors container, whose browser signs in; unset means none. */
+  connectorsUrl?: string;
+};
 
 export function createIntegrationUserService(
   dependencies: IntegrationUserDependencies,
 ): IntegrationUserService {
   const { orm, secretBox, connectedApps } = dependencies;
   const google = createGoogleClient(dependencies);
+  const signIn = createIntegrationUserSignInAttempts({
+    ...dependencies,
+    connectorsContainer: dependencies.connectorsUrl
+      ? createConnectorsContainerClient(dependencies.connectorsUrl)
+      : null,
+  });
   // shortcut: one creation at a time in this process, so two answers at once never create two
   // users in Google; that holds while the API runs as one process. Reserve the row in Postgres
   // before calling Google if it ever runs as more.
@@ -156,11 +178,19 @@ export function createIntegrationUserService(
       } finally {
         isCreating = false;
       }
+      signIn.start();
+    },
+    async startSignIn(ctx) {
+      requireOwner(ctx);
+      if (!(await integrationUserRepository(orm).find())) {
+        throw new ApplicationError("CONFLICT", "The integration user does not exist.");
+      }
+      signIn.start();
     },
     async readIntegrationUser(ctx) {
       ctx.require("MANAGE_WORKSPACE");
       const found = await integrationUserRepository(orm).find();
-      return found && { id: found.googleUserId, email: found.email };
+      return found && { id: found.googleUserId, email: found.email, signIn: await signIn.read() };
     },
     async readGoogleUserId(ctx, db) {
       ctx.requireSystem();
@@ -185,13 +215,8 @@ const INCREMENTAL_OFFLINE_CONSENT = {
   prompt: "consent",
 };
 
-/** Binds the encrypted secrets to their table, so no other ciphertext of the instance passes as them. */
-const SECRETS_ASSOCIATED_DATA = "integration_user";
-
 /** 256 random bits, as 43 characters: beyond guessing and inside Google's 100. */
 const PASSWORD_BYTES = 32;
-
-const CONFLICT_STATUS = 409;
 
 /** The Google Workspace connection with its own Google app's secret, as one stored version. */
 interface ConnectedGoogleApp {
@@ -200,15 +225,6 @@ interface ConnectedGoogleApp {
   clientSecret: string;
   /** The stored version read, which the save replaces or refuses. */
   revision: string;
-}
-
-/** What the consent granted: a token that may create users, and the grown grant to store. */
-interface WriteGrant {
-  accessToken: string;
-  refreshToken: string;
-  scopes: string[];
-  /** The super admin who consented, whose refresh token the connection now uses. */
-  adminEmail: string;
 }
 
 /** The owner's user id; refuses everyone else, the system included, with FORBIDDEN. */
@@ -284,49 +300,6 @@ function integrationUserExists(): ApplicationError {
   return new ApplicationError("CONFLICT", "The integration user already exists.");
 }
 
-/**
- * Exchanges the code and checks that a super admin of the connected workspace allowed creating
- * users, on top of everything the connection was granted before.
- */
-async function verifyWriteGrant(
-  google: GoogleClient,
-  { settings, clientSecret }: ConnectedGoogleApp,
-  answer: { code?: string; handle?: string; publicOrigin: string; nonce: string; now: Date },
-): Promise<WriteGrant> {
-  const { tokens, identity } = await verifyIdentity(
-    google,
-    { clientId: settings.clientId, clientSecret, nonce: answer.nonce },
-    { ...answer, redirectUri: googleRedirectAddress(answer.publicOrigin) },
-  );
-  if (!tokens.scopes.includes(GOOGLE_USER_WRITE_SCOPE)) {
-    throw new UserWriteRefusedError();
-  }
-  const admin = await readSuperAdmin(google, tokens.accessToken, identity);
-  requireSameWorkspace(settings, admin.domain);
-  const { accessToken, refreshToken, scopes } = tokens;
-  // Its refresh token replaces the connection's, so it must read all the scans read.
-  if (refreshToken === null || settings.grantedScopes.some((scope) => !scopes.includes(scope))) {
-    throw new ApplicationError("INVALID_INPUT", "Google's grant does not hold the earlier one.");
-  }
-  return { accessToken, refreshToken, scopes, adminEmail: admin.email };
-}
-
-/** Creates the user in the directory and returns its id; a taken address is `EmailTakenError`. */
-async function createDirectoryUser(
-  google: GoogleClient,
-  accessToken: string,
-  user: { email: string; password: string },
-): Promise<string> {
-  try {
-    const created = await google.createUser(accessToken, { ...user, ...INTEGRATION_USER_NAME });
-    return created.id;
-  } catch (error) {
-    throw error instanceof UnsuccessfulAnswerError && error.status === CONFLICT_STATUS
-      ? new EmailTakenError()
-      : error;
-  }
-}
-
 // shortcut: the directory user exists before its row, since no transaction spans Google, so a
 // failed save, or a second creation finishing at the same moment from another browser, leaves a
 // user in Google without a row, logged by its id; delete it through Google once the fake and the
@@ -345,7 +318,7 @@ async function saveIntegrationUser(
     created: IntegrationUser & { password: string };
   },
 ): Promise<void> {
-  const encryptedSecrets = secretBox.encrypt(JSON.stringify({ password }), SECRETS_ASSOCIATED_DATA);
+  const encryptedSecrets = encryptIntegrationUserSecrets(secretBox, { password });
   const { googleUserId } = created;
   try {
     await transact(async (tx) => {

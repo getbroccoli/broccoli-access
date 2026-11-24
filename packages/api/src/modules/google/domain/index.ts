@@ -18,7 +18,11 @@ export {
   EmailTakenError,
   GOOGLE_USER_WRITE_SCOPE,
   INTEGRATION_USER_NAME,
+  INTEGRATION_USER_SECRETS,
   type IntegrationUser,
+  type IntegrationUserSecrets,
+  type IntegrationUserSignIn,
+  type IntegrationUserSignInFailure,
   parseIntegrationUserEmail,
   UserWriteRefusedError,
 } from "./integrationUser";
