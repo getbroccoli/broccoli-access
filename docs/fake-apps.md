@@ -17,7 +17,7 @@
 
 ## Not goals
 
-- Other Google APIs: Gmail, Drive, groups, or anything that writes.
+- Other Google APIs: Gmail, Drive, groups, or any write but the user writes circle 3 adds (see "Circle 3").
 - Keeping data across restarts.
 - Running in a real install.
 - Slack's and Linear's own APIs and pages: the connectors repository fakes those for its connectors. This package fakes the connectors container instead.
@@ -330,6 +330,88 @@ Under `/_fake`, as for the fake Google:
 - **Fake connectors container:** the fake, the seed, the control endpoints and the conformance suite.
 - **Connect Linear, Disable and Enable, failed changes and Activity:** Linear, failures and the key revoke.
 - **Connect Slack, daily scans, Reconnect:** the Slack sign-in, the session expiry and failures.
+
+## Circle 3
+
+Circle 3's core is built against the same two fakes, which grow as below. Nothing in the core's tests needs a browser other than the owner's: the fake connectors container answers the two integration user calls from its memory.
+
+The real connector's sign-in, in a real browser against fake Google sign-in pages and a fake Slack, is tested in the connectors repository, with its own fakes.
+
+### Fake Google: user writes
+
+Google's paths and bodies, as for the reads. Each needs the scope `https://www.googleapis.com/auth/admin.directory.user`.
+
+- `POST /admin/directory/v1/users` creates a user from `primaryEmail`, `name.givenName`, `name.familyName`, `password` and `changePasswordAtNextLogin`. It answers with the user, with a new `id`. An email that exists gets `409` with reason `duplicate`; an email outside the customer's domain gets `400` with reason `invalid`.
+- `PUT /admin/directory/v1/users/{userKey}` with `{ "suspended": true }` or `false` suspends or restores a user and answers with the user. An unknown user gets `404` with reason `notFound`.
+- A token without the scope gets `403` with reason `insufficientPermissions`, as for the reads.
+- A created user shows in `users.list` at once.
+
+```json
+{
+  "kind": "admin#directory#user",
+  "id": "118204455667788990011",
+  "primaryEmail": "broccoli@acme.example",
+  "name": { "givenName": "Broccoli", "familyName": "Access", "fullName": "Broccoli Access" },
+  "isAdmin": false,
+  "suspended": false,
+  "changePasswordAtNextLogin": false,
+  "orgUnitPath": "/",
+  "customerId": "C03acme01",
+  "creationTime": "2026-12-10T09:00:00.000Z"
+}
+```
+
+### Fake Google: asking for the write permission
+
+- Authorization accepts `include_granted_scopes=true`, as Google does: the token it gives then holds the scopes granted before plus the new one. The consent page lists only the new permission, "See, create and change users in your organisation".
+- Cancel redirects with `error=access_denied`, and the stored connection keeps its old scopes.
+- `POST /_fake/consent/refuse-scope` with a scope: the next consent grants every scope asked for but that one, as when an admin unticks it.
+
+### Fake Google: control endpoints added
+
+- `GET /_fake/state` also counts created users, and lists the users created since the last reset with `primaryEmail`, `suspended` and `changePasswordAtNextLogin`. It never returns a password.
+- `POST /_fake/users/{email}/delete`: the user is gone from the directory, as when an admin deletes them in Google.
+- `POST /_fake/failures` takes the two write endpoints too.
+
+### Fake connectors container: what is added
+
+- **Manifest:**
+  - `slack` and `linear` list `remove`;
+  - `slack` lists `sign_in`;
+  - both list `roles`: Slack `member` (default) and `admin`; Linear `user` (default), `admin` and `guest`.
+- **Remove:** the member leaves the workspace. Removing a member who is gone succeeds with `changed: false`. The connection's own member answers `not_allowed`.
+- **Invite with a role:** the invitation keeps the role, and the member it becomes has it. `GET /_fake/state` shows each invitation's and member's role.
+- **`integration-user/setup`:** answers with a fixed two-step secret for an email and password the fake Google created; any other email or password answers `authentication_failed`. Repeating it with the secret answers the same secret.
+- **`connections/sign-in` for `slack`:**
+  - the integration user must have a pending invitation or be a member in Acme's Slack; otherwise `not_invited`;
+  - a pending invitation is accepted: the integration user becomes an active member with the role it was invited with;
+  - a member who is not an admin answers `permission_missing`;
+  - otherwise it answers with Acme's settings and a session the fake issued for the integration user. The fake keeps a session's member, so `isConnectionUser` is true for the integration user in `accounts/list`;
+  - a wrong password or two-step secret answers `authentication_failed`.
+- **Changes** run as the member the session belongs to. `GET /_fake/state` lists the last changes of each workspace with the member who made them, so a test can see that a change ran as the integration user.
+
+### Fake connectors container: control endpoints added
+
+- `POST /_fake/{connector}/members/{email}/remove`: the member is removed in the app itself.
+- `POST /_fake/{connector}/members/{email}/role` with `role`: an admin changed the role in the app.
+- `POST /_fake/slack/sessions/expire` still expires every Slack session. A session of the integration user is then made again by `connections/sign-in`.
+- `POST /_fake/failures` takes the calls `integration-user/setup` and `connections/sign-in` too, with any contract error, such as `blocked_by_check`.
+
+### Seed: what is added
+
+- **Fake Google:** nothing. The integration user and added people are created by the journeys.
+- **Slack:** two accounts without a person, both active: `ana.ruiz@gmail.example`, named "Ana Ruiz", and `sam@agency.example`, named "Sam Lee". One more without a person, `reports@acme.example`, named "Reports bot". Slack's member count grows from 41 to 44.
+- **Linear:** one account without a person, active: `deploys@acme.example`, named "Deploy bot".
+- **An app without a connection that people have:** Notion, from the fake Google's grants, for the by-hand journeys.
+
+### Which tasks use what
+
+- **Remove:** the remove action, its failures and the member remove control.
+- **Accounts without a person:** the four seeded accounts.
+- **Create the integration user:** the user create, the write permission consent, and `integration-user/setup` with its failures.
+- **Connect Slack with the integration user, and renewing:** an invitation for the integration user (the invitations control), `connections/sign-in`, the session expiry and failures.
+- **Templates and Provision:** roles on invites, the invitation accept control.
+- **Add a person and Offboard:** the user create and suspend, with their failures.
 
 ## Left to the builder
 

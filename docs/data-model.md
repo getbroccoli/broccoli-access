@@ -674,7 +674,224 @@ A pending invitation in a connected app, as the connection's last scan read it. 
 - **Couldn't invite:** the latest invite for that connection and email `failed`. The row shows why, with Try again and "I did it by hand", as for "Couldn't change".
 - **Activity:** lists invites next to Disable and Enable, as Invite.
 
+## Circles 3 and 4 (proposed)
+
+Proposed on 2026-11-24 and not approved yet. Nothing here is built. Each part is checked again when its circle starts. It builds on the invites data model above.
+
+The [connector contract](connector-contract.md) changes with `remove`, `roles` and server sign-in. Each change is designed there when its circle starts.
+
+### Connectors (changed)
+
+- `capabilities` add `remove`.
+- `remove` answers that the member is gone, with no member to read back. Removing a member who is already gone succeeds. The connection's own member cannot be removed.
+- `roles` (circle 3, part 2): the roles the app has, each `{ "key", "name", "isDefault" }`, with exactly one default. `invite` takes an optional role key, and the core sends one only to a connector that lists `roles`.
+- Google Workspace lists `invite` (circle 3, part 3), which creates the directory account, and `suspend` and `reactivate` (circle 3, part 3), which offboarding uses. It asks for the scope `admin.directory.user` when first used.
+- A connector's method (official API, internal API, robot) is its own business. The core never stores it.
+- `capabilities` add `sign_in`: the container can sign in to the app as the integration user (see the [connector contract](connector-contract.md#post-v1connectionssign-in)).
+- Errors add `not_invited`, from signing in only: the integration user has no invitation and no account in the app.
+
+### integration_user (new, circle 3, part 1)
+
+The one Google Workspace user that broccoli-access creates for itself and connectors act as. One row at most, like `instance`.
+
+- `email`: the address the owner picked, in the directory's domain.
+- `google_user_id`: the directory's id for it. The sync knows the integration user by this id, never by its email.
+- `encrypted_secrets`: its password and its two-step secret (`totpSecret`), which broccoli-access makes and the owner never sees.
+- `created_by`, `created_at`.
+- broccoli-access sets up its two-step sign-in in Google itself, in the server's browser. Nobody else signs in as it.
+- Its directory account creates no employee. Its account in any other app has the kind `service`, set by the sync.
+
+```json
+{
+  "id": true,
+  "email": "broccoli@acme.example",
+  "google_user_id": "118204455667788990011",
+  "encrypted_secrets": "v1:…",
+  "created_by": "usr_admin",
+  "created_at": "2026-12-10T09:00:00Z"
+}
+```
+
+### app_connections (changed)
+
+- Circle 3, part 1: `session_from` (new): `extension` or `server_sign_in`, set exactly for a connection with an app session. `extension` is the owner's own session, handed over. `server_sign_in` is the integration user's: broccoli-access renews it by signing in again, and Reconnect shows only when that fails.
+- Google Workspace: `grantedScopes` grows when the owner grants write access. Creating the integration user and creating a person's account both need `admin.directory.user`.
+
+### app_accounts (changed, circle 3, part 1)
+
+- `kind` (new):
+  - `personal`: a person's own account. The default.
+  - `service`: used by software, such as a bot or the integration user.
+  - `external`: someone outside the company, such as a contractor or a client's guest.
+- `note` (new): the owner's words on what a `service` or `external` account is for. Null for `personal`.
+- `employee_linked_by` (new): `email`, `owner`, or null when `employee_id` is null. With `owner`, the owner linked the account to an employee whose email differs, and the sync keeps `employee_id`. A `service` or `external` account has no employee.
+- `found_via` adds `said_by_owner` (circle 3, part 2): the owner created the account by hand in an app without a connection and said so. The sync keeps an account that has it.
+- A remove that succeeds, or one done by hand, deletes the connection's import record for the member and syncs the account at once, so no later sync brings it back. The account is deleted unless another source still sees it; then it stays as "Not in <App>". Its history stays.
+
+```json
+[
+  {
+    "id": "acc_ana_private_slack",
+    "app_id": "app_slack",
+    "email": "ana.ruiz@gmail.example",
+    "employee_id": "emp_ana",
+    "employee_linked_by": "owner",
+    "kind": "personal",
+    "note": null,
+    "status": "active",
+    "found_via": ["slack_members"]
+  },
+  {
+    "id": "acc_agency_slack",
+    "app_id": "app_slack",
+    "email": "sam@agency.example",
+    "employee_id": null,
+    "employee_linked_by": null,
+    "kind": "external",
+    "note": "Design agency, until March",
+    "status": "active",
+    "found_via": ["slack_members"]
+  }
+]
+```
+
+### account_changes (changed)
+
+- `action` adds `remove` (circle 3, part 1). `succeeded` for a remove: the connector read the members again and the account was gone.
+- `started_from` (new, circle 3, part 2): `account`, `provision` or, from circle 3, part 3, `offboarding`: where the owner's click was. Activity shows it.
+- `connection_id` may be null (circle 3, part 2): a change for an app without a connection. It fails at once with `no_connection`, and the owner makes it by hand.
+- `employee_id` (new, circle 3, part 2): the person a provision or an offboarding is for. Null when `started_from` is `account`.
+- `role` (new, circle 3, part 2): the role key an invite asked for. Null for the app's default.
+- An invite on the Google Workspace connection (circle 3, part 3) creates the directory account, with the names from the employee.
+- `encrypted_first_password` (new, circle 3, part 3): the first password of a directory account broccoli-access created. The person must change it at their first sign-in. It is cleared when the owner has seen it once, or after 7 days. It is never in history or logs.
+- **One at a time:** a change without a connection is one `running` at most per app and email.
+- **Provision** writes an `invite` where the person has no account, and a `reactivate` where their account is suspended. The other apps wait until the directory account's invite has succeeded.
+- **Offboarding** (circle 3, part 3) writes a `suspend` for every active account, the directory account included, and clears the person's templates and app choices. A pending invitation, and an account in an app without a connection, show as work to do by hand.
+
+The examples leave out the columns that do not change.
+
+```json
+[
+  {
+    "id": "chg_ivan_figma_invite",
+    "app_account_id": null,
+    "app_id": "app_figma",
+    "email": "ivan@acme.example",
+    "connection_id": "con_figma",
+    "action": "invite",
+    "role": "viewer",
+    "started_from": "provision",
+    "employee_id": "emp_ivan",
+    "status": "succeeded"
+  },
+  {
+    "id": "chg_ana_slack_remove",
+    "app_account_id": null,
+    "app_id": "app_slack",
+    "email": "ana@acme.example",
+    "connection_id": "con_slack",
+    "action": "remove",
+    "role": null,
+    "started_from": "offboarding",
+    "employee_id": "emp_ana",
+    "status": "succeeded"
+  }
+]
+```
+
+### employees (changed, circle 3, part 3)
+
+- An employee is also a person the owner added with "Add person", before their directory account exists. The row holds the names and the work email. Provision creates the directory account, and the next scan matches it by email.
+- A person the owner added who never got a directory account can be deleted.
+
+### templates (new, circle 3, part 2)
+
+A named list of apps, each with a role.
+
+- `name`: unique.
+- `created_at`.
+
+### template_apps (new, circle 3, part 2)
+
+One app in one template.
+
+- `template_id`, `app_id`: unique together.
+- `role`: a role key of the app's connector. Null for the app's default, and for an app without a connection.
+
+```json
+[
+  { "id": "tpl_engineer", "name": "Engineer", "created_at": "2027-01-12T10:00:00Z" },
+  {
+    "id": "tpa_engineer_slack",
+    "template_id": "tpl_engineer",
+    "app_id": "app_slack",
+    "role": null
+  },
+  {
+    "id": "tpa_engineer_figma",
+    "template_id": "tpl_engineer",
+    "app_id": "app_figma",
+    "role": "viewer"
+  }
+]
+```
+
+### employee_templates (new, circle 3, part 2)
+
+A template assigned to a person.
+
+- `employee_id`, `template_id`: unique together.
+- `assigned_by`, `assigned_at`.
+- Offboarding deletes a person's rows.
+
+### employee_app_choices (new, circle 3, part 2)
+
+What the owner changed for one person, apart from their templates.
+
+- `employee_id`, `app_id`: unique together.
+- `choice`:
+  - `to_review`: the app stopped being one of the person's apps while they hold an active account in it: a template was taken off them, or the app was taken out of a template, or the template was deleted. The row is written at that moment and stays until the owner keeps the account, which turns it to `added`, or the account is no longer active;
+  - `added`: the person gets the app though no template of theirs lists it;
+  - `removed`: the person does not get the app though a template of theirs lists it;
+  - `role_picked`: two of the person's templates give the app different roles, and the owner picked one.
+- `role`: for `added` and `role_picked`. Null for `removed` and `to_review`.
+- Deleting a template deletes its apps and its assignments. Deleting a person the owner added deletes their assignments and choices.
+
+Ivan's two `employee_templates` rows, then his one `employee_app_choices` row:
+
+```json
+[
+  {
+    "employee_id": "emp_ivan",
+    "template_id": "tpl_everyone",
+    "assigned_by": "usr_admin",
+    "assigned_at": "2027-01-12T10:05:00Z"
+  },
+  {
+    "employee_id": "emp_ivan",
+    "template_id": "tpl_engineer",
+    "assigned_by": "usr_admin",
+    "assigned_at": "2027-01-12T10:05:00Z"
+  },
+  { "employee_id": "emp_ivan", "app_id": "app_notion", "choice": "removed", "role": null }
+]
+```
+
+### record_history (changed)
+
+- Record types add `template` (circle 3, part 2). Assigning a template and a person's app choices are history lines on the employee.
+- New cause `removed_in_app` (circle 3, part 1): a remove succeeded. The ref is the account change.
+
 ## Computed when read
+
+- **Acts as the integration user** (proposed, circle 3, part 1): a connection whose own member (`isConnectionUser`) has the integration user's email. Remove, like Disable, is never offered on a connection's own member. Any other connection with an app session shows "Uses your own session", with the suggestion to switch.
+- **Accounts without a person** (proposed, circle 3, part 1): the accounts of an approved app with no employee and the kind `personal`. A link is suggested when the email's first part or the name is close to one employee's; nothing is stored until the owner confirms.
+- **A person's apps** (proposed, circle 3, part 2): the apps of their templates, plus their `added` choices, minus their `removed` ones. An app's role comes from the one template that lists it, or from the person's `role_picked` or `added` choice. Two templates with different roles and no choice is a role conflict, which the owner settles before Provision.
+- **Differences** (proposed, circle 3, part 2):
+  - **Missing:** one of the person's apps where they have no active account and no pending invitation. A suspended account is missing too, and Provision enables it.
+  - **Extra:** an active account that has a `to_review` choice, or one in an app that some template lists but that is not one of the person's apps, for a person with at least one template.
+
+  An account in an app no template lists is never a difference, so the accounts from before templates stay quiet.
 
 - **An employee's status**: the status of their account in the directory app. The UI shows "Suspended in Google", using the directory app's name.
 - **Suspended with access**: an employee suspended in the directory with at least one `active` account in another `approved` app. Their number is the Users badge and the "Suspended with access" tab.
@@ -704,14 +921,13 @@ Each list is a group of Broccoli tables. The ones marked "later" come back when 
 
 These are planned, not built yet. Each is added to the sections above when its circle starts. Removed Broccoli tables are copied back from Broccoli.
 
-- Employees whose directory account disappears, for "Terminated users with access".
+- Employees whose directory account disappears, for "Terminated users with access". It must tell them from a person the owner added who has no directory account yet.
 - CSV upload: `import_sources.kind` `file`, one source per app, with `file_id` and the app's id.
 - Apps added by hand: no catalog key and no external ids.
 - Robots and the owner's-browser runtime: `screenshot_file_id` on account changes, kept in `files`, and the one-time owner-browser addresses, held in memory.
 - More apps from the connectors container (Notion, Figma, Claude, Codex): one connector key each, with an `app_connections` row and a source, and no table change.
 - "Use the Broccoli app": `googleApp` `broccoli_google_app` in the Google Workspace settings.
 - Last used: `app_accounts.last_used_at`, from the source's log.
-- Requests, approvals and removal of access: processes, process runs and tasks on app accounts.
+- Requests and approvals of access: processes, process runs and tasks on app accounts.
 - App owners: `apps.owner_employee_id`, invited with invites and permission profiles.
-- Matching accounts that match nobody to employees: `import_choices`.
 - Your agent: the agent connection over MCP with agent activity.

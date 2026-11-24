@@ -31,12 +31,27 @@ The words Broccoli Access's code and docs use, and what each one means. Only Bro
 - **Connectors container**: the container image, built from a separate repository, that holds the connectors for every app except Google Workspace. The core calls it through the connector contract. It keeps no state: each call carries the connection, and the core saves what comes back.
 - **Robot**: a connector that works an app's admin pages in a browser, for an app without an API on the company's plan.
 - **Runtime**: where a connector's call runs: `server`, the connectors container by itself, or `owner_browser`, the owner's Chrome through the extension. Not the Node.js runtime.
-- **App session**: the owner's signed-in session in an app, handed over by the extension and used by a connector. Not a session, which is a browser signed in to Broccoli Access.
+- **App session**: a signed-in session in an app, the integration user's or the owner's own, used by a connector. It is handed over by the extension or made by server sign-in. Not a session, which is a browser signed in to Broccoli Access.
 - **Extension**: the Broccoli Access extension for Chrome. It hands over app sessions.
 - **Disable, Enable**: the UI words for suspending an app account and making it active again (`suspend` and `reactivate` in code). A suspended account shows as "Disabled".
 - **Invite**: the UI word for asking a connected app to send its own invitation to an employee who has no account in it (`invite` in code).
 - **Invited**: an employee with no account in a connected app whose latest invite there succeeded or was done by hand, until a scan finds their account; the row shows "Invited on <date>".
-- **Account change**: one Disable, Enable or Invite, from the owner's click to its result (`account_changes`).
+- **Account change**: one Invite, Disable, Enable or Remove, from the owner's click to its result (`account_changes`).
 - **Done by hand**: a failed account change that the owner made in the app themselves, then confirmed with "I did it by hand".
 - **Activity**: the page listing every account change, newest first. Not History, which belongs to one record.
+- **Integration user**: the Google Workspace user that Broccoli Access creates for itself, which the owner makes an admin in each app and connectors act as. Not "robot", which is a connector, nor "service account", which is an app account.
+- **Connector method**: how a connector reaches its app: the official API, the internal API, or a robot. The connector picks; the owner does not.
+- **Internal API**: the calls an app's own pages make, used with an app session.
+- **Handed over**: the owner's own app session, which they signed in to in Chrome and the extension sent to the instance.
+- **Server sign-in**: Broccoli Access signing in to an app as the integration user by itself, in a browser on the server, with "Sign in with Google" or the code the app sends to its mailbox.
+- **Remove**: the UI word for deleting an app account, to free its seat (`remove` in code). It cannot be undone. Not "delete".
+- **Account without a person**: an app account linked to no employee, and not marked as a service or external account.
+- **Service account**: an app account that software uses, such as a bot or the integration user.
+- **External account**: an app account of someone outside the company, such as a contractor. It has a note and no person page.
+- **Template**: a named list of apps, each with a role, that the owner assigns to people. Not "policy", which sounds like a rule that runs by itself.
+- **Provision**: invite a person to every app they are missing, in one step.
+- **Difference**: where a person's accounts do not match their templates: **missing**, an app they should have, or **extra**, an account no template of theirs gives. Broccoli Access lists differences and never fixes one by itself.
+- **Offboard**: disable every account of a person in one step and take their templates off.
+- **Connector factory**: a private repository where agents investigate an app, explore a test workspace of it, and check its connector against the real app every week.
+- **Parked**: an app in the connector factory that waits for a person, for a payment, a CAPTCHA or a phone check.
 - **Mail choice**: how the instance sends email: the owner's SMTP server, their Resend key, or no email. Saved on the instance in Settings.
