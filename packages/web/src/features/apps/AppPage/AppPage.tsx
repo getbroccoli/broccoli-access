@@ -44,7 +44,7 @@ export function AppPage() {
       {/* Connecting changes what only the server computes: the status, connection and users. */}
       <AppHeader app={app} onConnected={() => void refetch()} />
       <div className="grid gap-4 sm:grid-cols-2">
-        <CountCard label={t("apps.page.users")} count={app.peopleCount} />
+        <CountCard label={t("nav.people")} count={app.peopleCount} />
         <CountCard
           label={t("apps.page.suspendedWithAccess")}
           count={app.suspendedWithAccessCount}
@@ -53,7 +53,7 @@ export function AppPage() {
       </div>
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 className="text-lg font-semibold tracking-tight">{t("apps.page.users")}</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{t("apps.page.accounts")}</h2>
           {app.canChangeAccounts && workspace && (
             <p className="text-sm text-muted-foreground">
               {t("apps.page.changesActIn", { workspace })}

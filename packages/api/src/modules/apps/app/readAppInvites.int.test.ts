@@ -1,4 +1,5 @@
 import {
+  accountLinks,
   appUsers,
   expect,
   failLinearCall,
@@ -23,6 +24,30 @@ test("offers Ivan an Invite in Linear and no row in Google Workspace", async ({ 
       latestInvite: null,
     },
   ]);
+});
+
+test("refuses an Invite once the owner links Ivan to a scanned Linear member under another email", async ({
+  orm,
+  seed,
+  workspace: { service, owner, input, ivan, linear },
+}) => {
+  await seed.appAccount({
+    appId: linear.appId,
+    employeeId: ivan.id,
+    email: ivan.email,
+    foundVia: ["google_sign_in"],
+  });
+  expect(await service.readAppInvites(owner, [ivan.id])).toMatchObject([
+    { ...input, offered: true },
+  ]);
+
+  await accountLinks(orm).linkAccount(owner, {
+    appAccountId: linear.account("deploys@acme.example").id,
+    employeeId: ivan.id,
+  });
+
+  expect.soft(await service.readAppInvites(owner, [ivan.id])).toEqual([]);
+  await expect(service.inviteEmployee(owner, input)).rejects.toMatchObject({ code: "CONFLICT" });
 });
 
 test("keeps Ivan Invited until a scan finds his Linear member, then shows his account", async ({

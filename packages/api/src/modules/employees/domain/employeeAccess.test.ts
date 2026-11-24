@@ -39,7 +39,7 @@ it("gives no access for discovered or ignored apps", () => {
   const access = accessOfEmployees([
     directory,
     { ...slack, appStatus: "discovered" },
-    { ...slack, appName: "Notion", catalogKey: "notion", appStatus: "ignored" },
+    { ...slack, appId: "notion", appName: "Notion", catalogKey: "notion", appStatus: "ignored" },
   ]);
 
   expect(access.get("ana")).toEqual({
@@ -63,12 +63,25 @@ it("excludes the directory from approved apps and access", () => {
   );
 });
 
+it("keeps access known before a date when a second account first appears on that date", () => {
+  const exact = { ...slack, since: { at: slack.since.at, before: false } };
+
+  for (const accounts of [
+    [exact, slack],
+    [slack, exact],
+  ]) {
+    expect(accessOfEmployees(accounts).get("ana")?.currentAccess).toMatchObject([
+      { since: { at: slack.since.at, before: true } },
+    ]);
+  }
+});
+
 it("sorts current access by app name", () => {
   const access = accessOfEmployees([
     directory,
     slack,
-    { ...slack, appName: "Notion", catalogKey: "notion" },
-    { ...slack, appName: "Figma", catalogKey: "figma" },
+    { ...slack, appId: "notion", appName: "Notion", catalogKey: "notion" },
+    { ...slack, appId: "figma", appName: "Figma", catalogKey: "figma" },
   ]);
 
   expect(access.get("ana")?.currentAccess).toEqual([
@@ -103,6 +116,7 @@ it("does not mark an active employee with approved apps as suspended with access
 });
 
 const directory: EmployeeAccount = {
+  appId: "directory",
   employeeId: "ana",
   appName: "Google Workspace",
   catalogKey: "google_workspace",
@@ -114,6 +128,7 @@ const directory: EmployeeAccount = {
 };
 
 const slack: EmployeeAccount = {
+  appId: "slack",
   employeeId: "ana",
   appName: "Slack",
   catalogKey: "slack",

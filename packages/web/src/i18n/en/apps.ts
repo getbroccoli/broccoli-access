@@ -8,7 +8,6 @@ export const appsEn = {
   "apps.tab.ignored": "Ignored",
   "apps.column.app": "App",
   "apps.column.people": "People",
-  "apps.column.users": "Users",
   "apps.column.suspendedInGoogle": "Suspended in Google",
   "apps.column.foundVia": "Found via",
   "apps.column.since": "Since",
@@ -37,7 +36,8 @@ export const appsEn = {
   "apps.empty": "No apps here.",
   "apps.loadFailed": "Couldn’t load the apps.",
   "apps.retry": "Retry",
-  "apps.page.users": "Users",
+  "apps.page.accounts": "App accounts",
+  "apps.page.account": "App account",
   "apps.page.suspendedWithAccess": "Suspended in Google, still has access",
   "apps.page.column.person": "Person",
   "apps.page.column.status": "Status",
@@ -57,7 +57,7 @@ export const appsEn = {
     "Connect {app} to see every member and disable or enable their accounts from here. Until then, Broccoli Access sees only who signs in to {app} with Google.",
   "apps.page.openAdmin": "Open {app} admin",
   "apps.page.showMore": "Show {count} more",
-  "apps.page.noUsers": "Nobody uses this app yet.",
+  "apps.page.noUsers": "No app accounts linked to people yet.",
   "apps.page.column.actions": "Actions",
   "apps.page.you": "You",
   "apps.page.changesActIn": "Disable and Enable act in the {workspace} workspace.",
@@ -113,9 +113,9 @@ export const appsEn = {
   "apps.change.app": "App",
   "apps.change.workspace": "Workspace",
   "apps.change.disableEffect":
-    "{firstName} can no longer sign in to this workspace. You can enable the account again later.",
+    "This account can no longer sign in to this workspace. You can enable the account again later.",
   "apps.change.enableEffect":
-    "{firstName}’s account in this workspace becomes active again. You can disable it again later.",
+    "This account becomes active in this workspace again. You can disable it again later.",
   "apps.change.inviteEffect":
     "{app} sends {firstName} an invitation to join this workspace as a regular member, unless they already have one or have joined. Their account shows here once {app} is scanned after they join.",
   "apps.change.howItWorks":

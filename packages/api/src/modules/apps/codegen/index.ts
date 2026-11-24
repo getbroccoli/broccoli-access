@@ -2,7 +2,8 @@
 export const codegenMappers = {
   // A mutation namespace holds no data; its field resolves to an empty object.
   AppsMutations: "Record<PropertyKey, never>",
-  App: "../../modules/apps/app#AppSummary as AppModel",
+  App: "../../modules/apps/db#App as AppModel",
+  AccountWithoutPerson: "../../modules/apps/app#AccountWithoutPerson as AccountWithoutPersonModel",
   AppUser: "../../modules/apps/app#AppUser as AppUserModel",
   AppInvite: "../../modules/apps/app#AppInvite as AppInviteModel",
   AccountChange: "../../modules/apps/app#LatestAccountChange as AccountChangeModel",

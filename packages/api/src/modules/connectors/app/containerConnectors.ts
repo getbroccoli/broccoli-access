@@ -268,6 +268,7 @@ function importedAccount(
     sourceKey,
     raw,
     values: {
+      displayName: values.displayName,
       email: values.email,
       status: values.status,
       firstName: null,

@@ -91,6 +91,11 @@ export interface AppService {
   directoryAppId: (db: Orm | Tx) => Promise<string | null>;
   /** The employees whose account in the directory's app is suspended. Trusted read: no `ctx`. */
   findEmployeesSuspendedInDirectory: (db: Orm | Tx) => Promise<string[]>;
+  /** The employee ids attached to the selected app accounts. Trusted read. */
+  findAccountOwners: (
+    db: Orm | Tx,
+    ids: readonly string[],
+  ) => Promise<{ id: string; employeeId: string | null }[]>;
   /**
    * Every account that belongs to an employee and is in its app, with its app's name and status,
    * whether the app is the directory's, how it was found and since when. Trusted read: no `ctx`.
@@ -169,11 +174,7 @@ export function createAppService(dependencies: AppDependencies): AppService {
       ctx.require("MANAGE_WORKSPACE");
       const id = parseUuid(appId);
       const app = id && (await appRepository(orm).findById(id));
-      if (!app) {
-        return null;
-      }
-      const [summary] = await summarize(dependencies, [app]);
-      return summary!;
+      return app ? (await summarize(dependencies, [app]))[0]! : null;
     },
     async readApps(ctx, appIds) {
       ctx.require("MANAGE_WORKSPACE");
@@ -198,16 +199,16 @@ export function createAppService(dependencies: AppDependencies): AppService {
     directoryAppId: (db) => findDirectoryAppId(db, connectors),
     findEmployeesSuspendedInDirectory: (db) =>
       findEmployeesInDirectory(db, connectors, { status: "suspended" }),
+    findAccountOwners: (db, ids) => appAccountRepository(db).findByIds(ids),
     async findEmployeeAccounts(db, employeeIds, appIds) {
       const inAppFacts = await findInAppFacts(db, dependencies);
       const [accounts, directoryAppId] = await Promise.all([
         appAccountRepository(db).findEmployeeAccounts(inAppFacts, employeeIds, appIds),
         findDirectoryAppId(db, connectors),
       ]);
-      return accounts.map(({ appId, grantedAt, grantedBefore, firstSeenAt, ...account }) => ({
+      return accounts.map(({ grantedAt, grantedBefore, firstSeenAt, ...account }) => ({
         ...account,
-        appId,
-        inDirectory: appId === directoryAppId,
+        inDirectory: account.appId === directoryAppId,
         since: accountSince({ grantedAt, grantedBefore, firstSeenAt }),
       }));
     },
@@ -305,12 +306,13 @@ async function summarize(
   const suspendedInDirectory = new Set(suspended);
   return apps.map((app) => {
     const appUsers = usersByApp.get(app.id) ?? [];
+    const peopleCount = new Set(appUsers.map(({ employeeId }) => employeeId)).size;
     return {
       ...app,
-      peopleCount: appUsers.length,
+      peopleCount,
       foundVia: [...new Set(appUsers.flatMap(({ foundVia }) => foundVia))].sort(),
       since: appSince(appUsers),
-      preselected: isPreselected(appUsers.length, directoryPeople),
+      preselected: isPreselected(peopleCount, directoryPeople),
       suspendedWithAccessCount: countSuspendedWithAccess(appUsers, suspendedInDirectory),
       connected: connectedAppIds.has(app.id),
     };

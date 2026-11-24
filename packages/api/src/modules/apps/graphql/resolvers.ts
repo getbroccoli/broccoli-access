@@ -7,10 +7,13 @@ import {
   type Resolvers,
   type RequestLoader,
   type ResolversTypes,
+  type GraphqlContext,
   toEnum,
 } from "../../../core/graphql";
 import type { SecurityContext } from "../../../core/security";
 import type {
+  AccountWithoutPerson,
+  AccountLinkService,
   AccountChangeService,
   AccountChangeState,
   ConnectionState,
@@ -22,32 +25,45 @@ import type {
 } from "../app";
 import type { AccountChange } from "../domain";
 
+type AppResolverServices = Pick<
+  AppService & AppUserService & AccountChangeService & AccountLinkService,
+  | "linkAccount"
+  | "listAccountsWithoutPerson"
+  | "countAccountsWithoutPerson"
+  | "listApps"
+  | "readApp"
+  | "readApps"
+  | "readUsersOfApps"
+  | "countApps"
+  | "approveApp"
+  | "ignoreApp"
+  | "finishSetup"
+  | "changeAccount"
+  | "readChangeStates"
+  | "findAppsWithChangeableAccounts"
+  | "readConnectionStates"
+  | "listAccountChanges"
+  | "readRequesterNames"
+  | "markChangeDoneByHand"
+  | "inviteEmployee"
+>;
+
 export function createResolvers(
-  services: Pick<
-    AppService & AppUserService & AccountChangeService,
-    | "listApps"
-    | "readApp"
-    | "readApps"
-    | "readUsersOfApps"
-    | "countApps"
-    | "approveApp"
-    | "ignoreApp"
-    | "finishSetup"
-    | "changeAccount"
-    | "readChangeStates"
-    | "findAppsWithChangeableAccounts"
-    | "readConnectionStates"
-    | "listAccountChanges"
-    | "readRequesterNames"
-    | "markChangeDoneByHand"
-    | "inviteEmployee"
-  >,
+  services: AppResolverServices,
   people: RequestLoader<{ appAccounts: AppUser[]; appInvites: AppInvite[] }>,
 ): Resolvers {
   const loaders = createLoaders(services);
-
+  const summary = (app: AccountWithoutPerson["app"] | AppSummary, context: GraphqlContext) =>
+    "peopleCount" in app ? app : loaders.appsById(context).load(app.id);
   return {
     Query: {
+      accountsWithoutPerson: (_parent, { first, after }, context) =>
+        services.listAccountsWithoutPerson(context.getActor(), {
+          first: first ?? undefined,
+          after,
+        }),
+      accountsWithoutPersonCount: (_parent, _args, context) =>
+        services.countAccountsWithoutPerson(context.getActor()),
       app: (_parent, { id }, context) => services.readApp(context.getActor(), id),
       apps: (_parent, { status, first, after }, context) =>
         services.listApps(context.getActor(), {
@@ -63,6 +79,9 @@ export function createResolvers(
       apps: () => ({}),
     },
     AppsMutations: appsMutations(services, loaders),
+    AccountWithoutPerson: {
+      app: (account) => account.app,
+    },
     AppUser: {
       status: ({ status }) => toEnum(status),
       app: (user, _args, context) => loaders.appsById(context).load(user.appId),
@@ -114,7 +133,23 @@ export function createResolvers(
       failure: ({ error }) => error && toEnum(error),
     },
     App: {
+      peopleCount: async (app, _args, context) => (await summary(app, context)).peopleCount,
+      foundVia: async (app, _args, context) => (await summary(app, context)).foundVia,
+      since: async (app, _args, context) => (await summary(app, context)).since,
+      preselected: async (app, _args, context) => (await summary(app, context)).preselected,
+      suspendedWithAccessCount: async (app, _args, context) =>
+        (await summary(app, context)).suspendedWithAccessCount,
+      connected: async (app, _args, context) => (await summary(app, context)).connected,
       status: ({ status }) => toEnum(status),
+      peoplePreview: async (app, { first }, context) => {
+        if (first < 1) throw invalidInput([{ field: "first", code: "out_of_range" }]);
+        const accounts = await loaders.usersOfApps(context).load(app.id);
+        const people = Map.groupBy(
+          accounts.filter(({ inApp }) => inApp !== false),
+          ({ employeeId }) => employeeId,
+        );
+        return [...people.values()].slice(0, first).map((owned) => owned[0]!);
+      },
       users: async (app, { first }, context) => {
         if (first != null && first < 1) {
           throw invalidInput([{ field: "first", code: "out_of_range" }]);
@@ -134,10 +169,15 @@ export function createResolvers(
 
 /** The module's mutations: approving and ignoring apps, finishing setup, and account changes. */
 function appsMutations(
-  services: Parameters<typeof createResolvers>[0],
+  services: AppResolverServices,
   loaders: ReturnType<typeof createLoaders>,
 ): Resolvers["AppsMutations"] {
   return {
+    linkAccount: (_parent, { input }, context) =>
+      mutationPayload<ResolversTypes["AppAccountLinkPayload"]>(
+        async () => ({ appUser: await services.linkAccount(context.getActor(), input) }),
+        ["NOT_FOUND", "CONFLICT"],
+      ),
     approve: (_parent, { input }, context) =>
       mutationPayload<ResolversTypes["AppApprovePayload"]>(
         async () => ({ app: await services.approveApp(context.getActor(), input.id) }),
@@ -190,7 +230,7 @@ const ACTIONS = { SUSPEND: "suspend", REACTIVATE: "reactivate", INVITE: "invite"
 
 /** The change's account as its app's users list it; null for an invite, or once it belongs to no employee. */
 async function appUserOf(
-  services: Parameters<typeof createResolvers>[0],
+  services: AppResolverServices,
   ctx: SecurityContext,
   change: AccountChange,
 ): Promise<AppUser | null> {
@@ -202,7 +242,7 @@ async function appUserOf(
 }
 
 /** The request-scoped batches the fields read through, so a list costs one query per kind. */
-function createLoaders(services: Parameters<typeof createResolvers>[0]) {
+function createLoaders(services: AppResolverServices) {
   const changes = createChangeLoaders(services);
   return {
     usersOfApps: perRequest(
@@ -229,7 +269,7 @@ function createLoaders(services: Parameters<typeof createResolvers>[0]) {
 }
 
 /** The batches of Disable and Enable: the accounts' states, who asked, and the apps that offer them. */
-function createChangeLoaders(services: Parameters<typeof createResolvers>[0]) {
+function createChangeLoaders(services: AppResolverServices) {
   return {
     changeStates: perRequest(
       (context) =>

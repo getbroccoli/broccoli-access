@@ -12,6 +12,8 @@ export {
   type AppAccountRepository,
   type AppUserAccount,
   type EmployeeAppAccount,
+  type UnlinkedAccount,
+  UNLINKED_SORT_VALUES,
 } from "./appAccountRepository";
 export { accountChanges } from "./accountChangesTable";
 export { ACCOUNT_CHANGE_SORT_VALUES, accountChangeRepository } from "./accountChangeRepository";

@@ -113,6 +113,7 @@ test("maps all 42 Google directory users to their own app's accounts", async ({
     expect(account).toMatchObject({
       values: {
         email: person.email,
+        displayName: null,
         status: person.suspended ? "suspended" : "active",
         firstName: person.givenName,
         lastName: person.familyName,
@@ -162,6 +163,7 @@ test("maps every grant except the instance's own client to an app account", asyn
     },
     values: {
       email: "ana@acme.example",
+      displayName: null,
       status: "active",
       firstName: null,
       lastName: null,

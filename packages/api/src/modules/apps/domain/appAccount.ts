@@ -8,6 +8,9 @@ export interface AppAccount {
   /** Lowercased. */
   email: string;
   employeeId: string | null;
+  employeeLinkedBy: "email" | "owner" | null;
+  kind: "personal" | "service" | "external";
+  note: string | null;
   status: AccountStatus;
   /** The finding kinds whose last scan saw the account, such as `google_directory`. */
   foundVia: string[];
@@ -80,7 +83,7 @@ export function planAccountSync(
   for (const account of foundOnce(found)) {
     const before = knownByKey.get(accountKey(account));
     if (!before) {
-      plan.created.push({ ...account, foundVia: [findingKind], firstSeenAt: now });
+      plan.created.push(firstSeen(account, findingKind, now));
       continue;
     }
     plan.updated.push({
@@ -135,10 +138,14 @@ export function countSuspendedWithAccess(
   users: readonly Pick<AppAccount, "employeeId" | "status">[],
   suspendedInDirectory: ReadonlySet<string>,
 ): number {
-  return users.filter(
-    ({ employeeId, status }) =>
-      status === "active" && employeeId !== null && suspendedInDirectory.has(employeeId),
-  ).length;
+  return new Set(
+    users
+      .filter(
+        ({ employeeId, status }) =>
+          status === "active" && employeeId !== null && suspendedInDirectory.has(employeeId),
+      )
+      .map(({ employeeId }) => employeeId),
+  ).size;
 }
 
 /** The fields whose changes history keeps, in the order a history line lists them. */
@@ -150,6 +157,17 @@ const HISTORY_FIELDS = [
   "grantedAt",
   "grantedBefore",
 ] as const;
+
+function firstSeen(account: FoundAccount, findingKind: string, now: Date): Omit<AppAccount, "id"> {
+  return {
+    ...account,
+    ...emailLink(account.employeeId),
+    kind: "personal",
+    note: null,
+    foundVia: [findingKind],
+    firstSeenAt: now,
+  };
+}
 
 /** A known account as a scan of `findingKind` found it again. */
 function foundAgain(
@@ -166,15 +184,22 @@ function foundAgain(
   },
 ): AppAccount {
   const keepsStatus = statusKeptIn.has(before.appId) || statusKeptFor.has(before.id);
+
   return {
     ...before,
     status: keepsStatus ? before.status : account.status,
-    employeeId: account.employeeId,
+    ...(before.employeeLinkedBy === "owner"
+      ? {}
+      : emailLink(before.kind === "personal" ? account.employeeId : null)),
     foundVia: before.foundVia.includes(findingKind)
       ? before.foundVia
       : [...before.foundVia, findingKind],
     grantedAt: earlierGrant(before.grantedAt, account.grantedAt),
   };
+}
+
+function emailLink(employeeId: string | null) {
+  return { employeeId, employeeLinkedBy: employeeId ? ("email" as const) : null };
 }
 
 /** The found accounts, once each. */
@@ -207,6 +232,7 @@ function earlierGrant(known: Date | null, found: Date | null): Date | null {
   return known && earliest(known, found);
 }
 
+// shortcut: an app email change is a new account; follow renames if sync gains stable member identity.
 function accountKey({ appId, email }: { appId: string; email: string }): string {
   return `${appId} ${email}`;
 }

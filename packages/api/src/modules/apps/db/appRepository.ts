@@ -1,4 +1,4 @@
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, countDistinct, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -133,7 +133,7 @@ export function appRepository(db: Orm | Tx): AppRepository {
 }
 
 /** An app's people: the joined accounts with an employee, which are access. */
-const PEOPLE = count(appAccounts.employeeId);
+const PEOPLE = countDistinct(appAccounts.employeeId);
 
 const LOWERCASE_NAME = sql<string>`lower(${apps.name})`;
 

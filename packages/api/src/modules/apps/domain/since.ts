@@ -1,3 +1,5 @@
+import { isEarlierSince } from "../../../utils";
+
 /** Since when someone has had an account, or an app has had one: a date, or before a date. */
 export interface Since {
   at: Date;
@@ -25,12 +27,7 @@ export function appSince(accounts: readonly AccountDates[]): Since | null {
   return accounts
     .map(accountSince)
     .reduce<Since | null>(
-      (earliest, since) => (earliest && !isEarlier(since, earliest) ? earliest : since),
+      (earliest, since) => (earliest && !isEarlierSince(since, earliest) ? earliest : since),
       null,
     );
-}
-
-function isEarlier(since: Since, other: Since): boolean {
-  const difference = since.at.getTime() - other.at.getTime();
-  return difference < 0 || (difference === 0 && since.before && !other.before);
 }

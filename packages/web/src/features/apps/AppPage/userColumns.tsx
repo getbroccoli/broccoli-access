@@ -30,8 +30,8 @@ const PERSON: DataTableColumn<AppUserRow> = {
   id: "person",
   header: t("apps.page.column.person"),
   className: "w-[38%] min-w-56",
-  cell: ({ employee, isConnectionUser }) => (
-    <PersonCell employee={employee} isConnectionUser={isConnectionUser} />
+  cell: ({ employee, email, isConnectionUser }) => (
+    <PersonCell email={email} employee={employee} isConnectionUser={isConnectionUser} />
   ),
 };
 

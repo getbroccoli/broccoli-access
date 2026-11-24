@@ -1,4 +1,9 @@
 export {
+  type AccountLinkService,
+  type AccountWithoutPerson,
+  createAccountLinkService,
+} from "./accountLinkService";
+export {
   type AccountChangeService,
   type AccountChangeState,
   type ConnectionState,

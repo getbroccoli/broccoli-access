@@ -1,4 +1,5 @@
 fragment AccountChangeCell_appUser on AppUser {
+  email
   id
   status
   isConnectionUser

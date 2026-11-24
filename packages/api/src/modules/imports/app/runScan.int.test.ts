@@ -42,13 +42,14 @@ test("saves all 42 directory people with lowercase emails and their names", asyn
     expect(records.find((record) => record.sourceKey === person.id)).toMatchObject({
       sourceId,
       type: "app_account",
-      typeVersion: 2,
+      typeVersion: 3,
       raw: {
         id: person.id,
         primaryEmail: person.email,
         name: { givenName: person.givenName, familyName: person.familyName },
       },
       values: {
+        displayName: null,
         isConnectionUser: false,
         email: person.email.toLowerCase(),
         firstName: person.givenName,

@@ -26,6 +26,7 @@ import { changeTargetOf, useChangeAccount } from "./useChangeAccount";
 type Props = {
   /** The account for Disable and Enable, or the employee's invite row for Invite. */
   row: Pick<AccountChangeCell_AppUserFragment, "id" | "employee" | "app">;
+  accountEmail?: string;
   action: AccountChangeAction;
 };
 
@@ -33,7 +34,7 @@ type Props = {
  * Disable, Enable or Invite, confirmed in a dialog naming the person, the app and the workspace;
  * the dialog closes on confirm and the row then follows the change.
  */
-export function ConfirmAccountChangeDialog({ row, action }: Props) {
+export function ConfirmAccountChangeDialog({ row, action, accountEmail }: Props) {
   const [open, setOpen] = useState(false);
   const { changeAccount, loading } = useChangeAccount();
   const { employee, app } = row;
@@ -49,13 +50,15 @@ export function ConfirmAccountChangeDialog({ row, action }: Props) {
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger
         render={<Button type="button" variant="outline" size="sm" disabled={loading} />}
-        aria-label={t(copy.label, { name, app: app.name })}
+        aria-label={t(copy.label, { name: accountEmail ?? name, app: app.name })}
       >
         {t(copy.button)}
       </AlertDialogTrigger>
       <AlertDialogContent className="p-6 data-[size=default]:max-w-[calc(100%-2rem)] data-[size=default]:sm:max-w-lg">
         <AlertDialogHeader>
-          <AlertDialogTitle>{t(copy.title, { name, app: app.name })}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {t(copy.title, { name: accountEmail ?? name, app: app.name })}
+          </AlertDialogTitle>
         </AlertDialogHeader>
         <dl className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3 rounded-xl border border-border px-4 py-3 text-sm">
           <dt className="text-muted-foreground">{t("apps.change.person")}</dt>
@@ -71,6 +74,12 @@ export function ConfirmAccountChangeDialog({ row, action }: Props) {
               <span className="text-muted-foreground">{employee.email}</span>
             </span>
           </dd>
+          {accountEmail && accountEmail !== employee.email && (
+            <>
+              <dt className="text-muted-foreground">{t("apps.page.account")}</dt>
+              <dd className="text-right font-medium">{accountEmail}</dd>
+            </>
+          )}
           <dt className="text-muted-foreground">{t("apps.change.app")}</dt>
           <dd className="flex items-center justify-end gap-2 font-medium">
             <AppMark name={app.name} catalogKey={app.catalogKey} className="size-6" />

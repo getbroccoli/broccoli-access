@@ -17,10 +17,9 @@ query AppsPage($status: AppStatus!, $first: Int!, $approved: Boolean!) {
         status
         connected
         peopleCount
-        # The avatars a row shows before "+N"; accounts not in the app come last.
-        users(first: 4) {
+        # The distinct people shown before "+N".
+        users: peoplePreview(first: 4) {
           id
-          inApp
           employee {
             id
             firstName
@@ -62,7 +61,7 @@ query AppsPage($status: AppStatus!, $first: Int!, $approved: Boolean!) {
   }
 }
 
-query AppsScan {
+query DirectoryScan {
   setup {
     id
     googleWorkspace {

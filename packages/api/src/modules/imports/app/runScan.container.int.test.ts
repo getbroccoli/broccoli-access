@@ -47,6 +47,7 @@ test("links Linear members with directory emails to their employees with the sta
     const employee = employees.find((employee) => employee.email === person.email)!;
     expect(members.find((member) => member.email === person.email)).toMatchObject({
       employeeId: employee.id,
+      employeeLinkedBy: "email",
       status: person.status,
       foundVia: ["linear_members"],
     });
@@ -54,7 +55,7 @@ test("links Linear members with directory emails to their employees with the sta
   expect(members.map((member) => member.email)).not.toContain("new.hire@acme.example");
 });
 
-test("stores version-two Linear records and identifies the admin who owns the key", async ({
+test("stores version-three Linear records with each display name and the admin who owns the key", async ({
   orm,
   fakeConnectors,
 }) => {
@@ -68,9 +69,10 @@ test("stores version-two Linear records and identifies the admin who owns the ke
     expect(records.find((record) => record.sourceKey === member.sourceKey)).toMatchObject({
       sourceId: linear.sourceId,
       type: "app_account",
-      typeVersion: 2,
+      typeVersion: 3,
       values: {
         email: member.email,
+        displayName: member.displayName,
         status: member.status,
         isConnectionUser: member.email === "admin@acme.example",
         appName: "Linear",

@@ -1,20 +1,9 @@
-query PeoplePage($filter: EmployeeFilter) {
-  setup {
-    id
-    googleWorkspace {
-      id
-      scan {
-        id
-        status
-        readAt
-      }
-    }
-  }
+query PeoplePage($filter: EmployeeFilter, $showAccounts: Boolean! = false) {
   employeeCounts {
     all
     suspendedWithAccess
   }
-  employees(first: 10000, orderBy: { field: STATUS }, filter: $filter) {
+  employees(first: 10000, orderBy: { field: STATUS }, filter: $filter) @skip(if: $showAccounts) {
     edges {
       node {
         id
@@ -24,6 +13,66 @@ query PeoplePage($filter: EmployeeFilter) {
         avatarUrl
         status
         approvedAppNames
+      }
+    }
+  }
+}
+
+mutation LinkAccount($input: AppAccountLinkInput!) {
+  apps {
+    linkAccount(input: $input) {
+      appUser {
+        id
+      }
+      error {
+        __typename
+      }
+    }
+  }
+}
+
+query PeopleToLink($search: String, $after: String) {
+  employees(first: 50, after: $after, filter: { search: $search }) {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    edges {
+      node {
+        id
+        email
+        firstName
+        lastName
+      }
+    }
+  }
+}
+
+query AccountsWithoutPersonCount {
+  accountsWithoutPersonCount
+}
+
+query AccountsWithoutPerson($after: String, $first: Int = 100) {
+  accountsWithoutPerson(after: $after, first: $first) {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    edges {
+      node {
+        id
+        email
+        displayName
+        app {
+          id
+          name
+        }
+        suggestedEmployee {
+          id
+          firstName
+          lastName
+          email
+        }
       }
     }
   }

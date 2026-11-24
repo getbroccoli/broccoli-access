@@ -29,3 +29,11 @@ A manual check of the People page against a development stack: everyone in Googl
 - [ ] `/people?view=bogus&q=` opens All.
 - [ ] With the API failing, the page shows "Couldn’t load people" and "Try again" reloads it once the API is back.
 - [ ] At 390 px wide the search field goes under the tabs and the table stays inside its frame.
+
+## Accounts without a person
+
+- [ ] Start from the setup above with Slack approved. Use the fake Google's unsuspend control for Ana, then scan Google Workspace. Connect Slack and Linear and let their scans finish. The tab shows four accounts. Ana’s private Slack address suggests Ana Ruiz. The other three show "Nobody".
+- [ ] Choose "Link" beside Ana’s suggestion. The count drops to three. Open Ana from All. Her Slack work account and the account labelled `ana.ruiz@gmail.example` both appear under Current access.
+- [ ] In Settings → Connections, choose "Scan now" on Slack. Once the scan finishes, reopen Ana’s page and the tab. The private account stays on Ana’s page and the tab still shows three.
+- [ ] Choose "Decide" beside another account. Search by work email, select the employee and choose "Link". The account appears on that person’s page.
+- If the member changes their app email, the new unmatched address needs a new link.

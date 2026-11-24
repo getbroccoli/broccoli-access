@@ -22,6 +22,7 @@ export interface ConnectionMembers {
 
 /** A member of a connected app as its connection's last scan saw it. */
 export interface ConnectionMember {
+  displayName: string | null;
   connectionId: string;
   /** Lowercased. */
   email: string;

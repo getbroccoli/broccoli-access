@@ -9,6 +9,8 @@ type App {
   status: AppStatus!
   "How many people have an account in it; once its connection has scanned, only the accounts that scan returned count."
   peopleCount: Int!
+  "The first distinct people with access, as their accounts, in the same order as users."
+  peoplePreview(first: Int!): [AppUser!]!
   "The finding kinds that saw its people's accounts, sorted, such as `google_sign_in`; connector modules register them."
   foundVia: [String!]!
   "The earliest Since of its people's accounts; null without people."
@@ -28,6 +30,8 @@ type App {
 "An account in an app that belongs to an employee."
 type AppUser {
   id: ID!
+  "The account's email in the app, which may differ from the employee's work email."
+  email: String!
   "Whether the person may use the account in the app."
   status: AppAccountStatus!
   "Whether its app's connection's last successful scan returned it; null when the app has no connection or none of its scans has succeeded yet, and the account counts as before. Only false excludes it: an account not in its app, such as one only a Google sign-in found, is no access whatever its status, and offers no change."
@@ -168,7 +172,7 @@ enum ReconnectCause {
 type Employee {
   "Their accounts in approved apps other than the directory, leaving out those not in their app (`inApp` false): the active ones, and the suspended ones in connected apps, by app name. Admins only."
   appAccounts: [AppUser!]!
-  "The connected apps whose last scan found no member with their email, where Invite or Reconnect is offered, an invite was asked, or a scan read their pending invitation, also in an app whose connection cannot invite, by app name. Admins only."
+  "The connected apps whose last scan found neither their work email nor a member the owner linked to them, where Invite or Reconnect is offered, an invite was asked, or a scan read their pending invitation, also in an app whose connection cannot invite, by app name. Admins only."
   appInvites: [AppInvite!]!
 }
 
@@ -260,7 +264,40 @@ input SetupFinishInput {
   approvedAppIds: [ID!]!
 }
 
+"A personal account with no employee in an approved app. After the app’s first completed scan, only accounts its last scan returned qualify."
+type AccountWithoutPerson {
+  id: ID!
+  email: String!
+  "The member's name, when its connection has reported one."
+  displayName: String
+  app: App!
+}
+
+type AccountWithoutPersonEdge {
+  cursor: String!
+  node: AccountWithoutPerson!
+}
+
+type AccountWithoutPersonConnection {
+  edges: [AccountWithoutPersonEdge!]!
+  pageInfo: PageInfo!
+}
+
+input AppAccountLinkInput {
+  appAccountId: ID!
+  employeeId: ID!
+}
+
+type AppAccountLinkPayload {
+  appUser: AppUser
+  error: AppAccountLinkError
+}
+
+union AppAccountLinkError = NotFoundError | ConflictError
+
 type AppsMutations {
+  "Links an eligible account to an employee. The link survives a rescan of the same app and email. A new unmatched address needs a new link. Owner only."
+  linkAccount(input: AppAccountLinkInput!): AppAccountLinkPayload!
   "Approves an app and records it in the app's history. Admins only."
   approve(input: AppApproveInput!): AppApprovePayload!
   "Ignores an app and records it in the app's history; refused with a ConflictError for a connected app, which stays approved. Admins only."
@@ -338,6 +375,10 @@ type TemplateApp {
 }
 
 type Query {
+  "Eligible accounts without a person, by email. After an app’s first completed scan, its last scan must have returned the account. Owner only."
+  accountsWithoutPerson(first: Int = 100, after: String): AccountWithoutPersonConnection!
+  "How many accounts qualify for accountsWithoutPerson. Owner only."
+  accountsWithoutPersonCount: Int!
   "One app; null when there is none. Admins only."
   app(id: ID!): App
   "The apps with a status, the most people first, one page at a time. Admins only."

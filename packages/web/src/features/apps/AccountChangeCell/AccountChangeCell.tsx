@@ -78,7 +78,13 @@ export function AccountChangeCell({ appUser }: Props) {
           )}
         </span>
       )}
-      {user.offeredChange && <ConfirmAccountChangeDialog row={user} action={user.offeredChange} />}
+      {user.offeredChange && (
+        <ConfirmAccountChangeDialog
+          accountEmail={user.email}
+          row={user}
+          action={user.offeredChange}
+        />
+      )}
     </span>
   );
 }

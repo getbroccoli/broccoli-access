@@ -86,3 +86,70 @@ test("the owner sees why Ana's Linear Disable failed and marks it done by hand",
     },
   });
 }, 90_000);
+
+test("a failed Disable on a private account identifies the linked employee in Activity and on retry", async ({
+  env,
+  fakeConnectors,
+}) => {
+  const { browser, appId } = await connectedLinear(env);
+  const employee = await env.seed.employee();
+  const list = await browser.graphql("{ accountsWithoutPerson { edges { node { id email } } } }");
+  const { data } = (await list.json()) as {
+    data: { accountsWithoutPerson: { edges: { node: { id: string; email: string } }[] } };
+  };
+  const account = data.accountsWithoutPerson.edges.find(
+    ({ node }) => node.email === "deploys@acme.example",
+  )!.node;
+  const linked = await browser.graphql(
+    `mutation ($account: ID!, $person: ID!) {
+    apps { linkAccount(input: { appAccountId: $account, employeeId: $person }) { error { __typename } } }
+  }`,
+    { account: account.id, person: employee.id },
+  );
+  expect(await linked.json()).toEqual({ data: { apps: { linkAccount: { error: null } } } });
+  await failLinearCall(fakeConnectors.url, "actions/run", "unexpected_response");
+  const disable = await changeAccount(browser, account.id, "SUSPEND");
+  await expect
+    .poll(
+      async () =>
+        (await linearUsers(browser, appId)).find(({ id }) => id === account.id)?.latestChange
+          ?.status,
+      ACCOUNT_CHANGE_POLL,
+    )
+    .toBe("FAILED");
+
+  const read = await browser.graphql(
+    `query ($id: ID!) {
+    employee(id: $id) { appAccounts { id offeredChange latestChange { ...FailedDisable } } }
+    accountChanges { edges { node { ...FailedDisable } } }
+  }
+  fragment FailedDisable on AccountChange {
+    id action status failure finishedAt email app { id } employee { id firstName lastName email }
+  }`,
+    { id: employee.id },
+  );
+
+  const failed = {
+    id: disable.latestChange!.id,
+    action: "SUSPEND",
+    status: "FAILED",
+    failure: "UNEXPECTED_RESPONSE",
+    finishedAt: expect.any(String) as unknown,
+    email: account.email,
+    app: { id: appId },
+    employee: {
+      id: employee.id,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      email: employee.email,
+    },
+  };
+  expect(await read.json()).toEqual({
+    data: {
+      employee: {
+        appAccounts: [{ id: account.id, offeredChange: "SUSPEND", latestChange: failed }],
+      },
+      accountChanges: { edges: [{ node: failed }] },
+    },
+  });
+}, 90_000);

@@ -23,7 +23,7 @@ export function useToastWhenChangeSucceeds(user: AccountChangeCell_AppUserFragme
     runningChangeId.current = null;
     if (change.status === "SUCCEEDED") {
       const params = {
-        name: `${user.employee.firstName} ${user.employee.lastName}`,
+        name: user.email,
         app: user.app.name,
       };
       toast.success(

@@ -39,6 +39,11 @@ export interface EmployeeReadService {
   readEmployee: (ctx: SecurityContext, id: string) => Promise<Employee | null>;
   /** The employees with these ids the caller may read, sorted by name; an unknown id is left out. */
   readEmployees: (ctx: SecurityContext, ids: readonly string[], db?: Orm) => Promise<Employee[]>;
+  /** The employees the caller may read, keyed by their linked app account. */
+  readAccountOwners: (
+    ctx: SecurityContext,
+    accountIds: readonly string[],
+  ) => Promise<Map<string, Employee>>;
   /** The employees with these lowercased emails the caller may read; an email nobody has is left out. */
   readEmployeesByEmails: (ctx: SecurityContext, emails: readonly string[]) => Promise<Employee[]>;
   /** The signed-in user's own employee; null for a user without one, such as the owner. */
@@ -72,6 +77,8 @@ export function createEmployeeReadService({
   const employees = employeeRepository(orm);
   const readAccess = (ctx: SecurityContext) => readAccessOfEveryone(ctx, orm, accounts);
   const history = createRecordHistoryReaderService(orm, { employee: employeeRecordType(orm) });
+  const readEmployees: EmployeeReadService["readEmployees"] = async (ctx, ids, db = orm) =>
+    readableOf(ctx, await employeeRepository(db).findByIds(ids));
   return {
     holdForReference: (tx, ids) => employeeRepository(tx).holdForReference(ids),
     async readEmployee(ctx, id) {
@@ -83,8 +90,22 @@ export function createEmployeeReadService({
       await ctx.requireInScope("employee", "read", employeeId);
       return employees.findById(employeeId);
     },
-    readEmployees: async (ctx, ids, db = orm) =>
-      readableOf(ctx, await employeeRepository(db).findByIds(ids)),
+    readEmployees,
+    async readAccountOwners(ctx, ids) {
+      ctx.require("MANAGE_WORKSPACE");
+      const links = await accounts.findAccountOwners(orm, ids);
+      const found = await readEmployees(
+        ctx,
+        links.flatMap(({ employeeId }) => employeeId ?? []),
+      );
+      const byId = new Map(found.map((person) => [person.id, person]));
+      return new Map(
+        links.flatMap(({ id, employeeId }) => {
+          const person = employeeId && byId.get(employeeId);
+          return person ? [[id, person] as const] : [];
+        }),
+      );
+    },
     readEmployeesByEmails: async (ctx, emails) =>
       readableOf(ctx, await employees.findByEmails(emails)),
     async readMyEmployee(ctx) {

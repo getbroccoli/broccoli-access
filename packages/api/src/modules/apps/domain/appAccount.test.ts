@@ -109,7 +109,12 @@ it("keeps the status read by the app's connection while adding a finding kind", 
 });
 
 it("keeps the status of a protected account while updating its employee", () => {
-  const before = { ...ACCOUNT, employeeId: null, status: "suspended" as const };
+  const before = {
+    ...ACCOUNT,
+    employeeId: null,
+    employeeLinkedBy: null,
+    status: "suspended" as const,
+  };
 
   const plan = planAccountSync([before], {
     findingKind: "google_directory",
@@ -119,7 +124,9 @@ it("keeps the status of a protected account while updating its employee", () => 
     statusKeptFor: new Set([before.id]),
   });
 
-  expect(plan.updated).toEqual([{ before, after: { ...before, employeeId: ACCOUNT.employeeId } }]);
+  expect(plan.updated).toEqual([
+    { before, after: { ...before, employeeId: ACCOUNT.employeeId, employeeLinkedBy: "email" } },
+  ]);
 });
 
 it("takes the found status for a new account in an app another connection reads", () => {
@@ -166,7 +173,16 @@ it.each([
   });
 
   expect(plan).toEqual({
-    created: [{ ...found, foundVia: ["google_sign_in"], firstSeenAt: NOW }],
+    created: [
+      {
+        ...found,
+        kind: "personal",
+        note: null,
+        employeeLinkedBy: "email",
+        foundVia: ["google_sign_in"],
+        firstSeenAt: NOW,
+      },
+    ],
     updated: [],
     deleted: [],
   });
@@ -290,6 +306,9 @@ it("merges two found grants for the same person and app into one active account"
     created: [
       {
         ...account,
+        kind: "personal",
+        note: null,
+        employeeLinkedBy: "email",
         status: "active",
         grantedAt: null,
         grantedBefore,
@@ -308,6 +327,9 @@ const ACCOUNT: AppAccount = {
   appId: "app-google-workspace",
   email: "ana@acme.example",
   employeeId: "employee-ana",
+  kind: "personal",
+  note: null,
+  employeeLinkedBy: "email",
   status: "active",
   foundVia: ["google_directory"],
   firstSeenAt: new Date("2026-11-21T12:00:00Z"),

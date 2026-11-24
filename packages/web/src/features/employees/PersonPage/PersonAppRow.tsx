@@ -16,30 +16,39 @@ import { formatSince } from "@/lib/since";
 type Person = NonNullable<PersonPageQuery["employee"]>;
 type Props = {
   row: Person["personApps"]["edges"][number]["node"];
-  held: Person["appAccounts"];
+  account: Person["appAccounts"][number] | undefined;
+  showEmail: boolean;
+  first: boolean;
+  span: number;
   invite: Person["appInvites"][number] | undefined;
   showSources: boolean;
 };
 
 /** The role, sources, status and account actions for one app. */
-export function PersonAppRow({ row, held, invite, showSources }: Props) {
-  const account = held[0];
+export function PersonAppRow({ row, account, showEmail, first, span, invite, showSources }: Props) {
   return (
     <TableRow>
       <TableCell className="h-12 pl-4">
-        <span className="flex items-center gap-2.5 font-medium">
-          <AppMark name={row.app.name} catalogKey={row.app.catalogKey} />
-          {row.app.name}
-        </span>
+        {first && (
+          <span className="flex items-center gap-2.5 font-medium">
+            <AppMark name={row.app.name} catalogKey={row.app.catalogKey} />
+            {row.app.name}
+          </span>
+        )}
+        {showEmail && (
+          <span className="block pl-8 text-xs text-muted-foreground">{account?.email}</span>
+        )}
       </TableCell>
       {showSources ? (
-        <>
-          <TableCell>{row.role ?? "—"}</TableCell>
-          <TableCell>
-            {row.templates.map((template) => template.name).join(", ") ||
-              t("people.person.noTemplate")}
-          </TableCell>
-        </>
+        first && (
+          <>
+            <TableCell rowSpan={span}>{row.role ?? "—"}</TableCell>
+            <TableCell rowSpan={span}>
+              {row.templates.map((template) => template.name).join(", ") ||
+                t("people.person.noTemplate")}
+            </TableCell>
+          </>
+        )
       ) : (
         <>
           <TableCell>{account && <FoundVia findingKinds={account.foundVia} />}</TableCell>
@@ -47,10 +56,10 @@ export function PersonAppRow({ row, held, invite, showSources }: Props) {
         </>
       )}
       <TableCell>
-        {row.state === "MISSING" && (
+        {first && row.state === "MISSING" && (
           <StatusBadge tone="warning">{t("people.person.missing")}</StatusBadge>
         )}
-        {row.state === "EXTRA" && (
+        {first && row.state === "EXTRA" && (
           <StatusBadge tone="extra">{t("people.person.extra")}</StatusBadge>
         )}
         {row.state === "INVITED" && invite?.invitedAt && (
@@ -60,19 +69,16 @@ export function PersonAppRow({ row, held, invite, showSources }: Props) {
             })}
           </StatusBadge>
         )}
-        {held.map(
-          (account) =>
-            (showsCouldntChange(account) ||
-              row.state === "ACTIVE" ||
-              row.state === "SUSPENDED") && (
-              <AppAccountStatusCell key={account.id} appUser={account} />
-            ),
-        )}
-        {!held.length && row.state === "ACTIVE" && (
+        {account &&
+          (span > 1 ||
+            showsCouldntChange(account) ||
+            row.state === "ACTIVE" ||
+            row.state === "SUSPENDED") && <AppAccountStatusCell appUser={account} />}
+        {!account && row.state === "ACTIVE" && (
           <StatusBadge tone="active">{t("people.status.active")}</StatusBadge>
         )}
-        {((!held.length && row.state === "SUSPENDED") ||
-          (row.state === "MISSING" && row.accountStatus === "SUSPENDED")) && (
+        {((!account && row.state === "SUSPENDED") ||
+          (span === 1 && row.state === "MISSING" && row.accountStatus === "SUSPENDED")) && (
           <StatusBadge tone="muted">{t("apps.page.inApp.disabled")}</StatusBadge>
         )}
         {invite &&
@@ -81,9 +87,7 @@ export function PersonAppRow({ row, held, invite, showSources }: Props) {
           )}
       </TableCell>
       <TableCell className="pr-4 text-right">
-        {held.map((account) => (
-          <AccountChangeCell key={account.id} appUser={account} />
-        ))}
+        {account && <AccountChangeCell appUser={account} />}
         {invite && (row.state !== "INVITED" || invite.latestInvite?.status === "RUNNING") && (
           <InviteCell appInvite={invite} />
         )}

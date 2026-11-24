@@ -6,10 +6,11 @@ type Props = {
   employee: NonNullable<AppPageQuery["app"]>["users"][number]["employee"];
   /** Marks the member whose key or session the app's connection uses as "You". */
   isConnectionUser: boolean;
+  email: string;
 };
 
 /** A user's avatar, or initials without one, their name and their email below. */
-export function PersonCell({ employee, isConnectionUser }: Props) {
+export function PersonCell({ employee, isConnectionUser, email }: Props) {
   return (
     <div className="flex items-center gap-3">
       <Avatar
@@ -28,7 +29,7 @@ export function PersonCell({ employee, isConnectionUser }: Props) {
             </span>
           )}
         </span>
-        <span className="truncate text-xs text-muted-foreground">{employee.email}</span>
+        <span className="truncate text-xs text-muted-foreground">{email}</span>
       </span>
     </div>
   );
