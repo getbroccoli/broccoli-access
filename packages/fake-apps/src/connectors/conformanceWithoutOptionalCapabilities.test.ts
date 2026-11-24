@@ -16,7 +16,12 @@ describeConnectorConformance({
       connection: () => Promise.resolve({ settings: {}, secrets: { apiKey: ACME_LINEAR.apiKey } }),
       member: memberAccount(ACME_LINEAR, "chloe@acme.example"),
       causeError: (url, code) =>
-        control(url, "/failures", { connector: "linear", call: "actions/run", code, count: 1 }),
+        control(url, "/failures", {
+          connector: "linear",
+          call: "actions/run",
+          code: actionErrors[code],
+          count: 1,
+        }),
       reset: async (url) => {
         await control(url, "/reset");
         await control(url, "/delay", { milliseconds: 0 });
@@ -24,6 +29,20 @@ describeConnectorConformance({
     },
   ],
 });
+
+// A fixture written before sign-in knows only the errors an action can give.
+const actionErrors = {
+  authentication_failed: "authentication_failed",
+  permission_missing: "permission_missing",
+  rate_limited: "rate_limited",
+  app_unavailable: "app_unavailable",
+  unexpected_response: "unexpected_response",
+  blocked_by_check: "blocked_by_check",
+  account_not_found: "account_not_found",
+  wrong_workspace: "wrong_workspace",
+  not_allowed: "not_allowed",
+  owner_browser_lost: "owner_browser_lost",
+} as const;
 
 async function linearWithoutOptionalCapabilities(): Promise<string> {
   const fake = await startFakeConnectors({ delayMs: 0 });

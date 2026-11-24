@@ -26,7 +26,7 @@ export interface FakeConnectorsContext {
 export interface ConnectorsState {
   members: Record<FakeConnectorKey, SeedMember[]>;
   invitations: Record<FakeConnectorKey, PendingInvitation[]>;
-  /** The changes actions made in each workspace, oldest first. */
+  /** The last changes actions made in each workspace, oldest first. */
   changes: Record<FakeConnectorKey, MadeChange[]>;
   /** How many members each workspace ever had: a removed member's id is never given again. */
   joinedCounts: Record<FakeConnectorKey, number>;

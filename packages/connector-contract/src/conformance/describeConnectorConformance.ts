@@ -64,7 +64,7 @@ export interface ConnectorFixture {
     causeError: (url: string, code: (typeof SIGN_IN_ERROR_CODES)[number]) => Promise<void>;
   };
   /** Makes the next `actions/run` call through the container at `url` fail with `code`. */
-  causeError: (url: string, code: ConnectorErrorCode) => Promise<void>;
+  causeError: (url: string, code: ActionErrorCode) => Promise<void>;
   /**
    * Puts the fake app behind the container at `url` back to its seed before each check: the
    * member active, the member to remove back, no invitation for the invitee, the integration user
@@ -134,7 +134,11 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
 const NO_CHECK_TIMEOUT = 0;
 
 /** Every error an action can answer: `not_invited` comes only from the sign-in. */
-const ACTION_ERROR_CODES = CONNECTOR_ERROR_CODES.filter((code) => code !== "not_invited");
+const ACTION_ERROR_CODES = CONNECTOR_ERROR_CODES.filter(
+  (code): code is ActionErrorCode => code !== "not_invited",
+);
+
+type ActionErrorCode = Exclude<ConnectorErrorCode, "not_invited">;
 
 /** The errors only some connectors meet: a check that only a robot's page shows, and a lost owner's browser. */
 const OPTIONAL_ERROR_CODES = [
@@ -168,7 +172,7 @@ async function checkRepeatedActions(url: string, fixture: ConnectorFixture): Pro
 async function checkError(
   url: string,
   fixture: ConnectorFixture,
-  code: ConnectorErrorCode,
+  code: ActionErrorCode,
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
   await withinDeadline(fixture.causeError(url, code), "the fixture's causeError");

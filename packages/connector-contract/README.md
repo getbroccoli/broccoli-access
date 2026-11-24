@@ -71,4 +71,4 @@ A connector that lists `invite` needs `invitee` in its fixture; the invite check
 - `roles` in the manifest: an invite of `invitee` with a role the connector does not list must answer HTTP 400.
 - `sign_in` needs `signIn`: `integrationUser` (`email`, `password`, `totpSecret`), which `reset` leaves invited as an admin in the fake app, and `causeError(url, code)`, which makes the next `connections/sign-in` answer `not_invited`, `permission_missing` or `blocked_by_check`. The suite signs in and lists the members with the connection it gets.
 
-`causeError` is never asked for `not_invited`, which only the sign-in gives.
+The fixture's own `causeError`, for `actions/run`, is never asked for `not_invited`; only `signIn.causeError` is.

@@ -26,14 +26,15 @@ export function runAction(connection: ActingConnection, request: ActionRunReques
   if ("changed" in answer && answer.changed) {
     const { connector, state, actor } = connection;
     const { action, account } = request;
-    state.changes[connector.description.key].push({
-      action,
-      email: account.email,
-      madeBy: actor.email,
-    });
+    const changes = state.changes[connector.description.key];
+    changes.push({ action, email: account.email, madeBy: actor.email });
+    if (changes.length > MAX_CHANGES) changes.shift();
   }
   return answer;
 }
+
+/** The last changes a workspace keeps: far more than a test makes, so a long run stays small. */
+const MAX_CHANGES = 100;
 
 function inviteAnswer(connection: ActingConnection, account: Invite["account"]): ActionRunAnswer {
   const result = invite(connection.connector, connection.state, account);

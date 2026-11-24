@@ -13,7 +13,7 @@ export const SIGN_IN_ERROR_CODES = [
 
 /** The sign-in checks of one connector; a connector that does not list `sign_in` skips them. */
 export function describeSignInConformance(url: string, fixture: ConnectorFixture): void {
-  it("signs in as the integration user, with a connection that the list accepts", async ({
+  it("signs in as the integration user, with a connection of theirs that the list accepts", async ({
     skip,
   }) => checkSignIn(url, fixture, await signInOf(url, fixture, skip)));
   it.for(SIGN_IN_ERROR_CODES)(
@@ -40,7 +40,8 @@ async function checkSignIn(url: string, fixture: ConnectorFixture, signIn: SignI
   // Listing parses every page, so an error answer fails here.
   const accounts = await listAll({ url, fixture, connection: answer.connection });
 
-  expect(accounts.length).toBeGreaterThan(0);
+  const own = accounts.filter(({ values }) => values.isConnectionUser);
+  expect(own.map(({ values }) => values.email)).toEqual([signIn.integrationUser.email]);
 }
 
 /** The first sign-in, without a stored connection. */

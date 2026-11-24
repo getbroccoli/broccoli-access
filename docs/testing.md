@@ -150,7 +150,7 @@ curl -s -H 'content-type: application/json' "$FAKE/v1/connections/sign-in" \
   -d '{"connector": "slack", "connection": null, "integrationUser": {"email": "broccoli@acme.example", "password": "demo-password", "totpSecret": "JBSWY3DPEHPK3PXP"}}'
 ```
 
-The answer's `connection` works like `$SLACK`'s, and its changes show in the state with the integration user as `madeBy`.
+Put the answer's `connection` in place of `$SLACK`'s `connection` and the calls above work the same; their changes show in the state with the integration user as `madeBy`.
 
 ### The conformance suite
 

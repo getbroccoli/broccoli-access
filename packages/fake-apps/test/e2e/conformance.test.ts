@@ -64,10 +64,8 @@ describeConnectorConformance({
 });
 
 function failNextAction(connector: string): ConnectorFixture["causeError"] {
-  return (url, code) => {
-    if (code === "not_invited") throw new Error("Only connections/sign-in gives not_invited");
-    return control(url, "/failures", { connector, call: "actions/run", code, count: 1 });
-  };
+  return (url, code) =>
+    control(url, "/failures", { connector, call: "actions/run", code, count: 1 });
 }
 
 async function reset(url: string) {

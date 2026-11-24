@@ -45,6 +45,9 @@ const GOOGLE_STATE = z.object({
   createdUsers: z.array(z.object({ primaryEmail: z.string() })),
 });
 
+/** A fake on the same machine answers at once; a stalled one must not hold the call. */
+const GOOGLE_TIMEOUT_MS = 5_000;
+
 type SetupAnswer = IntegrationUserSetupAnswer | ConnectorErrorAnswer;
 
 /**
@@ -71,7 +74,9 @@ async function setUp(
 /** The emails of the users the fake Google created; nothing when it does not answer with them. */
 async function createdEmails(googleUrl: string): Promise<string[] | undefined> {
   try {
-    const response = await fetch(new URL("/_fake/state", googleUrl));
+    const response = await fetch(new URL("/_fake/state", googleUrl), {
+      signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
+    });
     const { createdUsers } = GOOGLE_STATE.parse(await response.json());
     return createdUsers.map((user) => user.primaryEmail.toLowerCase());
   } catch {
