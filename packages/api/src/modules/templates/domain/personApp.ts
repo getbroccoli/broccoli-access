@@ -6,6 +6,7 @@ export interface PersonApp {
   appId: string;
   templates: Template[];
   role: string | null;
+  accountStatus: AccountStatus | null;
   state: "active" | "suspended" | "missing" | "invited" | "extra" | null;
 }
 
@@ -58,7 +59,13 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
     const extra =
       choice?.choice === "to_review" || (facts.templates.length > 0 && facts.listedApps.has(appId));
     const state = appState({ expected, account, invited: !!invite?.invitedAt, extra });
-    rows.push({ appId, templates, role: choice?.role ?? null, state });
+    rows.push({
+      appId,
+      templates,
+      role: choice?.role ?? null,
+      accountStatus: account ?? null,
+      state,
+    });
   }
   return rows;
 }

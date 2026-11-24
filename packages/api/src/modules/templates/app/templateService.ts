@@ -23,7 +23,10 @@ const recordHistory = createRecordHistoryService();
  */
 export interface TemplateService extends TemplateAssignmentService {
   /** The templates, by name ignoring case. */
-  listTemplates: (ctx: SecurityContext, args: PageArgs) => Promise<Connection<Template>>;
+  listTemplates: (
+    ctx: SecurityContext,
+    args: PageArgs & { assignableTo?: string | null },
+  ) => Promise<Connection<Template>>;
   /** The template; null for an unknown or malformed id. */
   readTemplate: (ctx: SecurityContext, templateId: string) => Promise<Template | null>;
   /** Adds a template without apps; refuses a blank, too long or taken name as invalid `name`. */
@@ -72,12 +75,14 @@ export function createTemplateService({
 }: TemplateDependencies): TemplateService {
   return {
     ...createTemplateAssignmentService({ orm, transact, logger, apps, employees }),
-    async listTemplates(ctx, pageArgs) {
+    async listTemplates(ctx, { assignableTo, ...pageArgs }) {
       ctx.require("MANAGE_WORKSPACE");
+      if (assignableTo != null && !parseUuid(assignableTo))
+        throw invalidInput([{ field: "assignableTo", code: "invalid" }]);
       return paginate(pageArgs, {
         order: { field: "NAME", direction: "ASC" },
         keysetValues: TEMPLATE_SORT_VALUES,
-        fetch: (query) => templateRepository(orm).findPage(query),
+        fetch: (query) => templateRepository(orm).findPage(query, assignableTo),
       });
     },
     async readTemplate(ctx, templateId) {
@@ -126,15 +131,14 @@ export function createTemplateService({
       ctx.require("MANAGE_WORKSPACE");
       const deleted = await transact(async (tx) => {
         const template = await lockTemplate(tx, templateId);
-        const assigned = await assignmentRepository(tx).forTemplates([template.id]);
-        await templateRepository(tx).delete(template.id);
-        await reviewLostApps(
+        await removeSources(
           ctx,
           tx,
+          template,
+          template.apps.map((row) => row.appId),
+          () => templateRepository(tx).delete(template.id),
           apps,
           employees,
-          assigned.map((row) => row.employeeId),
-          template.apps.map((row) => row.appId),
         );
         await appendHistory(ctx, tx, {
           templateId: template.id,
@@ -181,21 +185,19 @@ export function createTemplateService({
         if (!app || !member) {
           return { template: before, changed: false };
         }
-        const assigned = await assignmentRepository(tx).forTemplates([before.id]);
-        await templateRepository(tx).deleteApp(before.id, app.id);
-        await reviewLostApps(
+        await removeSources(
           ctx,
           tx,
+          before,
+          [app.id],
+          () => templateRepository(tx).deleteApp(before.id, app.id),
           apps,
           employees,
-          assigned.map((row) => row.employeeId),
-          [app.id],
         );
-        const takenOut = { field: "app", oldValue: app.id, oldLabel: app.name, newValue: null };
         await appendHistory(ctx, tx, {
           templateId: before.id,
           operation: "UPDATED",
-          change: takenOut,
+          change: { field: "app", oldValue: app.id, oldLabel: app.name, newValue: null },
         });
         const remaining = before.apps.filter(({ id }) => id !== member.id);
         return { template: { ...before, apps: remaining }, changed: true };
@@ -242,4 +244,19 @@ async function appendHistory(
     cause: { kind: "EDITED_DIRECTLY" },
     records: [{ recordId: templateId, changes: [change] }],
   });
+}
+
+/** A template deletion cascades its assignments, so capture its people before removing either source. */
+async function removeSources(
+  ctx: SecurityContext,
+  tx: Tx,
+  template: Template,
+  appIds: string[],
+  remove: () => Promise<void>,
+  apps: PersonAccess,
+  employees: EmployeeById,
+) {
+  const people = await assignmentRepository(tx).employeeIds(template.id);
+  await remove();
+  await reviewLostApps(ctx, tx, apps, employees, people, appIds);
 }

@@ -27,7 +27,7 @@ test("an account marked Extra after take-off stays cleared when the owner disabl
   const assigned = await browser.graphql(
     `mutation ($input: TemplateAssignInput!) {
       templates { assign(input: $input) {
-        template { id peopleCount people(first: 6) { edges { node { id templates { id } } } } } error { __typename }
+        template { id peopleCount people(first: 6) { edges { node { id } } } } error { __typename }
       } }
     }`,
     { input },
@@ -40,7 +40,7 @@ test("an account marked Extra after take-off stays cleared when the owner disabl
             id: template.id,
             peopleCount: 1,
             people: {
-              edges: [{ node: { id: chloe.employee.id, templates: [{ id: template.id }] } }],
+              edges: [{ node: { id: chloe.employee.id } }],
             },
           },
           error: null,
@@ -93,7 +93,7 @@ test("an account marked Extra after take-off stays cleared when the owner disabl
 async function employeeApps(browser: Browser, id: string) {
   const response = await browser.graphql(
     `query ($id: ID!) {
-      employee(id: $id) { personApps { app { id catalogKey } templates { id } role state } }
+      employee(id: $id) { personApps(first: 20) { edges { node { app { id catalogKey } templates { id } role state } } } }
     }`,
     { id },
   );
@@ -101,14 +101,18 @@ async function employeeApps(browser: Browser, id: string) {
     data: {
       employee: {
         personApps: {
-          app: { id: string; catalogKey: string | null };
-          templates: { id: string }[];
-          role: string | null;
-          state: string | null;
-        }[];
+          edges: {
+            node: {
+              app: { id: string; catalogKey: string | null };
+              templates: { id: string }[];
+              role: string | null;
+              state: string | null;
+            };
+          }[];
+        };
       };
     };
   };
   expect(body).not.toHaveProperty("errors");
-  return body.data.employee.personApps;
+  return body.data.employee.personApps.edges.map(({ node }) => node);
 }

@@ -4,7 +4,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useRef } from "react";
 
-import { TemplatePageDocument } from "@/__generated__/graphql";
+import { TemplatePageDocument, MoreTemplatePeopleDocument } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 
 import { AddAppMenu } from "./AddAppMenu";
@@ -82,11 +82,11 @@ export function TemplatePage() {
         <TemplatePeople
           key={template.id}
           people={template.people}
-          count={template.peopleCount}
           loading={loading}
           onMore={() =>
             void fetchMore({
-              variables: { after: template.people.pageInfo.endCursor },
+              query: MoreTemplatePeopleDocument,
+              variables: { id: templateId, after: template.people.pageInfo.endCursor! },
               updateQuery: (previous, { fetchMoreResult }) => {
                 if (!previous.template || !fetchMoreResult.template) return previous;
                 const next = fetchMoreResult.template.people;
@@ -94,11 +94,21 @@ export function TemplatePage() {
                   ...previous,
                   template: {
                     ...previous.template,
-                    people: { ...next, edges: [...previous.template.people.edges, ...next.edges] },
+                    people: {
+                      ...next,
+                      edges: [
+                        ...new Map(
+                          [...previous.template.people.edges, ...next.edges].map((edge) => [
+                            edge.node.id,
+                            edge,
+                          ]),
+                        ).values(),
+                      ],
+                    },
                   },
                 };
               },
-            }).catch(() => toast.error(t("people.error.title")))
+            }).catch(() => toast.error(t("templates.people.moreFailed")))
           }
         />
       </section>

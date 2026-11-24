@@ -145,7 +145,8 @@ async function saveScan(
   const { sourceId, accounts } = findings;
   return dependencies.transact(async (tx) => {
     const sources = importSourceRepository(tx);
-    if ((await sources.lockById(sourceId))?.status !== "scanning") {
+    const source = await sources.lockById(sourceId);
+    if (source?.status !== "scanning") {
       return { saved: false, finishedSetupScan: false };
     }
     // Before the directory locks any employee, so two saves wait for each other, never deadlock.
@@ -164,7 +165,8 @@ async function saveScan(
     await sources.replaceRecords(sourceId, accounts);
     await syncAccounts(ctx, tx, findings, dependencies);
     await sources.markScanned(sourceId, new Date());
-    tx.publish("imports.appScanned", { appId: findings.connection.appId });
+    if (!source.readAt)
+      tx.publish("imports.appScanned", { appId: findings.connection.appId, sourceId });
     // Setup waits for the directory's people; another app's scan never ends its scan step.
     const finishedSetupScan =
       findings.connector.isDirectory && (await setupSteps.finishScanStep(ctx, tx));

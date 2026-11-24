@@ -1,4 +1,4 @@
-query PersonPage($id: ID!) {
+query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
   employee(id: $id) {
     id
     firstName
@@ -8,22 +8,39 @@ query PersonPage($id: ID!) {
     status
     suspendedWithAccess
     approvedAppNames
-    templates {
-      id
-      name
+    templates(first: 30, after: $templatesAfter) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      edges {
+        node {
+          id
+          name
+        }
+      }
     }
-    personApps {
-      app {
-        id
-        name
-        catalogKey
+    personApps(first: 30, after: $appsAfter) {
+      pageInfo {
+        hasNextPage
+        endCursor
       }
-      templates {
-        id
-        name
+      edges {
+        node {
+          accountStatus
+          app {
+            id
+            name
+            catalogKey
+          }
+          templates {
+            id
+            name
+          }
+          role
+          state
+        }
       }
-      role
-      state
     }
     appAccounts {
       offeredChange
@@ -41,6 +58,7 @@ query PersonPage($id: ID!) {
         canChangeAccounts
       }
       latestChange {
+        action
         id
         status
       }
@@ -65,8 +83,8 @@ query PersonPage($id: ID!) {
   }
 }
 
-query AssignableTemplates($after: String) {
-  templates(first: 12, after: $after) {
+query AssignableTemplates($employeeId: ID!, $after: String) {
+  templates(first: 12, after: $after, assignableTo: $employeeId) {
     edges {
       node {
         id

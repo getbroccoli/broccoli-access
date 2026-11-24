@@ -38,7 +38,7 @@ export interface EmployeeReadService {
   /** The employee with this id, or null when there is none. */
   readEmployee: (ctx: SecurityContext, id: string) => Promise<Employee | null>;
   /** The employees with these ids the caller may read, sorted by name; an unknown id is left out. */
-  readEmployees: (ctx: SecurityContext, ids: readonly string[]) => Promise<Employee[]>;
+  readEmployees: (ctx: SecurityContext, ids: readonly string[], db?: Orm) => Promise<Employee[]>;
   /** The employees with these lowercased emails the caller may read; an email nobody has is left out. */
   readEmployeesByEmails: (ctx: SecurityContext, emails: readonly string[]) => Promise<Employee[]>;
   /** The signed-in user's own employee; null for a user without one, such as the owner. */
@@ -83,7 +83,8 @@ export function createEmployeeReadService({
       await ctx.requireInScope("employee", "read", employeeId);
       return employees.findById(employeeId);
     },
-    readEmployees: async (ctx, ids) => readableOf(ctx, await employees.findByIds(ids)),
+    readEmployees: async (ctx, ids, db = orm) =>
+      readableOf(ctx, await employeeRepository(db).findByIds(ids)),
     readEmployeesByEmails: async (ctx, emails) =>
       readableOf(ctx, await employees.findByEmails(emails)),
     async readMyEmployee(ctx) {

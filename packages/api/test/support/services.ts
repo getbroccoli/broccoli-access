@@ -15,7 +15,6 @@ import {
 import {
   createAppConnectionService,
   createAppAccountService,
-  createInviteLoader,
   createAppInvitationService,
   createAppService,
   createAppUserService,
@@ -39,6 +38,7 @@ import {
   type GoogleConnectionService,
 } from "../../src/modules/google";
 import { createTemplateService, templatesModule } from "../../src/modules/templates";
+import { createPersonPageReader, personPageLoader } from "../../src/modules";
 import { accountChanges } from "./accountChanges";
 import { fakeMail } from "./fakeMail";
 import { TEST_SECRET_BOX } from "./testSecretBox";
@@ -162,10 +162,30 @@ export function templateReviewTransactor(orm: Orm) {
   const before = createBeforeCommitBus();
   const deps = templateDependencies(orm, {});
   before.subscribe(
-    templatesModule({ ...deps, invites: createInviteLoader(deps.apps.readAppInvites) })
-      .eventsBeforeCommit!,
+    templatesModule(
+      createTemplateService(deps),
+      deps.employees.readEmployees,
+      personPageLoader(personPages(orm)),
+    ).eventsBeforeCommit!,
   );
   return transactor(orm, createEventBus(createLogger("silent")), before);
+}
+
+export function personPages(
+  orm: Orm,
+  options: { connectors?: ConnectorRegistry; afterAssignments?: () => Promise<void> } = {},
+) {
+  const service = templates(orm, options);
+  return createPersonPageReader(orm, {
+    ...service,
+    ...appUsers(orm),
+    ...accountChanges(orm, options),
+    async readEmployeeTemplates(ctx, ids, db) {
+      const assigned = await service.readEmployeeTemplates(ctx, ids, db);
+      await options.afterAssignments?.();
+      return assigned;
+    },
+  });
 }
 
 function templateDependencies(

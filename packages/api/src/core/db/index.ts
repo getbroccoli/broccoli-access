@@ -1,5 +1,5 @@
 // Public values.
-export { connectDatabase } from "./database";
+export { connectDatabase, readSnapshot } from "./database";
 export { containsPattern } from "./likePattern";
 export { MIGRATION_LOCK_KEY } from "./migrationRun";
 export { anyOf } from "./anyOf";

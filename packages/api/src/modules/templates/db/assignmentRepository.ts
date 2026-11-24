@@ -8,7 +8,7 @@ import { templateApps } from "./templateAppsTable";
 /** Template assignments and exceptions, read in batches and changed in the caller's transaction. */
 export interface AssignmentRepository {
   forEmployees(ids: readonly string[]): Promise<Assignment[]>;
-  forTemplates(ids: readonly string[]): Promise<Assignment[]>;
+  employeeIds(templateId: string): Promise<string[]>;
   assign(assignment: Assignment, assignedBy: string): Promise<boolean>;
   takeOff(assignment: Assignment): Promise<boolean>;
   choicesFor(ids: readonly string[]): Promise<EmployeeAppChoice[]>;
@@ -42,8 +42,13 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
   return {
     forEmployees: (ids) =>
       assignments().where(anyOf(employeeTemplates.employeeId, ids)).orderBy(employeeTemplates.id),
-    forTemplates: (ids) =>
-      assignments().where(anyOf(employeeTemplates.templateId, ids)).orderBy(employeeTemplates.id),
+    employeeIds: async (templateId) =>
+      (
+        await orm
+          .select({ id: employeeTemplates.employeeId })
+          .from(employeeTemplates)
+          .where(eq(employeeTemplates.templateId, templateId))
+      ).map((row) => row.id),
     async assign(assignment, assignedBy) {
       const inserted = await orm
         .insert(employeeTemplates)
@@ -99,11 +104,7 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
         const rows = await orm
           .insert(employeeAppChoices)
           .values(batch.map((pair) => ({ ...pair, choice: "to_review" as const })))
-          .onConflictDoUpdate({
-            target: [employeeAppChoices.employeeId, employeeAppChoices.appId],
-            set: { choice: "to_review", role: null },
-            setWhere: eq(employeeAppChoices.choice, "role_picked"),
-          })
+          .onConflictDoNothing()
           .returning(PAIR);
         inserted.push(...rows);
       }

@@ -18,7 +18,12 @@ import {
   type AppAccountRepository,
 } from "../../src/modules/apps/db";
 import { integrationUserRepository } from "../../src/modules/google/db";
-import { employeeTemplates, templateApps, templates } from "../../src/modules/templates/db";
+import {
+  employeeAppChoices,
+  employeeTemplates,
+  templateApps,
+  templates,
+} from "../../src/modules/templates/db";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { seedUser } from "./seedUser";
 import { testTransactor } from "./testTransactor";
@@ -142,6 +147,10 @@ export class TestSeed {
         .values(appIds.map((appId) => ({ templateId: template!.id, appId })));
     }
     return template!;
+  }
+
+  async employeeAppChoice(choice: typeof employeeAppChoices.$inferInsert) {
+    await this.orm.insert(employeeAppChoices).values(choice);
   }
 
   async employeeTemplate(

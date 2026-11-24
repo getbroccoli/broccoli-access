@@ -6,11 +6,9 @@ import { t } from "@/i18n";
 
 export function TemplatePeople({
   people,
-  count,
   loading,
   onMore,
 }: {
-  count: number;
   loading: boolean;
   onMore: () => void;
   people: NonNullable<TemplatePageQuery["template"]>["people"];
@@ -37,7 +35,7 @@ export function TemplatePeople({
       ))}
       {people.pageInfo.hasNextPage && (
         <Button variant="link" disabled={loading} onClick={onMore}>
-          {t("templates.showMore", { count: String(Math.min(6, count - people.edges.length)) })}
+          {t("templates.people.more")}
         </Button>
       )}
     </div>

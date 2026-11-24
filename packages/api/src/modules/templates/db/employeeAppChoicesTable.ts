@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, pgTable, primaryKey, text, uuid } from "drizzle-orm/pg-core";
+import { check, index, pgTable, primaryKey, text, uuid } from "drizzle-orm/pg-core";
 
 /** A person's exception to their templates. The migration adds the cross-module foreign keys. */
 export const employeeAppChoices = pgTable(
@@ -11,6 +11,9 @@ export const employeeAppChoices = pgTable(
     role: text("role"),
   },
   (table) => [
+    index("employee_app_choices_review_app")
+      .on(table.appId)
+      .where(sql`${table.choice} = 'to_review'`),
     primaryKey({ columns: [table.employeeId, table.appId] }),
     check(
       "employee_app_choices_choice",

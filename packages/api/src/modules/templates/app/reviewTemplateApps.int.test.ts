@@ -141,3 +141,34 @@ test.for(["taking out the app", "deleting the template"] as const)(
     );
   },
 );
+
+test.for([
+  { choice: "role_picked", role: "viewer" },
+  { choice: "added", role: "admin" },
+  { choice: "removed", role: null },
+] as const)(
+  "taking off a template preserves the employee's $choice choice and its history",
+  async (choice, { orm, seed }) => {
+    const owner = await seed.owner();
+    const employee = await seed.employee();
+    const app = await seed.app({ status: "approved" });
+    const template = await seed.template({ appIds: [app.id] });
+    await seed.employeeTemplate({
+      templateId: template.id,
+      employeeId: employee.id,
+      assignedBy: owner.user!.userId,
+    });
+    await seed.appAccount({ employeeId: employee.id, appId: app.id });
+    const existing = { ...choice, employeeId: employee.id, appId: app.id };
+    await seed.employeeAppChoice(existing);
+
+    await templates(orm).takeOff(owner, { id: template.id, employeeId: employee.id });
+
+    expect(await storedEmployeeAppChoices(orm)).toEqual([existing]);
+    expect(
+      (await storedRecordHistory(orm))
+        .flatMap((line) => line.changes)
+        .map((change) => change.field),
+    ).toEqual(["template"]);
+  },
+);

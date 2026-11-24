@@ -6,13 +6,14 @@ import { t } from "@/i18n";
 
 type Template = { id: string; name: string };
 export function TemplateOptions({
-  assigned,
+  employeeId,
   onAssign,
 }: {
-  assigned: readonly Template[];
+  employeeId: string;
   onAssign: (template: Template) => void;
 }) {
   const { data, loading, error, fetchMore, refetch } = useQuery(AssignableTemplatesDocument, {
+    variables: { employeeId },
     fetchPolicy: "network-only",
   });
   const page = data?.templates;
@@ -24,8 +25,7 @@ export function TemplateOptions({
     );
   if (!page)
     return <DropdownMenuItem disabled>{t("people.person.loadingTemplates")}</DropdownMenuItem>;
-  const ids = new Set(assigned.map((template) => template.id));
-  const options = page.edges.filter(({ node }) => !ids.has(node.id));
+  const options = page.edges;
   return (
     <>
       {options.map(({ node }) => (

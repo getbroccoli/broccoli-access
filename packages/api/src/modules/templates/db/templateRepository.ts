@@ -1,4 +1,4 @@
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, notExists, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -30,7 +30,10 @@ export interface TemplateRepository {
   /** Like `findByIds` for one template, locking its row until the transaction ends. */
   lockById(id: string): Promise<Template | null>;
   /** One page of the templates, by name ignoring case. */
-  findPage(query: TemplatePageQuery): Promise<KeysetRow<Template, unknown[]>[]>;
+  findPage(
+    query: TemplatePageQuery,
+    assignableTo?: string | null,
+  ): Promise<KeysetRow<Template, unknown[]>[]>;
   /** Adds the app to the template, which must not list it yet. */
   insertApp(templateId: string, appId: string): Promise<TemplateApp>;
   deleteApp(templateId: string, appId: string): Promise<void>;
@@ -73,11 +76,28 @@ export function templateRepository(db: Orm | Tx): TemplateRepository {
       const [template] = await withAppsAndPeople(rows);
       return template ?? null;
     },
-    findPage: async ({ after, limit }) => {
+    findPage: async ({ after, limit }, assignableTo) => {
       const rows = await orm()
         .select({ template: templates, name: LOWERCASE_NAME })
         .from(templates)
-        .where(after ? afterKeyset(PAGE_ORDER, after) : undefined)
+        .where(
+          and(
+            after ? afterKeyset(PAGE_ORDER, after) : undefined,
+            assignableTo
+              ? notExists(
+                  orm()
+                    .select({ id: employeeTemplates.id })
+                    .from(employeeTemplates)
+                    .where(
+                      and(
+                        eq(employeeTemplates.templateId, templates.id),
+                        eq(employeeTemplates.employeeId, assignableTo),
+                      ),
+                    ),
+                )
+              : undefined,
+          ),
+        )
         .orderBy(...orderByKeyset(PAGE_ORDER))
         .limit(limit);
       const page = await withAppsAndPeople(rows.map(({ template }) => template));

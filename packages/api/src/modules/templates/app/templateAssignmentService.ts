@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { paginate, type PageArgs, type Connection } from "../../../core/pagination";
 import { ApplicationError } from "../../../core/applicationError";
-import type { Tx } from "../../../core/db";
+import type { Orm, Tx } from "../../../core/db";
 import type { ModuleDependencies } from "../../../core/moduleManifest";
-import { createRecordHistoryService } from "../../../core/records";
+import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { assignmentRepository } from "../db";
 import { appsOfPerson, type PersonApp, type Template } from "../domain";
@@ -15,12 +15,17 @@ import { clearInactiveReviews, reviewLostApps } from "./reviewLostApps";
 /** Changes to a person's templates and the reads that show what those templates give. */
 export interface TemplateAssignmentService {
   /** Ends reviews whose account just stopped being active, inside the account change or scan. */
-  clearInactiveReviews: (tx: Tx, appIds: readonly string[]) => Promise<void>;
+  clearInactiveReviews: (
+    tx: Tx,
+    appIds: readonly string[],
+    provenance: Pick<HistoryAppend, "cause" | "requestedBy">,
+  ) => Promise<void>;
   assign: (ctx: SecurityContext, input: AssignmentInput) => Promise<Template>;
   takeOff: (ctx: SecurityContext, input: AssignmentInput) => Promise<Template>;
   readEmployeeTemplates: (
     ctx: SecurityContext,
     employeeIds: readonly string[],
+    db?: Orm,
   ) => Promise<Template[][]>;
   readTemplatePeople: (
     ctx: SecurityContext,
@@ -31,9 +36,10 @@ export interface TemplateAssignmentService {
     ctx: SecurityContext,
     employeeIds: readonly string[],
     shared?: {
-      templates: Promise<Template[][]>;
-      invites: ReturnType<PersonAccess["readAppInvites"]>;
+      templates: Template[][];
+      invites: Awaited<ReturnType<PersonAccess["readAppInvites"]>>;
     },
+    db?: Orm,
   ) => Promise<PersonApp[][]>;
 }
 
@@ -50,12 +56,13 @@ const history = createRecordHistoryService();
 export function createTemplateAssignmentService(deps: Dependencies): TemplateAssignmentService {
   const { orm, apps } = deps;
   return {
-    clearInactiveReviews: (tx, appIds) => clearInactiveReviews(tx, apps, appIds),
+    clearInactiveReviews: (tx, appIds, provenance) =>
+      clearInactiveReviews(tx, apps, appIds, provenance),
     assign: (ctx, input) => changeAssignment(deps, ctx, input, "assign"),
     takeOff: (ctx, input) => changeAssignment(deps, ctx, input, "takeOff"),
-    readEmployeeTemplates(ctx, employeeIds) {
+    readEmployeeTemplates(ctx, employeeIds, db = orm) {
       ctx.require("MANAGE_WORKSPACE");
-      return employeeTemplatesOf(orm, employeeIds);
+      return employeeTemplatesOf(db, employeeIds);
     },
     async readTemplatePeople(ctx, id, args) {
       ctx.require("MANAGE_WORKSPACE");
@@ -68,13 +75,13 @@ export function createTemplateAssignmentService(deps: Dependencies): TemplateAss
           ),
       });
     },
-    async readEmployeeApps(ctx, employeeIds, shared) {
+    async readEmployeeApps(ctx, employeeIds, shared, db = orm) {
       ctx.require("MANAGE_WORKSPACE");
-      const repo = assignmentRepository(orm);
+      const repo = assignmentRepository(db);
       const [templates, choices, accounts, invites] = await Promise.all([
-        shared?.templates ?? employeeTemplatesOf(orm, employeeIds),
+        shared?.templates ?? employeeTemplatesOf(db, employeeIds),
         repo.choicesFor(employeeIds),
-        apps.findEmployeeAccounts(orm, employeeIds),
+        apps.findEmployeeAccounts(db, employeeIds),
         shared?.invites ?? apps.readAppInvites(ctx, employeeIds),
       ]);
       const listedApps = await repo.listedApps(accounts.map((account) => account.appId));
@@ -111,15 +118,7 @@ async function changeAssignment(
     const template = await lockTemplate(tx, input.id);
     const repo = assignmentRepository(tx);
     const assignment = { employeeId, templateId: template.id };
-    if (action === "assign") {
-      if (!(await apps.activeInDirectory(tx, employeeId))) {
-        throw new ApplicationError(
-          "INVALID_INPUT",
-          "Only a person active in the directory can be assigned a template.",
-          [{ field: "employeeId", code: "invalid" }],
-        );
-      }
-    }
+    if (action === "assign") await requireActiveEmployee(tx, apps, employees, employeeId);
     const changed =
       action === "assign"
         ? await repo.assign(assignment, assignedBy)
@@ -162,4 +161,20 @@ async function recordAssignment(
     cause: { kind: "EDITED_DIRECTLY" },
     records: [{ recordId: employeeId, changes: [{ field: "template", ...change }] }],
   });
+}
+
+async function requireActiveEmployee(
+  tx: Tx,
+  apps: PersonAccess,
+  employees: EmployeeById,
+  employeeId: string,
+) {
+  await employees.holdForReference(tx, [employeeId]);
+  if (!(await apps.activeInDirectory(tx, employeeId))) {
+    throw new ApplicationError(
+      "INVALID_INPUT",
+      "Only a person active in the directory can be assigned a template.",
+      [{ field: "employeeId", code: "invalid" }],
+    );
+  }
 }

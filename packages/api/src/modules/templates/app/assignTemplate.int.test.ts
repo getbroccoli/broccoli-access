@@ -1,7 +1,15 @@
 import {
   EMPLOYEE,
   OWNER,
+  connectedWorkspace,
   expect,
+  expectBlockedBy,
+  holdBeforeCommit,
+  scans,
+  storedEmployees,
+  suspendAtFakeGoogle,
+  SYSTEM,
+  templateReviewTransactor,
   storedEmployeeTemplates,
   storedRecordHistory,
   templates,
@@ -79,6 +87,47 @@ test.for(["suspended", "absent"] as const)(
     expect(await storedRecordHistory(orm)).toEqual([]);
   },
 );
+
+test("an assignment waiting for a directory suspension refuses the newly suspended employee", async ({
+  orm,
+  seed,
+  fakeGoogle,
+}) => {
+  const google = await connectedWorkspace(orm, fakeGoogle.url);
+  const employee = (await storedEmployees(orm)).find(
+    ({ email }) => email === "chloe@acme.example",
+  )!;
+  const template = await seed.template();
+  await suspendAtFakeGoogle(fakeGoogle.url, employee.email);
+  await google.scans.scanNow(google.ctx, google.connectionId);
+  const held = holdBeforeCommit(templateReviewTransactor(orm));
+  const directory = scans(orm, { googleUrl: fakeGoogle.url, transact: held.transact });
+  const saving = directory.runScan(SYSTEM, google.sourceId);
+  const pid = await held.ready;
+
+  const assignment = templates(orm).assign(google.ctx, {
+    id: template.id,
+    employeeId: employee.id,
+  });
+  const result = Promise.allSettled([assignment]);
+  try {
+    await expectBlockedBy(orm, pid);
+  } finally {
+    held.release();
+    await Promise.all([saving, result]);
+  }
+
+  expect(await result).toMatchObject([
+    {
+      status: "rejected",
+      reason: {
+        code: "INVALID_INPUT",
+        fieldErrors: [{ field: "employeeId", code: "invalid" }],
+      },
+    },
+  ]);
+  expect(await storedEmployeeTemplates(orm)).toEqual([]);
+});
 
 test.for(["assign", "takeOff"] as const)(
   "%s refuses a missing employee or template",

@@ -1,3 +1,5 @@
+import type { HistoryAppend } from "../../../core/records";
+
 // What this module adds to core's shared registries.
 
 declare module "../../../core/records" {
@@ -26,7 +28,11 @@ declare module "../../../core/jobs" {
 
 declare module "../../../core/events" {
   interface DomainEvents {
-    "apps.accountsChanged": { appIds: string[] };
+    "apps.accountsChanged": {
+      appIds: string[];
+      cause: HistoryAppend["cause"];
+      requestedBy?: string;
+    };
   }
 }
 

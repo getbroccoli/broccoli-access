@@ -5,6 +5,7 @@ import {
   mutationPayload,
   perRequest,
   type Resolvers,
+  type RequestLoader,
   type ResolversTypes,
   toEnum,
 } from "../../../core/graphql";
@@ -28,7 +29,6 @@ export function createResolvers(
     | "readApp"
     | "readApps"
     | "readUsersOfApps"
-    | "readUsersOfEmployees"
     | "countApps"
     | "approveApp"
     | "ignoreApp"
@@ -41,11 +41,11 @@ export function createResolvers(
     | "readRequesterNames"
     | "markChangeDoneByHand"
     | "inviteEmployee"
-    | "readAppInvites"
   >,
-  invitesOfEmployees: ReturnType<typeof createInviteLoader>,
+  people: RequestLoader<{ appAccounts: AppUser[]; appInvites: AppInvite[] }>,
 ): Resolvers {
   const loaders = createLoaders(services);
+
   return {
     Query: {
       app: (_parent, { id }, context) => services.readApp(context.getActor(), id),
@@ -66,16 +66,16 @@ export function createResolvers(
     AppUser: {
       status: ({ status }) => toEnum(status),
       app: (user, _args, context) => loaders.appsById(context).load(user.appId),
-      isConnectionUser: async ({ id }, _args, context) =>
-        (await loaders.changeStates(context).load(id)).isConnectionUser,
-      offeredChange: async ({ id }, _args, context) => {
-        const { offeredChange } = await loaders.changeStates(context).load(id);
+      isConnectionUser: async (user, _args, context) =>
+        (await loaders.actions(user, context)).isConnectionUser,
+      offeredChange: async (user, _args, context) => {
+        const { offeredChange } = await loaders.actions(user, context);
         return offeredChange && toEnum(offeredChange);
       },
-      offersReconnect: async ({ id }, _args, context) =>
-        (await loaders.changeStates(context).load(id)).offersReconnect,
-      latestChange: async ({ id }, _args, context) =>
-        (await loaders.changeStates(context).load(id)).latestChange,
+      offersReconnect: async (user, _args, context) =>
+        (await loaders.actions(user, context)).offersReconnect,
+      latestChange: async (user, _args, context) =>
+        (await loaders.actions(user, context)).latestChange,
     },
     AppInvite: {
       app: (invite, _args, context) => loaders.appsById(context).load(invite.appId),
@@ -124,9 +124,10 @@ export function createResolvers(
       canChangeAccounts: (app, _args, context) => loaders.changeableApps(context).load(app.id),
     },
     Employee: {
-      appAccounts: (employee, _args, context) =>
-        loaders.accountsOfEmployees(context).load(employee.id),
-      appInvites: (employee, _args, context) => invitesOfEmployees(context).load(employee.id),
+      appAccounts: async (employee, _args, context) =>
+        (await people(context).load(employee.id)).appAccounts,
+      appInvites: async (employee, _args, context) =>
+        (await people(context).load(employee.id)).appInvites,
     },
   };
 }
@@ -202,6 +203,7 @@ async function appUserOf(
 
 /** The request-scoped batches the fields read through, so a list costs one query per kind. */
 function createLoaders(services: Parameters<typeof createResolvers>[0]) {
+  const changes = createChangeLoaders(services);
   return {
     usersOfApps: perRequest(
       (context) =>
@@ -209,14 +211,6 @@ function createLoaders(services: Parameters<typeof createResolvers>[0]) {
           const users = await services.readUsersOfApps(context.getActor(), appIds);
           const byApp = Map.groupBy(users, ({ appId }) => appId);
           return appIds.map((appId) => byApp.get(appId) ?? []);
-        }),
-    ),
-    accountsOfEmployees: perRequest(
-      (context) =>
-        new DataLoader<string, AppUser[]>(async (employeeIds) => {
-          const users = await services.readUsersOfEmployees(context.getActor(), employeeIds);
-          const byEmployee = Map.groupBy(users, ({ employeeId }) => employeeId);
-          return employeeIds.map((employeeId) => byEmployee.get(employeeId) ?? []);
         }),
     ),
     appsById: perRequest(
@@ -228,7 +222,9 @@ function createLoaders(services: Parameters<typeof createResolvers>[0]) {
           );
         }),
     ),
-    ...createChangeLoaders(services),
+    ...changes,
+    actions: (user: AppUser, ctx: Parameters<typeof changes.changeStates>[0]) =>
+      user.changeState ?? changes.changeStates(ctx).load(user.id),
   };
 }
 
@@ -269,16 +265,4 @@ function createChangeLoaders(services: Parameters<typeof createResolvers>[0]) {
         }),
     ),
   };
-}
-
-/** A request reads each person’s invite facts once for rows and actions. */
-export function createInviteLoader(read: AccountChangeService["readAppInvites"]) {
-  return perRequest(
-    (context) =>
-      new DataLoader<string, AppInvite[]>(async (employeeIds) => {
-        const invites = await read(context.getActor(), employeeIds);
-        const byEmployee = Map.groupBy(invites, ({ employeeId }) => employeeId);
-        return employeeIds.map((employeeId) => byEmployee.get(employeeId) ?? []);
-      }),
-  );
 }

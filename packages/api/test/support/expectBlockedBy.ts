@@ -4,7 +4,20 @@ import { expect } from "vitest";
 import { ormOf, type Orm, type Transact } from "../../src/core/db";
 
 /** Waits until another connection is waiting for a lock the backend `blockingPid` holds. */
-export async function expectBlockedBy(orm: Orm, blockingPid: number): Promise<void> {
+export async function expectBlockedBy(
+  orm: Orm,
+  blockingPid: number,
+  operation?: Promise<unknown>,
+): Promise<void> {
+  let finished = false;
+  void operation?.then(
+    () => {
+      finished = true;
+    },
+    () => {
+      finished = true;
+    },
+  );
   await expect
     .poll(async () => {
       const { rows } = await orm.execute<{ waiting: boolean }>(sql`
@@ -12,7 +25,7 @@ export async function expectBlockedBy(orm: Orm, blockingPid: number): Promise<vo
           where datname = current_database() and wait_event_type = 'Lock'
             and ${blockingPid} = any(pg_blocking_pids(pid))) as waiting
       `);
-      return rows[0]!.waiting;
+      return finished || rows[0]!.waiting;
     })
     .toBe(true);
 }
@@ -32,4 +45,13 @@ export function holdBeforeCommit(transact: Transact) {
       return result;
     }, options);
   return { transact: held, ready: ready.promise, release: release.resolve };
+}
+
+/** Bound lock waits so disjoint writers can prove they finish before the held transaction. */
+export function withLockTimeout(transact: Transact): Transact {
+  return (work, options) =>
+    transact(async (tx) => {
+      await ormOf(tx).execute(sql`set local lock_timeout = '2s'`);
+      return work(tx);
+    }, options);
 }

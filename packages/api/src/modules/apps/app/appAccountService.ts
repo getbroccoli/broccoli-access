@@ -100,7 +100,7 @@ async function applyPlan(
       (account) => account.appId,
     ),
   );
-  if (appIds.size) tx.publish("apps.accountsChanged", { appIds: [...appIds] });
+  if (appIds.size) tx.publish("apps.accountsChanged", { appIds: [...appIds], cause });
   const history = [
     {
       operation: "CREATED" as const,

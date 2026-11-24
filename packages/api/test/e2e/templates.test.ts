@@ -162,3 +162,22 @@ test.for([
     fieldErrors: [],
   });
 });
+
+test("refuses an over-budget membership page even when the template has no people", async ({
+  env,
+}) => {
+  const { browser } = await env.signInAsOwner();
+  const template = await env.seed.template();
+
+  const response = await browser.graphql(
+    "query ($id: ID!) { template(id: $id) { people(first: 10001) { pageInfo { hasNextPage } } } }",
+    { id: template.id },
+  );
+
+  expect(await response.json()).toMatchObject({
+    data: { template: null },
+    errors: [
+      { path: ["template", "people"], message: "Request fewer template members at a time." },
+    ],
+  });
+});

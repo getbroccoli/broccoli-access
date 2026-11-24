@@ -1,7 +1,7 @@
 // Public values.
 export { GraphqlContext, startGraphqlApi } from "./apollo";
 export { mutationPayload } from "./mutationPayload";
-export { perRequest } from "./perRequest";
+export { perRequest, type RequestLoader } from "./perRequest";
 export { DateScalar, DateTimeScalar } from "./scalars";
 export { readSdl } from "./sdl";
 export { signedInUserOf } from "./signedInUser";

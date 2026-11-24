@@ -1,5 +1,3 @@
-import { sql } from "drizzle-orm";
-
 import {
   accountChanges,
   apps,
@@ -7,6 +5,10 @@ import {
   expectBlockedBy,
   failedDisable,
   googleScanWithLinearGrant,
+  grantAtFakeGoogle,
+  scannedLinear,
+  recordHistory,
+  withLockTimeout,
   holdBeforeCommit,
   OWNER,
   scans,
@@ -19,7 +21,6 @@ import {
   templates,
   test,
 } from "#test/support";
-import { ormOf } from "../../../core/db";
 
 test("a directory scan and a take-off for the same person both commit", async ({
   orm,
@@ -59,6 +60,52 @@ test("a directory scan and a take-off for the same person both commit", async ({
   ]);
 });
 
+test("a directory metadata update and a multi-app take-off for someone outside the scan both commit", async ({
+  orm,
+  seed,
+  fakeGoogle,
+  fakeConnectors,
+}) => {
+  const google = await googleScanWithLinearGrant(orm, fakeGoogle.url, "chloe@acme.example");
+  const person = await seed.employee({ email: "deploys@acme.example" });
+  const linear = await scannedLinear(orm, fakeConnectors.url);
+  const directoryId = (await apps(orm).directoryAppId(orm))!;
+  const template = await seed.template({ appIds: [directoryId, linear.appId] });
+  await seed.employeeTemplate({
+    templateId: template.id,
+    employeeId: person.id,
+    assignedBy: google.ownerUserId,
+  });
+  const clientId = "linear-desktop";
+  await grantAtFakeGoogle(fakeGoogle.url, {
+    email: "chloe@acme.example",
+    appName: "Linear",
+    clientId,
+  });
+  await suspendAtFakeGoogle(fakeGoogle.url, "chloe@acme.example");
+  await google.scans.scanNow(OWNER, google.connectionId);
+  const held = holdBeforeCommit(templateReviewTransactor(orm));
+  const scan = scans(orm, { transact: held.transact, googleUrl: fakeGoogle.url });
+  const saving = scan.runScan(SYSTEM, google.sourceId);
+  const pid = await held.ready;
+
+  const removing = templates(orm).takeOff(OWNER, { id: template.id, employeeId: person.id });
+  try {
+    await expectBlockedBy(orm, pid, removing);
+  } finally {
+    held.release();
+    await Promise.allSettled([saving, removing]);
+  }
+
+  await Promise.all([saving, removing]);
+  expect((await storedApps(orm)).find(({ id }) => id === linear.appId)?.externalIds).toContain(
+    `google:${clientId}`,
+  );
+  expect(await storedEmployeeAppChoices(orm)).toMatchObject([
+    { employeeId: person.id, appId: linear.appId, choice: "to_review" },
+  ]);
+});
+
 test("disabling one person's account clears its review while another person's take-off remains open", async ({
   orm,
   seed,
@@ -87,11 +134,7 @@ test("disabling one person's account clears its review while another person's ta
   });
   const review = templateReviewTransactor(orm);
   const changes = accountChanges(orm, {
-    transact: (work, options) =>
-      review(async (tx) => {
-        await ormOf(tx).execute(sql`set local lock_timeout = '2s'`);
-        return work(tx);
-      }, options),
+    transact: withLockTimeout(review),
   });
 
   try {
@@ -102,6 +145,12 @@ test("disabling one person's account clears its review while another person's ta
     held.release();
     await removing;
   }
+  const history = await recordHistory.read(orm, "employee", chloe.id, { first: 1 });
+  expect(history.edges[0]?.node).toMatchObject({
+    author: { kind: "SIGNED_IN_USER", id: owner.user!.userId },
+    cause: { kind: "DONE_BY_HAND", ref: change.id },
+    changes: [{ field: "appChoice", oldValue: linear.appId, newValue: null }],
+  });
   expect(await storedEmployeeAppChoices(orm)).toMatchObject([
     { employeeId: ivan.id, appId: slack.id },
   ]);

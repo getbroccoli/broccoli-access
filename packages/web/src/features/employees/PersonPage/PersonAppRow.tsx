@@ -4,6 +4,7 @@ import { FoundVia } from "@/components/FoundVia";
 import { TableRow, TableCell } from "@/components/ui/table";
 import {
   AccountChangeCell,
+  showsCouldntChange,
   AppAccountStatusCell,
   InviteCell,
   InviteStatusCell,
@@ -14,7 +15,7 @@ import { formatSince } from "@/lib/since";
 
 type Person = NonNullable<PersonPageQuery["employee"]>;
 type Props = {
-  row: Person["personApps"][number];
+  row: Person["personApps"]["edges"][number]["node"];
   held: Person["appAccounts"];
   invite: Person["appInvites"][number] | undefined;
   showSources: boolean;
@@ -61,8 +62,7 @@ export function PersonAppRow({ row, held, invite, showSources }: Props) {
         )}
         {held.map(
           (account) =>
-            (account.status === "SUSPENDED" ||
-              account.latestChange?.status === "FAILED" ||
+            (showsCouldntChange(account) ||
               row.state === "ACTIVE" ||
               row.state === "SUSPENDED") && (
               <AppAccountStatusCell key={account.id} appUser={account} />
@@ -71,7 +71,8 @@ export function PersonAppRow({ row, held, invite, showSources }: Props) {
         {!held.length && row.state === "ACTIVE" && (
           <StatusBadge tone="active">{t("people.status.active")}</StatusBadge>
         )}
-        {!held.length && row.state === "SUSPENDED" && (
+        {((!held.length && row.state === "SUSPENDED") ||
+          (row.state === "MISSING" && row.accountStatus === "SUSPENDED")) && (
           <StatusBadge tone="muted">{t("apps.page.inApp.disabled")}</StatusBadge>
         )}
         {invite &&

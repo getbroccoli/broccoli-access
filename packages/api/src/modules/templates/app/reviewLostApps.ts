@@ -1,5 +1,5 @@
 import type { Tx } from "../../../core/db";
-import { createRecordHistoryService } from "../../../core/records";
+import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import { PrincipalSecurityContext, type SecurityContext } from "../../../core/security";
 import { assignmentRepository, type EmployeeAppPair } from "../db";
 import type { PersonAccess, EmployeeById } from "../ports";
@@ -41,7 +41,12 @@ export async function reviewLostApps(
 }
 
 /** Checks reviews in the apps whose effective access just changed, after the scan or status update. */
-export async function clearInactiveReviews(tx: Tx, apps: PersonAccess, appIds: readonly string[]) {
+export async function clearInactiveReviews(
+  tx: Tx,
+  apps: PersonAccess,
+  appIds: readonly string[],
+  provenance: Pick<HistoryAppend, "cause" | "requestedBy">,
+) {
   const repo = assignmentRepository(tx);
   const names = await apps.lockAppsForReview(tx, appIds);
   const reviews = await repo.reviews(appIds);
@@ -58,6 +63,7 @@ export async function clearInactiveReviews(tx: Tx, apps: PersonAccess, appIds: r
     cleared,
     new Map(names.map((app) => [app.id, app.name])),
     "cleared",
+    provenance,
   );
 }
 
@@ -71,13 +77,14 @@ async function recordChoiceChanges(
   pairs: EmployeeAppPair[],
   names: ReadonlyMap<string, string>,
   action: "marked" | "cleared",
+  provenance: Pick<HistoryAppend, "cause" | "requestedBy"> = { cause: { kind: "EDITED_DIRECTLY" } },
 ) {
   if (!pairs.length) return;
   const grouped = Map.groupBy(pairs, (pair) => pair.employeeId);
   await history.append(ctx, tx, {
     recordType: "employee",
     operation: "UPDATED",
-    cause: { kind: "EDITED_DIRECTLY" },
+    ...provenance,
     records: [...grouped].map(([recordId, apps]) => ({
       recordId,
       changes: apps.map(({ appId }) =>

@@ -36,7 +36,13 @@ export const peopleEn = {
   "people.person.noTemplatesToAssign": "No templates left to assign.",
   "people.person.moreTemplates": "Show more templates",
   "people.person.loadingTemplates": "Loading templates…",
-  "people.person.templateRefreshFailed": "Template updated. Reload to see the change.",
+  "people.person.refreshFailed":
+    "Couldn’t refresh this person’s access. Any saved changes are kept.",
+  "people.person.ineligible": "Assigning {name} requires an active directory account.",
+  "people.person.suspendedTemplates":
+    "Only people active in the directory can be assigned templates.",
+  "people.person.moreApps": "Show more apps",
+  "people.person.moreFailed": "Couldn’t load more. Try again.",
   "people.person.templateChangeFailed": "Couldn’t update {name}. Reload and try again.",
   "people.person.role": "Role",
   "people.person.from": "From",

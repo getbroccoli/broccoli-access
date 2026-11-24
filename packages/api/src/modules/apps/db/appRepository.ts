@@ -106,13 +106,13 @@ export function appRepository(db: Orm | Tx): AppRepository {
         ]),
       ) as Record<AppStatus, number>;
     },
-    lockForReview: (ids) =>
-      orm()
-        .select({ id: apps.id, name: apps.name })
-        .from(apps)
-        .where(anyOf(apps.id, ids))
-        .orderBy(apps.id)
-        .for("no key update"),
+    async lockForReview(ids) {
+      // Metadata updates can already hold app rows in scan order. Review locks have their own namespace.
+      await orm()
+        .execute(sql`select pg_advisory_xact_lock(hashtextextended('template-review/' || id, 0))
+        from (select distinct id from unnest(${sql.param([...ids])}::uuid[]) as ids(id) order by id) as ordered`);
+      return orm().select({ id: apps.id, name: apps.name }).from(apps).where(anyOf(apps.id, ids));
+    },
     findByIds: (ids) => orm().select().from(apps).where(anyOf(apps.id, ids)),
     findById: async (id) => {
       const [app] = await orm().select().from(apps).where(eq(apps.id, id));

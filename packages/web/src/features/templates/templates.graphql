@@ -21,12 +21,12 @@ query TemplatesPage {
 
 # shortcut: reads up to 10,000 approved apps at once for "Add app"; search them once a company
 # approves more.
-query TemplatePage($id: ID!, $after: String) {
+query TemplatePage($id: ID!) {
   template(id: $id) {
     id
     name
     peopleCount
-    people(first: 6, after: $after) {
+    people(first: 6) {
       pageInfo {
         hasNextPage
         endCursor
@@ -156,6 +156,26 @@ mutation TakeOutTemplateApp($input: TemplateTakeOutAppInput!) {
         __typename
         ... on Error {
           message
+        }
+      }
+    }
+  }
+}
+
+query MoreTemplatePeople($id: ID!, $after: String!) {
+  template(id: $id) {
+    id
+    people(first: 6, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      edges {
+        node {
+          id
+          firstName
+          lastName
+          avatarUrl
         }
       }
     }

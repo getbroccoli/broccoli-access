@@ -65,23 +65,23 @@ export async function readAppInvites(
   dependencies: AccountChangeDependencies,
   ctx: SecurityContext,
   employeeIds: readonly string[],
+  db = dependencies.orm,
 ): Promise<AppInvite[]> {
   ctx.require("MANAGE_WORKSPACE");
-  const { orm } = dependencies;
-  const employees = await dependencies.employees.readEmployees(ctx, employeeIds);
+  const employees = await dependencies.employees.readEmployees(ctx, employeeIds, db);
   const [connectors, connections] = await Promise.all([
     dependencies.connectors.list(),
-    appConnectionRepository(orm).findAll(),
+    appConnectionRepository(db).findAll(),
   ]);
-  const facts = await readInviteFacts(dependencies, orm, { employees, connections, connectors });
-  const byAppName = await sortByAppName(orm, connections);
+  const facts = await readInviteFacts(dependencies, db, { employees, connections, connectors });
+  const byAppName = await sortByAppName(db, connections);
   const rows = employees.flatMap((employee) =>
     byAppName.flatMap((connection) => appInviteOf(employee, connection, facts) ?? []),
   );
   const running = rows.flatMap(({ latestInvite }) =>
     latestInvite?.status === "running" ? [latestInvite.id] : [],
   );
-  const ahead = await accountChangeRepository(orm).countChangesAhead(running);
+  const ahead = await accountChangeRepository(db).countChangesAhead(running);
   return rows.map((row) => ({
     ...row,
     latestInvite: row.latestInvite && withPlace(row.latestInvite, ahead),

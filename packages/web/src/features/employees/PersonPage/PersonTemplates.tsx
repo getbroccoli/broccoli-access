@@ -1,8 +1,12 @@
 import { useRef, useState } from "react";
 import { X } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { AssignTemplateDocument, TakeOffTemplateDocument } from "@/__generated__/graphql";
-import { usePayloadMutation } from "@/apollo";
+import {
+  AssignTemplateDocument,
+  TakeOffTemplateDocument,
+  PersonPageDocument,
+} from "@/__generated__/graphql";
+import { PayloadFailure, usePayloadMutation } from "@/apollo";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,29 +19,34 @@ import { t } from "@/i18n";
 type Template = { id: string; name: string };
 type Props = {
   person: { id: string; firstName: string; status?: string | null; templates: readonly Template[] };
-  refresh: () => Promise<unknown>;
 };
 
 /** The person's assigned templates. Removing a chip returns focus to the section. */
-export function PersonTemplates({ person, refresh }: Props) {
-  const [assign] = usePayloadMutation(AssignTemplateDocument);
-  const [takeOff] = usePayloadMutation(TakeOffTemplateDocument);
-  const [busy, setBusy] = useState(false);
+export function PersonTemplates({ person }: Props) {
+  const [assign, assigning] = usePayloadMutation(AssignTemplateDocument, {
+    refetch: [PersonPageDocument],
+  });
+  const [takeOff, takingOff] = usePayloadMutation(TakeOffTemplateDocument, {
+    refetch: [PersonPageDocument],
+  });
+  const busy = assigning.loading || takingOff.loading;
   const heading = useRef<HTMLHeadingElement>(null);
   const [open, setOpen] = useState(false);
 
   async function change(template: Template, action: "assign" | "takeOff") {
-    setBusy(true);
     try {
       const mutate = action === "assign" ? assign : takeOff;
       await mutate({ variables: { input: { id: template.id, employeeId: person.id } } });
-      // The server recomputes app states, including those that just lost their last source.
-      await refresh().catch(() => toast.error(t("people.person.templateRefreshFailed")));
       if (action === "takeOff") heading.current?.focus();
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof PayloadFailure &&
+        (error.payloadError as { __typename?: string }).__typename === "InvalidInputError"
+      ) {
+        toast.error(t("people.person.ineligible", { name: template.name }));
+        return;
+      }
       toast.error(t("people.person.templateChangeFailed", { name: template.name }));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -91,15 +100,17 @@ export function PersonTemplates({ person, refresh }: Props) {
             <DropdownMenuContent align="start" className="max-h-80 overflow-y-auto">
               {open && (
                 <TemplateOptions
-                  assigned={person.templates}
+                  employeeId={person.id}
                   onAssign={(template) => void change(template, "assign")}
                 />
               )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        {person.status !== "ACTIVE" && !person.templates.length && (
-          <span className="text-sm text-muted-foreground">{t("people.person.noTemplates")}</span>
+        {person.status !== "ACTIVE" && (
+          <span className="text-sm text-muted-foreground">
+            {t("people.person.suspendedTemplates")}
+          </span>
         )}
       </div>
     </section>

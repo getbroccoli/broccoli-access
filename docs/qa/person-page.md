@@ -30,8 +30,9 @@ Approve Slack again on its page, connect Linear as in [Connections settings](con
 
 ### Account actions with templates
 
-- [ ] Create a template named Linear users with Linear as its only app. Assign it to Chloé, then take it off. Her Linear row shows **Extra** and still offers **Disable**. Disable it from that row. Progress gives way to **Disabled** and **Enable**, and Extra clears.
-- [ ] Assign Linear users to Chloé again. The row shows both **Disabled** and **Missing**. Set `fail unexpected_response` as described above, then choose **Enable**. Open the failure, choose **I did it by hand** and confirm. Without reloading, the row shows **Active** and **Disable**, and Missing clears.
+- [ ] Create a template named Linear users with Linear as its only app. Assign it to Chloé, then take it off. Her Linear row shows **Active** and **Extra** together and still offers **Disable**. Disable it from that row. Progress gives way to **Disabled** and **Enable**, and Extra clears.
+- [ ] Assign Linear users to Chloé again. The row shows both **Disabled** and **Missing**. Set `fail unexpected_response` as described above, then choose **Enable**. Open the failure and choose **I did it by hand**. With the Network panel recording, use a local test proxy to allow the confirmation mutation and fail the next person-page read once. Confirm. The page says the change was saved, explains that the displayed access could not refresh and offers a retry.
+- [ ] Retry from that message. The Network panel shows a read and just one confirmation mutation across both attempts. Without a reload, the row shows **Active** and **Disable**, and Missing clears.
 
 ## Invite
 
@@ -60,7 +61,9 @@ Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page
 ### Picker requests and interrupted refresh
 
 - [ ] Open the browser's Network panel before loading an active person's page. Inspect the GraphQL operations on load and while an account change is running. The closed picker makes no request for the template catalog. Open **+ Assign template** and check that it requests a bounded page of options. Close it and check that account polling leaves the catalog alone. Opening suspended Ana's page also leaves the catalog alone.
-- [ ] Open Ivan's picker. Use a local HTTP test proxy to let **Assign template** succeed and fail the next person-page read. Assign Engineer. Verify the mutation response contains the saved template and a null error. The page does not report that the assignment failed. If it reports a refresh error, retry the read. Restore the connection and reopen Ivan. Engineer appears once and its people count includes Ivan once.
+- [ ] Open Ivan's picker. Use a local HTTP test proxy to let **Assign template** succeed and fail the next person-page read. Assign Engineer. Verify the mutation response contains the saved template and a null error. The page says the assignment was saved, explains the refresh failure and offers a retry. Restore the connection and retry from that message. In the Network panel, verify that retry sends a read and the assignment mutation ran only once. Engineer appears once and its people count includes Ivan once.
+- [ ] Create 13 templates named Picker 01 through Picker 13 and assign the first 12 to Ivan. Give Ivan any earlier alphabetic templates too. Open his picker again. The first page offers Picker 13 without an extra click to get past the 12 assigned templates.
+- [ ] Keep Ivan's picker open with Picker 13 available. In the fake Google, suspend Ivan with `POST <fake>/_fake/users/ivan@acme.example/suspend`. In another tab, run **Scan now** for Google and wait for success. In the original tab choose Picker 13. The refusal explains that assigning it requires someone active in the directory. After refreshing, Ivan keeps his existing chips and their take-off buttons, with an explanation beside them of why he cannot receive another template. Picker 13 was never assigned.
 
 ## No delete
 

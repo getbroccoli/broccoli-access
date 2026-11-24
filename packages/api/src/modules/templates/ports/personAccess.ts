@@ -14,7 +14,6 @@ export interface PersonAccess {
     {
       employeeId: string;
       appId: string;
-      inDirectory: boolean;
       status: AccountStatus;
     }[]
   >;

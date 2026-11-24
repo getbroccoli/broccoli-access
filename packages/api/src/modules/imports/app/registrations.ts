@@ -18,7 +18,7 @@ declare module "../../../core/jobs" {
 
 declare module "../../../core/events" {
   interface DomainEvents {
-    "imports.appScanned": { appId: string };
+    "imports.appScanned": { appId: string; sourceId: string };
   }
 }
 

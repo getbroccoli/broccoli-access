@@ -35,6 +35,7 @@ test("lists a shared app once with both template sources and the apps each templ
   await seed.employeeTemplate({ ...assignment, templateId: everyone.id });
   await seed.employeeTemplate({ ...assignment, templateId: engineer.id });
   await seed.appAccount({ employeeId: ivan.id, appId: figma.id });
+  await seed.appAccount({ employeeId: ivan.id, appId: figma.id, status: "suspended" });
   await seed.appAccount({ employeeId: ivan.id, appId: slack.id, status: "suspended" });
 
   const [empty, rows] = await templates(orm).readEmployeeApps(OWNER, [nobodyAssigned.id, ivan.id]);
@@ -43,20 +44,22 @@ test("lists a shared app once with both template sources and the apps each templ
   const fromEngineer: unknown = expect.objectContaining({ id: engineer.id, name: engineer.name });
   expect(empty).toEqual([]);
   expect(rows).toHaveLength(3);
-  expect(rows).toContainEqual({
+  expect.soft(rows).toContainEqual({
     appId: figma.id,
+    accountStatus: "active",
     templates: [fromEveryone],
     role: null,
     state: "active",
   });
-  expect(rows).toContainEqual({
+  expect.soft(rows).toContainEqual({
     appId: linear.id,
+    accountStatus: null,
     templates: [fromEngineer],
     role: null,
     state: "missing",
   });
   const shared = rows!.find(({ appId }) => appId === slack.id);
-  expect(shared).toMatchObject({ role: null, state: "missing" });
+  expect.soft(shared).toMatchObject({ accountStatus: "suspended", role: null, state: "missing" });
   expect(shared!.templates).toHaveLength(2);
   expect(shared!.templates).toEqual(expect.arrayContaining([fromEveryone, fromEngineer]));
 });
@@ -100,13 +103,13 @@ test("marks only active accounts in another template as extra once the person ha
   ]);
 
   const account = { templates: [], role: null };
-  expect(without).toEqual([{ ...account, appId: listed.id, state: "active" }]);
+  expect(without).toMatchObject([{ ...account, appId: listed.id, state: "active" }]);
   expect(withApps).toHaveLength(3);
   expect(withApps).toEqual(
     expect.arrayContaining([
-      { ...account, appId: listed.id, state: "extra" },
-      { ...account, appId: quiet.id, state: "active" },
-      { ...account, appId: suspended.id, state: "suspended" },
+      expect.objectContaining({ ...account, appId: listed.id, state: "extra" }),
+      expect.objectContaining({ ...account, appId: quiet.id, state: "active" }),
+      expect.objectContaining({ ...account, appId: suspended.id, state: "suspended" }),
     ]),
   );
 });

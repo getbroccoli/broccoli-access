@@ -17,8 +17,11 @@ export function CurrentAccessTable({ person }: { person: Person }) {
   const accounts = Map.groupBy(person.appAccounts, (account) => account.app.id);
   const invites = new Map(person.appInvites.map((invite) => [invite.app.id, invite]));
   const showSources =
-    person.templates.length > 0 || person.personApps.some((row) => row.state === "EXTRA");
-  const rows = person.personApps.toSorted((a, b) => a.app.name.localeCompare(b.app.name));
+    person.templates.edges.length > 0 ||
+    person.personApps.edges.some(({ node }) => node.state === "EXTRA");
+  const rows = person.personApps.edges
+    .map((edge) => edge.node)
+    .toSorted((a, b) => a.app.name.localeCompare(b.app.name));
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
       <Table>

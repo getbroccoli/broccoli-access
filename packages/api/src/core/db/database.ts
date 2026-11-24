@@ -62,3 +62,8 @@ export function connectDatabase(url: string, logger: Logger): Database {
     },
   };
 }
+
+/** Materialise related reads in one committed database snapshot; no writes or events. */
+export function readSnapshot<T>(orm: Orm, read: (db: Orm) => Promise<T>): Promise<T> {
+  return orm.transaction(read, { isolationLevel: "repeatable read", accessMode: "read only" });
+}

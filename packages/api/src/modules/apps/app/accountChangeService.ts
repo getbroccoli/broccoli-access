@@ -56,7 +56,11 @@ export interface AccountChangeService {
    * found no member with their email, where Invite or Reconnect is offered or an invite was asked;
    * by employee, then app name. Needs MANAGE_WORKSPACE.
    */
-  readAppInvites: (ctx: SecurityContext, employeeIds: readonly string[]) => Promise<AppInvite[]>;
+  readAppInvites: (
+    ctx: SecurityContext,
+    employeeIds: readonly string[],
+    db?: Orm,
+  ) => Promise<AppInvite[]>;
   /**
    * The run's job: makes the change through the connector, trying a rate-limited or unavailable
    * call again; saves a renewed connection first. When the member reads back with the new status,
@@ -79,6 +83,7 @@ export interface AccountChangeService {
   readChangeStates: (
     ctx: SecurityContext,
     appAccountIds: readonly string[],
+    db?: Orm,
   ) => Promise<Map<string, AccountChangeState>>;
   /**
    * Each of the connections' app, status and, while it needs reconnecting, why, by connection id;
@@ -179,19 +184,19 @@ export function createAccountChangeService(
       return change;
     },
     inviteEmployee: (ctx, input) => inviteEmployee(dependencies, ctx, input),
-    readAppInvites: (ctx, employeeIds) => readAppInvites(dependencies, ctx, employeeIds),
+    readAppInvites: (ctx, employeeIds, db) => readAppInvites(dependencies, ctx, employeeIds, db),
     runChange: (ctx, changeId) => runAccountChange(run, ctx, changeId),
     failChange: (ctx, changeId) => failRunningChange(dependencies, ctx, changeId),
     markChangeDoneByHand: (ctx, changeId) => markChangeDoneByHand(dependencies, ctx, changeId),
-    async readChangeStates(ctx, appAccountIds) {
+    async readChangeStates(ctx, appAccountIds, db = orm) {
       ctx.require("MANAGE_WORKSPACE");
       const changing = await changingConnectors(dependencies.connectors);
-      const accounts = await appAccountRepository(orm).findByIds(appAccountIds);
-      const facts = await readAccountFacts(dependencies, orm, accounts, changing);
+      const accounts = await appAccountRepository(db).findByIds(appAccountIds);
+      const facts = await readAccountFacts(dependencies, db, accounts, changing);
       const running = [...facts.values()].flatMap(({ latest }) =>
         latest?.status === "running" ? [latest.id] : [],
       );
-      const ahead = await accountChangeRepository(orm).countChangesAhead(running);
+      const ahead = await accountChangeRepository(db).countChangesAhead(running);
       return new Map(
         accounts.map(({ id }) => {
           const { isConnectionUser, latest, offered, reconnectOffered } = facts.get(id)!;

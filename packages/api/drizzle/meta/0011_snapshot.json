@@ -1,5 +1,5 @@
 {
-  "id": "de5a41db-67f6-40d6-9c17-a9884ad3126c",
+  "id": "74e52e87-ba4f-43bf-9c0a-677508613e5a",
   "prevId": "fafd8645-58f6-4100-902f-01bcf63aa4fb",
   "version": "7",
   "dialect": "postgresql",
@@ -884,7 +884,29 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "app_accounts_employee_app": {
+          "name": "app_accounts_employee_app",
+          "columns": [
+            {
+              "expression": "employee_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "app_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "app_accounts_app_id_apps_id_fk": {
           "name": "app_accounts_app_id_apps_id_fk",
@@ -1669,7 +1691,24 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "employee_app_choices_review_app": {
+          "name": "employee_app_choices_review_app",
+          "columns": [
+            {
+              "expression": "app_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"employee_app_choices\".\"choice\" = 'to_review'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "employee_app_choices_employee_id_app_id_pk": {
