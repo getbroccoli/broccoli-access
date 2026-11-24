@@ -218,7 +218,7 @@ const linearDescription = {
       key: "apiKey",
       kind: "text",
       label: "Personal API key",
-      help: "In Linear, signed in as an admin, open Settings → Account → Security & access, create a personal API key with full access and paste it here.",
+      help: "In Linear, signed in as an admin, open Settings → Security & access, click New API key under Personal API keys, give it full access and paste it here.",
       secret: true,
     },
   ],
