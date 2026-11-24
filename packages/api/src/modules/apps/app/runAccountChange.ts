@@ -1,6 +1,7 @@
 import {
   canChangeAccounts,
   canInvite,
+  offersInviteRole,
   type ConnectionUpdate,
   type Connector,
   ConnectorError,
@@ -171,8 +172,9 @@ async function runAction(
 }
 
 /** Whether the connector makes the change: it disables and enables accounts, or invites. */
-function canMake(connector: Connector, { action }: AccountChange): boolean {
-  return action === "invite" ? canInvite(connector) : canChangeAccounts(connector);
+function canMake(connector: Connector, { action, role }: AccountChange): boolean {
+  if (action !== "invite") return canChangeAccounts(connector);
+  return canInvite(connector) && offersInviteRole(connector.roles, role);
 }
 
 /**
@@ -185,7 +187,7 @@ async function makeChange(
   change: AccountChange,
 ): Promise<{ readBack: boolean; connection?: ConnectionUpdate }> {
   if (change.action === "invite") {
-    return { ...(await session.invite!(change.email)), readBack: true };
+    return { ...(await session.invite!(change.email, change.role ?? undefined)), readBack: true };
   }
   // A Disable or Enable always copies the member's source key.
   const account = { sourceKey: change.sourceKey!, email: change.email };

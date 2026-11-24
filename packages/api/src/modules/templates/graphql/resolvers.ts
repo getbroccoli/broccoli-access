@@ -92,6 +92,13 @@ export function createResolvers(
       },
     },
     PersonApp: {
+      roleSources: (row) =>
+        row.roleConflict
+          ? row.templates.map((template) => ({
+              template,
+              role: template.apps.find(({ appId }) => appId === row.appId)!.role,
+            }))
+          : [],
       accountStatus: ({ accountStatus }) => accountStatus && toEnum(accountStatus),
       state: ({ state }) => state && toEnum(state),
     },
@@ -108,6 +115,21 @@ export function createResolvers(
       templates: () => ({}),
     },
     TemplatesMutations: {
+      setAppRole: (_parent, { input }, context) =>
+        mutationPayload<ResolversTypes["TemplateSetAppRolePayload"]>(
+          async () => ({
+            template: await services.setAppRole(context.getActor(), {
+              ...input,
+              role: input.role ?? null,
+            }),
+          }),
+          ["INVALID_INPUT", "NOT_FOUND"],
+        ),
+      pickRole: (_parent, { input }, context) =>
+        mutationPayload<ResolversTypes["TemplatePickRolePayload"]>(async () => {
+          await services.pickRole(context.getActor(), { ...input, role: input.role ?? null });
+          return {};
+        }, ["CONFLICT", "INVALID_INPUT", "NOT_FOUND"]),
       assign: (_parent, { input }, context) =>
         mutationPayload<ResolversTypes["TemplateAssignPayload"]>(
           async () => ({ template: await services.assign(context.getActor(), input) }),

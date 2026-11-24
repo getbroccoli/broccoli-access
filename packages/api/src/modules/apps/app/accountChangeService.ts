@@ -1,5 +1,5 @@
 import { ApplicationError } from "../../../core/applicationError";
-import type { AccountAction, ConnectorRegistry } from "../../../core/connectors";
+import type { AccountAction, Connector, ConnectorRegistry } from "../../../core/connectors";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import type { JobQueue } from "../../../core/jobs";
 import type { Logger } from "../../../core/logger";
@@ -109,6 +109,11 @@ export interface AccountChangeService {
     ctx: SecurityContext,
     args: PageArgs,
   ) => Promise<Connection<LatestAccountChange>>;
+  /** The invite roles offered by each app's connection, in manifest order. */
+  readAppRoles: (
+    ctx: SecurityContext,
+    appIds: readonly string[],
+  ) => Promise<Map<string, NonNullable<Connector["roles"]>>>;
   /** The names of these users, by user id; for who asked for account changes. Needs MANAGE_WORKSPACE. */
   readRequesterNames: (
     ctx: SecurityContext,
@@ -150,6 +155,8 @@ export interface AccountChangeDependencies {
   secretBox: SecretBox;
   /** Every connector a connection may name. */
   connectors: ConnectorRegistry;
+  /** Template sources and personal choices at the time of the invite. */
+  readInviteRole: (tx: Tx, employeeId: string, appId: string) => Promise<string | null>;
   members: ConnectionMembers;
   /** The employees module, which owns their emails, which invites go to. */
   employees: EmployeesByName;
@@ -226,6 +233,17 @@ export function createAccountChangeService(
         ]),
       );
     },
+    async readAppRoles(ctx, appIds) {
+      ctx.require("MANAGE_WORKSPACE");
+      const [connections, connectors] = await Promise.all([
+        appConnectionRepository(orm).findByApps(appIds),
+        dependencies.connectors.list(),
+      ]);
+      const byKey = new Map(connectors.map(({ key, roles }) => [key, roles ?? []]));
+      return new Map(
+        connections.map(({ appId, connector }) => [appId, byKey.get(connector) ?? []]),
+      );
+    },
     async findAppsWithChangeableAccounts(ctx, appIds) {
       ctx.require("MANAGE_WORKSPACE");
       const [connections, changing] = await Promise.all([
@@ -300,6 +318,7 @@ async function askForChange(
     connectionId: connection.id,
     action,
     sourceKey: member.sourceKey,
+    role: null,
     requestedBy,
     requestedAt: new Date(),
   });

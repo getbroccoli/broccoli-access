@@ -1,6 +1,7 @@
 import {
   type AccountAction as ContractAccountAction,
   type Capability,
+  type ConnectorDescription,
   type ConnectorErrorCode as ContractErrorCode,
   type RuntimeKind,
 } from "@broccoli-access/connector-contract";
@@ -20,6 +21,8 @@ export interface Connector {
    * change them, `invite` to invite an email, and `list_invitations` to read the pending ones.
    */
   capabilities: readonly Capability[];
+  /** The roles its manifest offers on Invite. */
+  roles?: ConnectorDescription["roles"];
   /** Where its calls can run, in the order they are tried. */
   runtimes: readonly RuntimeKind[];
   /** The finding kinds it registers: what finds accounts of its own app, and of other apps. */
@@ -77,7 +80,7 @@ export interface ConnectorSession {
    * Invites the email as a member, unless it already has a member or a pending invitation, then
    * reads the invitation or the member back. A connector that lists `invite` has it.
    */
-  invite?(email: string): Promise<InviteResult>;
+  invite?(email: string, role?: string): Promise<InviteResult>;
 }
 
 export interface ConnectionDetails {
@@ -222,6 +225,11 @@ export function canInvite({
   runtimes,
 }: Pick<Connector, "capabilities" | "runtimes">): boolean {
   return capabilities.includes("invite") && runtimes.includes("server");
+}
+
+/** Null asks for the default, even on a connector that does not list roles. */
+export function offersInviteRole(roles: Connector["roles"], role: string | null): boolean {
+  return role === null || !!roles?.some(({ key }) => key === role);
 }
 
 /** Whether its scans read the app's pending invitations: it lists `list_invitations`. */

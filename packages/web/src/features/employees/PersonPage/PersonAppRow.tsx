@@ -1,3 +1,4 @@
+import { PersonAppRole } from "./PersonAppRole";
 import type { PersonPageQuery } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
 import { FoundVia } from "@/components/FoundVia";
@@ -17,6 +18,7 @@ type Person = NonNullable<PersonPageQuery["employee"]>;
 type Props = {
   row: Person["personApps"]["edges"][number]["node"];
   account: Person["appAccounts"][number] | undefined;
+  employeeId: string;
   showEmail: boolean;
   first: boolean;
   span: number;
@@ -25,9 +27,18 @@ type Props = {
 };
 
 /** The role, sources, status and account actions for one app. */
-export function PersonAppRow({ row, account, showEmail, first, span, invite, showSources }: Props) {
+export function PersonAppRow({
+  row,
+  account,
+  employeeId,
+  showEmail,
+  first,
+  span,
+  invite,
+  showSources,
+}: Props) {
   return (
-    <TableRow>
+    <TableRow className={row.roleConflict ? "bg-amber-50/70" : undefined}>
       <TableCell className="h-12 pl-4">
         {first && (
           <span className="flex items-center gap-2.5 font-medium">
@@ -42,7 +53,9 @@ export function PersonAppRow({ row, account, showEmail, first, span, invite, sho
       {showSources ? (
         first && (
           <>
-            <TableCell rowSpan={span}>{row.role ?? "—"}</TableCell>
+            <TableCell rowSpan={span}>
+              <PersonAppRole row={row} employeeId={employeeId} />
+            </TableCell>
             <TableCell rowSpan={span}>
               {row.templates.map((template) => template.name).join(", ") ||
                 t("people.person.noTemplate")}
@@ -88,9 +101,11 @@ export function PersonAppRow({ row, account, showEmail, first, span, invite, sho
       </TableCell>
       <TableCell className="pr-4 text-right">
         {account && <AccountChangeCell appUser={account} />}
-        {invite && (row.state !== "INVITED" || invite.latestInvite?.status === "RUNNING") && (
-          <InviteCell appInvite={invite} />
-        )}
+        {invite &&
+          !row.roleConflict &&
+          (row.state !== "INVITED" || invite.latestInvite?.status === "RUNNING") && (
+            <InviteCell appInvite={invite} />
+          )}
       </TableCell>
     </TableRow>
   );

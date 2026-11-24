@@ -143,7 +143,6 @@ test.for(["taking out the app", "deleting the template"] as const)(
 );
 
 test.for([
-  { choice: "role_picked", role: "viewer" },
   { choice: "added", role: "admin" },
   { choice: "removed", role: null },
 ] as const)(

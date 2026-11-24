@@ -1,0 +1,1 @@
+ALTER TABLE "account_changes" ADD COLUMN "role" text;

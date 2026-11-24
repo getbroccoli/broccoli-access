@@ -31,7 +31,7 @@ import {
 import { createImportRecordService, createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
 import { createPersonPageReader, personPageLoader } from "./personPageReader";
-import { createTemplateService, templatesModule } from "./templates";
+import { readInviteRole, createTemplateService, templatesModule } from "./templates";
 
 /** Settings that only some modules need, read from the environment by `main.ts`. */
 export interface ModuleSettings {
@@ -99,6 +99,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   });
   const employees = createEmployeeReadService({ ...core, accounts: apps });
   const changes = createAccountChangeService({
+    readInviteRole,
     ...core,
     connectors,
     members: importRecords,
@@ -112,7 +113,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   });
   const templates = createTemplateService({
     ...core,
-    apps: { ...apps, readAppInvites: changes.readAppInvites },
+    apps: { ...apps, readAppRoles: changes.readAppRoles, readAppInvites: changes.readAppInvites },
     employees,
   });
   const people = personPageLoader(

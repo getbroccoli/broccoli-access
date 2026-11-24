@@ -1,6 +1,10 @@
 import { toast } from "sonner";
 
-import { AddTemplateAppDocument, TakeOutTemplateAppDocument } from "@/__generated__/graphql";
+import {
+  AddTemplateAppDocument,
+  SetTemplateAppRoleDocument,
+  TakeOutTemplateAppDocument,
+} from "@/__generated__/graphql";
 import { PayloadFailure, usePayloadMutation } from "@/apollo";
 import { t } from "@/i18n";
 
@@ -13,9 +17,17 @@ type App = { id: string; name: string };
 export function useTemplateAppChanges(templateId: string) {
   const [addApp, adding] = usePayloadMutation(AddTemplateAppDocument);
   const [takeOutApp, takingOut] = usePayloadMutation(TakeOutTemplateAppDocument);
+  const [setRole, settingRole] = usePayloadMutation(SetTemplateAppRoleDocument);
   const input = (app: App) => ({ variables: { input: { id: templateId, appId: app.id } } });
   return {
-    changing: adding.loading || takingOut.loading,
+    changing: adding.loading || takingOut.loading || settingRole.loading,
+    setRole: async (app: App, role: string) => {
+      try {
+        await setRole({ variables: { input: { id: templateId, appId: app.id, role } } });
+      } catch {
+        toast.error(t("templates.role.failed", { app: app.name }));
+      }
+    },
     /** Adds the app; a failure shows as a toast. */
     add: (app: App) =>
       addApp(input(app)).then(

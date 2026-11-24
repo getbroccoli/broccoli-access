@@ -199,11 +199,16 @@ function templateDependencies(
   orm: Orm,
   options: { connectors?: ConnectorRegistry; transact?: Transact },
 ) {
+  const changes = accountChanges(orm, options);
   return {
     orm,
     transact: options.transact ?? testTransactor(orm),
     logger: createLogger("silent"),
-    apps: { ...apps(orm), readAppInvites: accountChanges(orm, options).readAppInvites },
+    apps: {
+      ...apps(orm),
+      readAppRoles: changes.readAppRoles,
+      readAppInvites: changes.readAppInvites,
+    },
     employees: employeeServices(orm),
   };
 }

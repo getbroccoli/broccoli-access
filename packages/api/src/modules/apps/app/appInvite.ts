@@ -1,5 +1,10 @@
 import { ApplicationError } from "../../../core/applicationError";
-import { canInvite, type Connector, listsInvitations } from "../../../core/connectors";
+import {
+  canInvite,
+  type Connector,
+  listsInvitations,
+  offersInviteRole,
+} from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
@@ -97,21 +102,18 @@ interface InvitedEmployee {
   email: string;
 }
 
+interface InviteRequest {
+  employee: InvitedEmployee;
+  appId: string;
+  requestedBy: string;
+  connectors: readonly Connector[];
+}
+
 /** Writes the running invite and queues its run, refusing an unknown app and what is not offered. */
 async function askForInvite(
   dependencies: AccountChangeDependencies,
   tx: Tx,
-  {
-    employee,
-    appId,
-    requestedBy,
-    connectors,
-  }: {
-    employee: InvitedEmployee;
-    appId: string;
-    requestedBy: string;
-    connectors: readonly Connector[];
-  },
+  { employee, appId, requestedBy, connectors }: InviteRequest,
 ): Promise<AppInvite> {
   await appAccountRepository(tx).lockForSync();
   const connection = await findConnectionOfApp(tx, appId);
@@ -123,6 +125,12 @@ async function askForInvite(
   if (!appInviteOf(employee, connection, facts)?.offered) {
     throw new ApplicationError("CONFLICT", NOT_OFFERED);
   }
+  await appRepository(tx).lockForReview([appId]);
+  const role = await dependencies.readInviteRole(tx, employee.id, appId);
+  const connector = connectors.find(({ key }) => key === connection.connector);
+  if (!offersInviteRole(connector?.roles, role)) {
+    throw new ApplicationError("CONFLICT", "The app no longer offers this role.");
+  }
   const changes = accountChangeRepository(tx);
   const change = await changes.insertRunning({
     appAccountId: null,
@@ -130,6 +138,7 @@ async function askForInvite(
     email: employee.email,
     connectionId: connection.id,
     action: "invite",
+    role,
     sourceKey: null,
     requestedBy,
     requestedAt: new Date(),

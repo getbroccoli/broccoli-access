@@ -167,6 +167,7 @@ function containerConnector(
     name,
     appDomain,
     capabilities,
+    roles: description.roles,
     runtimes,
     notice,
     adminUrl,
@@ -238,9 +239,9 @@ function containerSession(
       }
       return { status: answer.account.values.status, connection: answer.connection };
     },
-    async invite(email) {
+    async invite(email, role) {
       const answer = answerOf(
-        await client.runAction({ ...request(), action: "invite", account: { email } }),
+        await client.runAction({ ...request(), action: "invite", account: { email, role } }),
       );
       keep(answer.connection);
       // Success is the invitation, or the email's member, read back.

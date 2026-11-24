@@ -5,6 +5,7 @@ import type { Template } from "./template";
 export interface PersonApp {
   appId: string;
   templates: Template[];
+  roleConflict: boolean;
   role: string | null;
   accountStatus: AccountStatus | null;
   state: "active" | "suspended" | "missing" | "invited" | "extra" | null;
@@ -27,11 +28,12 @@ interface PersonAppFacts {
 
 /** Combines assignments, choices and actual access once per app, including apps only offering Invite. */
 export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
-  const sources = new Map<string, Template[]>();
+  const sources = new Map<string, { templates: Template[]; roles: Set<string | null> }>();
   for (const template of facts.templates) {
-    for (const { appId } of template.apps) {
-      const giving = sources.get(appId) ?? [];
-      giving.push(template);
+    for (const { appId, role } of template.apps) {
+      const giving = sources.get(appId) ?? { templates: [], roles: new Set<string | null>() };
+      giving.templates.push(template);
+      giving.roles.add(role);
       sources.set(appId, giving);
     }
   }
@@ -49,7 +51,8 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
   ]);
   const rows: PersonApp[] = [];
   for (const appId of ids) {
-    const templates = sources.get(appId) ?? [];
+    const source = sources.get(appId);
+    const templates = source?.templates ?? [];
     const choice = choices.get(appId);
     const expected =
       choice?.choice === "added" || (templates.length > 0 && choice?.choice !== "removed");
@@ -62,12 +65,23 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
     rows.push({
       appId,
       templates,
-      role: choice?.role ?? null,
+      ...personAppRole(source?.roles ?? new Set(), choice),
       accountStatus: account ?? null,
       state,
     });
   }
   return rows;
+}
+
+/** A choice of default is as explicit as any other picked role. */
+export function personAppRole(roles: ReadonlySet<string | null>, choice?: EmployeeAppChoice) {
+  if (choice?.choice === "added") return { role: choice.role, roleConflict: false };
+  if (choice?.choice === "removed") return { role: null, roleConflict: false };
+  if (roles.size < 2) return { role: roles.values().next().value ?? null, roleConflict: false };
+  if (choice?.choice === "role_picked" && roles.has(choice.role)) {
+    return { role: choice.role, roleConflict: false };
+  }
+  return { role: null, roleConflict: true };
 }
 
 function appState({

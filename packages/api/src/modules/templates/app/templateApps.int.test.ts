@@ -69,7 +69,7 @@ test("adding an existing app after it was ignored preserves the template and his
 
   expect(unchanged).toEqual({
     ...template,
-    apps: [{ id: memberships[0]!.id, appId: app.id }],
+    apps: [{ id: memberships[0]!.id, appId: app.id, role: null }],
     peopleCount: 0,
   });
   expect(await storedTemplateApps(orm)).toEqual(memberships);
@@ -159,7 +159,7 @@ test("taking out an app outside the template preserves its members and history",
 
   expect(updated).toMatchObject({
     id: template.id,
-    apps: [{ id: before[0]!.id, appId: member.id }],
+    apps: [{ id: before[0]!.id, appId: member.id, role: null }],
   });
   expect(await storedTemplateApps(orm)).toEqual(before);
   expect(await storedRecordHistory(orm)).toEqual([]);

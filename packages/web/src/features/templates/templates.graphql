@@ -42,10 +42,17 @@ query TemplatePage($id: ID!) {
     }
     apps {
       id
+      role
       app {
         id
         name
         catalogKey
+        connected
+        roles {
+          key
+          name
+          isDefault
+        }
       }
     }
   }
@@ -126,10 +133,17 @@ mutation AddTemplateApp($input: TemplateAddAppInput!) {
         id
         apps {
           id
+          role
           app {
             id
             name
             catalogKey
+            connected
+            roles {
+              key
+              name
+              isDefault
+            }
           }
         }
       }
@@ -176,6 +190,26 @@ query MoreTemplatePeople($id: ID!, $after: String!) {
           firstName
           lastName
           avatarUrl
+        }
+      }
+    }
+  }
+}
+
+mutation SetTemplateAppRole($input: TemplateSetAppRoleInput!) {
+  templates {
+    setAppRole(input: $input) {
+      template {
+        id
+        apps {
+          id
+          role
+        }
+      }
+      error {
+        __typename
+        ... on Error {
+          message
         }
       }
     }

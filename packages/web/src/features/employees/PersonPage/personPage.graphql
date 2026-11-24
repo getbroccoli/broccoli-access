@@ -32,10 +32,23 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
             id
             name
             catalogKey
+            roles {
+              key
+              name
+              isDefault
+            }
           }
           templates {
             id
             name
+          }
+          roleConflict
+          roleSources {
+            role
+            template {
+              id
+              name
+            }
           }
           role
           state
@@ -123,6 +136,19 @@ mutation TakeOffTemplate($input: TemplateTakeOffInput!) {
         id
         peopleCount
       }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation PickPersonAppRole($input: TemplatePickRoleInput!) {
+  templates {
+    pickRole(input: $input) {
       error {
         __typename
         ... on Error {

@@ -7,6 +7,7 @@ export {
   CONNECTOR_ERROR_CODES,
   ConnectorError,
   listsInvitations,
+  offersInviteRole,
 } from "./connector";
 export { withConnectorRetries } from "./connectorRetries";
 

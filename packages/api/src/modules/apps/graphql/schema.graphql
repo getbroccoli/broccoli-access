@@ -1,5 +1,7 @@
 "An application people use: found by a scan, or connected."
 type App {
+  "Roles offered for an invite by this app's connected connector."
+  roles: [AppRole!]!
   id: ID!
   name: String!
   "Such as `slack.com`; null when unknown."
@@ -391,4 +393,11 @@ type Query {
 
 type Mutation {
   apps: AppsMutations!
+}
+
+"One invite role from an app's connector manifest."
+type AppRole {
+  key: String!
+  name: String!
+  isDefault: Boolean!
 }

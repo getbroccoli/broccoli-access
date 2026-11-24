@@ -13,6 +13,8 @@ export interface AccountChange {
   appId: string;
   /** The account's email, or the invited employee's, lowercased, copied when the owner asked. */
   email: string;
+  /** The requested invite role, null for the default and for other changes. */
+  role: string | null;
   connectionId: string;
   action: AccountChangeAction;
   /** The member's id in the app, copied from the connection's record when the owner asked; null for an invite. */
