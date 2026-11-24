@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 
 import { ApplicationError } from "../../../core/applicationError";
@@ -51,7 +52,8 @@ export interface AppConnectionService {
    * Replaces the connection's settings or secrets, whichever `update` carries, joining `tx`; new
    * settings add a line to its history, secrets never. With `replacing`, the secrets of the call
    * whose answer renewed them, it saves nothing once the stored secrets differ, such as after a
-   * reconnect; returns whether it saved. Admins only; refuses an unknown connection with NOT_FOUND.
+   * reconnect; `replacingRevision` likewise refuses a changed app. Returns whether it saved.
+   * Admins only; refuses an unknown connection with NOT_FOUND.
    */
   changeConnection: (
     ctx: SecurityContext,
@@ -61,6 +63,7 @@ export interface AppConnectionService {
       settings?: Record<string, unknown>;
       secrets?: Record<string, unknown>;
       replacing?: Record<string, unknown>;
+      replacingRevision?: string;
     },
   ) => Promise<boolean>;
   /**
@@ -114,6 +117,17 @@ export interface AppConnectionService {
   ) => Promise<CatalogApp[]>;
   /** The connection with id `connectionId` without its secrets, or null. Trusted read: no `ctx`. */
   readConnectionById: (db: Orm | Tx, connectionId: string) => Promise<AppConnection | null>;
+  /** Matching settings and decrypted secrets from one stored version. Trusted read; never for a client. */
+  readConnectionWithSecrets: (
+    db: Orm | Tx,
+    connectionId: string,
+  ) => Promise<{
+    connection: AppConnection;
+    secrets: Record<string, string>;
+    revision: string;
+  } | null>;
+  /** Locks the connection for this transaction; true only if its settings and credentials still match. */
+  holdConnectionRevision: (tx: Tx, connectionId: string, revision: string) => Promise<boolean>;
   /**
    * The connection's secrets, decrypted, such as Google Workspace's `{ clientSecret, refreshToken }`;
    * null for an unknown connection. Trusted read: no `ctx`, and never for a client.
@@ -159,12 +173,20 @@ export function createAppConnectionService({
       });
       return { appId: app.id, connectionId: id };
     },
-    async changeConnection(ctx, tx, connectionId, { settings, secrets, replacing }) {
+    async changeConnection(
+      ctx,
+      tx,
+      connectionId,
+      { settings, secrets, replacing, replacingRevision },
+    ) {
       ctx.require("MANAGE_WORKSPACE");
       const connections = appConnectionRepository(tx);
       const old = await connections.lockById(connectionId);
       if (!old) {
         throw new ApplicationError("NOT_FOUND", "No app connection has this id.");
+      }
+      if (replacingRevision && !(await holdsRevision(tx, old, replacingRevision))) {
+        return false;
       }
       if (replacing && !(await holdsSecrets(secretBox, tx, connectionId, replacing))) {
         return false;
@@ -207,6 +229,24 @@ export function createAppConnectionService({
         .map(catalogApp);
     },
     readConnectionById: (db, connectionId) => appConnectionRepository(db).findById(connectionId),
+    async readConnectionWithSecrets(db, connectionId) {
+      const stored = await appConnectionRepository(db).findWithSecrets(connectionId);
+      if (!stored) return null;
+      const { encryptedSecrets, ...connection } = stored;
+      const secrets = JSON.parse(secretBox.decrypt(encryptedSecrets, connectionId)) as Record<
+        string,
+        string
+      >;
+      return {
+        connection,
+        secrets,
+        revision: connectionRevision(connection.settings, encryptedSecrets),
+      };
+    },
+    async holdConnectionRevision(tx, connectionId, revision) {
+      const connection = await appConnectionRepository(tx).lockById(connectionId);
+      return connection !== null && holdsRevision(tx, connection, revision);
+    },
     async readSecrets(db, connectionId) {
       const encrypted = await appConnectionRepository(db).findEncryptedSecrets(connectionId);
       return encrypted === null
@@ -278,4 +318,19 @@ function signedInUserOf(ctx: SecurityContext): string {
     throw new ApplicationError("FORBIDDEN", "Only a signed-in admin accepts a notice.");
   }
   return ctx.user.userId;
+}
+
+function connectionRevision(settings: Record<string, unknown>, encryptedSecrets: string): string {
+  return createHash("sha256")
+    .update(JSON.stringify([settings, encryptedSecrets]))
+    .digest("base64url");
+}
+
+async function holdsRevision(
+  tx: Tx,
+  connection: AppConnection,
+  revision: string,
+): Promise<boolean> {
+  const encrypted = await appConnectionRepository(tx).findEncryptedSecrets(connection.id);
+  return encrypted !== null && connectionRevision(connection.settings, encrypted) === revision;
 }

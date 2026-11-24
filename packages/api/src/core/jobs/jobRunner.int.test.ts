@@ -215,3 +215,59 @@ test("runs jobs in order within a group while another group can run alongside", 
     .poll(() => started, { timeout: 10_000 })
     .toEqual(["first", "other", "second", "third"]);
 });
+
+test("concurrent runners finish each waiting job in a group before starting the next", async ({
+  runner,
+  databaseUrl,
+  transact,
+}) => {
+  const secondRunner = createJobRunner(databaseUrl, createLogger("silent"));
+  const releaseWorkers = Promise.withResolvers<void>();
+  const releaseFirst = Promise.withResolvers<void>();
+  const started: string[] = [];
+  const events: string[] = [];
+  const handlers = [
+    {
+      "example.ran": {
+        groupConcurrency: 1,
+        run: async ({ id }: typeof EXAMPLE_JOB) => {
+          started.push(id);
+          if (id.startsWith("blocker-")) return releaseWorkers.promise;
+          if (id === "other") return;
+          events.push(`start ${id}`);
+          if (id === "first") await releaseFirst.promise;
+          events.push(`finish ${id}`);
+        },
+        onFailed: () => {
+          throw new Error("The job should succeed");
+        },
+      },
+    },
+  ];
+  const send = (id: string, group: string) =>
+    transact((tx) => runner.queue.send(tx, "example.ran", { id }, { group }));
+
+  try {
+    await runner.start(handlers);
+    await secondRunner.start(handlers);
+    // Keep both workers on each runner busy until the whole group is waiting.
+    const blockers = ["blocker-1", "blocker-2", "blocker-3", "blocker-4"];
+    for (const id of blockers) await send(id, id);
+    await expect.poll(() => started.length, { timeout: 8_000 }).toBe(blockers.length);
+    await send("first", "linear");
+    await send("second", "linear");
+    await send("other", "slack");
+
+    releaseWorkers.resolve();
+    await expect
+      .poll(() => started, { timeout: 8_000 })
+      .toEqual(expect.arrayContaining(["first", "other"]));
+    releaseFirst.resolve();
+    await expect.poll(() => events.length, { timeout: 10_000 }).toBe(4);
+    expect(events).toEqual(["start first", "finish first", "start second", "finish second"]);
+  } finally {
+    releaseWorkers.resolve();
+    releaseFirst.resolve();
+    await secondRunner.stop();
+  }
+});

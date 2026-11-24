@@ -1,3 +1,4 @@
+import { ApplicationError } from "../../../core/applicationError";
 import {
   type ConnectionUpdate,
   type Connector,
@@ -20,6 +21,8 @@ const setupSteps = createSetupStepService();
 /** How a scan ended without saving: its connector error, and what turning to Reconnect needs. */
 export interface ScanFailure {
   failure: ConnectorErrorCode;
+  /** A directory failure is valid only for the credentials that produced it. */
+  directoryRevision?: string;
   /** The secrets its failing call used, after the scan's own renewals; null before it read them. */
   secretsUsed: Record<string, unknown> | null;
   /** Whether the connection may turn to Reconnect: one of the connectors container's. */
@@ -37,11 +40,14 @@ export async function scanSource(
   progressBySource: Map<string, ScanProgress>,
 ): Promise<ScanFailure | null> {
   const { orm, apps } = dependencies;
-  const connection = (await apps.readConnectionById(orm, connectionId))!;
+  const { connection, secrets, revision } = (await apps.readConnectionWithSecrets(
+    orm,
+    connectionId,
+  ))!;
   const connector = (await dependencies.connectors.list()).find(
     (candidate) => candidate.key === connection.connector,
   );
-  const used = { secrets: await apps.readSecrets(orm, connectionId) };
+  const used = { secrets };
   try {
     // A connector the connectors container does not list now is unavailable.
     if (!connector) {
@@ -50,7 +56,7 @@ export async function scanSource(
     await readAndSave(
       ctx,
       dependencies,
-      { sourceId, connection, connector, used },
+      { sourceId, connection, connector, used, revision },
       progressBySource,
     );
     return null;
@@ -58,9 +64,10 @@ export async function scanSource(
     if (!(error instanceof ConnectorError)) {
       throw error;
     }
-    // Google Workspace, the directory, has no Reconnect: its failure stays the scan's.
+    // Directory recovery uses its scan failure, rather than changing the connection status.
     return {
       failure: error.code,
+      directoryRevision: connector?.isDirectory ? revision : undefined,
       secretsUsed: used.secrets,
       reconnects: connector?.isDirectory === false,
     };
@@ -69,7 +76,7 @@ export async function scanSource(
 
 /** The secrets the scan's calls use: the stored ones, then those it renewed and saved. */
 interface SecretsInUse {
-  secrets: Record<string, unknown> | null;
+  secrets: Record<string, unknown>;
 }
 
 /** The scan's connection as the apps module gives it, without its secrets. */
@@ -83,10 +90,11 @@ async function readAndSave(
     connection: ScannedConnection;
     connector: Connector;
     used: SecretsInUse;
+    revision: string;
   },
   progressBySource: Map<string, ScanProgress>,
 ): Promise<void> {
-  const { sourceId, connection, connector, used } = target;
+  const { sourceId, connection, connector, used, revision } = target;
   const readStartedAt = new Date();
   const retrying = <T>(call: () => Promise<T>) => withRetries(dependencies, sourceId, call);
   const session = await retrying(() =>
@@ -111,7 +119,7 @@ async function readAndSave(
     accounts,
     retrying,
   });
-  const findings = { sourceId, connection, connector, readStartedAt, ...read };
+  const findings = { sourceId, connection, connector, readStartedAt, revision, ...read };
   const outcome = await saveScan(ctx, dependencies, findings);
   dependencies.logger.info(
     { sourceId, accounts: accounts.length, ...found, photoChanges: read.photos.size, ...outcome },
@@ -126,7 +134,7 @@ async function readAndSave(
 async function saveScan(
   ctx: SecurityContext,
   dependencies: ScanDependencies,
-  findings: ScanFindings,
+  findings: ScanFindings & { revision: string },
 ): Promise<{ saved: boolean; finishedSetupScan: boolean }> {
   const { sourceId, accounts } = findings;
   return dependencies.transact(async (tx) => {
@@ -136,6 +144,17 @@ async function saveScan(
     }
     // Before the directory locks any employee, so two saves wait for each other, never deadlock.
     await dependencies.apps.holdAccountSyncs(ctx, tx);
+    if (
+      findings.connector.isDirectory &&
+      !(await dependencies.apps.holdConnectionRevision(
+        tx,
+        findings.connection.id,
+        findings.revision,
+      ))
+    ) {
+      // The job retries from a fresh connection; stale findings must never reach app history.
+      throw new ApplicationError("CONFLICT", "The directory connection changed during the scan.");
+    }
     await sources.replaceRecords(sourceId, accounts);
     await syncAccounts(ctx, tx, findings, dependencies);
     await sources.markScanned(sourceId, new Date());
@@ -212,7 +231,7 @@ async function saveConnectionUpdate(
   }
   // A reconnect meanwhile replaced the secrets this scan's calls use; its own stay.
   const saved = await transact((tx) =>
-    apps.changeConnection(ctx, tx, connectionId, { ...update, replacing: used.secrets ?? {} }),
+    apps.changeConnection(ctx, tx, connectionId, { ...update, replacing: used.secrets }),
   );
   if (saved && update.secrets) {
     used.secrets = update.secrets;

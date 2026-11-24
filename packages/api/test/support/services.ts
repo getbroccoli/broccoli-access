@@ -85,7 +85,11 @@ export function mailSettings(
 
 export function googleConnection(
   orm: Orm,
-  { googleUrl, jobs = recordingJobQueue().jobs }: { googleUrl: string; jobs?: JobQueue },
+  {
+    googleUrl,
+    relayUrl,
+    jobs = recordingJobQueue().jobs,
+  }: { googleUrl: string; relayUrl?: string; jobs?: JobQueue },
 ): GoogleConnectionService {
   return createGoogleConnectionService({
     orm,
@@ -94,18 +98,23 @@ export function googleConnection(
     logger: createLogger("silent"),
     openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
     adminApiUrl: googleUrl,
+    relayUrl,
     connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
     employeeDirectory: employeeDirectory(orm),
-    scans: scans(orm, { googleUrl, jobs }),
+    scans: scans(orm, { googleUrl, relayUrl, jobs }),
   });
 }
 
-export function googleSignIn(orm: Orm, { googleUrl }: { googleUrl: string }) {
+export function googleSignIn(
+  orm: Orm,
+  { googleUrl, relayUrl }: { googleUrl: string; relayUrl?: string },
+) {
   return createGoogleSignInService({
     orm,
     secretBox: TEST_SECRET_BOX,
     openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
     adminApiUrl: googleUrl,
+    relayUrl,
     connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
   });
 }
@@ -136,11 +145,13 @@ export function scans(
   orm: Orm,
   {
     googleUrl = "http://127.0.0.1:9",
+    relayUrl,
     jobs = recordingJobQueue().jobs,
     connectors,
     transact = testTransactor(orm),
   }: {
     googleUrl?: string;
+    relayUrl?: string;
     jobs?: JobQueue;
     connectors?: ConnectorRegistry;
     transact?: Transact;
@@ -157,6 +168,7 @@ export function scans(
           createGoogleWorkspaceConnector({
             openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
             adminApiUrl: googleUrl,
+            relayUrl,
           }),
         ]),
     },

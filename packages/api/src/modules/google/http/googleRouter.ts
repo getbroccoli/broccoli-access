@@ -1,6 +1,5 @@
 import { parseCookies } from "better-auth/cookies";
 import express, { type CookieOptions, type Request, type Response, Router } from "express";
-import { z } from "zod";
 
 import { ApplicationError, sendApplicationError } from "../../../core/applicationError";
 import { readSetupToken } from "../../../core/instance";
@@ -16,6 +15,12 @@ import {
   UnknownGoogleAccountError,
 } from "../domain";
 import { CONSENT_LIFETIME_MS, type ConsentState, consentFlowOf } from "../helpers";
+import {
+  parseStart,
+  parseAnswer,
+  hasConsentAnswer,
+  type ConsentAnswer,
+} from "./googleConsentInput";
 
 /**
  * Google's side of setup, sign-in and Settings, under `/api`: `POST /google/connect` starts the
@@ -33,14 +38,16 @@ export function googleRouter(
   const { resolveSecurity, publicOrigin } = http;
   return Router()
     .post("/google/connect", express.json({ limit: MAX_BODY_BYTES }), async (request, response) => {
-      const { clientId, clientSecret } = CONNECTION_START.parse(request.body ?? {});
       try {
+        const { clientId, clientSecret, googleApp } = parseStart(request.body);
         const security = await requireSecurity(resolveSecurity, request, NOT_SETUP_HOLDER);
         response.json(
           await connection.startConnection(security, {
+            googleApp,
             clientId,
             clientSecret,
             publicOrigin: await publicOrigin(request),
+            browserOrigin: request.headers.origin,
             setupToken: readSetupToken(request.headers.cookie),
             now: new Date(),
           }),
@@ -67,7 +74,7 @@ export function googleRouter(
       startAppChange(routes, request, response),
     )
     .get("/google/callback", async (request, response) => {
-      const answer = CONSENT_ANSWER.parse(request.query);
+      const answer = parseAnswer(request.query);
       await finisherOf(consentFlowOf(answer.state ?? ""))(routes, { request, response, answer });
     });
 }
@@ -94,20 +101,6 @@ const SIGN_IN_COOKIE = "broccoli_access_google_sign_in";
 
 /** Binds a Google app change's `state` to the browser that started it, like `SIGN_IN_COOKIE`. */
 const CHANGE_APP_COOKIE = "broccoli_access_google_change_app";
-
-const CONNECTION_START = z.object({
-  clientId: z.string().catch(""),
-  clientSecret: z.string().catch(""),
-});
-
-/** Google's redirect: a code, or an error such as `access_denied` when the person cancels. */
-const CONSENT_ANSWER = z.object({
-  code: z.string().optional().catch(undefined),
-  state: z.string().optional().catch(undefined),
-  error: z.string().optional().catch(undefined),
-});
-
-type ConsentAnswer = z.infer<typeof CONSENT_ANSWER>;
 
 /** What the callback's handlers use. */
 interface GoogleRoutes {
@@ -151,9 +144,9 @@ async function finishConsent(
   { request, response, answer }: Callback,
 ): Promise<void> {
   const { resolveSecurity, publicOrigin, startSession } = http;
-  if (answer.code === undefined || answer.state === undefined) {
+  if (!hasConsentAnswer(answer)) {
     const failure = cancelledOrFailed(answer);
-    logger.info({ failure }, "Google consent ended without a code");
+    logger.info({ failure }, "Google consent ended without an answer");
     sendBackToConnect(response, failure);
     return;
   }
@@ -161,6 +154,7 @@ async function finishConsent(
     const security = await requireSecurity(resolveSecurity, request, NOT_SETUP_HOLDER);
     const { userId } = await connection.finishConsent(security, {
       code: answer.code,
+      handle: answer.handle,
       state: answer.state,
       publicOrigin: await publicOrigin(request),
       setupToken: readSetupToken(request.headers.cookie),
@@ -181,16 +175,16 @@ async function finishSignIn(
   { request, response, answer }: Callback,
 ): Promise<void> {
   const origin = await http.publicOrigin(request);
-  response.clearCookie(SIGN_IN_COOKIE, consentCookie(origin));
-  if (answer.code === undefined || answer.state === undefined) {
+  if (!hasConsentAnswer(answer)) {
     const failure = cancelledOrFailed(answer);
-    logger.info({ failure }, "Google sign-in ended without a code");
+    logger.info({ failure }, "Google sign-in ended without an answer");
     sendBackToLogin(response, failure);
     return;
   }
   try {
     const { userId } = await signIn.finishSignIn({
       code: answer.code,
+      handle: answer.handle,
       state: answer.state,
       publicOrigin: origin,
       browserToken: parseCookies(request.headers.cookie ?? "").get(SIGN_IN_COOKIE) ?? null,
@@ -212,14 +206,16 @@ async function startAppChange(
   request: Request,
   response: Response,
 ): Promise<void> {
-  const { clientId, clientSecret } = CONNECTION_START.parse(request.body ?? {});
   try {
+    const { clientId, clientSecret, googleApp } = parseStart(request.body);
     const security = await requireSecurity(http.resolveSecurity, request, NOT_OWNER);
     const origin = await http.publicOrigin(request);
     const { authorizationUrl, browserToken } = await connection.startAppChange(security, {
+      googleApp,
       clientId,
       clientSecret,
       publicOrigin: origin,
+      browserOrigin: request.headers.origin,
       now: new Date(),
     });
     response.cookie(CHANGE_APP_COOKIE, browserToken, consentCookie(origin));
@@ -235,10 +231,9 @@ async function finishAppChange(
   { request, response, answer }: Callback,
 ): Promise<void> {
   const origin = await http.publicOrigin(request);
-  response.clearCookie(CHANGE_APP_COOKIE, consentCookie(origin));
-  if (answer.code === undefined || answer.state === undefined) {
+  if (!hasConsentAnswer(answer)) {
     const failure = cancelledOrFailed(answer);
-    logger.info({ failure }, "Google app change ended without a code");
+    logger.info({ failure }, "Google app change ended without an answer");
     sendBackToAppChange(response, failure);
     return;
   }
@@ -246,6 +241,7 @@ async function finishAppChange(
     const security = await requireSecurity(http.resolveSecurity, request, NOT_OWNER);
     await connection.finishAppChange(security, {
       code: answer.code,
+      handle: answer.handle,
       state: answer.state,
       publicOrigin: origin,
       browserToken: parseCookies(request.headers.cookie ?? "").get(CHANGE_APP_COOKIE) ?? null,

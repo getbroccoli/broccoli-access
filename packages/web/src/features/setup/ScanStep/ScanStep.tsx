@@ -1,10 +1,12 @@
 import { useQuery } from "@apollo/client/react";
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { SetupScanDocument } from "@/__generated__/graphql";
-import { Button } from "@/components/ui/button";
+import { ScanNowButton } from "@/components/ScanNowButton";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { t } from "@/i18n";
+import { needsGoogleReconnect } from "@/lib/googleScan";
 
 import { SetupLayout } from "../SetupLayout";
 import { scanStepHints, type ScanSteps } from "./scanStepHints";
@@ -24,6 +26,8 @@ const STARTING_SCAN: ScanSteps = {
 export function ScanStep() {
   const { data, error, refetch, startPolling, stopPolling } = useQuery(SetupScanDocument);
   const connection = data?.setup.googleWorkspace;
+  const failed = connection?.scan?.status === "SCAN_FAILED";
+  const needsReconnect = needsGoogleReconnect(connection?.scan?.failure);
   const finished = connection?.scan != null && connection.scan.status !== "SCANNING";
   const scanned = connection?.scan?.status === "SCANNED";
   const router = useRouter();
@@ -77,6 +81,28 @@ export function ScanStep() {
             hint={hints.signInLogs}
           />
         </ol>
+      )}
+      {failed && connection && (
+        <div className="mt-6 flex flex-col items-start gap-3">
+          <p role="alert" className="text-sm text-destructive">
+            {needsReconnect
+              ? t("settings.connections.googleReconnect")
+              : t("settings.connections.scanFailed")}
+          </p>
+          {needsReconnect && (
+            <Link
+              to="/settings/connections/google-app"
+              className={buttonVariants({ variant: "outline" })}
+            >
+              {t("apps.reconnect.button")}
+            </Link>
+          )}
+          <ScanNowButton
+            connectionId={connection.id}
+            isScanning={false}
+            className="items-start pb-0"
+          />
+        </div>
       )}
     </SetupLayout>
   );

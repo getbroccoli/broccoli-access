@@ -5,6 +5,7 @@ export {
   randomConsentToken,
   sealConsentState,
   type ConsentState,
+  type RelayConsentState,
   type GoogleAppChangeState,
   type WorkspaceConsentState,
 } from "./consentState";

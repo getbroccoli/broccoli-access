@@ -26,6 +26,7 @@ export interface TestServerOptions {
   connectorsUrl?: string;
   googleOpenIdConfigurationUrl?: string;
   googleAdminApiUrl?: string;
+  googleRelayUrl?: string;
 }
 
 /**
@@ -42,6 +43,7 @@ export async function startTestServer(
     connectorsUrl,
     resendApiUrl = "http://127.0.0.1:9",
     googleOpenIdConfigurationUrl = "http://127.0.0.1:9/.well-known/openid-configuration",
+    googleRelayUrl,
     googleAdminApiUrl = "http://127.0.0.1:9",
   }: TestServerOptions = {},
 ): Promise<RunningServer> {
@@ -57,6 +59,7 @@ export async function startTestServer(
         connectorsUrl,
         googleOpenIdConfigurationUrl,
         googleAdminApiUrl,
+        googleRelayUrl,
       }),
   );
   return {

@@ -17,7 +17,11 @@ export const GOOGLE_SCOPES = [
 ];
 
 /** A live setup holder and a registered callback, before any consent. */
-export async function googleSetup(orm: Orm, googleUrl: string, jobs?: JobQueue) {
+export async function googleSetup(
+  orm: Orm,
+  googleUrl: string,
+  options: { jobs?: JobQueue; relayUrl?: string } = {},
+) {
   const now = new Date("2026-11-21T12:00:00Z");
   const input = {
     clientId: ACME.oauthClient.clientId,
@@ -31,5 +35,5 @@ export async function googleSetup(orm: Orm, googleUrl: string, jobs?: JobQueue) 
     expiresAt: new Date("2026-11-24T12:00:00Z"),
   });
   await registerGoogleRedirect(googleUrl, input.publicOrigin);
-  return { connection: googleConnection(orm, { googleUrl, jobs }), input };
+  return { connection: googleConnection(orm, { googleUrl, ...options }), input };
 }

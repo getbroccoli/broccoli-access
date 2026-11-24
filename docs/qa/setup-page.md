@@ -16,9 +16,11 @@ A manual check of setup held by one browser, which connects Google Workspace wit
 - [ ] In B, any path lands on `/setup/in-progress`, titled "Setup is in progress on another device", with the `docker compose down --volumes && docker compose up` command, and `/setup` goes back to it.
 - [ ] Closing and reopening A keeps it on `/setup`.
 
-## Connect Google Workspace
+## Connect Google Workspace with the fake Google
 
-- [ ] The page matches the design: "Step 1 of 3", "Connect Google Workspace", "How to connect" with "Use the Broccoli app" disabled and marked "Coming soon", and "Use your own Google app" selected.
+- [ ] Start shared Google setup through the intended public HTTPS address without `SELF_HOSTED_PUBLIC_URL`, including behind TLS termination. Later sign-in uses that same callback address. An explicit `SELF_HOSTED_PUBLIC_URL` override uses the configured address instead.
+- [ ] Without `GOOGLE_RELAY_URL`, "Use the Broccoli app" is disabled and marked "Coming soon", and "Use your own Google app" is selected.
+- [ ] With a configured relay, the Broccoli app is selected. Its copy explains that Google’s keys pass through the relay while directory data goes directly to this server. Credential fields appear only after choosing your own app.
 - [ ] The redirect address is `<URL>/api/google/callback`; "Copy" shows "Copied", and the copied text equals the address the fake Google redirects to after consent.
 - [ ] The five Google Cloud steps are listed; each link opens Google Cloud in a new tab.
 - [ ] "Connect as Google admin" stays disabled until the client ID and secret are both filled in; the secret is masked.
@@ -53,3 +55,13 @@ Start setup in A, then restart the dev stack with `pnpm dev --drop-db`.
 - [ ] On a narrow window, one bar per step replaces the step list, the two ways to connect stack, and nothing scrolls sideways.
 - [ ] On a narrow window, the banner's button goes below its text and the app table scrolls sideways inside its frame.
 - [ ] Screenshots of `/setup` (desktop and narrow; empty and with an error), `/setup/scan`, `/setup/in-progress` and the first-run Applications page go in the pull request description.
+
+- [ ] If the first scan fails, Scan now retries it. An authentication failure also offers Reconnect; its Google app page opens while unrelated Settings pages remain unavailable until setup finishes.
+
+## Shared Google app with real Google
+
+Use a separate fresh instance with a configured relay and Google's real OpenID and Directory endpoints. A human workspace super admin completes Google's consent.
+
+- [ ] Choose the Broccoli app, confirm the destination host and allow Google's requested permissions. The callback signs in the owner and starts the first scan. No grant to the Broccoli app appears among discovered apps.
+- [ ] After a successful connection, finish setup, log out and sign in through the same Google app.
+- [ ] On a separate fresh instance, cancelling consent saves no connection and signs nobody in.

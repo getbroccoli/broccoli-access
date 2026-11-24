@@ -6,7 +6,7 @@ import { AppMark } from "@/components/AppMark";
 import { buttonVariants } from "@/components/ui/button";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
-import { ScanNowButton } from "@/shell";
+import { ScanNowButton } from "@/components/ScanNowButton";
 
 import { ApproveAppButton } from "../ApproveAppButton";
 import { ConnectAppButton } from "../ConnectAppButton";

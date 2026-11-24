@@ -1,4 +1,4 @@
-import { ApplicationError, type FieldError, invalidInput } from "../../../core/applicationError";
+import { ApplicationError } from "../../../core/applicationError";
 import type { Orm, Transact } from "../../../core/db";
 import { createInstanceService, createOwnerService } from "../../../core/instance";
 import type { Logger } from "../../../core/logger";
@@ -9,11 +9,9 @@ import {
   profilesOf,
   type SecurityContext,
 } from "../../../core/security";
-import { createGoogleClient, type GoogleClient } from "../../../integrations/google";
+import { createGoogleClient } from "../../../integrations/google";
 import {
   GOOGLE_WORKSPACE,
-  GOOGLE_WORKSPACE_SCOPES,
-  googleRedirectAddress,
   type GoogleWorkspaceSettings,
   parseGoogleWorkspaceSettings,
   requireSameWorkspace,
@@ -22,18 +20,33 @@ import {
 import {
   openConsentState,
   randomConsentToken,
-  sealConsentState,
+  type RelayConsentState,
   type WorkspaceConsentState,
 } from "../helpers";
 import type { ConnectedApps, Scans } from "../ports";
-import { consentUrl } from "./consentUrl";
-import { readSuperAdmin, type SuperAdmin, type VerifiedGrant, verifyGrant } from "./verifyGrant";
+import {
+  readSuperAdmin,
+  type SuperAdmin,
+  type VerifiedGrant,
+  verifyGrant,
+  startConsent,
+  rememberConsentOrigin,
+  consentRedirectAddress,
+} from "./googleConsent";
+
+import type {
+  ConnectionStart,
+  ConsentAnswer,
+  AppChangeStart,
+  AppChangeAnswer,
+  GoogleWorkspaceConnection,
+} from "./googleConnectionTypes";
 
 const instances = createInstanceService();
 const owners = createOwnerService();
 
 /**
- * Connecting Google Workspace with the instance's own Google app, as setup's first step, and
+ * Connecting Google Workspace with the selected Google app, as setup's first step, and
  * changing that Google app later.
  */
 export interface GoogleConnectionService {
@@ -78,51 +91,6 @@ export interface GoogleConnectionService {
   readOrganization: () => Promise<{ name: string; domain: string } | null>;
 }
 
-/** What the browser holding setup sends to start the consent. */
-export interface ConnectionStart {
-  clientId: string;
-  clientSecret: string;
-  /** Where browsers reach the instance; Google redirects to its callback there. */
-  publicOrigin: string;
-  setupToken: string | null;
-  now: Date;
-}
-
-/** Google's redirect back after the admin allowed access. */
-export interface ConsentAnswer {
-  code: string;
-  state: string;
-  publicOrigin: string;
-  setupToken: string | null;
-  now: Date;
-}
-
-/** What the owner sends to change the Google app. */
-export interface AppChangeStart {
-  clientId: string;
-  clientSecret: string;
-  /** Where browsers reach the instance; Google redirects to its callback there. */
-  publicOrigin: string;
-  now: Date;
-}
-
-/** Google's redirect back after the admin allowed the new Google app. */
-export interface AppChangeAnswer {
-  code: string;
-  state: string;
-  publicOrigin: string;
-  /** The token `startAppChange` gave the browser; null when the browser has none. */
-  browserToken: string | null;
-  now: Date;
-}
-
-export interface GoogleWorkspaceConnection {
-  id: string;
-  domain: string;
-  organizationName: string;
-  adminEmail: string;
-}
-
 export interface GoogleConnectionDependencies {
   orm: Orm;
   transact: Transact;
@@ -132,6 +100,10 @@ export interface GoogleConnectionDependencies {
   openIdConfigurationUrl: string;
   /** `GOOGLE_ADMIN_API_URL`. */
   adminApiUrl: string;
+  /** The shared Google app relay; absent until it is available. */
+  relayUrl?: string;
+  /** Optional deployment override for the remembered public origin. */
+  publicUrl?: string;
   connectedApps: ConnectedApps;
   scans: Scans;
   /** Builds the new owner's security context, which authors the connection's history. */
@@ -144,23 +116,22 @@ export function createGoogleConnectionService(
   const { orm, transact, secretBox, logger, connectedApps } = dependencies;
   const google = createGoogleClient(dependencies);
   return {
-    async startConnection(ctx, { clientId, clientSecret, publicOrigin, setupToken, now }) {
+    async startConnection(ctx, start) {
       ctx.requireSetupHolder();
-      const credentials = parseCredentials(clientId, clientSecret);
-      const heldToken = await requireConnectStep(orm, setupToken, now);
-      const nonce = randomConsentToken();
-      const state = sealConsentState(
-        secretBox,
-        { flow: "connect_google_workspace", ...credentials, nonce },
-        { browserToken: heldToken, now },
-      );
+      const browserToken = await requireConnectStep(orm, start.setupToken, start.now);
+      const origin = await rememberConsentOrigin(ctx, dependencies, start);
       return {
-        authorizationUrl: await workspaceConsentUrl(google, {
-          clientId: credentials.clientId,
-          redirectUri: googleRedirectAddress(publicOrigin),
-          state,
-          nonce,
-        }),
+        authorizationUrl: await startConsent(
+          google,
+          secretBox,
+          {
+            ...start,
+            publicOrigin: origin,
+            flow: "connect_google_workspace",
+            browserToken,
+          },
+          dependencies.relayUrl,
+        ),
       };
     },
     async finishConsent(ctx, answer) {
@@ -176,28 +147,35 @@ export function createGoogleConnectionService(
           "The consent expired or was not this server's.",
         );
       }
-      const redirectUri = googleRedirectAddress(answer.publicOrigin);
-      const grant = await verifyGrant(google, consent, { ...answer, redirectUri });
+      const redirectUri = await consentRedirectAddress(dependencies, consent, answer.publicOrigin);
+      const grant = await verifyGrant(
+        google,
+        consent,
+        { ...answer, redirectUri },
+        dependencies.relayUrl,
+      );
       const admin = await readSuperAdmin(google, grant.tokens.accessToken, grant.identity);
       return saveConnection(dependencies, ctx, answer, { consent, grant, admin });
     },
-    async startAppChange(ctx, { clientId, clientSecret, publicOrigin, now }) {
+    async startAppChange(ctx, start) {
       ctx.require("MANAGE_WORKSPACE");
-      const credentials = parseCredentials(clientId, clientSecret);
-      await requireConnection(connectedApps, orm);
-      const nonce = randomConsentToken();
+      const connection = await requireConnection(connectedApps, orm);
+      const stored = await connectedApps.readConnectionWithSecrets(orm, connection.id);
+      if (!stored) throw new ApplicationError("CONFLICT", "Google Workspace is not connected.");
+      const origin = await rememberConsentOrigin(ctx, dependencies, start);
       const browserToken = randomConsentToken();
-      const state = sealConsentState(
+      const authorizationUrl = await startConsent(
+        google,
         secretBox,
-        { flow: "change_google_app", ...credentials, nonce },
-        { browserToken, now },
+        {
+          ...start,
+          publicOrigin: origin,
+          flow: "change_google_app",
+          browserToken,
+          revision: stored.revision,
+        },
+        dependencies.relayUrl,
       );
-      const authorizationUrl = await workspaceConsentUrl(google, {
-        clientId: credentials.clientId,
-        redirectUri: googleRedirectAddress(publicOrigin),
-        state,
-        nonce,
-      });
       return { authorizationUrl, browserToken };
     },
     async finishAppChange(ctx, answer) {
@@ -207,30 +185,42 @@ export function createGoogleConnectionService(
         browserToken === null
           ? null
           : openConsentState(secretBox, answer.state, { browserToken, now });
-      if (change?.flow !== "change_google_app") {
+      if (change?.flow !== "change_google_app" || !change.revision) {
         throw new ApplicationError(
           "INVALID_INPUT",
           "The consent expired or was not this browser's.",
         );
       }
       const connection = await requireConnection(connectedApps, orm);
-      const redirectUri = googleRedirectAddress(answer.publicOrigin);
-      const grant = await verifyGrant(google, change, { ...answer, redirectUri });
+      const redirectUri = await consentRedirectAddress(dependencies, change, answer.publicOrigin);
+      const grant = await verifyGrant(
+        google,
+        change,
+        { ...answer, redirectUri },
+        dependencies.relayUrl,
+      );
       const admin = await readSuperAdmin(google, grant.tokens.accessToken, grant.identity);
       const settings = parseGoogleWorkspaceSettings(connection.settings);
       requireSameWorkspace(settings, admin.domain);
       const changed: GoogleWorkspaceSettings = {
-        ...withGoogleApp(settings, change.clientId),
+        ...withGoogleApp(settings, grant.clientId),
+        googleApp: "codeVerifier" in change ? "broccoli_google_app" : "own_google_app",
         organizationName: admin.organizationName,
         adminEmail: admin.email,
         grantedScopes: grant.tokens.scopes,
       };
-      await transact((tx) =>
+      const saved = await transact((tx) =>
         connectedApps.changeConnection(ctx, tx, connection.id, {
           settings: { ...changed },
-          secrets: { clientSecret: change.clientSecret, refreshToken: grant.tokens.refreshToken },
+          replacingRevision: change.revision,
+          secrets: {
+            ...("clientSecret" in change && { clientSecret: change.clientSecret }),
+            refreshToken: grant.tokens.refreshToken,
+          },
         }),
       );
+      if (!saved)
+        throw new ApplicationError("CONFLICT", "The Google app changed during consent. Try again.");
       logger.info({ connectionId: connection.id }, "Google app changed");
     },
     async readConnection(ctx) {
@@ -239,10 +229,9 @@ export function createGoogleConnectionService(
       if (!connection) {
         return null;
       }
-      const { domain, organizationName, adminEmail } = parseGoogleWorkspaceSettings(
-        connection.settings,
-      );
-      return { id: connection.id, domain, organizationName, adminEmail };
+      const { domain, organizationName, adminEmail, googleApp, clientId } =
+        parseGoogleWorkspaceSettings(connection.settings);
+      return { id: connection.id, domain, organizationName, adminEmail, googleApp, clientId };
     },
     async readOrganization() {
       const connection = await connectedApps.readConnection(orm, GOOGLE_WORKSPACE);
@@ -255,22 +244,6 @@ export function createGoogleConnectionService(
   };
 }
 
-/** Google gives a refresh token, which the scans need, only for an offline consent asked now. */
-const OFFLINE_CONSENT = { access_type: "offline", prompt: "consent" };
-
-/** Google's address for an offline consent to every scope the scans read. */
-async function workspaceConsentUrl(
-  google: GoogleClient,
-  request: { clientId: string; redirectUri: string; state: string; nonce: string },
-): Promise<string> {
-  const { authorizationEndpoint } = await google.discover();
-  return consentUrl(
-    authorizationEndpoint,
-    { ...request, scopes: GOOGLE_WORKSPACE_SCOPES },
-    OFFLINE_CONSENT,
-  );
-}
-
 /** The Google Workspace connection; refuses with CONFLICT before it exists. */
 async function requireConnection(connectedApps: ConnectedApps, orm: Orm) {
   const connection = await connectedApps.readConnection(orm, GOOGLE_WORKSPACE);
@@ -278,17 +251,6 @@ async function requireConnection(connectedApps: ConnectedApps, orm: Orm) {
     throw new ApplicationError("CONFLICT", "Google Workspace is not connected.");
   }
   return connection;
-}
-
-function parseCredentials(clientId: string, clientSecret: string) {
-  const credentials = { clientId: clientId.trim(), clientSecret: clientSecret.trim() };
-  const fieldErrors: FieldError[] = Object.entries(credentials)
-    .filter(([, value]) => value === "")
-    .map(([field]) => ({ field, code: "required" }));
-  if (fieldErrors.length > 0) {
-    throw invalidInput(fieldErrors);
-  }
-  return credentials;
 }
 
 /** The setup token, once its browser is found to hold setup at the connect step; refuses otherwise. */
@@ -312,11 +274,15 @@ async function saveConnection(
     consent,
     grant,
     admin,
-  }: { consent: WorkspaceConsentState; grant: VerifiedGrant; admin: SuperAdmin },
+  }: {
+    consent: WorkspaceConsentState | RelayConsentState;
+    grant: VerifiedGrant;
+    admin: SuperAdmin;
+  },
 ): Promise<{ userId: string }> {
   const settings: GoogleWorkspaceSettings = {
-    googleApp: "own_google_app",
-    clientId: consent.clientId,
+    googleApp: "codeVerifier" in consent ? "broccoli_google_app" : "own_google_app",
+    clientId: grant.clientId,
     domain: admin.domain,
     organizationName: admin.organizationName,
     adminEmail: admin.email,
@@ -335,7 +301,10 @@ async function saveConnection(
       connector: GOOGLE_WORKSPACE,
       app: { name: "Google Workspace", domain: null },
       settings: { ...settings },
-      secrets: { clientSecret: consent.clientSecret, refreshToken: grant.tokens.refreshToken },
+      secrets: {
+        ...("clientSecret" in consent && { clientSecret: consent.clientSecret }),
+        refreshToken: grant.tokens.refreshToken,
+      },
     });
     const scan = { connectionId, sourceName: admin.domain };
     const { sourceId } = await scans.scanConnection(owner, tx, scan);

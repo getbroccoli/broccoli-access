@@ -44,3 +44,16 @@ Copyright (C) 2026 Minari Limited.
 
 Broccoli Access is open source under the [GNU Affero General Public License v3.0](LICENSE).
 The Broccoli Access name and logo are covered by our [trademark policy](.github/TRADEMARK.md).
+
+### Shared Google app
+
+By default, connect with your own Google app. To enable a configured shared app,
+pass `GOOGLE_RELAY_URL` to the API container. The published Compose file leaves
+it unset until the shared app is verified by Google. Its client secret stays on
+the relay; tokens pass through it during consent and refresh, while directory
+data goes directly from Google to your server. Protected setup remembers your
+instance’s public address for shared Google sign-in; no extra URL setting is
+required. Existing installations remember it when an admin changes the Google
+app. Open setup through the intended public address. To move domains, set
+`SELF_HOSTED_PUBLIC_URL` to the new address; it overrides the saved one. Settings → Connections → Change
+Google app switches either way without deleting people or apps.

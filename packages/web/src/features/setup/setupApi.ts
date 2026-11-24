@@ -1,3 +1,5 @@
+import type { GoogleApp } from "@/__generated__/graphql";
+
 import { postJson } from "@/lib/postJson";
 
 /**
@@ -15,17 +17,17 @@ export async function startSetup(): Promise<boolean> {
 }
 
 /**
- * Starts Google's consent for the admin's own Google app at `path`, setup's connection or the
+ * Starts Google's consent for the selected Google app at `path`, setup's connection or the
  * owner's change of app: the address of Google's consent page, or null when the API refused or
  * could not be reached.
  */
 export async function startGoogleConsent(
   path: GoogleConsentPath,
-  clientId: string,
-  clientSecret: string,
+  googleApp: GoogleApp,
+  credentials: { clientId?: string; clientSecret?: string },
 ): Promise<string | null> {
   try {
-    const response = await postJson(path, { clientId, clientSecret });
+    const response = await postJson(path, { googleApp: googleApp.toLowerCase(), ...credentials });
     if (!response.ok) {
       return null;
     }

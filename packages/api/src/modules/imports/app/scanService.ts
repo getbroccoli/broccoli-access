@@ -191,12 +191,18 @@ async function failScanOfConnection(
     failure,
     secretsUsed,
     reconnects,
+    directoryRevision,
   }: ScanFailure & { sourceId: string; connectionId: string },
 ): Promise<boolean> {
   return transact(async (tx) => {
-    if (!(await markFailed(tx, sourceId, failure)) || !reconnects) {
-      return false;
+    if (!(await markFailed(tx, sourceId, failure))) return false;
+    if (
+      directoryRevision !== undefined &&
+      !(await apps.holdConnectionRevision(tx, connectionId, directoryRevision))
+    ) {
+      throw new ApplicationError("CONFLICT", "The directory connection changed during the scan.");
     }
+    if (!reconnects) return false;
     return apps.turnToReconnect(ctx, tx, {
       connectionId,
       error: failure,

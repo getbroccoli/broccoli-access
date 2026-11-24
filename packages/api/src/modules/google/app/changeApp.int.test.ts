@@ -1,33 +1,32 @@
 import { ACME } from "@broccoli-access/fake-apps";
+import { onTestFinished } from "vitest";
 
 import {
   expect,
   test,
   EMPLOYEE,
   SYSTEM,
-  googleScanSetup,
-  googleConnection,
   registerGoogleRedirect,
   consentAtGoogle,
   GOOGLE_SCOPES,
   TEST_SECRET_BOX,
-  employeeDirectory,
-  instances,
   recordHistory,
+  postFakeControl,
   storedApps,
   storedAppConnections,
-  storedUsers,
-  storedGoogleAccounts,
-  storedEmployees,
   storedAppAccounts,
-  storedImportSources,
-  storedImportRecords,
   storedRecordHistory,
   changeStoredGoogleDomain,
+  connectedWorkspace,
+  containerConnectors,
+  createGoogleWorkspaceConnector,
+  scans,
+  startFakeHttpServer,
+  storedImportSources,
+  storedWorkspace,
 } from "#test/support";
 
 import type { Orm } from "../../../core/db";
-import { PrincipalSecurityContext } from "../../../core/security";
 import { OtherWorkspaceError } from "../domain";
 
 test("changing the Google app replaces credentials and scopes while keeping the owner, apps and people", async ({
@@ -249,49 +248,66 @@ test("refuses starting a Google app change without MANAGE_WORKSPACE", async ({
   expect(await storedChangeState(orm)).toEqual(before);
 });
 
-async function connectedWorkspace(orm: Orm, googleUrl: string) {
-  const { ownerUserId, connectionId, sourceId, scans } = await googleScanSetup(orm, googleUrl);
-  await scans.runScan(SYSTEM, sourceId);
-  const ctx = PrincipalSecurityContext.user(
-    {
-      userId: ownerUserId,
-      email: "admin@acme.example",
-      isOwner: true,
-      permissionProfiles: ["EMPLOYEE", "OWNER"],
-      employeeId: null,
-    },
-    employeeDirectory(orm),
-  );
-  const input = {
-    clientId: "replacement-google-client",
-    clientSecret: "replacement-google-secret",
-    publicOrigin: "http://localhost:3000",
-    now: new Date("2026-11-21T12:00:00Z"),
-  };
-  await registerGoogleRedirect(googleUrl, input.publicOrigin, input);
-  return {
-    connection: googleConnection(orm, { googleUrl }),
-    ctx,
-    input,
-    connectionId,
-    ownerUserId,
-    scans,
-    sourceId,
-  };
-}
+test.for(["valid", "revoked"] as const)(
+  "a scan using a %s old refresh token retries after an app switch without recording stale results",
+  async (oldToken, { orm, fakeGoogle }) => {
+    const {
+      connection,
+      ctx,
+      input,
+      connectionId,
+      sourceId,
+      scans: retry,
+    } = await connectedWorkspace(orm, fakeGoogle.url);
+    const { authorizationUrl, browserToken } = await connection.startAppChange(ctx, input);
+    const callback = await consentAtGoogle(authorizationUrl);
+    const manifest = await startFakeHttpServer(async () => {
+      if (oldToken === "revoked") await postFakeControl(fakeGoogle.url, "tokens/revoke");
+      await connection.finishAppChange(ctx, {
+        ...input,
+        browserToken,
+        code: callback.searchParams.get("code")!,
+        state: callback.searchParams.get("state")!,
+      });
+      return { status: 200, body: { connectors: [] } };
+    });
+    onTestFinished(() => manifest.stop());
+    const container = containerConnectors(manifest.url);
+    const google = createGoogleWorkspaceConnector({
+      openIdConfigurationUrl: fakeGoogle.url + "/.well-known/openid-configuration",
+      adminApiUrl: fakeGoogle.url,
+    });
+    const scan = scans(orm, {
+      connectors: { list: async () => [google, ...(await container.list())] },
+    });
+    await scan.scanNow(ctx, connectionId);
 
-async function storedWorkspace(orm: Orm) {
-  return {
-    instance: await instances.readInstance(orm),
-    users: await storedUsers(orm),
-    googleAccounts: await storedGoogleAccounts(orm),
-    apps: await storedApps(orm),
-    people: await storedEmployees(orm),
-    appAccounts: await storedAppAccounts(orm),
-    sources: await storedImportSources(orm),
-    records: await storedImportRecords(orm),
-  };
-}
+    const initialApps = await storedApps(orm);
+    const scanHistory = async () =>
+      (await storedRecordHistory(orm)).filter(
+        (entry) => entry.causeKind === "found_by_scan" || entry.causeKind === "connector_error",
+      );
+    const initialHistory = await scanHistory();
+
+    await expect(scan.runScan(SYSTEM, sourceId)).rejects.toMatchObject({ code: "CONFLICT" });
+
+    expect(await storedImportSources(orm)).toMatchObject([
+      { id: sourceId, status: "scanning", failure: null },
+    ]);
+    expect(await storedApps(orm)).toEqual(initialApps);
+    expect(await scanHistory()).toEqual(initialHistory);
+
+    await retry.runScan(SYSTEM, sourceId);
+
+    expect(await storedApps(orm)).toEqual(initialApps);
+    expect(await storedAppConnections(orm)).toMatchObject([
+      { settings: { clientId: input.clientId } },
+    ]);
+    expect(await storedImportSources(orm)).toMatchObject([
+      { id: sourceId, status: "scanned", failure: null },
+    ]);
+  },
+);
 
 async function storedChangeState(orm: Orm) {
   return {

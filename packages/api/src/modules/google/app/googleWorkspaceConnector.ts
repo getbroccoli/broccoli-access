@@ -6,6 +6,8 @@ import {
 } from "../../../core/connectors";
 import {
   createGoogleClient,
+  createGoogleRelayClient,
+  GoogleRelayError,
   type GoogleClient,
   type GoogleToken,
   type GoogleUser,
@@ -27,6 +29,7 @@ export function createGoogleWorkspaceConnector(addresses: {
   openIdConfigurationUrl: string;
   /** `GOOGLE_ADMIN_API_URL`. */
   adminApiUrl: string;
+  relayUrl?: string;
 }): Connector {
   const google = createGoogleClient(addresses);
   return {
@@ -45,11 +48,13 @@ export function createGoogleWorkspaceConnector(addresses: {
     settings: GOOGLE_WORKSPACE_SETTINGS,
     secrets: GOOGLE_WORKSPACE_SECRETS,
     async openSession(connection) {
-      const { clientId, previousClientIds } = parseGoogleWorkspaceSettings(connection.settings);
-      const secrets = GOOGLE_WORKSPACE_SECRETS.parse(connection.secrets);
-      const accessToken = await asConnectorError(signInError, async () =>
-        google.refreshAccessToken(await google.discover(), { clientId, ...secrets }),
+      const { clientId, previousClientIds, googleApp } = parseGoogleWorkspaceSettings(
+        connection.settings,
       );
+      const accessToken =
+        googleApp === "broccoli_google_app"
+          ? await refreshShared(addresses.relayUrl, connection.secrets)
+          : await refreshOwn(google, clientId, connection.secrets);
       const readGrantLog = onceUntilRead(() =>
         grantLogSince(google, accessToken, new Date(Date.now() - GRANT_LOG_MS)),
       );
@@ -229,6 +234,8 @@ function connectorErrorCode(
   error: unknown,
   errorOfStatus: (status: number) => ConnectorErrorCode,
 ): ConnectorErrorCode {
+  if (error instanceof GoogleRelayError)
+    return error.code === "invalid_handoff" ? "unexpected_response" : error.code;
   if (error instanceof UnsuccessfulAnswerError) {
     return errorOfStatus(error.status);
   }
@@ -270,3 +277,24 @@ const UNAUTHORIZED = 401;
 const FORBIDDEN = 403;
 const TOO_MANY_REQUESTS = 429;
 const SERVER_ERROR = 500;
+
+async function refreshShared(relayUrl: string | undefined, secrets: unknown): Promise<string> {
+  const { refreshToken } = GOOGLE_WORKSPACE_SECRETS.omit({ clientSecret: true })
+    .strict()
+    .parse(secrets);
+  return asConnectorError(signInError, async () => {
+    if (!relayUrl) throw new TypeError("The Google relay is unavailable");
+    return createGoogleRelayClient(relayUrl).refresh(refreshToken);
+  });
+}
+
+async function refreshOwn(
+  google: GoogleClient,
+  clientId: string,
+  secrets: unknown,
+): Promise<string> {
+  const credentials = GOOGLE_WORKSPACE_SECRETS.required().parse(secrets);
+  return asConnectorError(signInError, async () =>
+    google.refreshAccessToken(await google.discover(), { clientId, ...credentials }),
+  );
+}

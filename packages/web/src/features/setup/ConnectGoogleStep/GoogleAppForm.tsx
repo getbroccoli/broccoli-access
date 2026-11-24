@@ -1,8 +1,8 @@
 import { useQuery } from "@apollo/client/react";
 import { GoogleLogo } from "@phosphor-icons/react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 
-import { ConnectGoogleDocument } from "@/__generated__/graphql";
+import { ConnectGoogleDocument, type GoogleApp } from "@/__generated__/graphql";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,11 +11,10 @@ import { t, type MessageKey } from "@/i18n";
 
 import { type GoogleConsentPath, startGoogleConsent } from "../setupApi";
 import { GoogleCloudSteps } from "./GoogleCloudSteps";
+import { HowToConnect } from "./HowToConnect";
 import { RedirectAddress } from "./RedirectAddress";
 
 type Props = {
-  /** Above the Google app's fields, such as setup's choice of how to connect. */
-  children?: ReactNode;
   /** Where the API starts Google's consent with the client. */
   consentPath: GoogleConsentPath;
   /** Why the last consent failed, from Google's redirect back. */
@@ -23,22 +22,33 @@ type Props = {
 };
 
 /**
- * The admin's own Google app: the redirect address, how to make the app in Google Cloud, and its
- * client ID and secret, which leave for Google's consent page; Google's answer comes back to the API.
+ * The choice of Google app, with credentials only for the admin's own app, followed by consent.
  */
-export function GoogleAppForm({ children, consentPath, failure }: Props) {
-  const { data, error, refetch } = useQuery(ConnectGoogleDocument);
+export function GoogleAppForm({ consentPath, failure }: Props) {
+  const { data, error, refetch } = useQuery(ConnectGoogleDocument, {
+    variables: { changingApp: consentPath === "/api/google/change-app" },
+  });
+  const [choice, setChoice] = useState<GoogleApp | null>(null);
+  const available = data?.setup.broccoliGoogleAppAvailable ?? false;
+  const defaultApp = data?.setup.googleWorkspace?.googleApp ?? "BROCCOLI_GOOGLE_APP";
+  const googleApp = choice ?? (available ? defaultApp : "OWN_GOOGLE_APP");
+  const ownApp = googleApp === "OWN_GOOGLE_APP";
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [starting, setStarting] = useState(false);
   const [startFailed, setStartFailed] = useState(false);
-  const isFilledIn = clientId.trim() !== "" && clientSecret.trim() !== "";
+  const isFilledIn = !ownApp || (clientId.trim() !== "" && clientSecret.trim() !== "");
   const shownFailure = startFailed ? "setup.connect.startFailed" : failure;
 
   const connect = async () => {
+    if (!data || !isFilledIn || starting) return;
     setStarting(true);
     setStartFailed(false);
-    const authorizationUrl = await startGoogleConsent(consentPath, clientId, clientSecret);
+    const authorizationUrl = await startGoogleConsent(
+      consentPath,
+      googleApp,
+      ownApp ? { clientId, clientSecret } : {},
+    );
     if (authorizationUrl) {
       window.location.assign(authorizationUrl);
       return;
@@ -46,6 +56,18 @@ export function GoogleAppForm({ children, consentPath, failure }: Props) {
     setStarting(false);
     setStartFailed(true);
   };
+
+  if (!data)
+    return error ? (
+      <div role="alert" className="flex flex-col items-start gap-3">
+        <p className="text-sm text-destructive">{t("setup.connect.loadFailed")}</p>
+        <Button type="button" variant="outline" onClick={() => void refetch()}>
+          {t("setup.connect.retry")}
+        </Button>
+      </div>
+    ) : (
+      <Skeleton className="h-64 rounded-xl" />
+    );
 
   return (
     <form
@@ -56,49 +78,45 @@ export function GoogleAppForm({ children, consentPath, failure }: Props) {
         void connect();
       }}
     >
-      {children}
-      <div className="flex flex-col gap-6 rounded-xl border border-border p-5 sm:p-7">
-        {data ? (
+      <HowToConnect
+        selected={googleApp}
+        onSelect={setChoice}
+        available={available}
+        disabled={starting}
+      />
+      {ownApp && (
+        <div className="flex flex-col gap-6 rounded-xl border border-border p-5 sm:p-7">
           <RedirectAddress address={data.setup.googleRedirectAddress} />
-        ) : error ? (
-          <div role="alert" className="flex flex-col items-start gap-3">
-            <p className="text-sm text-destructive">{t("setup.connect.loadFailed")}</p>
-            <Button type="button" variant="outline" onClick={() => void refetch()}>
-              {t("setup.connect.retry")}
-            </Button>
-          </div>
-        ) : (
-          <Skeleton className="h-[72px] rounded-lg" />
-        )}
-        <GoogleCloudSteps />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="google-client-id">{t("setup.connect.clientId")}</Label>
-            <Input
-              id="google-client-id"
-              autoComplete="off"
-              spellCheck={false}
-              readOnly={starting}
-              className="h-11 rounded-lg px-4"
-              value={clientId}
-              onChange={(event) => setClientId(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="google-client-secret">{t("setup.connect.clientSecret")}</Label>
-            <Input
-              id="google-client-secret"
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              readOnly={starting}
-              className="h-11 rounded-lg px-4"
-              value={clientSecret}
-              onChange={(event) => setClientSecret(event.target.value)}
-            />
+          <GoogleCloudSteps />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="google-client-id">{t("setup.connect.clientId")}</Label>
+              <Input
+                id="google-client-id"
+                autoComplete="off"
+                spellCheck={false}
+                disabled={starting}
+                className="h-11 rounded-lg px-4"
+                value={clientId}
+                onChange={(event) => setClientId(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="google-client-secret">{t("setup.connect.clientSecret")}</Label>
+              <Input
+                id="google-client-secret"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                disabled={starting}
+                className="h-11 rounded-lg px-4"
+                value={clientSecret}
+                onChange={(event) => setClientSecret(event.target.value)}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
       <div className="flex flex-col items-start gap-3">
         <Button
           type="submit"

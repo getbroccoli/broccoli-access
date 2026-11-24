@@ -31,5 +31,27 @@ test("reads the client secret and refresh token stored by consent", async ({ orm
 test("returns no secrets for an unknown connection", async ({ orm }) => {
   const service = createAppConnectionService({ secretBox: TEST_SECRET_BOX });
 
-  expect(await service.readSecrets(orm, "00000000-0000-4000-8000-000000000001")).toBeNull();
+  const missing = "00000000-0000-4000-8000-000000000001";
+  expect(await service.readSecrets(orm, missing)).toBeNull();
+  expect(await service.readConnectionWithSecrets(orm, missing)).toBeNull();
+});
+
+test("reads the saved connection and its matching decrypted credentials together", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connectionId } = await googleScanSetup(orm, fakeGoogle.url);
+  const service = createAppConnectionService({ secretBox: TEST_SECRET_BOX });
+  const [saved] = await storedAppConnections(orm);
+
+  const result = await service.readConnectionWithSecrets(orm, connectionId);
+
+  expect(result).toMatchObject({
+    connection: { id: connectionId, settings: saved!.settings },
+    secrets: JSON.parse(TEST_SECRET_BOX.decrypt(saved!.encryptedSecrets, connectionId)) as Record<
+      string,
+      string
+    >,
+  });
+  expect(result?.connection).not.toHaveProperty("encryptedSecrets");
 });

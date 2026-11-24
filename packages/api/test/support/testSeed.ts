@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 
 import type { Orm } from "../../src/core/db";
 import { files } from "../../src/core/files";
-import { instanceRepository } from "../../src/core/instance/db";
+import { instance, instanceRepository } from "../../src/core/instance/db";
 import type { MailSource, SetupStep } from "../../src/core/instance/domain";
 import { hashSetupToken } from "../../src/core/instance/helpers";
 import { PrincipalSecurityContext, type SecurityContext } from "../../src/core/security";
@@ -62,6 +62,11 @@ export class TestSeed {
   async setupStep(step: SetupStep): Promise<void> {
     const instance = instanceRepository(this.orm);
     await instance.advanceStep((await instance.readInstance()).step, step);
+  }
+
+  /** Restores the missing address of a connection created before origin persistence. */
+  async clearPublicOrigin(): Promise<void> {
+    await this.orm.update(instance).set({ publicOrigin: null });
   }
 
   async setupSession({

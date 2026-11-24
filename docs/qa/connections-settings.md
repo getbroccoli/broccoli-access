@@ -11,7 +11,7 @@ A manual check of Settings → Connections against a development stack: the Goog
 
 - [ ] Settings opens on "Connections", first in the settings menu, with "Where Broccoli Access finds your people and their accounts." under the title.
 - [ ] "Directory" heads the Google Workspace card; "Apps", with "Connect an app to see its members, and disable or enable their accounts from here.", heads a card for Slack and one for Linear below it.
-- [ ] The card shows "Google Workspace" with "Connected", "acme.example, connected as admin@acme.example with your own Google app." and "Scanned today at HH:MM." with the time of the last scan in the browser's time zone.
+- [ ] The card shows "Google Workspace" with "Connected", "acme.example, connected as admin@acme.example." and either "Broccoli app" or your Google app’s client ID and "Scanned today at HH:MM." with the time of the last scan in the browser's time zone.
 - [ ] "Scan now" and "Change Google app" sit at the card's right; at 390 px wide they wrap under the text.
 
 ## Scan now
@@ -22,7 +22,7 @@ A manual check of Settings → Connections against a development stack: the Goog
 
 ## Change Google app
 
-- [ ] "Change Google app" opens `/settings/connections/google-app` titled "Change Google app", with the redirect address, the Google Cloud steps and the client ID and secret fields; "Connections" stays highlighted in the menu.
+- [ ] "Change Google app" opens `/settings/connections/google-app` titled "Change Google app", with both app choices; choosing your own app reveals the redirect address, Google Cloud steps and credential fields; "Connections" stays highlighted in the menu.
 - [ ] Register a second client in the fake (`POST <fake>/_fake/clients` with a client ID, secret and the redirect address), enter it and choose "Connect as Google admin": the fake's consent page names the new client; allowing as `admin@acme.example` returns to Connections, and People is unchanged.
 - [ ] Choosing Cancel at Google returns to the change page with "You cancelled at Google. The Google app hasn’t changed."
 - [ ] Consenting as a user who is not a super admin returns with "That Google account isn’t a super admin. Sign in with a super admin account."
@@ -71,5 +71,12 @@ With Slack and Linear connected as above, and `FAKE` set to the fake connectors'
 - [ ] Signed in again at the fake Slack in a tab, "Reconnect" then "Hand over" closes the window, a toast says "Slack is reconnected.", and the card is "Connected" again with "Scan now".
 - [ ] After `curl -s -X POST "$FAKE/_fake/linear/keys/revoke"`, disabling Chloé on Linear's page turns Linear's card to "Reconnect" with "Linear refused the API key: it was revoked or expired. Found when you disabled Chloé Martin today at HH:MM.", "Changes in Linear fail until you paste a new key." and "Paste a new key".
 - [ ] "Paste a new key" opens "Paste a new key for Linear" with "Check and save"; another key shows "Linear refused it. Check it and try again." and Linear stays in Reconnect. After `curl -s -X POST "$FAKE/_fake/reset"`, `lin_api_acme_fake` closes the dialog and the card is "Connected" with "Scan now" and "Change key".
-- [ ] A Google Workspace scan that fails (fake Google `POST /_fake/tokens/revoke`, then "Scan now") shows "The last scan failed. Try Scan now again." and keeps "Connected".
+- [ ] A Google Workspace scan that fails (fake Google `POST /_fake/tokens/revoke`, then "Scan now") shows "Reconnect" and offers consent through Change Google app. The current app is selected; after consent, Scan now clears the failure without a reload.
 - [ ] At 390 px wide, a card in Reconnect wraps its button under the text without horizontal scrolling.
+
+## Shared Google app
+
+- [ ] Switch own app → Broccoli app → own app. Connection ID, owner, people and approved apps stay; a cancelled or refused change leaves the old app working.
+- [ ] After each switch, Scan now excludes grants to both current and previous Google apps.
+- [ ] A revoked shared refresh token shows Reconnect. Consent again through Change Google app, then Scan now succeeds.
+- [ ] A relay outage fails the scan and permits a retry; it does not show Reconnect.

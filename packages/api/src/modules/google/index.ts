@@ -19,7 +19,7 @@ export {
 export type { GoogleConnectionService } from "./app";
 
 /**
- * Google Workspace connected with the instance's own Google app: the consent at setup, signing in
+ * Google Workspace connected with either Google app: the consent at setup, signing in
  * with Google after it, and Google's redirect for both.
  */
 export function googleModule(dependencies: GoogleConnectionDependencies): ModuleManifest {
@@ -28,7 +28,7 @@ export function googleModule(dependencies: GoogleConnectionDependencies): Module
   return {
     name: "google",
     typeDefs: readSdl(import.meta.url, "./graphql/schema.graphql"),
-    resolvers: createResolvers(connection),
+    resolvers: createResolvers(connection, Boolean(dependencies.relayUrl)),
     router: (http) => googleRouter({ connection, signIn }, http, dependencies.logger),
   };
 }

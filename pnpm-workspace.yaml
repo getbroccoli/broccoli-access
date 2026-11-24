@@ -10,3 +10,5 @@ allowBuilds:
   "@apollo/protobufjs": false
   esbuild: false
   unrs-resolver: false
+patchedDependencies:
+  pg-boss@12.35.1: patches/pg-boss@12.35.1.patch

@@ -18,6 +18,7 @@ const server = await startServer(env, logger, (core) =>
     resendApiUrl: "https://api.resend.com",
     googleOpenIdConfigurationUrl: env.googleOpenIdConfigurationUrl,
     googleAdminApiUrl: env.googleAdminApiUrl,
+    googleRelayUrl: env.googleRelayUrl,
     connectorsUrl: env.connectorsUrl,
   }),
 );

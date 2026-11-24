@@ -1,7 +1,8 @@
 import type { PeoplePageQuery } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 import { formatLastScan } from "@/lib/lastScan";
-import { PageHeader, ScanNowButton } from "@/shell";
+import { PageHeader } from "@/shell";
+import { ScanNowButton } from "@/components/ScanNowButton";
 
 type Props = {
   /** The Google Workspace connection; null without one, undefined while it loads. */

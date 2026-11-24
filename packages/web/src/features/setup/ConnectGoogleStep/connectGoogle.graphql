@@ -1,6 +1,11 @@
-query ConnectGoogle {
+query ConnectGoogle($changingApp: Boolean!) {
   setup {
     id
+    broccoliGoogleAppAvailable
+    googleWorkspace @include(if: $changingApp) {
+      id
+      googleApp
+    }
     googleRedirectAddress
   }
 }

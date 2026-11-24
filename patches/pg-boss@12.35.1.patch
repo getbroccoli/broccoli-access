@@ -1,0 +1,27 @@
+diff --git a/dist/manager.js b/dist/manager.js
+index d63a67c1e75338de4a287c83bd8202e7762cc033..3869eea50ebcde2f7d1fcccdbb226065fa558c62 100644
+--- a/dist/manager.js
++++ b/dist/manager.js
+@@ -1574,7 +1574,21 @@ class Manager extends EventEmitter {
+         const query = plans.fetchNextJob(fetchOptions, this.config.noSkipLocked);
+         let result;
+         try {
+-            result = await db.executeSql(query.text, query.values);
++            if (options.groupConcurrency === 1) {
++                // Acquire before the claim statement so its snapshot sees the previous claim.
++                result = await this.ensureTransaction(db, async (tx) => {
++                    if (db === this.db && this.db._pgbdb) {
++                        await tx.executeSql('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
++                    }
++                    await tx.executeSql('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
++                        `pgboss.group-claim:${this.config.schema}:${name}`
++                    ]);
++                    return tx.executeSql(query.text, query.values);
++                });
++            }
++            else {
++                result = await db.executeSql(query.text, query.values);
++            }
+         }
+         catch (err) {
+             // The only fetch error we tolerate is a unique-constraint violation (SQLSTATE 23505) from a

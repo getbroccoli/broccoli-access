@@ -1,0 +1,1 @@
+ALTER TABLE "instance" ADD COLUMN "public_origin" text;

@@ -3,18 +3,20 @@ import type { Orm } from "../../../core/db";
 import { createOwnerService } from "../../../core/instance";
 import { createGoogleClient } from "../../../integrations/google";
 import {
-  GOOGLE_SIGN_IN_SCOPES,
   GOOGLE_WORKSPACE,
   GOOGLE_WORKSPACE_SECRETS,
-  googleRedirectAddress,
   parseGoogleWorkspaceSettings,
   UnknownGoogleAccountError,
 } from "../domain";
-import { openConsentState, randomConsentToken, sealConsentState } from "../helpers";
+import { openConsentState, randomConsentToken } from "../helpers";
 import type { ConnectedApps } from "../ports";
-import { consentUrl } from "./consentUrl";
 import type { GoogleConnectionDependencies } from "./googleConnectionService";
-import { verifyIdentity } from "./verifyGrant";
+import {
+  verifyIdentity,
+  startConsent,
+  sharedConsentOrigin,
+  consentRedirectAddress,
+} from "./googleConsent";
 
 const owners = createOwnerService();
 
@@ -45,7 +47,8 @@ export interface SignInStart {
 
 /** Google's redirect back after the person chose their account. */
 export interface SignInAnswer {
-  code: string;
+  code?: string;
+  handle?: string;
   state: string;
   publicOrigin: string;
   /** The token `startSignIn` gave the browser; null when the browser has none. */
@@ -55,7 +58,13 @@ export interface SignInAnswer {
 
 type GoogleSignInDependencies = Pick<
   GoogleConnectionDependencies,
-  "orm" | "secretBox" | "openIdConfigurationUrl" | "adminApiUrl" | "connectedApps"
+  | "orm"
+  | "secretBox"
+  | "openIdConfigurationUrl"
+  | "adminApiUrl"
+  | "connectedApps"
+  | "relayUrl"
+  | "publicUrl"
 >;
 
 export function createGoogleSignInService(
@@ -65,25 +74,26 @@ export function createGoogleSignInService(
   const google = createGoogleClient(dependencies);
   return {
     async startSignIn({ publicOrigin, now }) {
-      const { clientId } = await readClient(connectedApps, orm);
-      const nonce = randomConsentToken();
+      const client = await readClient(connectedApps, orm);
       const browserToken = randomConsentToken();
-      const state = sealConsentState(
+      const authorizationUrl = await startConsent(
+        google,
         secretBox,
-        { flow: "sign_in_with_google", nonce },
-        { browserToken, now },
+        {
+          ...client,
+          flow: "sign_in_with_google",
+          publicOrigin:
+            client.googleApp === "broccoli_google_app"
+              ? await sharedConsentOrigin(orm, dependencies.publicUrl)
+              : publicOrigin,
+          browserToken,
+          now,
+        },
+        dependencies.relayUrl,
       );
-      const { authorizationEndpoint } = await google.discover();
-      const authorizationUrl = consentUrl(authorizationEndpoint, {
-        clientId,
-        redirectUri: googleRedirectAddress(publicOrigin),
-        scopes: GOOGLE_SIGN_IN_SCOPES,
-        state,
-        nonce,
-      });
       return { authorizationUrl, browserToken };
     },
-    async finishSignIn({ code, state, publicOrigin, browserToken, now }) {
+    async finishSignIn({ code, handle, state, publicOrigin, browserToken, now }) {
       const signIn =
         browserToken === null ? null : openConsentState(secretBox, state, { browserToken, now });
       if (signIn?.flow !== "sign_in_with_google") {
@@ -93,11 +103,25 @@ export function createGoogleSignInService(
         );
       }
       const client = await readClient(connectedApps, orm);
-      const { identity } = await verifyIdentity(
+      if ("codeVerifier" in signIn !== (client.googleApp === "broccoli_google_app")) {
+        throw new ApplicationError("INVALID_INPUT", "The Google app changed during sign-in.");
+      }
+      const { identity, clientId } = await verifyIdentity(
         google,
-        { ...client, nonce: signIn.nonce },
-        { code, redirectUri: googleRedirectAddress(publicOrigin), now },
+        "codeVerifier" in signIn
+          ? signIn
+          : { clientId: client.clientId, clientSecret: client.clientSecret!, nonce: signIn.nonce },
+        {
+          code,
+          handle,
+          redirectUri: await consentRedirectAddress(dependencies, signIn, publicOrigin),
+          now,
+        },
+        dependencies.relayUrl,
       );
+      if (clientId !== client.clientId) {
+        throw new ApplicationError("INVALID_INPUT", "The sign-in used another Google app.");
+      }
       const userId = await owners.findUserIdByGoogleAccount(orm, identity.sub);
       if (userId === null) {
         throw new UnknownGoogleAccountError();
@@ -108,15 +132,15 @@ export function createGoogleSignInService(
 }
 
 /** The Google app of the Google Workspace connection; refuses with CONFLICT before it exists. */
-async function readClient(
-  connectedApps: ConnectedApps,
-  orm: Orm,
-): Promise<{ clientId: string; clientSecret: string }> {
+async function readClient(connectedApps: ConnectedApps, orm: Orm) {
   const connection = await connectedApps.readConnection(orm, GOOGLE_WORKSPACE);
   if (!connection) {
     throw new ApplicationError("CONFLICT", "Google Workspace is not connected.");
   }
-  const { clientId } = parseGoogleWorkspaceSettings(connection.settings);
-  const secrets = await connectedApps.readSecrets(orm, connection.id);
-  return { clientId, clientSecret: GOOGLE_WORKSPACE_SECRETS.parse(secrets).clientSecret };
+  const stored = await connectedApps.readConnectionWithSecrets(orm, connection.id);
+  if (!stored) throw new ApplicationError("CONFLICT", "Google Workspace is not connected.");
+  const { clientId, googleApp } = parseGoogleWorkspaceSettings(stored.connection.settings);
+  if (googleApp === "broccoli_google_app") return { clientId, googleApp };
+  const { clientSecret } = GOOGLE_WORKSPACE_SECRETS.required().parse(stored.secrets);
+  return { clientId, googleApp, clientSecret };
 }
