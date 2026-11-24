@@ -36,3 +36,4 @@ A manual check of the People page against a development stack: everyone in Googl
 - [ ] Choose "Link" beside Ana’s suggestion. The count drops to three. Open Ana from All. Her Slack work account and the account labelled `ana.ruiz@gmail.example` both appear under Current access.
 - [ ] In Settings → Connections, choose "Scan now" on Slack. Once the scan finishes, reopen Ana’s page and the tab. The private account stays on Ana’s page and the tab still shows three.
 - [ ] Choose "Decide" beside another account. Search by work email, select the employee and choose "Link". The account appears on that person’s page.
+- If the member changes their app email, the new unmatched address needs a new link.

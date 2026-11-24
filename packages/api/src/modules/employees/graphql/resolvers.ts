@@ -12,30 +12,7 @@ import type { Employee, EmployeeAccess } from "../domain";
 import { avatarUrl } from "../http";
 
 export function createResolvers(services: EmployeeService & EmployeeReadService): Resolvers {
-  const access = perRequest(
-    (context) =>
-      new DataLoader<string, EmployeeAccess>((employeeIds) =>
-        services.readAccessOfEmployees(context.getActor(), employeeIds),
-      ),
-  );
-  const employeesById = perRequest(
-    (context) =>
-      new DataLoader<string, Employee>(async (ids) => {
-        const found = await services.readEmployees(context.getActor(), ids);
-        const byId = new Map(found.map((employee) => [employee.id, employee]));
-        return ids.map(
-          (id) => byId.get(id) ?? new Error("No employee the caller may read has this id."),
-        );
-      }),
-  );
-  const employeesByEmail = perRequest(
-    (context) =>
-      new DataLoader<string, Employee | null>(async (emails) => {
-        const found = await services.readEmployeesByEmails(context.getActor(), emails);
-        const byEmail = new Map(found.map((employee) => [employee.email, employee]));
-        return emails.map((email) => byEmail.get(email) ?? null);
-      }),
-  );
+  const { access, employeesById, employeesByEmail, accountOwners } = employeeLoaders(services);
   return {
     Query: {
       employee: (_parent, { id }, context) => services.readEmployee(context.getActor(), id),
@@ -74,7 +51,10 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
       employee: (invite, _args, context) => employeesById(context).load(invite.employeeId),
     },
     AccountChange: {
-      employee: (change, _args, context) => employeesByEmail(context).load(change.email),
+      employee: (change, _args, context) =>
+        change.appAccountId
+          ? accountOwners(context).load(change.appAccountId)
+          : employeesByEmail(context).load(change.email),
     },
     User: {
       employee: (_user, _args, context) => services.readMyEmployee(context.getActor()),
@@ -97,4 +77,39 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
         (await access(context).load(id)).suspendedWithAccess,
     },
   };
+}
+
+function employeeLoaders(services: EmployeeReadService) {
+  const access = perRequest(
+    (context) =>
+      new DataLoader<string, EmployeeAccess>((employeeIds) =>
+        services.readAccessOfEmployees(context.getActor(), employeeIds),
+      ),
+  );
+  const employeesById = perRequest(
+    (context) =>
+      new DataLoader<string, Employee>(async (ids) => {
+        const found = await services.readEmployees(context.getActor(), ids);
+        const byId = new Map(found.map((employee) => [employee.id, employee]));
+        return ids.map(
+          (id) => byId.get(id) ?? new Error("No employee the caller may read has this id."),
+        );
+      }),
+  );
+  const accountOwners = perRequest(
+    (context) =>
+      new DataLoader<string, Employee | null>(async (ids) => {
+        const owners = await services.readAccountOwners(context.getActor(), ids);
+        return ids.map((id) => owners.get(id) ?? null);
+      }),
+  );
+  const employeesByEmail = perRequest(
+    (context) =>
+      new DataLoader<string, Employee | null>(async (emails) => {
+        const found = await services.readEmployeesByEmails(context.getActor(), emails);
+        const byEmail = new Map(found.map((employee) => [employee.email, employee]));
+        return emails.map((email) => byEmail.get(email) ?? null);
+      }),
+  );
+  return { access, employeesById, employeesByEmail, accountOwners };
 }

@@ -79,13 +79,19 @@ test("keeps the owner link when a Disable is being requested on the same account
   });
 });
 
-test("records the owner's link as a direct edit to the account", async ({ orm, seed }) => {
+test("records the canonical employee id in history when the owner links with an uppercase UUID", async ({
+  orm,
+  seed,
+}) => {
   const owner = await seed.owner();
   const person = await seed.employee();
   const app = await seed.app({ status: "approved" });
   const account = await seed.appAccount({ appId: app.id });
 
-  await accountLinks(orm).linkAccount(owner, { appAccountId: account.id, employeeId: person.id });
+  await accountLinks(orm).linkAccount(owner, {
+    appAccountId: account.id,
+    employeeId: person.id.toUpperCase(),
+  });
 
   expect(await storedAppAccounts(orm)).toMatchObject([
     { id: account.id, employeeId: person.id, employeeLinkedBy: "owner" },

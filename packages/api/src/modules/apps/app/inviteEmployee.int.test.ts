@@ -1,10 +1,14 @@
 import {
+  accountLinks,
   expect,
+  expectBlockedBy,
+  holdBeforeCommit,
   inviteTest as test,
   linearInvitations,
   postFakeControl,
   SYSTEM,
 } from "#test/support";
+import { ormOf } from "../../../core/db";
 import { accountChanges } from "../db";
 
 test("stores Ivan's running invite with his email and no account or source key, and queues it by connection", async ({
@@ -40,6 +44,38 @@ test("stores Ivan's running invite with his email and no account or source key, 
       options: { group: linear.connectionId },
     },
   ]);
+});
+
+test("an Invite waits for an in-progress owner link and queues nothing once the linked member is visible", async ({
+  orm,
+  transact,
+  workspace: { service, owner, linear, input, sent },
+}) => {
+  const held = holdBeforeCommit(transact);
+  const link = held.transact((tx) =>
+    accountLinks(ormOf(tx)).linkAccount(owner, {
+      appAccountId: linear.account("deploys@acme.example").id,
+      employeeId: input.employeeId,
+    }),
+  );
+  const pid = await Promise.race([
+    held.ready,
+    link.then(() => {
+      throw new Error("Link was not held");
+    }),
+  ]);
+  const invite = service.inviteEmployee(owner, input);
+  const results = Promise.allSettled([link, invite]);
+  try {
+    await expectBlockedBy(orm, pid);
+  } finally {
+    held.release();
+    await results;
+  }
+
+  expect(await link).toMatchObject({ employeeId: input.employeeId });
+  await expect.soft(invite).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(sent).toEqual([]);
 });
 
 test("running Ivan's invite sends one Linear invitation and shows him Invited, dated by its finish", async ({

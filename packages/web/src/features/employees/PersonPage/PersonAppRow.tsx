@@ -29,20 +29,26 @@ export function PersonAppRow({ row, account, showEmail, first, span, invite, sho
   return (
     <TableRow>
       <TableCell className="h-12 pl-4">
-        {first && <span className="flex items-center gap-2.5 font-medium">
-          <AppMark name={row.app.name} catalogKey={row.app.catalogKey} />
-          {row.app.name}
-        </span>}
-        {showEmail && <span className="block pl-8 text-xs text-muted-foreground">{account?.email}</span>}
+        {first && (
+          <span className="flex items-center gap-2.5 font-medium">
+            <AppMark name={row.app.name} catalogKey={row.app.catalogKey} />
+            {row.app.name}
+          </span>
+        )}
+        {showEmail && (
+          <span className="block pl-8 text-xs text-muted-foreground">{account?.email}</span>
+        )}
       </TableCell>
-      {showSources ? first && (
-        <>
-          <TableCell rowSpan={span}>{row.role ?? "—"}</TableCell>
-          <TableCell rowSpan={span}>
-            {row.templates.map((template) => template.name).join(", ") ||
-              t("people.person.noTemplate")}
-          </TableCell>
-        </>
+      {showSources ? (
+        first && (
+          <>
+            <TableCell rowSpan={span}>{row.role ?? "—"}</TableCell>
+            <TableCell rowSpan={span}>
+              {row.templates.map((template) => template.name).join(", ") ||
+                t("people.person.noTemplate")}
+            </TableCell>
+          </>
+        )
       ) : (
         <>
           <TableCell>{account && <FoundVia findingKinds={account.foundVia} />}</TableCell>
@@ -63,9 +69,11 @@ export function PersonAppRow({ row, account, showEmail, first, span, invite, sho
             })}
           </StatusBadge>
         )}
-        {account && (span > 1 || showsCouldntChange(account) || row.state === "ACTIVE" || row.state === "SUSPENDED") && (
-          <AppAccountStatusCell appUser={account} />
-        )}
+        {account &&
+          (span > 1 ||
+            showsCouldntChange(account) ||
+            row.state === "ACTIVE" ||
+            row.state === "SUSPENDED") && <AppAccountStatusCell appUser={account} />}
         {!account && row.state === "ACTIVE" && (
           <StatusBadge tone="active">{t("people.status.active")}</StatusBadge>
         )}

@@ -39,6 +39,12 @@ export const appAccounts = pgTable(
   (table) => [
     index("app_accounts_employee_app").on(table.employeeId, table.appId),
     unique("app_accounts_app_email").on(table.appId, table.email),
+    index("app_accounts_without_person")
+      .on(table.email, table.id)
+      .where(sql`${table.employeeId} is null and ${table.kind} = 'personal'`),
+    index("app_accounts_owner_link")
+      .on(table.employeeId, table.appId)
+      .where(sql`${table.employeeLinkedBy} = 'owner'`),
     check("app_accounts_kind", sql`${table.kind} in ('personal', 'service', 'external')`),
     check(
       "app_accounts_employee_link",

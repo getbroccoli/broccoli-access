@@ -39,7 +39,7 @@ export interface ImportSourceRepository {
    * The source's account of the member whose key or session the connection uses; null without
    * one, as a version 1 record, which predates the flag, reads.
    */
-  findConnectionUserEmail(id: string): Promise<string | null>;
+  findConnectionUserEmail(connectionId: string): Promise<string | null>;
   /**
    * The members with one of `emails` that the last saved scan of one of `connectionIds` found; a
    * version 1 record, which predates the flag, reads as not the connection's user.
@@ -109,15 +109,16 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
         })
         .from(importRecords)
         .where(eq(importRecords.sourceId, id)),
-    findConnectionUserEmail: async (id) => {
+    findConnectionUserEmail: async (connectionId) => {
       const [record] = await orm()
         .select({
           email: sql<string>`${importRecords.values} ->> 'email'`,
         })
         .from(importRecords)
+        .innerJoin(importSources, eq(importSources.id, importRecords.sourceId))
         .where(
           and(
-            eq(importRecords.sourceId, id),
+            eq(importSources.connectionId, connectionId),
             // The builder has no JSON operators; the key is a constant.
             sql`(${importRecords.values} ->> 'isConnectionUser') = 'true'`,
           ),

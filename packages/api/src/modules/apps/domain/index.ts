@@ -1,4 +1,4 @@
-export { suggestEmployee } from "./suggestEmployee";
+export { employeeMatcher } from "./suggestEmployee";
 export {
   APP_STATUSES,
   appChanges,

@@ -39,7 +39,10 @@ test("the owner reads a suggested person and links the account over GraphQL", as
     },
   });
 
-  const linked = await browser.graphql(LINK, { appAccountId: account.id, employeeId: employee.id });
+  const linked = await browser.graphql(LINK, {
+    appAccountId: account.id,
+    employeeId: employee.id.toUpperCase(),
+  });
   expect(await linked.json()).toEqual({
     data: {
       apps: {

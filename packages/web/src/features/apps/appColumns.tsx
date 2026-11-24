@@ -51,7 +51,7 @@ export const APPROVED_APP_COLUMNS: DataTableColumn<ApprovedAppRow>[] = [
   APP_COLUMN,
   emptyForAppsToConnect({
     id: "users",
-    header: t("apps.column.users"),
+    header: t("apps.column.people"),
     className: "w-[14%]",
     cell: ({ users, peopleCount }) => <AppPeopleCell users={users} peopleCount={peopleCount} />,
   }),

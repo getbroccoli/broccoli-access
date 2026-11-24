@@ -10,3 +10,4 @@ export { imageTypeOf } from "./imageTypeOf";
 // Public types.
 export type { CalendarDate } from "./calendarDate";
 export type { ImageType } from "./imageTypeOf";
+export { isEarlierSince } from "./earlierSince";

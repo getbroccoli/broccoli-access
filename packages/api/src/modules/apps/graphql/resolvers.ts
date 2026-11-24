@@ -7,10 +7,12 @@ import {
   type Resolvers,
   type RequestLoader,
   type ResolversTypes,
+  type GraphqlContext,
   toEnum,
 } from "../../../core/graphql";
 import type { SecurityContext } from "../../../core/security";
 import type {
+  AccountWithoutPerson,
   AccountLinkService,
   AccountChangeService,
   AccountChangeState,
@@ -46,9 +48,13 @@ type AppResolverServices = Pick<
   | "inviteEmployee"
 >;
 
-export function createResolvers(services: AppResolverServices, people: RequestLoader<{ appAccounts: AppUser[]; appInvites: AppInvite[] }>): Resolvers {
+export function createResolvers(
+  services: AppResolverServices,
+  people: RequestLoader<{ appAccounts: AppUser[]; appInvites: AppInvite[] }>,
+): Resolvers {
   const loaders = createLoaders(services);
-
+  const summary = (app: AccountWithoutPerson["app"] | AppSummary, context: GraphqlContext) =>
+    "peopleCount" in app ? app : loaders.appsById(context).load(app.id);
   return {
     Query: {
       accountsWithoutPerson: (_parent, { first, after }, context) =>
@@ -74,7 +80,7 @@ export function createResolvers(services: AppResolverServices, people: RequestLo
     },
     AppsMutations: appsMutations(services, loaders),
     AccountWithoutPerson: {
-      app: (account, _args, context) => loaders.appsById(context).load(account.appId),
+      app: (account) => account.app,
     },
     AppUser: {
       status: ({ status }) => toEnum(status),
@@ -127,6 +133,13 @@ export function createResolvers(services: AppResolverServices, people: RequestLo
       failure: ({ error }) => error && toEnum(error),
     },
     App: {
+      peopleCount: async (app, _args, context) => (await summary(app, context)).peopleCount,
+      foundVia: async (app, _args, context) => (await summary(app, context)).foundVia,
+      since: async (app, _args, context) => (await summary(app, context)).since,
+      preselected: async (app, _args, context) => (await summary(app, context)).preselected,
+      suspendedWithAccessCount: async (app, _args, context) =>
+        (await summary(app, context)).suspendedWithAccessCount,
+      connected: async (app, _args, context) => (await summary(app, context)).connected,
       status: ({ status }) => toEnum(status),
       peoplePreview: async (app, { first }, context) => {
         if (first < 1) throw invalidInput([{ field: "first", code: "out_of_range" }]);

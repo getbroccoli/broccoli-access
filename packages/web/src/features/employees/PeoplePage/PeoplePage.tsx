@@ -1,10 +1,10 @@
-import { toast } from "sonner";
+import { useAccountsWithoutPerson } from "./useAccountsWithoutPerson";
 import { useQuery } from "@apollo/client/react";
 import { useNavigate, useRouteContext, useRouter, useSearch } from "@tanstack/react-router";
 
 import {
-  AccountsWithoutPersonDocument,
-  PeopleDirectoryScanDocument,
+  AccountsWithoutPersonCountDocument,
+  DirectoryScanDocument,
   PeoplePageDocument,
 } from "@/__generated__/graphql";
 import { TableSearchField } from "@/components/dataTable";
@@ -34,20 +34,25 @@ export function PeoplePage() {
   const { data, error, refetch } = useQuery(PeoplePageDocument, {
     variables: {
       showAccounts,
-      isOwner: me.isOwner,
       filter: suspendedOnly ? { suspendedWithAccess: true } : { search: q },
     },
     fetchPolicy: "cache-and-network",
   });
-  const directory = useQuery(PeopleDirectoryScanDocument, { fetchPolicy: "cache-and-network" });
-  const accounts = useQuery(AccountsWithoutPersonDocument, {
-    skip: !showAccounts,
+  const directory = useQuery(DirectoryScanDocument, { fetchPolicy: "cache-and-network" });
+  const badge = useQuery(AccountsWithoutPersonCountDocument, {
+    skip: !me.isOwner,
     fetchPolicy: "cache-and-network",
   });
+  const accounts = useAccountsWithoutPerson(showAccounts);
   const connection = directory.data?.setup.googleWorkspace;
   const isScanning = connection?.scan?.status === "SCANNING";
   usePollWhileScanning(isScanning, directory);
-  const refresh = () => Promise.all([refetch(), ...(showAccounts ? [accounts.refetch()] : [])]);
+  const refresh = () =>
+    Promise.allSettled([
+      refetch(),
+      ...(me.isOwner ? [badge.refetch()] : []),
+      ...(showAccounts ? [accounts.refresh()] : []),
+    ]);
   useRefetchAfterScan(isScanning, refresh);
   useRefetchAfterContainerConnectorScans(refresh);
   const people = data?.employees?.edges.map(({ node }) => node);
@@ -59,7 +64,7 @@ export function PeoplePage() {
         <PeopleTabs
           view={view}
           isOwner={me.isOwner}
-          accountCount={data?.accountsWithoutPersonCount}
+          accountCount={badge.data?.accountsWithoutPersonCount}
           counts={data?.employeeCounts}
           // All is the default, so its URL holds no view.
           onViewChange={(next) =>
@@ -85,13 +90,9 @@ export function PeoplePage() {
           {t("people.suspendedWithAccess.description")}
         </p>
       )}
-      {((error && !data) || (showAccounts && accounts.error && !accounts.data)) && (
-        <div role="alert" className="flex flex-col items-start gap-3">
-          <p className="text-sm text-destructive">{t("people.error.title")}</p>
-          <Button type="button" variant="outline" onClick={() => void refresh()}>
-            {t("people.error.retry")}
-          </Button>
-        </div>
+      {error && !data && <LoadError message={t("people.error.title")} retry={refetch} />}
+      {showAccounts && accounts.error && !accounts.data && (
+        <LoadError message={t("people.accounts.loadFailed")} retry={accounts.refetch} />
       )}
       {((!data && !error) || (showAccounts && accounts.loading && !accounts.data)) && (
         <Skeleton className="h-[300px] rounded-xl" />
@@ -101,23 +102,8 @@ export function PeoplePage() {
           accounts={accounts.data.accountsWithoutPerson}
           loading={accounts.loading}
           refresh={refresh}
-          loadMore={() =>
-            void accounts
-              .fetchMore({
-                variables: { after: accounts.data?.accountsWithoutPerson.pageInfo.endCursor },
-                updateQuery: (previous, { fetchMoreResult: next }) => ({
-                  ...next,
-                  accountsWithoutPerson: {
-                    ...next.accountsWithoutPerson,
-                    edges: [
-                      ...previous.accountsWithoutPerson.edges,
-                      ...next.accountsWithoutPerson.edges,
-                    ],
-                  },
-                }),
-              })
-              .catch(() => toast.error(t("people.error.title")))
-          }
+          refreshCounts={() => void Promise.allSettled([refetch(), badge.refetch()])}
+          loadMore={() => void accounts.loadMore()}
         />
       )}
       {!showAccounts && people && (
@@ -138,4 +124,15 @@ function emptyStateOf(suspendedOnly: boolean, query: string | undefined): string
     return t("people.suspendedWithAccess.empty");
   }
   return query ? t("people.noResults.title", { query }) : t("people.empty.title");
+}
+
+function LoadError({ message, retry }: { message: string; retry: () => Promise<unknown> }) {
+  return (
+    <div role="alert" className="flex flex-col items-start gap-3">
+      <p className="text-sm text-destructive">{message}</p>
+      <Button type="button" variant="outline" onClick={() => void retry().catch(() => undefined)}>
+        {t("people.error.retry")}
+      </Button>
+    </div>
+  );
 }

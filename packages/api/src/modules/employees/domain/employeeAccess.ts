@@ -1,3 +1,4 @@
+import { isEarlierSince } from "../../../utils";
 import type { AccountStatus } from "../../../core/connectors";
 
 /** One of an employee's accounts, as the apps module reads it. */
@@ -51,7 +52,7 @@ function accessOf(accounts: readonly EmployeeAccount[]): EmployeeAccess {
   const currentAccess = [...byApp.values()]
     .map((members) => {
       const earliest = members.reduce((one, other) =>
-        one.since.at <= other.since.at ? one : other,
+        isEarlierSince(other.since, one.since) ? other : one,
       );
       return {
         appName: earliest.appName,

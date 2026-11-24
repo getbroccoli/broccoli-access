@@ -27,6 +27,7 @@ import {
 import type { AppAccount, AppStatus, InAppFacts } from "../domain";
 import { appAccounts } from "./appAccountsTable";
 import { appConnections } from "./appConnectionsTable";
+import type { App } from "./appRepository";
 import { apps } from "./appsTable";
 
 /** App accounts in Postgres, through the pool or inside a transaction. */
@@ -53,6 +54,7 @@ export interface AppAccountRepository {
   /** The accounts the owner linked to these employees, including private email addresses. */
   findOwnerLinks(
     employeeIds: readonly string[],
+    appIds: readonly string[],
   ): Promise<{ employeeId: string; email: string; appId: string }[]>;
   countWithoutPerson(facts: InAppFacts): Promise<number>;
   insertMany(accounts: readonly Omit<AppAccount, "id">[]): Promise<AppAccount[]>;
@@ -91,7 +93,8 @@ export interface AppAccountRepository {
   ): Promise<EmployeeAppAccount[]>;
 }
 
-export type UnlinkedAccount = Pick<AppAccount, "id" | "appId" | "email"> & {
+export type UnlinkedAccount = Pick<AppAccount, "id" | "email"> & {
+  app: App;
   connectionId: string | null;
 };
 export const UNLINKED_SORT_VALUES: Record<"EMAIL", z.ZodType<unknown[]>> = {
@@ -148,7 +151,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .select({
           id: appAccounts.id,
           email: appAccounts.email,
-          appId: appAccounts.appId,
+          app: apps,
           connectionId: appConnections.id,
         })
         .from(appAccounts)
@@ -159,7 +162,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .limit(limit);
       return rows.map((node) => ({ node, values: [node.email, node.id] }));
     },
-    findOwnerLinks: (employeeIds) =>
+    findOwnerLinks: (employeeIds, appIds) =>
       orm()
         .select({
           employeeId: sql<string>`${appAccounts.employeeId}`,
@@ -170,6 +173,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .where(
           and(
             anyOf(appAccounts.employeeId, employeeIds),
+            anyOf(appAccounts.appId, appIds),
             eq(appAccounts.employeeLinkedBy, "owner"),
           ),
         ),
@@ -264,11 +268,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
           appName: apps.name,
           catalogKey: apps.catalogKey,
           appStatus: apps.status,
-          status: appAccounts.status,
-          foundVia: appAccounts.foundVia,
-          grantedAt: appAccounts.grantedAt,
-          grantedBefore: appAccounts.grantedBefore,
-          firstSeenAt: appAccounts.firstSeenAt,
+          ...accessColumns,
         })
         .from(appAccounts)
         .innerJoin(apps, eq(apps.id, appAccounts.appId))
@@ -314,6 +314,14 @@ const EMAIL_ORDER = keysetOrder(
   false,
 );
 
+const accessColumns = {
+  status: appAccounts.status,
+  foundVia: appAccounts.foundVia,
+  grantedAt: appAccounts.grantedAt,
+  grantedBefore: appAccounts.grantedBefore,
+  firstSeenAt: appAccounts.firstSeenAt,
+};
+
 const columns = {
   id: appAccounts.id,
   appId: appAccounts.appId,
@@ -322,11 +330,7 @@ const columns = {
   employeeLinkedBy: appAccounts.employeeLinkedBy,
   kind: appAccounts.kind,
   note: appAccounts.note,
-  status: appAccounts.status,
-  foundVia: appAccounts.foundVia,
-  grantedAt: appAccounts.grantedAt,
-  grantedBefore: appAccounts.grantedBefore,
-  firstSeenAt: appAccounts.firstSeenAt,
+  ...accessColumns,
 };
 
 function userColumns(facts: InAppFacts) {
@@ -336,11 +340,7 @@ function userColumns(facts: InAppFacts) {
     email: appAccounts.email,
     // Never null: the queries keep only accounts with an employee.
     employeeId: sql<string>`${appAccounts.employeeId}`,
-    status: appAccounts.status,
-    foundVia: appAccounts.foundVia,
-    grantedAt: appAccounts.grantedAt,
-    grantedBefore: appAccounts.grantedBefore,
-    firstSeenAt: appAccounts.firstSeenAt,
+    ...accessColumns,
     inApp: inApp(facts),
   };
 }

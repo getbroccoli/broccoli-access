@@ -15,4 +15,6 @@ EXECUTE FUNCTION clear_app_account_employee_link();--> statement-breakpoint
 ALTER TABLE "app_accounts" ADD CONSTRAINT "app_accounts_kind" CHECK ("app_accounts"."kind" in ('personal', 'service', 'external')),
   ADD CONSTRAINT "app_accounts_employee_link" CHECK (("app_accounts"."employee_id" is null) = ("app_accounts"."employee_linked_by" is null)
       and ("app_accounts"."employee_linked_by" is null or ("app_accounts"."kind" = 'personal' and "app_accounts"."employee_linked_by" in ('email','owner')))),
-  ADD CONSTRAINT "app_accounts_note" CHECK ("app_accounts"."kind" <> 'personal' or "app_accounts"."note" is null);
+  ADD CONSTRAINT "app_accounts_note" CHECK ("app_accounts"."kind" <> 'personal' or "app_accounts"."note" is null);--> statement-breakpoint
+CREATE INDEX "app_accounts_without_person" ON "app_accounts" USING btree ("email","id") WHERE "app_accounts"."employee_id" is null and "app_accounts"."kind" = 'personal';--> statement-breakpoint
+CREATE INDEX "app_accounts_owner_link" ON "app_accounts" USING btree ("employee_id","app_id") WHERE "app_accounts"."employee_linked_by" = 'owner';

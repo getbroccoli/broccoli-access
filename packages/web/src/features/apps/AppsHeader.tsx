@@ -1,7 +1,7 @@
 import { useQuery } from "@apollo/client/react";
 import { useEffect, useRef } from "react";
 
-import { AppsScanDocument, type AppsScanQuery } from "@/__generated__/graphql";
+import { DirectoryScanDocument, type DirectoryScanQuery } from "@/__generated__/graphql";
 import { useCache } from "@/apollo";
 import { t } from "@/i18n";
 import { formatLastScan } from "@/lib/lastScan";
@@ -20,7 +20,7 @@ type Props = {
 /** The page's title with when the last scan ran, and Scan now; the apps reload once a scan ends. */
 export function AppsHeader({ canScan }: Props) {
   // A scan started elsewhere, such as in Settings, changes the scan outside this cache.
-  const scanQuery = useQuery(AppsScanDocument, { fetchPolicy: "cache-and-network" });
+  const scanQuery = useQuery(DirectoryScanDocument, { fetchPolicy: "cache-and-network" });
   const connection = scanQuery.data?.setup.googleWorkspace;
   const isScanning = connection?.scan?.status === "SCANNING";
   usePollWhileScanning(isScanning, scanQuery);
@@ -42,7 +42,7 @@ export function AppsHeader({ canScan }: Props) {
   );
 }
 
-type Connection = NonNullable<AppsScanQuery["setup"]["googleWorkspace"]>;
+type Connection = NonNullable<DirectoryScanQuery["setup"]["googleWorkspace"]>;
 
 /** "Scanned today at 08:00": page headers show the last scan without the full stop. */
 function lastScan(connection: Connection): string {

@@ -63,6 +63,19 @@ it("excludes the directory from approved apps and access", () => {
   );
 });
 
+it("keeps access known before a date when a second account first appears on that date", () => {
+  const exact = { ...slack, since: { at: slack.since.at, before: false } };
+
+  for (const accounts of [
+    [exact, slack],
+    [slack, exact],
+  ]) {
+    expect(accessOfEmployees(accounts).get("ana")?.currentAccess).toMatchObject([
+      { since: { at: slack.since.at, before: true } },
+    ]);
+  }
+});
+
 it("sorts current access by app name", () => {
   const access = accessOfEmployees([
     directory,

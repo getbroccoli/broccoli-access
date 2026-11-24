@@ -1,26 +1,61 @@
-/** The one active employee whose name or email username matches best, or null for a tie or weak match. */
-export function suggestEmployee(
-  account: { email: string; displayName: string | null },
-  employees: readonly { id: string; firstName: string; lastName: string; email: string }[],
-): string | null {
-  const accountNames = [normalise(account.displayName ?? ""), username(account.email)].filter(
-    Boolean,
-  );
-  let best = 0;
-  let suggestion: string | null = null;
+interface Person {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+/** Index the active directory once for a page. A key shared by two employees stays ambiguous. */
+export function employeeMatcher(employees: readonly Person[]) {
+  const exact = new Map<string, string | null>();
+  const missingLetter = new Map<string, string | null>();
+  const changedLetter = new Map<string, string | null>();
   for (const person of employees) {
-    const names = [normalise(person.firstName + person.lastName), username(person.email)];
-    const score = Math.max(
-      ...accountNames.flatMap((name) => names.map((other) => closeness(name, other))),
-    );
-    if (score > best) {
-      best = score;
-      suggestion = person.id;
-    } else if (score === best) {
-      suggestion = null;
+    for (const name of new Set([
+      normalise(person.firstName + person.lastName),
+      username(person.email),
+    ])) {
+      if (!name) continue;
+      index(exact, name, person.id);
+      if (name.length < MIN_TYPO_LENGTH) continue;
+      for (const { shorter, wildcard } of letterKeys(name)) {
+        if (shorter.length >= MIN_TYPO_LENGTH) index(missingLetter, shorter, person.id);
+        index(changedLetter, wildcard, person.id);
+      }
     }
   }
-  return suggestion;
+
+  return ({ email, displayName }: { email: string; displayName: string | null }): string | null => {
+    const names = new Set([normalise(displayName ?? ""), username(email)]);
+    const matches = new Set<string | null | undefined>();
+    for (const name of names) matches.add(exact.get(name));
+    matches.delete(undefined);
+    if (matches.size === 0) {
+      for (const name of names) {
+        if (name.length < MIN_TYPO_LENGTH) continue;
+        matches.add(missingLetter.get(name));
+        for (const { shorter, wildcard } of letterKeys(name)) {
+          if (shorter.length >= MIN_TYPO_LENGTH) matches.add(exact.get(shorter));
+          matches.add(changedLetter.get(wildcard));
+        }
+      }
+      matches.delete(undefined);
+    }
+    return matches.size === 1 ? (matches.values().next().value ?? null) : null;
+  };
+}
+
+function index(keys: Map<string, string | null>, key: string, id: string): void {
+  keys.set(key, keys.has(key) && keys.get(key) !== id ? null : id);
+}
+
+/** Dropping one letter finds an insertion or deletion. Marking its position finds a substitution. */
+function* letterKeys(name: string) {
+  for (let i = 0; i < name.length; i++) {
+    const start = name.slice(0, i);
+    const end = name.slice(i + 1);
+    yield { shorter: start + end, wildcard: start + "*" + end };
+  }
 }
 
 function username(email: string): string {
@@ -32,22 +67,6 @@ function normalise(name: string): string {
     .normalize("NFKD")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]/gu, "");
-}
-
-/** Prefer an exact match. Allow one missing, extra or mistyped letter only in longer names. */
-function closeness(one: string, other: string): number {
-  if (one === other) return 2;
-  if (
-    Math.min(one.length, other.length) < MIN_TYPO_LENGTH ||
-    Math.abs(one.length - other.length) > 1
-  )
-    return 0;
-  const shorter = one.length <= other.length ? one : other;
-  const longer = one.length <= other.length ? other : one;
-  let index = 0;
-  while (index < shorter.length && shorter[index] === longer[index]) index++;
-  const skip = shorter.length === longer.length ? 1 : 0;
-  return Number(shorter.slice(index + skip) === longer.slice(index + 1));
 }
 
 /** A one-letter difference in a short name is too weak to suggest a person. */

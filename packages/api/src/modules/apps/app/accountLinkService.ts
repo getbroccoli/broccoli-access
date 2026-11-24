@@ -6,12 +6,13 @@ import { createRecordHistoryService } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
 import {
+  type App,
   appAccountRepository,
   appRepository,
   type UnlinkedAccount,
   UNLINKED_SORT_VALUES,
 } from "../db";
-import { accountChanges, suggestEmployee } from "../domain";
+import { accountChanges, employeeMatcher } from "../domain";
 import type { ConnectionMembers, EmployeesByName } from "../ports";
 import { type AppUser, toAppUser } from "./appUserService";
 import { findInAppFacts } from "./inAppFacts";
@@ -32,7 +33,7 @@ export interface AccountLinkService {
 
 export interface AccountWithoutPerson {
   id: string;
-  appId: string;
+  app: App;
   email: string;
   displayName: string | null;
   suggestedEmployeeId: string | null;
@@ -68,19 +69,19 @@ export function createAccountLinkService(
         ),
         findEmployeesInDirectory(orm, dependencies.connectors, { status: "active" }),
       ]);
-      const candidates = await employees.readEmployees(ctx, activeIds);
+      const suggest = employeeMatcher(await employees.readEmployees(ctx, activeIds));
       return {
         ...page,
-        edges: page.edges.map(({ cursor, node: { id, appId, email, connectionId } }) => {
+        edges: page.edges.map(({ cursor, node: { id, app, email, connectionId } }) => {
           const displayName = names.get(`${connectionId} ${email}`) ?? null;
           return {
             cursor,
             node: {
               id,
-              appId,
+              app,
               email,
               displayName,
-              suggestedEmployeeId: suggestEmployee({ email, displayName }, candidates),
+              suggestedEmployeeId: suggest({ email, displayName }),
             },
           };
         }),
@@ -90,11 +91,12 @@ export function createAccountLinkService(
       requireOwner(ctx);
       return appAccountRepository(orm).countWithoutPerson(await findInAppFacts(orm, dependencies));
     },
-    async linkAccount(ctx, { appAccountId, employeeId }) {
+    async linkAccount(ctx, input) {
       requireOwner(ctx);
-      if (!parseUuid(appAccountId))
-        throw new ApplicationError("NOT_FOUND", "No app account has this id.");
-      if (!parseUuid(employeeId) || !(await employees.readEmployees(ctx, [employeeId])).length) {
+      const appAccountId = parseUuid(input.appAccountId);
+      const employeeId = parseUuid(input.employeeId);
+      if (!appAccountId) throw new ApplicationError("NOT_FOUND", "No app account has this id.");
+      if (!employeeId || !(await employees.readEmployees(ctx, [employeeId])).length) {
         throw new ApplicationError("NOT_FOUND", "No employee has this id.");
       }
       const account = await transact((tx) =>

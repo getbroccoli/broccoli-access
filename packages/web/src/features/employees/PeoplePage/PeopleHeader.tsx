@@ -1,4 +1,4 @@
-import type { PeopleDirectoryScanQuery } from "@/__generated__/graphql";
+import type { DirectoryScanQuery } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 import { formatLastScan } from "@/lib/lastScan";
 import { PageHeader } from "@/shell";
@@ -6,7 +6,7 @@ import { ScanNowButton } from "@/components/ScanNowButton";
 
 type Props = {
   /** The Google Workspace connection; null without one, undefined while it loads. */
-  connection: PeopleDirectoryScanQuery["setup"]["googleWorkspace"] | undefined;
+  connection: DirectoryScanQuery["setup"]["googleWorkspace"] | undefined;
   /** Whether the page has its data, so the description waits for the last scan. */
   loaded: boolean;
 };

@@ -130,7 +130,7 @@ type AppInvite {
 
 # Adds the person to an account change; the server merges the types of the modules.
 type AccountChange {
-  "The employee whose email is now the change's email; null when nobody has it."
+  "The employee linked to the target account, or the employee with the change’s email for an invite or a historical change without an account. Null when nobody matches."
   employee: Employee
 }
 

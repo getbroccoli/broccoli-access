@@ -113,6 +113,7 @@ async function askForInvite(
     connectors: readonly Connector[];
   },
 ): Promise<AppInvite> {
+  await appAccountRepository(tx).lockForSync();
   const connection = await findConnectionOfApp(tx, appId);
   const facts = await readInviteFacts(dependencies, tx, {
     employees: [employee],
@@ -226,7 +227,10 @@ async function readMemberKeys(
   employees: readonly InvitedEmployee[],
   connections: readonly AppConnection[],
 ) {
-  const links = await appAccountRepository(db).findOwnerLinks(employees.map(({ id }) => id));
+  const links = await appAccountRepository(db).findOwnerLinks(
+    employees.map(({ id }) => id),
+    connections.map(({ appId }) => appId),
+  );
   const emails = [...new Set([...employees, ...links].map(({ email }) => email))];
   const found = await members.findConnectionMembers(db, {
     connectionIds: connections.map(({ id }) => id),

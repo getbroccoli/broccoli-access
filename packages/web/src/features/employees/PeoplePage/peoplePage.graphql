@@ -1,13 +1,8 @@
-query PeoplePage(
-  $filter: EmployeeFilter
-  $showAccounts: Boolean! = false
-  $isOwner: Boolean! = false
-) {
+query PeoplePage($filter: EmployeeFilter, $showAccounts: Boolean! = false) {
   employeeCounts {
     all
     suspendedWithAccess
   }
-  accountsWithoutPersonCount @include(if: $isOwner)
   employees(first: 10000, orderBy: { field: STATUS }, filter: $filter) @skip(if: $showAccounts) {
     edges {
       node {
@@ -28,10 +23,6 @@ mutation LinkAccount($input: AppAccountLinkInput!) {
     linkAccount(input: $input) {
       appUser {
         id
-        email
-        employee {
-          id
-        }
       }
       error {
         __typename
@@ -57,22 +48,12 @@ query PeopleToLink($search: String, $after: String) {
   }
 }
 
-query PeopleDirectoryScan {
-  setup {
-    id
-    googleWorkspace {
-      id
-      scan {
-        id
-        status
-        readAt
-      }
-    }
-  }
+query AccountsWithoutPersonCount {
+  accountsWithoutPersonCount
 }
 
-query AccountsWithoutPerson($after: String) {
-  accountsWithoutPerson(after: $after) {
+query AccountsWithoutPerson($after: String, $first: Int = 100) {
+  accountsWithoutPerson(after: $after, first: $first) {
     pageInfo {
       hasNextPage
       endCursor

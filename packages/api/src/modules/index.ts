@@ -134,9 +134,20 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     }),
     importsModule(scans),
     connectorsModule(containerConnections),
-    appsModule({ ...apps, ...users, ...changes, ...createAccountLinkService({
-      ...core, connectors: directoryConnectors, members: importRecords, employees,
-    }) }, people),
+    appsModule(
+      {
+        ...apps,
+        ...users,
+        ...changes,
+        ...createAccountLinkService({
+          ...core,
+          connectors: directoryConnectors,
+          members: importRecords,
+          employees,
+        }),
+      },
+      people,
+    ),
     extensionModule({ ...core, appSessions: containerConnections }),
     templatesModule(templates, employees.readEmployees, people),
   ];

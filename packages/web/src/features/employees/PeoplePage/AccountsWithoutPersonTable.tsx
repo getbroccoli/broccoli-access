@@ -3,11 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import {
-  LinkAccountDocument,
-  PeoplePageDocument,
-  type AccountsWithoutPersonQuery,
-} from "@/__generated__/graphql";
+import { LinkAccountDocument, type AccountsWithoutPersonQuery } from "@/__generated__/graphql";
 import { PayloadFailure, usePayloadMutation } from "@/apollo";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,25 +29,28 @@ export function AccountsWithoutPersonTable({
   loading,
   loadMore,
   refresh,
+  refreshCounts,
 }: {
   accounts: Accounts;
   loading: boolean;
   loadMore: () => void;
   refresh: () => Promise<unknown>;
+  refreshCounts: () => void;
 }) {
-  const [choosing, setChoosing] = useState<Account | null>(null);
+  const [chosenId, setChoosing] = useState<string | null>(null);
+  const choosing = accounts.edges.find(({ node }) => node.id === chosenId)?.node;
   const [link, mutation] = usePayloadMutation(LinkAccountDocument, {
     update: (cache, { data }) => {
       const id = data?.apps.linkAccount.appUser?.id;
       if (id) removeLinkedAccount(cache, id);
     },
-    refetch: [PeoplePageDocument],
   });
 
   async function linkTo(account: Account, person: Person) {
     try {
       await link({ variables: { input: { appAccountId: account.id, employeeId: person.id } } });
       setChoosing(null);
+      refreshCounts();
       toast.success(
         t("people.accounts.linked", { name: `${person.firstName} ${person.lastName}` }),
       );
@@ -117,7 +116,7 @@ export function AccountsWithoutPersonTable({
                       variant="outline"
                       aria-haspopup="dialog"
                       disabled={mutation.loading || loading}
-                      onClick={() => setChoosing(account)}
+                      onClick={() => setChoosing(account.id)}
                     >
                       {t("people.accounts.decide")}
                       <CaretDown aria-hidden />

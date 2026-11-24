@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useQuery } from "@apollo/client/react";
 import { useState } from "react";
 
@@ -67,7 +68,7 @@ export function LinkAccountDialog({
         {error && (
           <div role="alert">
             {t("people.error.title")}{" "}
-            <Button variant="ghost" onClick={() => void refetch()}>
+            <Button variant="ghost" onClick={() => void refetch().catch(() => undefined)}>
               {t("people.error.retry")}
             </Button>
           </div>
@@ -89,7 +90,7 @@ export function LinkAccountDialog({
                     edges: [...previous.employees.edges, ...next.employees.edges],
                   },
                 }),
-              }).catch(() => void refetch())
+              }).catch(() => toast.error(t("people.accounts.morePeopleFailed")))
             }
           >
             {t("people.accounts.more")}

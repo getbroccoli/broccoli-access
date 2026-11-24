@@ -172,7 +172,7 @@ enum ReconnectCause {
 type Employee {
   "Their accounts in approved apps other than the directory, leaving out those not in their app (`inApp` false): the active ones, and the suspended ones in connected apps, by app name. Admins only."
   appAccounts: [AppUser!]!
-  "The connected apps whose last scan found no member with their email, where Invite or Reconnect is offered, an invite was asked, or a scan read their pending invitation, also in an app whose connection cannot invite, by app name. Admins only."
+  "The connected apps whose last scan found neither their work email nor a member the owner linked to them, where Invite or Reconnect is offered, an invite was asked, or a scan read their pending invitation, also in an app whose connection cannot invite, by app name. Admins only."
   appInvites: [AppInvite!]!
 }
 
@@ -264,7 +264,7 @@ input SetupFinishInput {
   approvedAppIds: [ID!]!
 }
 
-"A personal account in an approved app that has no employee."
+"A personal account with no employee in an approved app. After the app’s first completed scan, only accounts its last scan returned qualify."
 type AccountWithoutPerson {
   id: ID!
   email: String!
@@ -296,7 +296,7 @@ type AppAccountLinkPayload {
 union AppAccountLinkError = NotFoundError | ConflictError
 
 type AppsMutations {
-  "Links a personal account without a person in an approved app to an employee. Owner only."
+  "Links an eligible account to an employee. The link survives a rescan of the same app and email. A new unmatched address needs a new link. Owner only."
   linkAccount(input: AppAccountLinkInput!): AppAccountLinkPayload!
   "Approves an app and records it in the app's history. Admins only."
   approve(input: AppApproveInput!): AppApprovePayload!
@@ -375,9 +375,9 @@ type TemplateApp {
 }
 
 type Query {
-  "Personal accounts in approved apps without a person, by email. Owner only."
+  "Eligible accounts without a person, by email. After an app’s first completed scan, its last scan must have returned the account. Owner only."
   accountsWithoutPerson(first: Int = 100, after: String): AccountWithoutPersonConnection!
-  "How many personal accounts in approved apps have no person. Owner only."
+  "How many accounts qualify for accountsWithoutPerson. Owner only."
   accountsWithoutPersonCount: Int!
   "One app; null when there is none. Admins only."
   app(id: ID!): App
