@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  pg-boss@12.35.1: 13d45e98c4f061223d627bddc169f1798e5ba0ae95c19d4fac8729148df77769
+
 importers:
 
   .:
@@ -70,7 +73,7 @@ importers:
         version: 8.23.1
       pg-boss:
         specifier: 12.35.1
-        version: 12.35.1
+        version: 12.35.1(patch_hash=13d45e98c4f061223d627bddc169f1798e5ba0ae95c19d4fac8729148df77769)
       pino:
         specifier: 10.4.0
         version: 10.4.0
@@ -9515,7 +9518,7 @@ snapshots:
 
   pathe@2.0.3: {}
 
-  pg-boss@12.35.1:
+  pg-boss@12.35.1(patch_hash=13d45e98c4f061223d627bddc169f1798e5ba0ae95c19d4fac8729148df77769):
     dependencies:
       cron-parser: 5.10.2
       pg: 8.23.1
