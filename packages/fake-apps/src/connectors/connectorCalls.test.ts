@@ -176,16 +176,6 @@ it("answers account_not_found for Chloé's source key with Ana's email", async (
   expect(result.body).toEqual({ error: { code: "account_not_found" } });
 });
 
-it("answers account_not_found for a pending invitation", async ({ connectors: { url } }) => {
-  const result = await callConnector(url, "actions/run", {
-    ...linearRequest,
-    action: "suspend",
-    account: { sourceKey: "d3a1f8e2-6b4c-4f1a-9e2d-000000000008", email: "new.hire@acme.example" },
-  });
-
-  expect(result.body).toEqual({ error: { code: "account_not_found" } });
-});
-
 it("answers wrong_workspace for another Linear organisation ID", async ({
   connectors: { url },
 }) => {

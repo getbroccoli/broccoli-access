@@ -10,10 +10,9 @@ import {
   type Connection,
   type ConnectorErrorCode,
 } from "../connectorCalls.js";
-import { CONNECTOR_MANIFEST, RUNTIME_KINDS } from "../connectorManifest.js";
+import { CONNECTOR_MANIFEST } from "../connectorManifest.js";
 import { describeInviteConformance } from "./describeInviteConformance.js";
 import {
-  SERVER,
   actionFields,
   getManifest,
   listAll,
@@ -24,6 +23,7 @@ import {
   send,
   startFlow,
   withinDeadline,
+  unlistedRuntimes,
   type Flow,
 } from "./flow.js";
 
@@ -126,9 +126,6 @@ const OPTIONAL_ERROR_CODES = [
 /** Any character that ends a line, which would break a one-line skip note. */
 const LINE_BREAK = /[\n\r\u2028\u2029]/;
 
-/** An address that answers nothing: the suite never drives an owner's browser. */
-const UNUSED_BROWSER_URL = "ws://127.0.0.1:9/conformance";
-
 async function checkList(url: string, fixture: ConnectorFixture): Promise<void> {
   const [flow] = await startFlow(url, fixture);
 
@@ -229,15 +226,6 @@ async function answersOf(url: string, fixture: ConnectorFixture): Promise<unknow
   const action = await send(flow, "actions/run", actionFields(fixture, "suspend"));
   expect(ACTION_RUN_ANSWER.safeParse(action).error, "the action's answer").toBeUndefined();
   return [manifest, testAnswer, ...pages, action].map(withoutRenewedSecrets);
-}
-
-/** Every runtime the connector does not list, and one no version of the contract has. */
-function unlistedRuntimes(listed: readonly string[]): { kind: string; url?: string }[] {
-  const unlisted = RUNTIME_KINDS.filter((kind) => !listed.includes(kind));
-  return [
-    ...unlisted.map((kind) => (kind === "server" ? SERVER : { kind, url: UNUSED_BROWSER_URL })),
-    { kind: "unknown_runtime" },
-  ];
 }
 
 /** Two containers may renew a session differently; the answers about the app must still agree. */

@@ -1,14 +1,7 @@
 import { ACCOUNTS_LIST_ANSWER, ACTION_RUN_ANSWER } from "@broccoli-access/connector-contract";
-import { expect } from "vitest";
+import { expect, onTestFinished, vi } from "vitest";
 
-import {
-  callConnector,
-  control,
-  DAY,
-  linearRequest,
-  memberAccount,
-  test as it,
-} from "#test/support";
+import { callConnector, control, linearRequest, memberAccount, test as it } from "#test/support";
 import { ACME_LINEAR } from "../seed";
 
 it("discovers the Acme workspace with its Linear key", async ({ connectors: { url } }) => {
@@ -56,17 +49,20 @@ it("lists the seeded Linear invitation separately from members", async ({
 });
 
 it("lists Ivan's new Linear invitation with a 30-day expiry", async ({ connectors: { url } }) => {
-  const before = Date.now();
-  const result = await callConnector(url, "actions/run", inviteIvan);
-  const after = Date.now();
+  const invitation = {
+    email: inviteIvan.account.email,
+    invitedAt: "2026-11-24T12:00:00.000Z",
+    expiresAt: "2026-12-24T12:00:00.000Z",
+  };
+  vi.useFakeTimers({ toFake: ["Date"] });
+  onTestFinished(() => {
+    vi.useRealTimers();
+  });
+  vi.setSystemTime(new Date(invitation.invitedAt));
 
-  const { changed, invitation } = ACTION_RUN_ANSWER.parse(result.body);
-  expect(changed).toBe(true);
-  expect(invitation?.email).toBe(inviteIvan.account.email);
-  const invitedAt = Date.parse(invitation!.invitedAt!);
-  expect(invitedAt).toBeGreaterThanOrEqual(before);
-  expect(invitedAt).toBeLessThanOrEqual(after);
-  expect(Date.parse(invitation!.expiresAt!) - invitedAt).toBe(30 * DAY);
+  const result = await callConnector(url, "actions/run", inviteIvan);
+
+  expect(result.body).toMatchObject({ changed: true, invitation });
   const list = await callConnector(url, "accounts/list", { ...linearRequest, cursor: null });
   expect(ACCOUNTS_LIST_ANSWER.parse(list.body).invitations).toContainEqual(invitation);
 });

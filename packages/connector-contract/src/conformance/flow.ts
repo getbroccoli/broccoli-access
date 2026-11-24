@@ -16,6 +16,7 @@ import {
 } from "../connectorCalls.js";
 import {
   CONNECTOR_MANIFEST,
+  RUNTIME_KINDS,
   type Capability,
   type ConnectorDescription,
   type RuntimeKind,
@@ -134,7 +135,16 @@ export function post(url: string, path: string, body: object): Promise<Response>
   });
 }
 
-export const SERVER = { kind: "server" } as const;
+/** Every runtime the connector does not list, and one no version of the contract has. */
+export function unlistedRuntimes(listed: readonly string[]): { kind: string; url?: string }[] {
+  const unlisted = RUNTIME_KINDS.filter((kind) => !listed.includes(kind));
+  return [
+    ...unlisted.map((kind) => (kind === "server" ? SERVER : { kind, url: UNUSED_BROWSER_URL })),
+    { kind: "unknown_runtime" },
+  ];
+}
+
+const SERVER = { kind: "server" } as const;
 
 /** A connector answers within 90 seconds (contract "Answers"). */
 const CALL_TIMEOUT_MS = 90_000;
@@ -183,3 +193,6 @@ async function descriptionOf(
   const manifest = CONNECTOR_MANIFEST.parse(await getManifest(url));
   return manifest.connectors.find(({ key }) => key === connector);
 }
+
+/** An address that answers nothing: the suite never drives an owner's browser. */
+const UNUSED_BROWSER_URL = "ws://127.0.0.1:9/conformance";
