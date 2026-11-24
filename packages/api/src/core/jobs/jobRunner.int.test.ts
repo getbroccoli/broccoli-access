@@ -258,7 +258,9 @@ test("concurrent runners finish each waiting job in a group before starting the 
     await send("other", "slack");
 
     releaseWorkers.resolve();
-    await expect.poll(() => started, { timeout: 8_000 }).toContain("other");
+    await expect
+      .poll(() => started, { timeout: 8_000 })
+      .toEqual(expect.arrayContaining(["first", "other"]));
     releaseFirst.resolve();
     await expect.poll(() => events.length, { timeout: 10_000 }).toBe(6);
     expect(events).toEqual([
