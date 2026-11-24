@@ -1,6 +1,6 @@
 # QA: Activity
 
-A manual check of the Activity page, which lists every Disable and Enable, against a development stack.
+A manual check of the Activity page, which lists every Disable, Enable and Invite, against a development stack.
 
 ## Setup
 
@@ -9,12 +9,13 @@ A manual check of the Activity page, which lists every Disable and Enable, again
 
 ## Changes that end
 
-- [ ] The left menu shows "Activity" between "People" and the profile button; it opens `/activity` with the title "Activity" and "Every Disable and Enable, newest first.".
-- [ ] Before any change, the table reads "No Disable or Enable yet.".
+- [ ] The left menu shows "Activity" between "People" and the profile button; it opens `/activity` with the title "Activity" and "Every Disable, Enable and Invite, newest first.".
+- [ ] Before any change, the table reads "No Disable, Enable or Invite yet.".
 - [ ] Disable Chloé on Linear's page; the toast's "View in Activity" opens Activity, whose first row reads Chloé Martin with chloe@acme.example, Linear, "Disable", "Mia Novak" and "Today at" the time asked, and "On the server" with a check.
 - [ ] After `curl -s -H 'content-type: application/json' -d '{"connector": "linear", "call": "actions/run", "code": "not_allowed", "count": 1}' "$FAKE/_fake/failures"`, disable Ana and open Activity from the left menu: it lists her change first with "Couldn’t disable" in red and "Linear doesn’t allow this change" below, and Chloé's change below it.
 - [ ] Ana's "Couldn’t disable" opens "Couldn’t disable Ana Ruiz in Linear" with "Asked by Mia Novak today at <time>.", the reason "Linear doesn’t allow this change. Linear refuses it for some members, such as the workspace’s owner. Nothing changed in Linear.", "Open Linear admin" and "Close", and no Try again or "I did it by hand": those stay on her account's row (see [App page](app-page.md#when-a-change-fails)).
 - [ ] With the fake slowed (`curl -s -H 'content-type: application/json' -d '{"milliseconds": 5000}' "$FAKE/_fake/delay"`), confirm a Disable on Linear's page and open Activity from the left menu at once: the change shows as "Disabling in Linear…" with a spinner, then "On the server" without a reload.
+- [ ] Invite Ivan Petrov to Linear from his person page (see [A person's page](person-page.md#invite)): Activity's first row reads Ivan Petrov with ivan@acme.example, Linear, "Invite", "Mia Novak" and "Today at" the time asked, and "On the server".
 - [ ] Chloé's name opens her person page.
 
 ## Narrow screens

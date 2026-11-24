@@ -605,6 +605,75 @@ The owner's Chrome extension, paired with this instance.
 }
 ```
 
+## Invites
+
+### account_changes (changed)
+
+- `action` adds `invite`: invite an employee to a connected app where they have no account.
+- An invite has no app account or member yet, so `app_account_id` and `source_key` are null. `email` is the employee's email.
+- `succeeded` for an invite: the connector read the invitation, or an existing member, back.
+- **One at a time:** at most one `running` invite per connection and email, enforced by a second partial unique index.
+- **History:** an invite has no app account, so it writes no history line. Activity shows it.
+
+```json
+{
+  "id": "chg_ivan_slack_invite",
+  "app_account_id": null,
+  "app_id": "app_slack",
+  "email": "ivan@acme.example",
+  "connection_id": "con_slack",
+  "action": "invite",
+  "source_key": null,
+  "status": "succeeded",
+  "attempts": [{ "runtime": "server", "error": null, "at": "2026-12-03T09:00:04Z" }],
+  "error": null,
+  "requested_by": "usr_admin",
+  "requested_at": "2026-12-03T09:00:00Z",
+  "finished_at": "2026-12-03T09:00:04Z"
+}
+```
+
+### app_invitations (new)
+
+A pending invitation in a connected app, as the connection's last scan read it. An invitation is not access: it is not an app account and counts nowhere an account does.
+
+- `connection_id`, `app_id`, `email` (lowercase): `connection_id` and `email` unique together.
+- `invited_at`, `expires_at`: as the app gives them; null when it does not.
+- `first_seen_at`: when a scan first saw it.
+- A scan of a connection whose connector lists `list_invitations` rewrites that connection's invitations; one the scan no longer returns is deleted. No history.
+
+```json
+[
+  {
+    "id": "inv_ivan_slack",
+    "connection_id": "con_slack",
+    "app_id": "app_slack",
+    "email": "ivan@acme.example",
+    "invited_at": null,
+    "expires_at": null,
+    "first_seen_at": "2026-12-04T06:00:12Z"
+  },
+  {
+    "id": "inv_ivan_linear",
+    "connection_id": "con_linear",
+    "app_id": "app_linear",
+    "email": "ivan@acme.example",
+    "invited_at": "2026-12-03T09:00:02Z",
+    "expires_at": "2027-01-02T09:00:02Z",
+    "first_seen_at": "2026-12-04T06:00:15Z"
+  }
+]
+```
+
+### Computed when read (added)
+
+- **Invite offered:** for an employee who is active in the directory, on each app with a connection whose connector lists `invite`, when the connection's last scan returned no account with the employee's email, the row is not Invited, and no invite is `running`. While the connection is `reconnect`, Reconnect shows instead.
+- **Invited:** the employee has no account in that app, and:
+  - the connector lists `list_invitations`: an `app_invitations` row for the email, dated by its `invited_at`, else its `first_seen_at`; or a `succeeded` or `done_by_hand` invite that finished after the connection's last finished scan, dated by its `finished_at`;
+  - otherwise: the latest invite is `succeeded` or `done_by_hand`, dated by its `finished_at`.
+- **Couldn't invite:** the latest invite for that connection and email `failed`. The row shows why, with Try again and "I did it by hand", as for "Couldn't change".
+- **Activity:** lists invites next to Disable and Enable, as Invite.
+
 ## Computed when read
 
 - **An employee's status**: the status of their account in the directory app. The UI shows "Suspended in Google", using the directory app's name.
