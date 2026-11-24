@@ -4,7 +4,13 @@ import { z } from "zod";
 export const RUNTIME_KINDS = ["server", "owner_browser"] as const;
 
 /** What a connector can do with its app's accounts in v1. */
-export const CAPABILITIES = ["list_accounts", "suspend", "reactivate"] as const;
+export const CAPABILITIES = [
+  "list_accounts",
+  "suspend",
+  "reactivate",
+  "invite",
+  "list_invitations",
+] as const;
 
 /** A value the owner types or pastes, such as an API key. */
 const TEXT_FIELD = z.object({

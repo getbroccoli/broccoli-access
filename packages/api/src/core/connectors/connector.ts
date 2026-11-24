@@ -1,5 +1,5 @@
 import {
-  type AccountAction,
+  type AccountAction as ContractAccountAction,
   type Capability,
   CONNECTOR_ERROR_CODES as CONTRACT_ERROR_CODES,
   type RuntimeKind,
@@ -128,6 +128,9 @@ export interface AccountValues {
   /** The member whose key or session the connection uses; false in version 1 records. */
   isConnectionUser: boolean;
 }
+
+/** Disable (`suspend`) or Enable (`reactivate`): the contract's actions the core sends. */
+export type AccountAction = Extract<ContractAccountAction, "suspend" | "reactivate">;
 
 /** Whether the person may use their account in the app. */
 export const ACCOUNT_STATUSES = ["active", "suspended"] as const;
