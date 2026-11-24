@@ -12,6 +12,8 @@ import {
 } from "../connectorCalls.js";
 import { CONNECTOR_MANIFEST } from "../connectorManifest.js";
 import { describeInviteConformance } from "./describeInviteConformance.js";
+import { describeRemoveConformance } from "./describeRemoveConformance.js";
+import { describeSignInConformance, SIGN_IN_ERROR_CODES } from "./describeSignInConformance.js";
 import {
   actionFields,
   getManifest,
@@ -49,12 +51,24 @@ export interface ConnectorFixture {
    * lists `invite` needs it.
    */
   invitee?: { email: string };
+  /** An active member that the suite removes; a connector that lists `remove` needs it. */
+  memberToRemove?: { sourceKey: string; email: string };
+  /** A connector that lists `sign_in` needs it. */
+  signIn?: {
+    /**
+     * The integration user, which `reset` leaves invited as an admin, for example with an
+     * `actions/run` invite with the admin role through another connection.
+     */
+    integrationUser: { email: string; password: string; totpSecret: string };
+    /** Makes the next `connections/sign-in` through the container at `url` answer with `code`. */
+    causeError: (url: string, code: (typeof SIGN_IN_ERROR_CODES)[number]) => Promise<void>;
+  };
   /** Makes the next `actions/run` call through the container at `url` fail with `code`. */
   causeError: (url: string, code: ConnectorErrorCode) => Promise<void>;
   /**
    * Puts the fake app behind the container at `url` back to its seed before each check: the
-   * member active, no invitation for the invitee, the connection's credentials working, and no
-   * error waiting.
+   * member active, the member to remove back, no invitation for the invitee, the integration user
+   * invited as an admin, the connection's credentials working, and no error waiting.
    */
   reset: (url: string) => Promise<void>;
   /**
@@ -92,11 +106,13 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
         it("changes the member once when an action repeats, and reports the status read afterwards", () =>
           checkRepeatedActions(url, fixture));
         describeInviteConformance(url, fixture);
+        describeRemoveConformance(url, fixture);
+        describeSignInConformance(url, fixture);
         // A check, not a throw while collecting: Vitest would then skip the caller's afterAll(stop).
         if (fixture.cannotCause !== undefined)
           it("lists in cannotCause only errors its connector can never give, each with a one-line reason", () =>
             checkCannotCause(url, fixture));
-        it.for(CONNECTOR_ERROR_CODES)(
+        it.for(ACTION_ERROR_CODES)(
           "answers %s, when the fixture causes it, as that error",
           (code, { skip }) => {
             const reason = cannotCauseReason(fixture, code);
@@ -116,6 +132,9 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
 
 /** Each call and fixture step has its own deadline, so a check that makes many needs none. */
 const NO_CHECK_TIMEOUT = 0;
+
+/** Every error an action can answer: `not_invited` comes only from the sign-in. */
+const ACTION_ERROR_CODES = CONNECTOR_ERROR_CODES.filter((code) => code !== "not_invited");
 
 /** The errors only some connectors meet: a check that only a robot's page shows, and a lost owner's browser. */
 const OPTIONAL_ERROR_CODES = [

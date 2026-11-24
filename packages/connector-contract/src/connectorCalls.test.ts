@@ -3,6 +3,10 @@ import { expect, it } from "vitest";
 import {
   APP_CALL,
   APP_SESSION,
+  CONNECTION_SIGN_IN_REQUEST,
+  CONNECTION_SIGN_IN_ANSWER,
+  INTEGRATION_USER_SETUP_REQUEST,
+  INTEGRATION_USER_SETUP_ANSWER,
   CONNECTION_TEST_ANSWER,
   ACCOUNTS_LIST_ANSWER,
   ACTION_RUN_REQUEST,
@@ -32,16 +36,21 @@ it("parses the documented list answer", () => {
   expect(ACCOUNTS_LIST_ANSWER.parse(list)).toEqual(list);
 });
 
-it("parses the documented action request", () => {
-  expect(ACTION_RUN_REQUEST.parse(actionRequest)).toEqual(actionRequest);
-});
+it.for(["suspend", "reactivate", "remove"])(
+  "parses a %s request for an existing member",
+  (action) => {
+    const request = { ...actionRequest, action };
+    expect(ACTION_RUN_REQUEST.parse(request)).toEqual(request);
+  },
+);
 
 it("parses the documented action answer", () => {
   expect(ACTION_RUN_ANSWER.parse(actionAnswer)).toEqual(actionAnswer);
 });
 
-it("parses the documented error answer", () => {
-  expect(CONNECTOR_ERROR_ANSWER.parse(errorAnswer)).toEqual(errorAnswer);
+it.for(["blocked_by_check", "not_invited"])("parses a %s error answer", (code) => {
+  const answer = { error: { ...errorAnswer.error, code } };
+  expect(CONNECTOR_ERROR_ANSWER.parse(answer)).toEqual(answer);
 });
 
 it.for([
@@ -117,12 +126,10 @@ it("requires changed in an action answer", () => {
 });
 
 it("parses an invite request with just the email as its account", () => {
-  const request = { ...actionRequest, action: "invite", account: { email: invitation.email } };
-
-  expect(ACTION_RUN_REQUEST.parse(request)).toEqual(request);
+  expect(ACTION_RUN_REQUEST.parse(inviteRequest)).toEqual(inviteRequest);
 });
 
-it.for(["suspend", "reactivate"])("requires a source key to %s a member", (action) => {
+it.for(["suspend", "reactivate", "remove"])("requires a source key to %s a member", (action) => {
   const request = { ...actionRequest, action, account: { email: invitation.email } };
 
   expect(ACTION_RUN_REQUEST.safeParse(request).success).toBe(false);
@@ -162,6 +169,109 @@ it("parses a list answer with pending invitations", () => {
 
   expect(ACCOUNTS_LIST_ANSWER.parse(answer)).toEqual(answer);
 });
+
+it("keeps an invite role even if the connector does not list it", () => {
+  const request = { ...inviteRequest, account: { ...inviteRequest.account, role: "unlisted" } };
+  expect(ACTION_RUN_REQUEST.parse(request)).toEqual(request);
+});
+
+it("rejects an empty invite role", () => {
+  const request = { ...inviteRequest, account: { ...inviteRequest.account, role: "" } };
+  expect(ACTION_RUN_REQUEST.safeParse(request).success).toBe(false);
+});
+
+it.for([true, false])("parses a remove answer with changed %s", (changed) => {
+  const answer = { changed, removed: true };
+  expect(ACTION_RUN_ANSWER.parse(answer)).toEqual(answer);
+});
+
+it("keeps the connection update and app calls in a remove answer", () => {
+  const answer = { changed: true, removed: true, connection: list.connection, appCalls: [appCall] };
+  expect(ACTION_RUN_ANSWER.parse(answer)).toEqual(answer);
+});
+
+it.for([true, false])("rejects an account or invitation answer with removed %s", (removed) => {
+  expect(ACTION_RUN_ANSWER.safeParse({ ...actionAnswer, removed }).success).toBe(false);
+  expect(ACTION_RUN_ANSWER.safeParse({ changed: true, invitation, removed }).success).toBe(false);
+});
+
+it("rejects removed false as a remove answer", () => {
+  expect(ACTION_RUN_ANSWER.safeParse({ changed: false, removed: false }).success).toBe(false);
+});
+
+it.for([null, "demo-secret"])("parses a setup request with two-step secret %s", (totpSecret) => {
+  const request = {
+    integrationUser: { ...integrationUser, totpSecret },
+  };
+  expect(INTEGRATION_USER_SETUP_REQUEST.parse(request)).toEqual(request);
+});
+
+it.for([
+  { reason: "an uppercase email", fields: { email: "Broccoli@acme.example" } },
+  { reason: "an empty password", fields: { password: "" } },
+  { reason: "an empty two-step secret", fields: { totpSecret: "" } },
+  { reason: "a missing two-step secret", fields: { totpSecret: undefined } },
+])("rejects $reason in integration user credentials", ({ fields }) => {
+  const request = { integrationUser: { ...integrationUser, ...fields } };
+  expect(INTEGRATION_USER_SETUP_REQUEST.safeParse(request).success).toBe(false);
+  expect(CONNECTION_SIGN_IN_REQUEST.safeParse({ ...signInRequest, ...request }).success).toBe(
+    false,
+  );
+});
+
+it("requires a non-empty secret in a setup answer", () => {
+  const answer = { totpSecret: "demo-secret" };
+  expect(INTEGRATION_USER_SETUP_ANSWER.parse(answer)).toEqual(answer);
+  expect(INTEGRATION_USER_SETUP_ANSWER.safeParse({ totpSecret: "" }).success).toBe(false);
+});
+
+it("accepts sign-in with a new or stored connection", () => {
+  for (const stored of [null, connection.connection]) {
+    const request = { ...signInRequest, connection: stored };
+    expect(CONNECTION_SIGN_IN_REQUEST.parse(request)).toEqual(request);
+  }
+});
+
+it("requires the connection key in a sign-in request", () => {
+  const request = { connector: "slack", integrationUser };
+  expect(CONNECTION_SIGN_IN_REQUEST.safeParse(request).success).toBe(false);
+});
+
+it("rejects an unnamed connector in a sign-in request", () => {
+  const request = { ...signInRequest, connector: "" };
+  expect(CONNECTION_SIGN_IN_REQUEST.safeParse(request).success).toBe(false);
+});
+
+it("parses the full connection and workspace details from sign-in", () => {
+  const answer = { ...connectionTest, connection: connection.connection };
+  expect(CONNECTION_SIGN_IN_ANSWER.parse(answer)).toEqual(answer);
+});
+
+it.for([
+  { reason: "no connection", fields: {} },
+  { reason: "no settings", fields: { connection: { secrets: {} } } },
+  { reason: "no secrets", fields: { connection: { settings: {} } } },
+])("rejects a sign-in answer with $reason", ({ fields }) => {
+  const answer = { details: connectionTest.details, ...fields };
+  expect(CONNECTION_SIGN_IN_ANSWER.safeParse(answer).success).toBe(false);
+});
+
+it("requires workspace details in a sign-in answer", () => {
+  const answer = { connection: connection.connection };
+  expect(CONNECTION_SIGN_IN_ANSWER.safeParse(answer).success).toBe(false);
+});
+
+const integrationUser = {
+  email: "broccoli@acme.example",
+  password: "demo-password",
+  totpSecret: "demo-secret",
+};
+
+const signInRequest = {
+  connector: "slack",
+  integrationUser,
+  connection: null,
+};
 
 const invitation = { email: "ivan@acme.example", invitedAt: null, expiresAt: null };
 
@@ -219,16 +329,13 @@ const actionRequest = {
   runtime: { kind: "server" },
 };
 
+const inviteRequest = { ...actionRequest, action: "invite", account: { email: invitation.email } };
+
 const actionAnswer = {
   changed: true,
   account: {
     sourceKey: "U04ABCDEF",
-    values: {
-      email: "jane@acme.example",
-      status: "suspended",
-      displayName: "Jane Doe",
-      isConnectionUser: false,
-    },
+    values: { ...list.accounts[0]!.values, status: "suspended" },
   },
 };
 

@@ -5,7 +5,13 @@ import {
 } from "@broccoli-access/connector-contract/conformance";
 import { afterAll } from "vitest";
 
-import { control, memberAccount, signInToFakeSlack } from "#test/support";
+import {
+  control,
+  integrationUser,
+  inviteSlackAdmin,
+  memberAccount,
+  signInToFakeSlack,
+} from "#test/support";
 import { ACME_LINEAR, ACME_SLACK } from "../../src/seed";
 
 const image = process.env.FAKE_CONNECTORS_IMAGE;
@@ -28,14 +34,29 @@ describeConnectorConformance({
       }),
       invitee: { email: "ivan@acme.example" },
       member: memberAccount(ACME_SLACK, "ana@acme.example"),
+      memberToRemove: memberAccount(ACME_SLACK, "ben@acme.example"),
+      signIn: {
+        integrationUser,
+        causeError: (url, code) =>
+          control(url, "/failures", {
+            connector: "slack",
+            call: "connections/sign-in",
+            code,
+            count: 1,
+          }),
+      },
       causeError: failNextAction("slack"),
-      reset,
+      reset: async (url) => {
+        await reset(url);
+        await inviteSlackAdmin(url);
+      },
     },
     {
       connector: "linear",
       connection: () => Promise.resolve({ settings: {}, secrets: { apiKey: ACME_LINEAR.apiKey } }),
       invitee: { email: "ivan@acme.example" },
       member: memberAccount(ACME_LINEAR, "chloe@acme.example"),
+      memberToRemove: memberAccount(ACME_LINEAR, "david@acme.example"),
       causeError: failNextAction("linear"),
       reset,
     },
@@ -43,8 +64,10 @@ describeConnectorConformance({
 });
 
 function failNextAction(connector: string): ConnectorFixture["causeError"] {
-  return (url, code) =>
-    control(url, "/failures", { connector, call: "actions/run", code, count: 1 });
+  return (url, code) => {
+    if (code === "not_invited") throw new Error("Only connections/sign-in gives not_invited");
+    return control(url, "/failures", { connector, call: "actions/run", code, count: 1 });
+  };
 }
 
 async function reset(url: string) {

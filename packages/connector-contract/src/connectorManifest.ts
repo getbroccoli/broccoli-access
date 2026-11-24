@@ -10,6 +10,8 @@ export const CAPABILITIES = [
   "reactivate",
   "invite",
   "list_invitations",
+  "remove",
+  "sign_in",
 ] as const;
 
 /** A value the owner types or pastes, such as an API key. */
@@ -31,6 +33,13 @@ const APP_SESSION_FIELD = z.object({
   storageKeys: z.array(z.string().min(1)).optional(),
 });
 
+/** A role a member can be invited with; a connector without roles invites with the app's default. */
+const ROLE = z.object({
+  key: z.string().min(1),
+  name: z.string().min(1),
+  isDefault: z.boolean(),
+});
+
 /** One connector the container offers: what the core shows and runs without code for its app. */
 export const CONNECTOR_DESCRIPTION = z.object({
   key: z.string().min(1),
@@ -44,6 +53,12 @@ export const CONNECTOR_DESCRIPTION = z.object({
     .array(z.string())
     .min(1)
     .transform((capabilities) => capabilities.filter(isCapability)),
+  roles: z
+    .array(ROLE)
+    .refine((roles) => roles.filter((role) => role.isDefault).length === 1, {
+      message: "Exactly one role is the default",
+    })
+    .optional(),
   findingKind: z.string().min(1),
   connectionFields: z.array(z.discriminatedUnion("kind", [TEXT_FIELD, APP_SESSION_FIELD])),
   /** Shown before the first connection; null for an API connector. */
@@ -62,5 +77,6 @@ function isCapability(capability: string): capability is Capability {
 export type RuntimeKind = (typeof RUNTIME_KINDS)[number];
 export type Capability = (typeof CAPABILITIES)[number];
 export type ConnectorDescription = z.infer<typeof CONNECTOR_DESCRIPTION>;
+export type ConnectorRole = z.infer<typeof ROLE>;
 export type ConnectionField = ConnectorDescription["connectionFields"][number];
 export type ConnectorManifest = z.infer<typeof CONNECTOR_MANIFEST>;

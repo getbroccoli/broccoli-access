@@ -5,6 +5,7 @@ import {
   callConnector,
   linearRequest,
   memberAccount,
+  readState,
   signInToFakeSlack,
   test as it,
 } from "#test/support";
@@ -193,13 +194,79 @@ it("answers wrong_workspace for another Linear organisation ID", async ({
   expect(result.body).toEqual({ error: { code: "wrong_workspace" } });
 });
 
+it("removes a suspended member once from both the list and the workspace", async ({
+  connectors: { url },
+}) => {
+  const account = memberAccount(ACME_LINEAR, "hannah@acme.example");
+  const request = { ...linearRequest, action: "remove", account };
+
+  const removed = await callConnector(url, "actions/run", request);
+  const repeated = await callConnector(url, "actions/run", request);
+
+  expect(removed.body).toEqual({ changed: true, removed: true });
+  expect(repeated.body).toEqual({ changed: false, removed: true });
+  const list = await callConnector(url, "accounts/list", { ...linearRequest, cursor: null });
+  expect(
+    ACCOUNTS_LIST_ANSWER.parse(list.body).accounts.map(({ sourceKey }) => sourceKey),
+  ).not.toContain(account.sourceKey);
+  expect((await readState(url)).linear.map(({ email }) => email)).not.toContain(account.email);
+});
+
+it("reports an unknown member as already removed", async ({ connectors: { url } }) => {
+  const account = { sourceKey: "gone", email: "gone@acme.example" };
+  const result = await callConnector(url, "actions/run", {
+    ...linearRequest,
+    action: "remove",
+    account,
+  });
+
+  expect(result.body).toEqual({ changed: false, removed: true });
+});
+
+it("preserves the member whose Linear key requested removal", async ({ connectors: { url } }) => {
+  const account = memberAccount(ACME_LINEAR, "admin@acme.example");
+
+  const result = await callConnector(url, "actions/run", {
+    ...linearRequest,
+    action: "remove",
+    account,
+  });
+
+  expect(result.body).toEqual({ error: { code: "not_allowed" } });
+  expect((await readState(url)).linear).toContainEqual(expect.objectContaining(account));
+});
+
+it("records changed Linear actions in order with the member who made them", async ({
+  connectors: { url },
+}) => {
+  const account = memberAccount(ACME_LINEAR, "chloe@acme.example");
+  const invitee = { email: "ivan@acme.example" };
+  for (const action of ["suspend", "suspend", "reactivate", "remove"]) {
+    await callConnector(url, "actions/run", { ...linearRequest, action, account });
+  }
+  await callConnector(url, "actions/run", { ...linearRequest, action: "invite", account: invitee });
+
+  const madeBy = "admin@acme.example";
+  expect((await readState(url)).changes.linear).toEqual([
+    { action: "suspend", email: account.email, madeBy },
+    { action: "reactivate", email: account.email, madeBy },
+    { action: "remove", email: account.email, madeBy },
+    { action: "invite", email: invitee.email, madeBy },
+  ]);
+});
+
 const linearDescription = {
   key: "linear",
   version: 1,
   name: "Linear",
   appDomain: "linear.app",
   runtimes: ["server"],
-  capabilities: ["list_accounts", "suspend", "reactivate", "invite", "list_invitations"],
+  capabilities: ["list_accounts", "suspend", "reactivate", "invite", "list_invitations", "remove"],
+  roles: [
+    { key: "user", name: "User", isDefault: true },
+    { key: "admin", name: "Admin", isDefault: false },
+    { key: "guest", name: "Guest", isDefault: false },
+  ],
   findingKind: "linear_members",
   connectionFields: [
     {
@@ -220,7 +287,19 @@ const slackDescription = {
   name: "Slack",
   appDomain: "slack.com",
   runtimes: ["server"],
-  capabilities: ["list_accounts", "suspend", "reactivate", "invite", "list_invitations"],
+  capabilities: [
+    "list_accounts",
+    "suspend",
+    "reactivate",
+    "invite",
+    "list_invitations",
+    "remove",
+    "sign_in",
+  ],
+  roles: [
+    { key: "member", name: "Member", isDefault: true },
+    { key: "admin", name: "Admin", isDefault: false },
+  ],
   findingKind: "slack_members",
   connectionFields: [
     {

@@ -9,7 +9,7 @@ import { listen } from "../utils";
 import { startFakeConnectors } from "./fakeConnectors";
 
 describeConnectorConformance({
-  urls: [await linearWithoutInvites(), await linearWithoutInvites()],
+  urls: [await linearWithoutOptionalCapabilities(), await linearWithoutOptionalCapabilities()],
   fixtures: [
     {
       connector: "linear",
@@ -25,7 +25,7 @@ describeConnectorConformance({
   ],
 });
 
-async function linearWithoutInvites(): Promise<string> {
+async function linearWithoutOptionalCapabilities(): Promise<string> {
   const fake = await startFakeConnectors({ delayMs: 0 });
   afterAll(fake.stop);
   const app = express();
@@ -34,9 +34,9 @@ async function linearWithoutInvites(): Promise<string> {
     const manifest = CONNECTOR_MANIFEST.parse(await upstream.json());
     const linear = manifest.connectors.find(({ key }) => key === "linear")!;
     const capabilities = linear.capabilities.filter(
-      (capability) => !["invite", "list_invitations"].includes(capability),
+      (capability) => !["invite", "list_invitations", "remove"].includes(capability),
     );
-    response.json({ connectors: [{ ...linear, capabilities }] });
+    response.json({ connectors: [{ ...linear, capabilities, roles: undefined }] });
   });
   app.use(express.text({ type: "*/*" }), async (request, response) => {
     const upstream = await fetch(fake.url + request.originalUrl, {

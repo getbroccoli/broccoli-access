@@ -3,6 +3,9 @@ import { z } from "zod";
 /** The calls that carry a connection, by their path after `/v1/`. */
 export const CONNECTOR_CALLS = ["connections/test", "accounts/list", "actions/run"] as const;
 
+/** The calls that carry the integration user and no runtime: the container's own browser signs in. */
+export const INTEGRATION_USER_CALLS = ["integration-user/setup", "connections/sign-in"] as const;
+
 /** Why a connector failed (contract "Errors"); it never passes on the app's raw answer. */
 export const CONNECTOR_ERROR_CODES = [
   "authentication_failed",
@@ -15,16 +18,21 @@ export const CONNECTOR_ERROR_CODES = [
   "wrong_workspace",
   "not_allowed",
   "owner_browser_lost",
+  "not_invited",
 ] as const;
 
 /** Whether the member may use their account in the app; pending invitations are not members. */
 export const ACCOUNT_STATUSES = ["active", "suspended"] as const;
 
 /** The changes `actions/run` makes: to one member, or an invitation of one email. */
-export const ACCOUNT_ACTIONS = ["suspend", "reactivate", "invite"] as const;
+export const ACCOUNT_ACTIONS = ["suspend", "reactivate", "invite", "remove"] as const;
 
 /** The actions on an existing member, which name it by its `sourceKey` and email. */
-const MEMBER_ACTIONS = ["suspend", "reactivate"] as const satisfies readonly AccountAction[];
+const MEMBER_ACTIONS = [
+  "suspend",
+  "reactivate",
+  "remove",
+] as const satisfies readonly AccountAction[];
 
 /**
  * The longest screenshot an error carries: 1 MB of PNG as base64, which takes four characters
@@ -139,13 +147,19 @@ export const ACCOUNTS_LIST_ANSWER = z.object({
   appCalls: APP_CALLS,
 });
 
-/** An invite names its recipient by email only, whether or not a member has that email. */
+/**
+ * An invite names its recipient by email only, whether or not a member has that email, with an
+ * optional role: one of the connector's `roles` keys, which only the container can check.
+ */
 export const ACTION_RUN_REQUEST = z.discriminatedUnion("action", [
   CALL.extend({
     action: z.enum(MEMBER_ACTIONS),
     account: z.object({ sourceKey: z.string().min(1), email: EMAIL }),
   }),
-  CALL.extend({ action: z.literal("invite"), account: z.object({ email: EMAIL }) }),
+  CALL.extend({
+    action: z.literal("invite"),
+    account: z.object({ email: EMAIL, role: z.string().min(1).optional() }),
+  }),
 ]);
 
 const ACTION_ANSWER = z.object({
@@ -154,17 +168,47 @@ const ACTION_ANSWER = z.object({
   appCalls: APP_CALLS,
 });
 
+const NOTHING = z.undefined().optional();
+
 /**
- * Whether anything changed, and what the connector read again after the call: the member, or for
- * an invite of an email without one, the pending invitation. Never both.
+ * Whether anything changed, and what the connector read again after the call: the member; for an
+ * invite of an email without one, the pending invitation; for a remove, that the member is gone.
+ * Never two of them.
  */
 export const ACTION_RUN_ANSWER = z.union([
   ACTION_ANSWER.extend({
     account: z.object({ sourceKey: z.string().min(1), values: ACCOUNT_VALUES }),
-    invitation: z.undefined().optional(),
+    invitation: NOTHING,
+    removed: NOTHING,
   }),
-  ACTION_ANSWER.extend({ invitation: INVITATION, account: z.undefined().optional() }),
+  ACTION_ANSWER.extend({ invitation: INVITATION, account: NOTHING, removed: NOTHING }),
+  ACTION_ANSWER.extend({ removed: z.literal(true), account: NOTHING, invitation: NOTHING }),
 ]);
+
+/** The integration user as the directory knows it; `totpSecret` is null until its setup. */
+const INTEGRATION_USER = z.object({
+  email: EMAIL,
+  password: z.string().min(1),
+  totpSecret: z.string().min(1).nullable(),
+});
+
+export const INTEGRATION_USER_SETUP_REQUEST = z.object({ integrationUser: INTEGRATION_USER });
+
+/** The two-step secret the directory's page showed, or the request's own when it carried one. */
+export const INTEGRATION_USER_SETUP_ANSWER = z.object({ totpSecret: z.string().min(1) });
+
+/** `connection` is null the first time, and the stored one when renewing its session. */
+export const CONNECTION_SIGN_IN_REQUEST = z.object({
+  connector: z.string().min(1),
+  integrationUser: INTEGRATION_USER,
+  connection: CONNECTION.nullable(),
+});
+
+/** As a connection test's answer, with the whole connection: the settings and the new session. */
+export const CONNECTION_SIGN_IN_ANSWER = z.object({
+  details: CONNECTION_TEST_ANSWER.shape.details,
+  connection: CONNECTION,
+});
 
 /** A connector error, answered with HTTP 200. */
 export const CONNECTOR_ERROR_ANSWER = z.object({
@@ -178,6 +222,7 @@ export const CONNECTOR_ERROR_ANSWER = z.object({
 
 export type AppCall = z.infer<typeof APP_CALL>;
 export type ConnectorCall = (typeof CONNECTOR_CALLS)[number];
+export type IntegrationUserCall = (typeof INTEGRATION_USER_CALLS)[number];
 export type ConnectorErrorCode = (typeof CONNECTOR_ERROR_CODES)[number];
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 export type AccountAction = (typeof ACCOUNT_ACTIONS)[number];
@@ -194,4 +239,9 @@ export type Invitation = z.infer<typeof INVITATION>;
 export type AccountValues = ListedAccount["values"];
 export type ActionRunRequest = z.infer<typeof ACTION_RUN_REQUEST>;
 export type ActionRunAnswer = z.infer<typeof ACTION_RUN_ANSWER>;
+export type IntegrationUser = z.infer<typeof INTEGRATION_USER>;
+export type IntegrationUserSetupRequest = z.infer<typeof INTEGRATION_USER_SETUP_REQUEST>;
+export type IntegrationUserSetupAnswer = z.infer<typeof INTEGRATION_USER_SETUP_ANSWER>;
+export type ConnectionSignInRequest = z.infer<typeof CONNECTION_SIGN_IN_REQUEST>;
+export type ConnectionSignInAnswer = z.infer<typeof CONNECTION_SIGN_IN_ANSWER>;
 export type ConnectorErrorAnswer = z.infer<typeof CONNECTOR_ERROR_ANSWER>;

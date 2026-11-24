@@ -11,6 +11,8 @@ export interface FakeConnectorsOptions {
   host?: string;
   /** Defaults to a free port. */
   port?: number;
+  /** The fake Google's address, which `integration-user/setup` asks for the users it created. */
+  googleUrl?: string;
   /** How long each call's answer takes, at start and after reset; defaults to a short delay. */
   delayMs?: number;
   /** Receives one line per call; silent by default. */
@@ -38,6 +40,7 @@ export async function startFakeConnectors(
       context.state = seededState(delayMs);
     },
     log: options.log ?? (() => {}),
+    googleUrl: options.googleUrl,
   };
   const app = express();
   app.disable("x-powered-by");

@@ -25,7 +25,7 @@ import {
   storedImportSources,
 } from "#test/support";
 
-test("links all seven Linear members to their employees with the status Linear reports", async ({
+test("links Linear members with directory emails to their employees with the status Linear reports", async ({
   orm,
   fakeGoogle,
   fakeConnectors,
@@ -40,8 +40,10 @@ test("links all seven Linear members to their employees with the status Linear r
     (account) => account.appId === linear.appId,
   );
   const employees = await storedEmployees(orm);
-  expect(members).toHaveLength(7);
-  for (const person of ACME_LINEAR.members) {
+  expect(members).toHaveLength(8);
+  for (const person of ACME_LINEAR.members.filter(
+    ({ email }) => email !== "deploys@acme.example",
+  )) {
     const employee = employees.find((employee) => employee.email === person.email)!;
     expect(members.find((member) => member.email === person.email)).toMatchObject({
       employeeId: employee.id,
@@ -61,7 +63,7 @@ test("stores version-two Linear records and identifies the admin who owns the ke
   await linear.scans.runScan(SYSTEM, linear.sourceId);
 
   const records = await storedImportRecords(orm);
-  expect(records).toHaveLength(7);
+  expect(records).toHaveLength(8);
   for (const member of ACME_LINEAR.members) {
     expect(records.find((record) => record.sourceKey === member.sourceKey)).toMatchObject({
       sourceId: linear.sourceId,
@@ -166,8 +168,8 @@ test("a third unavailable list answer fails the scan and preserves the last snap
   await linear.scans.runScan(SYSTEM, linear.sourceId);
   const records = await storedImportRecords(orm);
   const accounts = await storedAppAccounts(orm);
-  expect(records).toHaveLength(7);
-  expect(accounts).toHaveLength(7);
+  expect(records).toHaveLength(8);
+  expect(accounts).toHaveLength(8);
   await linear.scans.scanNow(OWNER, linear.connectionId);
   await failLinearCall(fakeConnectors.url, "accounts/list", "app_unavailable", 3);
 
@@ -187,7 +189,7 @@ test("the third attempt can finish a Linear scan", async ({ orm, fakeConnectors 
   await linear.scans.runScan(SYSTEM, linear.sourceId);
 
   expect(await storedImportSources(orm)).toMatchObject([{ status: "scanned", failure: null }]);
-  expect(await storedImportRecords(orm)).toHaveLength(7);
+  expect(await storedImportRecords(orm)).toHaveLength(8);
 });
 
 test.for([
@@ -245,7 +247,7 @@ test("keeps the first page's updated connection when the next page fails", async
   const linear = await connectLinear(orm, fakeConnectors.url);
   await linear.scans.runScan(SYSTEM, linear.sourceId);
   const before = await storedImportRecords(orm);
-  expect(before).toHaveLength(7);
+  expect(before).toHaveLength(8);
   const settings = { organizationId: "renewed-organisation", urlKey: "renewed" };
   const secrets = { apiKey: "renewed-test-key" };
   const server = await serveAccountList(fakeConnectors.url, (request, response) => {
@@ -279,7 +281,7 @@ test("keeps the first page's updated connection when the next page fails", async
   expect(inspect(history, { depth: null })).not.toContain(secrets.apiKey);
 });
 
-test("counts the seven returned Linear members and one suspension without matching employees", async ({
+test("counts the eight returned Linear members and one suspension without matching employees", async ({
   orm,
   fakeConnectors,
 }) => {
@@ -290,6 +292,6 @@ test("counts the seven returned Linear members and one suspension without matchi
   expect(await storedEmployees(orm)).toEqual([]);
   expect(await linear.scans.readScan(OWNER, linear.connectionId)).toMatchObject({
     status: "scanned",
-    people: { count: 7, suspended: 1 },
+    people: { count: 8, suspended: 1 },
   });
 });

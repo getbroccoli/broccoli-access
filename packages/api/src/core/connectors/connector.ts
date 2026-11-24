@@ -1,7 +1,7 @@
 import {
   type AccountAction as ContractAccountAction,
   type Capability,
-  CONNECTOR_ERROR_CODES as CONTRACT_ERROR_CODES,
+  type ConnectorErrorCode as ContractErrorCode,
   type RuntimeKind,
 } from "@broccoli-access/connector-contract";
 import type { z } from "zod";
@@ -173,9 +173,21 @@ export const ACCOUNT_VALUES_VERSION = 2;
 
 /**
  * Why a connector failed; it never passes on the app's raw answer. The connectors container's own
- * codes, such as `wrong_workspace`, come from the connector contract.
+ * codes, such as `wrong_workspace`, come from the connector contract, except `not_invited`: only
+ * signing in as the integration user gives it, which the core does not do yet.
  */
-export const CONNECTOR_ERROR_CODES = CONTRACT_ERROR_CODES;
+export const CONNECTOR_ERROR_CODES = [
+  "authentication_failed",
+  "permission_missing",
+  "rate_limited",
+  "app_unavailable",
+  "unexpected_response",
+  "blocked_by_check",
+  "account_not_found",
+  "wrong_workspace",
+  "not_allowed",
+  "owner_browser_lost",
+] as const satisfies readonly ContractErrorCode[];
 
 export type ConnectorErrorCode = (typeof CONNECTOR_ERROR_CODES)[number];
 

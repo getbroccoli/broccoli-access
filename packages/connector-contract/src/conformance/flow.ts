@@ -1,4 +1,4 @@
-import { expect } from "vitest";
+import { expect, type TestContext } from "vitest";
 import { z } from "zod";
 
 import {
@@ -19,6 +19,7 @@ import {
   RUNTIME_KINDS,
   type Capability,
   type ConnectorDescription,
+  type ConnectorRole,
   type RuntimeKind,
 } from "../connectorManifest.js";
 import type { ConnectorFixture } from "./describeConnectorConformance.js";
@@ -62,6 +63,17 @@ export async function listPages(flow: Flow): Promise<unknown[]> {
   } while (cursor !== null && pages.length < MAX_PAGES);
   expect(cursor, "the last page's nextCursor").toBeNull();
   return pages;
+}
+
+/** Skips the check for a connector that does not list `capability`. */
+export async function skipUnlessListed(
+  url: string,
+  fixture: ConnectorFixture,
+  capability: Capability,
+  skip: TestContext["skip"],
+): Promise<void> {
+  if (!(await capabilitiesOf(url, fixture.connector)).includes(capability))
+    skip(`${fixture.connector} does not list ${capability}`);
 }
 
 /** Calls on the server runtime and keeps the connection update a successful answer carries. */
@@ -113,6 +125,13 @@ export async function capabilitiesOf(url: string, connector: string): Promise<Ca
   return (await descriptionOf(url, connector))?.capabilities ?? [];
 }
 
+export async function rolesOf(
+  url: string,
+  connector: string,
+): Promise<ConnectorRole[] | undefined> {
+  return (await descriptionOf(url, connector))?.roles;
+}
+
 export async function getManifest(url: string): Promise<unknown> {
   const response = await fetch(`${url}/v1/connectors`, {
     redirect: "manual",
@@ -125,14 +144,42 @@ export async function getManifest(url: string): Promise<unknown> {
 }
 
 /** Never follows a redirect: it would leave the container, and the contract answers with 200. */
-export function post(url: string, path: string, body: object): Promise<Response> {
+export function post(
+  url: string,
+  path: string,
+  body: object,
+  timeoutMs = CALL_TIMEOUT_MS,
+): Promise<Response> {
   return fetch(`${url}/v1/${path}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
     redirect: "manual",
-    signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
+}
+
+/**
+ * A call's answer, which must come with HTTP 200 and match one of the contract's answers: an
+ * error alone, with a listed code, or a success without an error.
+ */
+export async function call(
+  url: string,
+  path: string,
+  body: object,
+  timeoutMs?: number,
+): Promise<unknown> {
+  const response = await post(url, path, body, timeoutMs);
+  expect(response.status, `HTTP status of ${path}`).toBe(200);
+  const answer: unknown = await response.json();
+  expect(ANY_ANSWER.safeParse(answer).error, `answer of ${path}`).toBeUndefined();
+  // The suite never sends APP_CALLS_HEADER, so the app's calls must stay out of every answer.
+  expect(answer, `app calls in the answer of ${path}`).not.toHaveProperty("appCalls");
+  if (isError(answer)) {
+    expect(Object.keys(answer), `error answer of ${path}`).toEqual(["error"]);
+    expect(CONNECTOR_ERROR_CODES, `error code of ${path}`).toContain(answer.error.code);
+  }
+  return answer;
 }
 
 /** Every runtime the connector does not list, and one no version of the contract has. */
@@ -155,6 +202,7 @@ const FIXTURE_TIMEOUT_MS = CALL_TIMEOUT_MS;
 /** A paging loop that never ends is a failure, not a hang. */
 const MAX_PAGES = 1_000;
 
+/** A sign-in's answer has a connection test's shape, so it is among them. */
 const ANY_ANSWER = z.union([
   CONNECTION_TEST_ANSWER,
   ACCOUNTS_LIST_ANSWER,
@@ -163,24 +211,6 @@ const ANY_ANSWER = z.union([
 ]);
 
 const UPDATING_ANSWER = z.object({ connection: CONNECTION_UPDATE.optional() });
-
-/**
- * A call's answer, which must come with HTTP 200 and match one of the contract's answers: an
- * error alone, with a listed code, or a success without an error.
- */
-async function call(url: string, path: string, body: object): Promise<unknown> {
-  const response = await post(url, path, body);
-  expect(response.status, `HTTP status of ${path}`).toBe(200);
-  const answer: unknown = await response.json();
-  expect(ANY_ANSWER.safeParse(answer).error, `answer of ${path}`).toBeUndefined();
-  // The suite never sends APP_CALLS_HEADER, so the app's calls must stay out of every answer.
-  expect(answer, `app calls in the answer of ${path}`).not.toHaveProperty("appCalls");
-  if (isError(answer)) {
-    expect(Object.keys(answer), `error answer of ${path}`).toEqual(["error"]);
-    expect(CONNECTOR_ERROR_CODES, `error code of ${path}`).toContain(answer.error.code);
-  }
-  return answer;
-}
 
 function isError(answer: unknown): answer is { error: { code: unknown } } {
   return typeof answer === "object" && answer !== null && "error" in answer;

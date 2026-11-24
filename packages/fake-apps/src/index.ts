@@ -8,6 +8,7 @@ export {
   ACME,
   ACME_LINEAR,
   ACME_SLACK,
+  INTEGRATION_USER_TOTP_SECRET,
   type AcmeSeed,
   type SeedApp,
   type SeedCustomer,
