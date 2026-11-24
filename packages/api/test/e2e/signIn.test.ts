@@ -53,3 +53,23 @@ test("sends an unknown Google account back to login without a session", async ({
   );
   expect(await (await browser.graphql("{ me { id } }")).json()).toEqual({ data: { me: null } });
 });
+
+test("an older sign-in callback leaves the newer sign-in usable in the same browser", async ({
+  env,
+}) => {
+  const { user } = await env.signInAsOwner();
+  const browser = env.browser();
+  const first = await browser.getManual("/api/google/sign-in");
+  const second = await browser.getManual("/api/google/sign-in");
+  const older = await consentAtGoogle(first.headers.get("location")!);
+  const current = await consentAtGoogle(second.headers.get("location")!);
+
+  const refused = await browser.getManual(older.href);
+  expect(refused.headers.get("location")).toBe("/login?signInError=failed");
+  const accepted = await browser.getManual(current.href);
+
+  expect(accepted.headers.get("location")).toBe("/");
+  expect(await (await browser.graphql("{ me { id } }")).json()).toEqual({
+    data: { me: { id: user.id } },
+  });
+});

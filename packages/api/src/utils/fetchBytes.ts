@@ -5,9 +5,20 @@
  */
 export async function fetchBytes(
   url: URL,
-  { timeoutMs, maxBytes, init }: { timeoutMs: number; maxBytes: number; init?: RequestInit },
+  {
+    timeoutMs,
+    maxBytes,
+    init,
+    errorOfResponse,
+  }: {
+    timeoutMs: number;
+    maxBytes: number;
+    init?: RequestInit;
+    errorOfResponse?: (response: Response) => Promise<Error>;
+  },
 ): Promise<Buffer | null> {
   const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  if (!response.ok && errorOfResponse) throw await errorOfResponse(response);
   if (response.status === 404) {
     return null;
   }

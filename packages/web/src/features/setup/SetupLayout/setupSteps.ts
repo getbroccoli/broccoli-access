@@ -84,7 +84,11 @@ export function requireFinishedSetup<Me>({ context, location }: Gate<Me>): Me {
     throw loginRedirect(location.href);
   }
   const stepPage = setupStepPage(context.setupStep);
-  if (context.setupStep !== "DONE" && location.pathname !== stepPage) {
+  const recoveringGoogle =
+    context.me &&
+    context.setupStep === "SCAN" &&
+    location.pathname === "/settings/connections/google-app";
+  if (context.setupStep !== "DONE" && location.pathname !== stepPage && !recoveringGoogle) {
     throw redirect({ to: stepPage, replace: true });
   }
   // Setup ends by signing the new owner in, so only a signed-in user gets here.

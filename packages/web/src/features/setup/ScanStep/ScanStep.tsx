@@ -1,9 +1,10 @@
 import { useQuery } from "@apollo/client/react";
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
-import { SetupScanDocument } from "@/__generated__/graphql";
-import { Button } from "@/components/ui/button";
+import { ScanNowDocument, SetupScanDocument } from "@/__generated__/graphql";
+import { usePayloadMutation } from "@/apollo";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { t } from "@/i18n";
 
 import { SetupLayout } from "../SetupLayout";
@@ -23,7 +24,10 @@ const STARTING_SCAN: ScanSteps = {
 /** Setup's second step, where the owner lands after connecting Google: the scan of their workspace. */
 export function ScanStep() {
   const { data, error, refetch, startPolling, stopPolling } = useQuery(SetupScanDocument);
+  const [scanNow, { loading, error: retryError }] = usePayloadMutation(ScanNowDocument);
   const connection = data?.setup.googleWorkspace;
+  const failed = connection?.scan?.status === "SCAN_FAILED";
+  const needsReconnect = connection?.scan?.failure === "AUTHENTICATION_FAILED";
   const finished = connection?.scan != null && connection.scan.status !== "SCANNING";
   const scanned = connection?.scan?.status === "SCANNED";
   const router = useRouter();
@@ -77,6 +81,38 @@ export function ScanStep() {
             hint={hints.signInLogs}
           />
         </ol>
+      )}
+      {failed && connection && (
+        <div className="mt-6 flex flex-col items-start gap-3">
+          <p role="alert" className="text-sm text-destructive">
+            {needsReconnect
+              ? t("settings.connections.googleReconnect")
+              : t("settings.connections.scanFailed")}
+          </p>
+          {needsReconnect && (
+            <Link
+              to="/settings/connections/google-app"
+              className={buttonVariants({ variant: "outline" })}
+            >
+              {t("apps.reconnect.button")}
+            </Link>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={loading}
+            onClick={() =>
+              void scanNow({ variables: { connectionId: connection.id } }).catch(() => undefined)
+            }
+          >
+            {t("scans.scanNow")}
+          </Button>
+          {retryError && (
+            <p role="alert" className="text-sm text-destructive">
+              {t("scans.scanNowFailed")}
+            </p>
+          )}
+        </div>
       )}
     </SetupLayout>
   );

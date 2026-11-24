@@ -15,7 +15,6 @@ export type ConsentState =
 /** The relay's compact state carries the proof needed to redeem its one-use handoff. */
 export interface RelayConsentState {
   flow: WorkspaceConsentState["flow"] | SignInState["flow"] | GoogleAppChangeState["flow"];
-  googleApp: "broccoli_google_app";
   nonce: string;
   codeVerifier: string;
   expiresAt: number;
@@ -113,7 +112,6 @@ export function openConsentState(
       return expiresAt > now.getTime()
         ? {
             flow: flow as RelayConsentState["flow"],
-            googleApp: "broccoli_google_app",
             nonce,
             codeVerifier,
             expiresAt,

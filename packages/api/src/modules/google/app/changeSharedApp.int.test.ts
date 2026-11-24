@@ -123,6 +123,53 @@ test("a shared app grant from another workspace keeps the original connection", 
   expect(await storedAppConnections(orm)).toEqual(before);
 });
 
+test("a delayed shared consent cannot overwrite a newer own-app change", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { workspace, relay, grant, answer } = await startSharedChange(orm, fakeGoogle.url);
+  const { ctx, connection, input } = workspace;
+  const redeeming = Promise.withResolvers<void>();
+  const resume = Promise.withResolvers<void>();
+  relay.redeem.mockReset().mockImplementationOnce(async () => {
+    redeeming.resolve();
+    await resume.promise;
+    return Response.json(grant);
+  });
+  const stale = connection.finishAppChange(ctx, answer);
+  await Promise.race([
+    redeeming.promise,
+    stale.then(() => {
+      throw new Error("Expected relay redemption");
+    }),
+  ]);
+
+  try {
+    const { authorizationUrl, browserToken } = await connection.startAppChange(ctx, input);
+    const callback = await consentAtGoogle(authorizationUrl);
+    await connection.finishAppChange(ctx, {
+      ...input,
+      browserToken,
+      code: callback.searchParams.get("code")!,
+      state: callback.searchParams.get("state")!,
+    });
+  } finally {
+    resume.resolve();
+  }
+
+  await expect(stale).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(await storedAppConnections(orm)).toMatchObject([
+    {
+      id: workspace.connectionId,
+      settings: {
+        clientId: input.clientId,
+        googleApp: "own_google_app",
+        previousClientIds: [ACME.oauthClient.clientId],
+      },
+    },
+  ]);
+});
+
 async function startSharedChange(orm: Orm, googleUrl: string) {
   const workspace = await connectedWorkspace(orm, googleUrl, GOOGLE_RELAY_URL);
   const { now, publicOrigin } = workspace.input;

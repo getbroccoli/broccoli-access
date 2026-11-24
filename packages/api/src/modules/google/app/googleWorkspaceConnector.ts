@@ -7,6 +7,7 @@ import {
 import {
   createGoogleClient,
   createGoogleRelayClient,
+  GoogleRelayError,
   type GoogleClient,
   type GoogleToken,
   type GoogleUser,
@@ -50,16 +51,18 @@ export function createGoogleWorkspaceConnector(addresses: {
       const { clientId, previousClientIds, googleApp } = parseGoogleWorkspaceSettings(
         connection.settings,
       );
-      const secrets = GOOGLE_WORKSPACE_SECRETS.parse(connection.secrets);
+      const secrets = (
+        googleApp === "broccoli_google_app"
+          ? GOOGLE_WORKSPACE_SECRETS.omit({ clientSecret: true }).strict()
+          : GOOGLE_WORKSPACE_SECRETS.required()
+      ).parse(connection.secrets);
       const accessToken = await asConnectorError(signInError, async () => {
         if (googleApp === "broccoli_google_app") {
           if (!addresses.relayUrl) throw new TypeError("The Google relay is unavailable");
           return createGoogleRelayClient(addresses.relayUrl).refresh(secrets.refreshToken);
         }
-        return google.refreshAccessToken(await google.discover(), {
-          clientId,
-          ...GOOGLE_WORKSPACE_SECRETS.required().parse(secrets),
-        });
+        const credentials = GOOGLE_WORKSPACE_SECRETS.required().parse(secrets);
+        return google.refreshAccessToken(await google.discover(), { clientId, ...credentials });
       });
       const readGrantLog = onceUntilRead(() =>
         grantLogSince(google, accessToken, new Date(Date.now() - GRANT_LOG_MS)),
@@ -240,6 +243,7 @@ function connectorErrorCode(
   error: unknown,
   errorOfStatus: (status: number) => ConnectorErrorCode,
 ): ConnectorErrorCode {
+  if (error instanceof GoogleRelayError) return error.code;
   if (error instanceof UnsuccessfulAnswerError) {
     return errorOfStatus(error.status);
   }

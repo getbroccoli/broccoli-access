@@ -25,10 +25,13 @@ type Props = {
  * The choice of Google app, with credentials only for the admin's own app, followed by consent.
  */
 export function GoogleAppForm({ consentPath, failure }: Props) {
-  const { data, error, refetch } = useQuery(ConnectGoogleDocument);
+  const { data, error, refetch } = useQuery(ConnectGoogleDocument, {
+    variables: { changingApp: consentPath === "/api/google/change-app" },
+  });
   const [choice, setChoice] = useState<GoogleApp | null>(null);
   const available = data?.setup.broccoliGoogleAppAvailable ?? false;
-  const googleApp = choice ?? (available ? "BROCCOLI_GOOGLE_APP" : "OWN_GOOGLE_APP");
+  const defaultApp = data?.setup.googleWorkspace?.googleApp ?? "BROCCOLI_GOOGLE_APP";
+  const googleApp = choice ?? (available ? defaultApp : "OWN_GOOGLE_APP");
   const ownApp = googleApp === "OWN_GOOGLE_APP";
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
@@ -91,7 +94,7 @@ export function GoogleAppForm({ consentPath, failure }: Props) {
                 id="google-client-id"
                 autoComplete="off"
                 spellCheck={false}
-                readOnly={starting}
+                disabled={!data || starting}
                 className="h-11 rounded-lg px-4"
                 value={clientId}
                 onChange={(event) => setClientId(event.target.value)}
@@ -104,7 +107,7 @@ export function GoogleAppForm({ consentPath, failure }: Props) {
                 type="password"
                 autoComplete="off"
                 spellCheck={false}
-                readOnly={starting}
+                disabled={!data || starting}
                 className="h-11 rounded-lg px-4"
                 value={clientSecret}
                 onChange={(event) => setClientSecret(event.target.value)}

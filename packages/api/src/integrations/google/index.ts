@@ -1,7 +1,7 @@
 // Public values.
 export { createGoogleClient } from "./googleClient";
 
-export { createGoogleRelayClient } from "./googleRelayClient";
+export { createGoogleRelayClient, GoogleRelayError } from "./googleRelayClient";
 
 // Public types.
 export type {

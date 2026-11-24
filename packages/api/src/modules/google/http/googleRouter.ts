@@ -1,6 +1,5 @@
 import { parseCookies } from "better-auth/cookies";
 import express, { type CookieOptions, type Request, type Response, Router } from "express";
-import { z } from "zod";
 
 import { ApplicationError, sendApplicationError } from "../../../core/applicationError";
 import { readSetupToken } from "../../../core/instance";
@@ -16,6 +15,12 @@ import {
   UnknownGoogleAccountError,
 } from "../domain";
 import { CONSENT_LIFETIME_MS, type ConsentState, consentFlowOf } from "../helpers";
+import {
+  parseStart,
+  parseAnswer,
+  hasConsentAnswer,
+  type ConsentAnswer,
+} from "./googleConsentInput";
 
 /**
  * Google's side of setup, sign-in and Settings, under `/api`: `POST /google/connect` starts the
@@ -33,8 +38,8 @@ export function googleRouter(
   const { resolveSecurity, publicOrigin } = http;
   return Router()
     .post("/google/connect", express.json({ limit: MAX_BODY_BYTES }), async (request, response) => {
-      const { clientId, clientSecret, googleApp } = CONNECTION_START.parse(request.body ?? {});
       try {
+        const { clientId, clientSecret, googleApp } = parseStart(request.body);
         const security = await requireSecurity(resolveSecurity, request, NOT_SETUP_HOLDER);
         response.json(
           await connection.startConnection(security, {
@@ -68,7 +73,7 @@ export function googleRouter(
       startAppChange(routes, request, response),
     )
     .get("/google/callback", async (request, response) => {
-      const answer = CONSENT_ANSWER.parse(request.query);
+      const answer = parseAnswer(request.query);
       await finisherOf(consentFlowOf(answer.state ?? ""))(routes, { request, response, answer });
     });
 }
@@ -95,22 +100,6 @@ const SIGN_IN_COOKIE = "broccoli_access_google_sign_in";
 
 /** Binds a Google app change's `state` to the browser that started it, like `SIGN_IN_COOKIE`. */
 const CHANGE_APP_COOKIE = "broccoli_access_google_change_app";
-
-const CONNECTION_START = z.object({
-  googleApp: z.enum(["own_google_app", "broccoli_google_app"]).default("own_google_app"),
-  clientId: z.string().catch(""),
-  clientSecret: z.string().catch(""),
-});
-
-/** Google's redirect: a code, or an error such as `access_denied` when the person cancels. */
-const CONSENT_ANSWER = z.object({
-  code: z.string().optional().catch(undefined),
-  handle: z.string().optional().catch(undefined),
-  state: z.string().optional().catch(undefined),
-  error: z.string().optional().catch(undefined),
-});
-
-type ConsentAnswer = z.infer<typeof CONSENT_ANSWER>;
 
 /** What the callback's handlers use. */
 interface GoogleRoutes {
@@ -154,11 +143,7 @@ async function finishConsent(
   { request, response, answer }: Callback,
 ): Promise<void> {
   const { resolveSecurity, publicOrigin, startSession } = http;
-  if (
-    (answer.code === undefined && answer.handle === undefined) ||
-    answer.state === undefined ||
-    answer.error !== undefined
-  ) {
+  if (!hasConsentAnswer(answer)) {
     const failure = cancelledOrFailed(answer);
     logger.info({ failure }, "Google consent ended without an answer");
     sendBackToConnect(response, failure);
@@ -189,12 +174,7 @@ async function finishSignIn(
   { request, response, answer }: Callback,
 ): Promise<void> {
   const origin = await http.publicOrigin(request);
-  response.clearCookie(SIGN_IN_COOKIE, consentCookie(origin));
-  if (
-    (answer.code === undefined && answer.handle === undefined) ||
-    answer.state === undefined ||
-    answer.error !== undefined
-  ) {
+  if (!hasConsentAnswer(answer)) {
     const failure = cancelledOrFailed(answer);
     logger.info({ failure }, "Google sign-in ended without an answer");
     sendBackToLogin(response, failure);
@@ -209,6 +189,7 @@ async function finishSignIn(
       browserToken: parseCookies(request.headers.cookie ?? "").get(SIGN_IN_COOKIE) ?? null,
       now: new Date(),
     });
+    response.clearCookie(SIGN_IN_COOKIE, consentCookie(origin));
     response.append("Set-Cookie", await http.startSession(userId));
     logger.info({ userId }, "Signed in with Google");
     response.redirect(302, HOME);
@@ -225,8 +206,8 @@ async function startAppChange(
   request: Request,
   response: Response,
 ): Promise<void> {
-  const { clientId, clientSecret, googleApp } = CONNECTION_START.parse(request.body ?? {});
   try {
+    const { clientId, clientSecret, googleApp } = parseStart(request.body);
     const security = await requireSecurity(http.resolveSecurity, request, NOT_OWNER);
     const origin = await http.publicOrigin(request);
     const { authorizationUrl, browserToken } = await connection.startAppChange(security, {
@@ -249,12 +230,7 @@ async function finishAppChange(
   { request, response, answer }: Callback,
 ): Promise<void> {
   const origin = await http.publicOrigin(request);
-  response.clearCookie(CHANGE_APP_COOKIE, consentCookie(origin));
-  if (
-    (answer.code === undefined && answer.handle === undefined) ||
-    answer.state === undefined ||
-    answer.error !== undefined
-  ) {
+  if (!hasConsentAnswer(answer)) {
     const failure = cancelledOrFailed(answer);
     logger.info({ failure }, "Google app change ended without an answer");
     sendBackToAppChange(response, failure);
@@ -270,6 +246,7 @@ async function finishAppChange(
       browserToken: parseCookies(request.headers.cookie ?? "").get(CHANGE_APP_COOKIE) ?? null,
       now: new Date(),
     });
+    response.clearCookie(CHANGE_APP_COOKIE, consentCookie(origin));
     response.redirect(302, CONNECTIONS_PAGE);
   } catch (error) {
     const failure = appChangeFailureOf(error);

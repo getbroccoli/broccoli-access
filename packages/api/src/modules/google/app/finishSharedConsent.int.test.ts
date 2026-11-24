@@ -5,6 +5,8 @@ import {
   test,
   SETUP_HOLDER,
   googleSetup,
+  googleConnection,
+  recordTokenRequests,
   GOOGLE_SCOPES,
   RELAY_HANDLE,
   startSharedGoogleSetup,
@@ -42,6 +44,7 @@ test("redeems shared consent, makes the admin owner and queues the connection's 
   });
 
   expect(relay.requests).toHaveLength(1);
+  expect(relay.requests[0]!.redirect).not.toBe("follow");
   await assertRelayRedemption(relay.requests[0]!, authorization);
   expect(await storedUsers(orm)).toMatchObject([{ id: userId, email: "admin@acme.example" }]);
   expect(await storedGoogleAccounts(orm)).toMatchObject([
@@ -71,6 +74,23 @@ test("redeems shared consent, makes the admin owner and queues the connection's 
   const sources = await storedImportSources(orm);
   expect(sources).toMatchObject([{ connectionId: id, status: "scanning" }]);
   expect(sent).toEqual([{ name: "imports.scanConnection", payload: { sourceId: sources[0]!.id } }]);
+});
+
+test("reports a removed relay before contacting Google for an outstanding shared consent", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { input, state } = await startSharedGoogleSetup(orm, fakeGoogle.url);
+  const connection = googleConnection(orm, { googleUrl: fakeGoogle.url });
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockRejectedValue(new Error("Unexpected HTTP request"));
+  onTestFinished(() => fetch.mockRestore());
+
+  await expect(
+    connection.finishConsent(SETUP_HOLDER, { ...input, state, handle: RELAY_HANDLE }),
+  ).rejects.toMatchObject({ code: "UNAVAILABLE" });
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 test.for([
@@ -165,18 +185,3 @@ test.for(["handle", "code and handle"])(
     expect(requests).toEqual([]);
   },
 );
-
-function recordTokenRequests() {
-  const requests: string[] = [];
-  const fetchDirect = globalThis.fetch;
-  const stub = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
-    const url = new URL(input instanceof Request ? input.url : String(input));
-    if (["/token", "/google/redeem"].includes(url.pathname)) {
-      requests.push(url.pathname);
-      return Promise.resolve(Response.json({ error: "invalid_grant" }, { status: 400 }));
-    }
-    return fetchDirect(input, init);
-  });
-  onTestFinished(() => stub.mockRestore());
-  return requests;
-}

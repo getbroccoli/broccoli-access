@@ -4,7 +4,7 @@ import { googleRedirectAddress } from "../domain";
 
 export function createResolvers(
   google: Pick<GoogleConnectionService, "readConnection" | "readOrganization">,
-  broccoliGoogleAppAvailable = false,
+  broccoliGoogleAppAvailable: boolean,
 ): Resolvers {
   return {
     Setup: {

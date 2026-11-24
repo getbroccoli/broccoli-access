@@ -7,20 +7,20 @@ import { onTestFinished, vi } from "vitest";
 import { consentAtGoogle, registerGoogleRedirect } from "./googleConsent";
 import { GOOGLE_SCOPES } from "./googleSetup";
 
-export const GOOGLE_RELAY_URL = "https://relay.acme.example";
+export const GOOGLE_RELAY_URL = "https://relay.acme.example/integrations";
 export const SHARED_GOOGLE_APP = { googleApp: "broccoli_google_app" } as const;
 export const RELAY_HANDLE = "acme-handoff";
 export const SHARED_CLIENT_ID = "acme-shared-google-client";
 
 /** Only intercept requests to the configured relay. Google and the instance use real HTTP. */
 export function stubGoogleRelay() {
-  const redeem = vi.fn<() => Response>(unexpectedRelayRequest);
+  const redeem = vi.fn<() => Response | Promise<Response>>(unexpectedRelayRequest);
   const refresh = vi.fn<() => Response>(unexpectedRelayRequest);
   const requests: Request[] = [];
   const fetchDirect = globalThis.fetch;
   const stub = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input);
-    if (new URL(url).origin !== GOOGLE_RELAY_URL) return fetchDirect(input, init);
+    if (new URL(url).origin !== new URL(GOOGLE_RELAY_URL).origin) return fetchDirect(input, init);
     const request = new Request(input, init);
     requests.push(request);
     if (request.url === GOOGLE_RELAY_URL + "/google/redeem") return redeem();
@@ -105,6 +105,26 @@ export async function googleRelayGrant(
     refresh_token: tokens.refresh_token ?? null,
     scope: tokens.scope,
   };
+}
+
+export function recordTokenRequests() {
+  const requests: string[] = [];
+  const fetchDirect = globalThis.fetch;
+  const stub = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    const refreshing =
+      init?.body instanceof URLSearchParams && init.body.get("grant_type") === "refresh_token";
+    if (
+      (url.pathname === "/token" && !refreshing) ||
+      url.href === GOOGLE_RELAY_URL + "/google/redeem"
+    ) {
+      requests.push(url.pathname);
+      return Promise.resolve(Response.json({ error: "invalid_grant" }, { status: 400 }));
+    }
+    return fetchDirect(input, init);
+  });
+  onTestFinished(() => stub.mockRestore());
+  return requests;
 }
 
 function unexpectedRelayRequest(): never {

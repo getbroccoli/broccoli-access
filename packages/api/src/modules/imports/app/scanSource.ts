@@ -37,11 +37,11 @@ export async function scanSource(
   progressBySource: Map<string, ScanProgress>,
 ): Promise<ScanFailure | null> {
   const { orm, apps } = dependencies;
-  const connection = (await apps.readConnectionById(orm, connectionId))!;
+  const { connection, secrets } = (await apps.readConnectionWithSecrets(orm, connectionId))!;
   const connector = (await dependencies.connectors.list()).find(
     (candidate) => candidate.key === connection.connector,
   );
-  const used = { secrets: await apps.readSecrets(orm, connectionId) };
+  const used = { secrets };
   try {
     // A connector the connectors container does not list now is unavailable.
     if (!connector) {

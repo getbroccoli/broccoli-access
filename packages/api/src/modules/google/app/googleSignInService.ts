@@ -119,9 +119,10 @@ async function readClient(connectedApps: ConnectedApps, orm: Orm) {
   if (!connection) {
     throw new ApplicationError("CONFLICT", "Google Workspace is not connected.");
   }
-  const { clientId, googleApp } = parseGoogleWorkspaceSettings(connection.settings);
+  const stored = await connectedApps.readConnectionWithSecrets(orm, connection.id);
+  if (!stored) throw new ApplicationError("CONFLICT", "Google Workspace is not connected.");
+  const { clientId, googleApp } = parseGoogleWorkspaceSettings(stored.connection.settings);
   if (googleApp === "broccoli_google_app") return { clientId, googleApp };
-  const secrets = await connectedApps.readSecrets(orm, connection.id);
-  const { clientSecret } = GOOGLE_WORKSPACE_SECRETS.required().parse(secrets);
+  const { clientSecret } = GOOGLE_WORKSPACE_SECRETS.required().parse(stored.secrets);
   return { clientId, googleApp, clientSecret };
 }

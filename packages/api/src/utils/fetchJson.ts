@@ -11,7 +11,12 @@ import { fetchBytes, readBytes } from "./fetchBytes";
 export async function fetchJson<T>(
   url: URL,
   schema: z.ZodType<T>,
-  options: { timeoutMs: number; maxBytes: number; init?: RequestInit },
+  options: {
+    timeoutMs: number;
+    maxBytes: number;
+    init?: RequestInit;
+    errorOfResponse?: (response: Response) => Promise<Error>;
+  },
 ): Promise<T | null> {
   const body = await fetchBytes(url, options);
   return body && schema.parse(JSON.parse(body.toString("utf8")));

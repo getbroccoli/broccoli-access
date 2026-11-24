@@ -19,13 +19,23 @@ export interface ConnectedApps {
     ctx: SecurityContext,
     tx: Tx,
     connectionId: string,
-    connection: { settings: Record<string, unknown>; secrets: Record<string, string> },
+    connection: {
+      settings: Record<string, unknown>;
+      secrets: Record<string, string>;
+      replacingSettings?: Record<string, unknown>;
+    },
   ): Promise<boolean>;
   /** The connection of `connector` without its secrets, or null. */
   readConnection(
     db: Orm | Tx,
     connector: string,
   ): Promise<{ id: string; settings: Record<string, unknown> } | null>;
-  /** The secrets of connection `connectionId`, decrypted, or null for an unknown connection. */
-  readSecrets(db: Orm | Tx, connectionId: string): Promise<Record<string, string> | null>;
+  /** One stored version of settings and decrypted secrets, or null. */
+  readConnectionWithSecrets(
+    db: Orm | Tx,
+    connectionId: string,
+  ): Promise<{
+    connection: { id: string; settings: Record<string, unknown> };
+    secrets: Record<string, string>;
+  } | null>;
 }

@@ -1,4 +1,5 @@
 import { ACME } from "@broccoli-access/fake-apps";
+import { onTestFinished } from "vitest";
 
 import {
   expect,
@@ -16,6 +17,11 @@ import {
   storedRecordHistory,
   changeStoredGoogleDomain,
   connectedWorkspace,
+  containerConnectors,
+  createGoogleWorkspaceConnector,
+  scans,
+  startFakeHttpServer,
+  storedImportSources,
   storedWorkspace,
 } from "#test/support";
 
@@ -239,6 +245,46 @@ test("refuses starting a Google app change without MANAGE_WORKSPACE", async ({
   });
 
   expect(await storedChangeState(orm)).toEqual(before);
+});
+
+test("a scan uses matching credentials when the Google app changes during connector discovery", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { connection, ctx, input, connectionId, sourceId } = await connectedWorkspace(
+    orm,
+    fakeGoogle.url,
+  );
+  const { authorizationUrl, browserToken } = await connection.startAppChange(ctx, input);
+  const callback = await consentAtGoogle(authorizationUrl);
+  const manifest = await startFakeHttpServer(async () => {
+    await connection.finishAppChange(ctx, {
+      ...input,
+      browserToken,
+      code: callback.searchParams.get("code")!,
+      state: callback.searchParams.get("state")!,
+    });
+    return { status: 200, body: { connectors: [] } };
+  });
+  onTestFinished(() => manifest.stop());
+  const container = containerConnectors(manifest.url);
+  const google = createGoogleWorkspaceConnector({
+    openIdConfigurationUrl: fakeGoogle.url + "/.well-known/openid-configuration",
+    adminApiUrl: fakeGoogle.url,
+  });
+  const scan = scans(orm, {
+    connectors: { list: async () => [google, ...(await container.list())] },
+  });
+  await scan.scanNow(ctx, connectionId);
+
+  await scan.runScan(SYSTEM, sourceId);
+
+  expect(await storedAppConnections(orm)).toMatchObject([
+    { settings: { clientId: input.clientId } },
+  ]);
+  expect(await storedImportSources(orm)).toMatchObject([
+    { id: sourceId, status: "scanned", failure: null },
+  ]);
 });
 
 async function storedChangeState(orm: Orm) {

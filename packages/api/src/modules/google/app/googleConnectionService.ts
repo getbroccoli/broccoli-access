@@ -234,15 +234,18 @@ export function createGoogleConnectionService(
         adminEmail: admin.email,
         grantedScopes: grant.tokens.scopes,
       };
-      await transact((tx) =>
+      const saved = await transact((tx) =>
         connectedApps.changeConnection(ctx, tx, connection.id, {
           settings: { ...changed },
+          replacingSettings: connection.settings,
           secrets: {
             ...("clientSecret" in change && { clientSecret: change.clientSecret }),
             refreshToken: grant.tokens.refreshToken,
           },
         }),
       );
+      if (!saved)
+        throw new ApplicationError("CONFLICT", "The Google app changed during consent. Try again.");
       logger.info({ connectionId: connection.id }, "Google app changed");
     },
     async readConnection(ctx) {

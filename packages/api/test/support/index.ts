@@ -120,6 +120,7 @@ export {
   SHARED_GOOGLE_APP,
   SHARED_CLIENT_ID,
   stubGoogleRelay,
+  recordTokenRequests,
   assertRelayRedemption,
   googleRelayGrant,
 } from "./googleRelay";

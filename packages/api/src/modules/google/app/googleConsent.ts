@@ -49,11 +49,7 @@ export async function startConsent(
   if (start.googleApp === "broccoli_google_app") {
     const relay = requireGoogleRelay(relayUrl);
     const codeVerifier = randomConsentToken();
-    const state = sealConsentState(
-      secretBox,
-      { flow: start.flow, googleApp: start.googleApp, nonce, codeVerifier },
-      start,
-    );
+    const state = sealConsentState(secretBox, { flow: start.flow, nonce, codeVerifier }, start);
     return relay.authorize({
       returnTo: redirectUri,
       state,
@@ -129,10 +125,11 @@ export async function verifyIdentity(
   ) {
     throw new ApplicationError("INVALID_INPUT", "The answer does not match this consent.");
   }
+  const relay = shared ? requireGoogleRelay(relayUrl) : undefined;
   const openId = await google.discover();
   const { clientId, ...tokens } = await refusingRejectedCode(async () => {
     if ("codeVerifier" in consent) {
-      return requireGoogleRelay(relayUrl).redeem(answer.handle!, consent.codeVerifier);
+      return relay!.redeem(answer.handle!, consent.codeVerifier);
     }
     return {
       ...(await google.exchangeCode(openId, {

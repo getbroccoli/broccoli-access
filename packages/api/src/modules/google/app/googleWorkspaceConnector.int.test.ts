@@ -1,5 +1,5 @@
 import { ACME } from "@broccoli-access/fake-apps";
-import { onTestFinished } from "vitest";
+import { onTestFinished, vi } from "vitest";
 
 import {
   GOOGLE_RELAY_URL,
@@ -211,19 +211,22 @@ test("a retried page reads only the tokens lists that failed", async ({
 });
 
 test.for([
-  { failure: "invalid_grant", expected: "authentication_failed" },
-  { failure: "oauth", expected: "app_unavailable" },
-  { failure: "network", expected: "app_unavailable" },
+  { failure: "invalid_grant", status: 400, expected: "authentication_failed" },
+  { failure: "invalid_request", status: 400, expected: "unexpected_response" },
+  { failure: "unrecognised body", status: 400, expected: "unexpected_response" },
+  { failure: "proxy refused", status: 403, expected: "app_unavailable" },
+  { failure: "route unavailable", status: 404, expected: "app_unavailable" },
+  { failure: "oauth", status: 502, expected: "app_unavailable" },
+  { failure: "network", status: 0, expected: "app_unavailable" },
 ])(
   "classifies shared refresh failure $failure as $expected",
-  async ({ failure, expected }, { fakeGoogle }) => {
+  async ({ failure, status, expected }, { fakeGoogle }) => {
     const relay = stubGoogleRelay();
     relay.refresh.mockImplementation(() => {
       if (failure === "network") throw new TypeError("fetch failed");
-      return Response.json(
-        { ok: false, error: failure },
-        { status: failure === "oauth" ? 502 : 400 },
-      );
+      return failure === "unrecognised body"
+        ? new Response("Bad request", { status })
+        : Response.json({ ok: false, error: failure }, { status });
     });
     const connector = relayConnector(fakeGoogle.url);
 
@@ -238,21 +241,43 @@ test.for([
   },
 );
 
-test("an own-app connection missing its client secret cannot refresh through the relay", async ({
-  fakeGoogle,
-}) => {
+test("refuses a redirect when refreshing shared credentials", async ({ fakeGoogle }) => {
   const relay = stubGoogleRelay();
-  const connector = relayConnector(fakeGoogle.url);
+  relay.refresh.mockReturnValueOnce(Response.redirect(GOOGLE_RELAY_URL + "/moved", 303));
 
   await expect(
-    connector.openSession({
-      settings: { ...SHARED_SETTINGS, googleApp: "own_google_app" },
+    relayConnector(fakeGoogle.url).openSession({
+      settings: SHARED_SETTINGS,
       secrets: { refreshToken: "acme-refresh" },
     }),
   ).rejects.toThrow();
 
-  expect(relay.requests).toEqual([]);
+  expect(relay.requests).toHaveLength(1);
+  expect(relay.requests[0]!.redirect).not.toBe("follow");
 });
+
+test.for([
+  { googleApp: "own_google_app", secrets: { refreshToken: "acme-refresh" } },
+  {
+    googleApp: "broccoli_google_app",
+    secrets: { refreshToken: "acme-refresh", clientSecret: "acme-fixture" },
+  },
+])(
+  "refuses incompatible secrets for $googleApp before any HTTP request",
+  async ({ googleApp, secrets }, { fakeGoogle }) => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("Unexpected HTTP request"));
+    onTestFinished(() => fetch.mockRestore());
+    const connector = relayConnector(fakeGoogle.url);
+
+    await expect(
+      connector.openSession({ settings: { ...SHARED_SETTINGS, googleApp }, secrets }),
+    ).rejects.toThrow();
+
+    expect(fetch).not.toHaveBeenCalled();
+  },
+);
 
 const SHARED_SETTINGS = {
   ...SHARED_GOOGLE_APP,

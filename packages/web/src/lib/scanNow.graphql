@@ -3,6 +3,7 @@ mutation ScanNow($connectionId: ID!) {
     scanConnection(connectionId: $connectionId) {
       scan {
         id
+        failure
         status
         readAt
       }

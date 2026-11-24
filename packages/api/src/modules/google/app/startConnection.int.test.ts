@@ -1,14 +1,18 @@
+import { onTestFinished, vi } from "vitest";
 import {
   expect,
   test,
   EMPLOYEE,
   SETUP_HOLDER,
   googleSetup,
+  googleConnection,
   GOOGLE_SCOPES,
   SHARED_GOOGLE_APP,
   GOOGLE_RELAY_URL,
   startSharedGoogleSetup,
 } from "#test/support";
+
+import { loadEnv } from "../../../core/env";
 
 test("requests offline consent with all Google Workspace scopes and encrypted credentials", async ({
   orm,
@@ -111,3 +115,36 @@ test("reports that the shared Google app is unavailable when no relay is configu
     }),
   ).rejects.toMatchObject({ code: "UNAVAILABLE" });
 });
+
+test.for([
+  "http://relay.acme.example",
+  "https://fixture@relay.acme.example",
+  "https://relay.acme.example?option=acme",
+  "https://relay.acme.example/#acme",
+])(
+  "refuses shared consent with an unsafe relay URL %s before HTTP",
+  async (relayUrl, { orm, databaseUrl, fakeGoogle }) => {
+    const {
+      input: { publicOrigin, setupToken, now },
+    } = await googleSetup(orm, fakeGoogle.url);
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("Unexpected HTTP request"));
+    onTestFinished(() => fetch.mockRestore());
+
+    await expect(async () => {
+      const config = loadEnv({ DATABASE_URL: databaseUrl, GOOGLE_RELAY_URL: relayUrl });
+      const connection = googleConnection(orm, {
+        googleUrl: fakeGoogle.url,
+        relayUrl: config.googleRelayUrl,
+      });
+      await connection.startConnection(SETUP_HOLDER, {
+        ...SHARED_GOOGLE_APP,
+        publicOrigin,
+        setupToken,
+        now,
+      });
+    }).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+  },
+);

@@ -160,3 +160,30 @@ it("sends the owner selecting apps from People to Apps", () => {
   assert(isRedirect(caught));
   expect(caught.options).toMatchObject({ to: "/apps", replace: true });
 });
+
+it("opens Google app recovery for the signed-in owner during the first scan", () => {
+  const me = { id: "owner" };
+  const path = "/settings/connections/google-app";
+
+  expect(
+    requireFinishedSetup({
+      context: { me, holdsSetup: false, setupStep: "SCAN" },
+      location: { href: path, pathname: path },
+    }),
+  ).toBe(me);
+});
+
+it("keeps unrelated settings behind the first scan", () => {
+  let caught: unknown;
+  try {
+    requireFinishedSetup({
+      context: { me: { id: "owner" }, holdsSetup: false, setupStep: "SCAN" },
+      location: { href: "/settings/connections", pathname: "/settings/connections" },
+    });
+  } catch (error) {
+    caught = error;
+  }
+
+  assert(isRedirect(caught));
+  expect(caught.options).toMatchObject({ to: "/setup/scan", replace: true });
+});

@@ -50,7 +50,23 @@ const envSchema = z
       blankAsUnset,
       z.url({ protocol: /^https?$/ }).default(GOOGLE_ADMIN_API_URL),
     ),
-    GOOGLE_RELAY_URL: z.preprocess(blankAsUnset, z.url({ protocol: /^https?$/ }).optional()),
+    GOOGLE_RELAY_URL: z.preprocess(
+      blankAsUnset,
+      z
+        .url({ protocol: /^https?$/ })
+        .refine((value) => {
+          const url = new URL(value);
+          return (
+            !url.username &&
+            !url.password &&
+            !url.search &&
+            !url.hash &&
+            (url.protocol === "https:" ||
+              ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
+          );
+        }, "Use HTTPS, or loopback HTTP, without credentials, query or fragment")
+        .optional(),
+    ),
     CONNECTORS_URL: z.preprocess(blankAsUnset, z.url({ protocol: /^https?$/ }).optional()),
   })
   .transform((variables): Env => ({

@@ -42,6 +42,8 @@ export interface AppConnectionRepository {
   /** Every connection; an instance has at most one per connector. */
   findAll(): Promise<AppConnection[]>;
   findById(id: string): Promise<AppConnection | null>;
+  /** One stored version of the connection and its encrypted secrets. */
+  findWithSecrets(id: string): Promise<(AppConnection & { encryptedSecrets: string }) | null>;
   /** The connections of the apps `appIds`; an app nobody connected has none. */
   findByApps(appIds: readonly string[]): Promise<AppConnection[]>;
   /** Like `findById`, locking the row until the transaction ends. */
@@ -88,6 +90,13 @@ export function appConnectionRepository(db: Orm | Tx): AppConnectionRepository {
     findById: async (id) => {
       const [connection] = await orm()
         .select(columns)
+        .from(appConnections)
+        .where(eq(appConnections.id, id));
+      return connection ?? null;
+    },
+    findWithSecrets: async (id) => {
+      const [connection] = await orm()
+        .select({ ...columns, encryptedSecrets: appConnections.encryptedSecrets })
         .from(appConnections)
         .where(eq(appConnections.id, id));
       return connection ?? null;
