@@ -85,6 +85,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     employeesModule({ ...core, accounts: apps }),
     googleModule({
       ...core,
+      publicUrl,
       ...googleAddresses,
       connectedApps,
       scans,

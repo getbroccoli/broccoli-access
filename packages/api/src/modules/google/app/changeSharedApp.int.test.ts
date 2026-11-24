@@ -9,6 +9,7 @@ import {
   SHARED_GOOGLE_APP,
   RELAY_HANDLE,
   googleRelayGrant,
+  googleSignIn,
   recordTokenRequests,
   stubGoogleRelay,
   assertRelayRedemption,
@@ -112,6 +113,31 @@ test.for(["?", "#"])(
     expect(await storedAppAccounts(orm)).toEqual(accounts);
   },
 );
+
+test("an owner switching a legacy own-app connection establishes the shared sign-in address", async ({
+  orm,
+  seed,
+  fakeGoogle,
+}) => {
+  const workspace = await connectedWorkspace(orm, fakeGoogle.url, GOOGLE_RELAY_URL);
+  await seed.clearPublicOrigin();
+  const { now, publicOrigin } = workspace.input;
+  const visitor = { now, publicOrigin: "https://alias.acme.example" };
+  const signIn = googleSignIn(orm, { googleUrl: fakeGoogle.url, relayUrl: GOOGLE_RELAY_URL });
+  await signIn.startSignIn(visitor);
+
+  const change = await startSharedChange(orm, fakeGoogle.url, workspace);
+  await workspace.connection.finishAppChange(workspace.ctx, {
+    ...change.answer,
+    publicOrigin: visitor.publicOrigin,
+  });
+  await assertRelayRedemption(change.relay.requests[0]!, change.authorization);
+
+  const { authorizationUrl } = await signIn.startSignIn(visitor);
+  expect(new URL(authorizationUrl).searchParams.get("return_to")).toBe(
+    publicOrigin + "/api/google/callback",
+  );
+});
 
 test("a shared app grant from another workspace keeps the original connection", async ({
   orm,

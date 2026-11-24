@@ -1,3 +1,5 @@
+import { onTestFinished, vi } from "vitest";
+
 import {
   expect,
   test,
@@ -21,12 +23,15 @@ test("shared sign-in redeems the owner's identity without storing sign-in tokens
   orm,
   fakeGoogle,
 }) => {
-  const { signIn, owner, authorization, input, relay } = await startOwnerSignIn(
+  const { setup, signIn, owner, authorization, input, relay } = await startOwnerSignIn(
     orm,
     fakeGoogle.url,
   );
   expect(authorization.origin + authorization.pathname).toBe(
     GOOGLE_RELAY_URL + "/google/authorize",
+  );
+  expect(authorization.searchParams.get("return_to")).toBe(
+    setup.input.publicOrigin + "/api/google/callback",
   );
   expect(authorization.searchParams.get("purpose")).toBe("sign_in");
   expect(input.state).toMatch(/^[A-Za-z0-9_-]{1,256}$/);
@@ -42,6 +47,37 @@ test("shared sign-in redeems the owner's identity without storing sign-in tokens
     { userId: owner.userId, accessToken: null, refreshToken: null, idToken: null },
   ]);
   expect(await storedAppConnections(orm)).toEqual([before]);
+});
+
+test("public shared sign-in requires a saved address before any outbound request", async ({
+  orm,
+  seed,
+  fakeGoogle,
+}) => {
+  const { signIn, input } = await startOwnerSignIn(orm, fakeGoogle.url);
+  await seed.clearPublicOrigin();
+  const network = vi
+    .spyOn(globalThis, "fetch")
+    .mockClear()
+    .mockRejectedValue(new Error("Unexpected HTTP request"));
+  onTestFinished(() => network.mockRestore());
+
+  await expect(signIn.startSignIn(input)).rejects.toMatchObject({ code: "UNAVAILABLE" });
+  await expect(signIn.finishSignIn(input)).rejects.toMatchObject({ code: "UNAVAILABLE" });
+  expect(network).not.toHaveBeenCalled();
+});
+
+test("a relay refusal for a different handoff destination refuses sign-in", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { signIn, input, relay, authorization } = await startOwnerSignIn(orm, fakeGoogle.url);
+  relay.redeem.mockReturnValueOnce(
+    Response.json({ ok: false, error: "invalid_handoff" }, { status: 400 }),
+  );
+
+  await expect(signIn.finishSignIn(input)).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  await assertRelayRedemption(relay.requests.at(-1)!, authorization);
 });
 
 test("shared sign-in refuses a valid Google identity issued for a different relay client", async ({
@@ -86,7 +122,8 @@ async function startOwnerSignIn(orm: Orm, googleUrl: string) {
     handle: RELAY_HANDLE,
   });
   const signIn = googleSignIn(orm, { googleUrl, relayUrl: GOOGLE_RELAY_URL });
-  const { now, publicOrigin } = setup.input;
+  const { now } = setup.input;
+  const publicOrigin = "https://alias.acme.example";
   const { authorizationUrl, browserToken } = await signIn.startSignIn({ now, publicOrigin });
   const authorization = new URL(authorizationUrl);
   const input = {

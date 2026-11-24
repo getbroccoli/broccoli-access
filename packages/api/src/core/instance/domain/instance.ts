@@ -4,6 +4,7 @@ import { holdsSetup, SetupInProgressError, type SetupSession } from "./setupSess
 
 /** The stored facts needed to restore an instance; secrets are read separately. */
 export interface InstanceState {
+  publicOrigin: string | null;
   ownerUserId: string | null;
   step: SetupStep;
   setupSession: SetupSession | null;
@@ -17,6 +18,10 @@ export class Instance {
 
   constructor(state: InstanceState) {
     this.#state = structuredClone(state);
+  }
+
+  get publicOrigin(): string | null {
+    return this.#state.publicOrigin;
   }
 
   get ownerUserId(): string | null {

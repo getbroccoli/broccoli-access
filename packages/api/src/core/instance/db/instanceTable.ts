@@ -11,6 +11,8 @@ export const instance = pgTable(
     id: boolean("id").primaryKey().default(true),
     ownerUserId: text("owner_user_id").references(() => user.id),
     setupStep: text("setup_step", { enum: SETUP_STEPS }).notNull().default("connect_google"),
+    /** The origin remembered during protected setup; public sign-in never changes it. */
+    publicOrigin: text("public_origin"),
     /** Before the owner exists: the hash of the setup holder's token. */
     setupTokenHash: text("setup_token_hash"),
     setupExpiresAt: timestamp("setup_expires_at", { withTimezone: true }),

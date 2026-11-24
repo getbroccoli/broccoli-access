@@ -21,6 +21,8 @@ export interface InstanceRepository {
   lockInstance(): Promise<Instance>;
   /** The owner's id and sign-in email, or null before an owner exists. */
   readOwner(): Promise<{ userId: string; email: string } | null>;
+  /** Saves the origin after the caller locks and checks the instance. */
+  savePublicOrigin(origin: string): Promise<void>;
   saveSetupSession(session: SetupSession): Promise<void>;
   clearSetupSession(): Promise<void>;
   setOwner(userId: string, step: SetupStep): Promise<void>;
@@ -59,6 +61,7 @@ export function instanceRepository(db: Orm | Tx): InstanceRepository {
     orm()
       .select({
         ownerUserId: instance.ownerUserId,
+        publicOrigin: instance.publicOrigin,
         step: instance.setupStep,
         mailSource: instance.mailSource,
         ...sessionColumns,
@@ -76,6 +79,10 @@ export function instanceRepository(db: Orm | Tx): InstanceRepository {
         .from(instance)
         .innerJoin(user, eq(user.id, instance.ownerUserId));
       return row ?? null;
+    },
+
+    savePublicOrigin: async (publicOrigin) => {
+      await orm().update(instance).set({ publicOrigin });
     },
 
     saveSetupSession: async ({ tokenHash, expiresAt }: SetupSession): Promise<void> => {
@@ -180,6 +187,7 @@ function toSetupSession({
 }
 
 function toInstance([row]: {
+  publicOrigin: string | null;
   ownerUserId: string | null;
   step: SetupStep;
   mailSource: MailSource | null;
@@ -191,6 +199,7 @@ function toInstance([row]: {
   }
   return new Instance({
     ownerUserId: row.ownerUserId,
+    publicOrigin: row.publicOrigin,
     step: row.step,
     setupSession: toSetupSession(row),
     mailSource: row.mailSource,

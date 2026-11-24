@@ -47,6 +47,7 @@ export function googleRouter(
             clientId,
             clientSecret,
             publicOrigin: await publicOrigin(request),
+            browserOrigin: request.headers.origin,
             setupToken: readSetupToken(request.headers.cookie),
             now: new Date(),
           }),
@@ -214,6 +215,7 @@ async function startAppChange(
       clientId,
       clientSecret,
       publicOrigin: origin,
+      browserOrigin: request.headers.origin,
       now: new Date(),
     });
     response.cookie(CHANGE_APP_COOKIE, browserToken, consentCookie(origin));

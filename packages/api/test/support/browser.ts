@@ -1,7 +1,7 @@
 /** A client that keeps cookies like a browser and sends its own address as the Origin. */
 export interface Browser {
   postForm(path: string, body: URLSearchParams, formOrigin: string): Promise<Response>;
-  post(path: string, body: unknown): Promise<Response>;
+  post(path: string, body: unknown, origin?: string): Promise<Response>;
   put(path: string, body: Buffer): Promise<Response>;
   get(path: string): Promise<Response>;
   /** Answers a redirect with the redirect itself instead of following it. */
@@ -58,7 +58,7 @@ export function createBrowser(baseUrl: string | (() => string), origin?: string)
   return {
     postForm: (path: string, body: URLSearchParams, formOrigin: string) =>
       request(path, "POST", body, "manual", formOrigin),
-    post: (path: string, body: unknown) => request(path, "POST", body),
+    post: (path, body, origin) => request(path, "POST", body, "follow", origin),
     put: (path: string, body: Buffer) => request(path, "PUT", body),
     get: (path: string) => request(path, "GET"),
     getManual: (path: string) => request(path, "GET", undefined, "manual"),

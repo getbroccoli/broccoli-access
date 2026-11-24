@@ -9,7 +9,11 @@ import { shortScopeName } from "./shortScopeName";
 /** The shared Google app's authorization and server-to-server token endpoints. */
 export interface GoogleRelayClient {
   authorize: (request: RelayAuthorization) => string;
-  redeem: (handle: string, codeVerifier: string) => Promise<GoogleTokens & { clientId: string }>;
+  redeem: (
+    handle: string,
+    codeVerifier: string,
+    returnTo: string,
+  ) => Promise<GoogleTokens & { clientId: string }>;
   refresh: (refreshToken: string) => Promise<string>;
 }
 
@@ -37,11 +41,11 @@ export function createGoogleRelayClient(relayUrl: string): GoogleRelayClient {
       }).toString();
       return url.toString();
     },
-    async redeem(handle, codeVerifier) {
+    async redeem(handle, codeVerifier, returnTo) {
       const tokens = await fetchRelay(
         endpoint("redeem"),
         REDEEMED,
-        jsonPost({ handle, code_verifier: codeVerifier }),
+        jsonPost({ handle, code_verifier: codeVerifier, return_to: returnTo }),
       );
       return {
         clientId: tokens.client_id,

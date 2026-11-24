@@ -43,6 +43,7 @@ function exampleInstance(state: Partial<InstanceState> = {}): Instance {
     ownerUserId: null,
     step: "connect_google",
     setupSession: null,
+    publicOrigin: null,
     mailSource: null,
     ...state,
   });

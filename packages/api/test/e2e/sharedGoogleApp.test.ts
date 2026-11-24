@@ -9,10 +9,11 @@ import {
   SHARED_GOOGLE_APP,
   recordTokenRequests,
   stubGoogleRelay,
+  assertRelayRedemption,
   googleRelayGrant,
 } from "#test/support";
 
-test("shared setup and sign-in callbacks establish sessions for the same owner", async ({
+test("a public URL override after shared setup sends owner sign-in to the configured callback", async ({
   env,
   fakeGoogle,
 }) => {
@@ -28,14 +29,40 @@ test("shared setup and sign-in callbacks establish sessions for the same owner",
     data: { me: { id: string } };
   };
   expect(owner.data.me.id).toBeTruthy();
+  const publicUrl = "https://access.acme.example";
+  await env.restart({ googleRelayUrl: GOOGLE_RELAY_URL, publicUrl });
   const returning = env.browser();
   const start = await returning.getManual("/api/google/sign-in");
   expect(start.status).toBe(302);
+  const authorization = new URL(start.headers.get("location")!);
+  expect(authorization.searchParams.get("return_to")).toBe(publicUrl + "/api/google/callback");
 
-  expect(
-    await finishCallback(returning, start.headers.get("location")!, fakeGoogle.url, relay),
-  ).toBe("/");
+  expect(await finishCallback(returning, authorization.href, fakeGoogle.url, relay)).toBe("/");
+  await assertRelayRedemption(
+    relay.requests.filter((request) => request.url.endsWith("/google/redeem")).at(-1)!,
+    authorization,
+  );
   expect(await (await returning.graphql("{ me { id } }")).json()).toEqual(owner);
+});
+
+test("protected setup remembers the browser's HTTPS origin behind a TLS proxy", async ({ env }) => {
+  await env.restart({ googleRelayUrl: GOOGLE_RELAY_URL });
+  const holder = await env.startSetup();
+  const path = "/api/google/connect";
+  const publicOrigin = "https://" + new URL(env.url).host;
+
+  const refused = await holder.post(path, SHARED_GOOGLE_APP, "https://other.acme.example");
+  expect(refused.status).toBe(403);
+  const allowed = await holder.post(path, SHARED_GOOGLE_APP, publicOrigin);
+  const later = await holder.post(path, SHARED_GOOGLE_APP);
+
+  for (const start of [allowed, later]) {
+    expect(start.status).toBe(200);
+    const { authorizationUrl } = (await start.json()) as { authorizationUrl: string };
+    expect(new URL(authorizationUrl).searchParams.get("return_to")).toBe(
+      publicOrigin + "/api/google/callback",
+    );
+  }
 });
 
 test("the change-app route accepts shared consent and returns the owner to connections", async ({
@@ -121,7 +148,7 @@ async function finishCallback(
   const callback = new URL(authorization.searchParams.get("return_to")!);
   callback.searchParams.set("state", authorization.searchParams.get("state")!);
   callback.searchParams.set("handle", RELAY_HANDLE);
-  const finished = await browser.getManual(callback.href);
+  const finished = await browser.getManual(callback.pathname + callback.search);
   expect(finished.status).toBe(302);
   return finished.headers.get("location");
 }

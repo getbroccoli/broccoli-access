@@ -39,6 +39,7 @@ test("redeems shared consent, makes the admin owner and queues the connection's 
 
   const { userId } = await connection.finishConsent(SETUP_HOLDER, {
     ...input,
+    publicOrigin: "https://alias.acme.example",
     state,
     handle: RELAY_HANDLE,
   });

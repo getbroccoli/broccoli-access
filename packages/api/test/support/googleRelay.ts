@@ -37,7 +37,11 @@ export async function assertRelayRedemption(request: Request, authorization: URL
   assert.equal(request.method, "POST");
   assert.match(request.headers.get("content-type") ?? "", /^application\/json\b/i);
   const body = (await request.json()) as { code_verifier: string };
-  assert.deepEqual(body, { handle: RELAY_HANDLE, code_verifier: body.code_verifier });
+  assert.deepEqual(body, {
+    handle: RELAY_HANDLE,
+    code_verifier: body.code_verifier,
+    return_to: authorization.searchParams.get("return_to"),
+  });
   assert.match(body.code_verifier, /^[A-Za-z0-9._~-]{43,128}$/);
   assert.equal(
     createHash("sha256").update(body.code_verifier).digest("base64url"),

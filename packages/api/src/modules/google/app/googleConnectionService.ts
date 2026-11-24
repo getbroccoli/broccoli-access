@@ -12,7 +12,6 @@ import {
 import { createGoogleClient } from "../../../integrations/google";
 import {
   GOOGLE_WORKSPACE,
-  googleRedirectAddress,
   type GoogleWorkspaceSettings,
   parseGoogleWorkspaceSettings,
   requireSameWorkspace,
@@ -31,7 +30,17 @@ import {
   type VerifiedGrant,
   verifyGrant,
   startConsent,
+  rememberConsentOrigin,
+  consentRedirectAddress,
 } from "./googleConsent";
+
+import type {
+  ConnectionStart,
+  ConsentAnswer,
+  AppChangeStart,
+  AppChangeAnswer,
+  GoogleWorkspaceConnection,
+} from "./googleConnectionTypes";
 
 const instances = createInstanceService();
 const owners = createOwnerService();
@@ -82,57 +91,6 @@ export interface GoogleConnectionService {
   readOrganization: () => Promise<{ name: string; domain: string } | null>;
 }
 
-/** What the browser holding setup sends to start the consent. */
-export interface ConnectionStart {
-  googleApp?: GoogleWorkspaceSettings["googleApp"];
-  clientId?: string;
-  clientSecret?: string;
-  /** Where browsers reach the instance; Google redirects to its callback there. */
-  publicOrigin: string;
-  setupToken: string | null;
-  now: Date;
-}
-
-/** Google's redirect back after the admin allowed access. */
-export interface ConsentAnswer {
-  code?: string;
-  handle?: string;
-  state: string;
-  publicOrigin: string;
-  setupToken: string | null;
-  now: Date;
-}
-
-/** What the owner sends to change the Google app. */
-export interface AppChangeStart {
-  googleApp?: GoogleWorkspaceSettings["googleApp"];
-  clientId?: string;
-  clientSecret?: string;
-  /** Where browsers reach the instance; Google redirects to its callback there. */
-  publicOrigin: string;
-  now: Date;
-}
-
-/** Google's redirect back after the admin allowed the new Google app. */
-export interface AppChangeAnswer {
-  code?: string;
-  handle?: string;
-  state: string;
-  publicOrigin: string;
-  /** The token `startAppChange` gave the browser; null when the browser has none. */
-  browserToken: string | null;
-  now: Date;
-}
-
-export interface GoogleWorkspaceConnection {
-  googleApp: GoogleWorkspaceSettings["googleApp"];
-  clientId: string;
-  id: string;
-  domain: string;
-  organizationName: string;
-  adminEmail: string;
-}
-
 export interface GoogleConnectionDependencies {
   orm: Orm;
   transact: Transact;
@@ -144,6 +102,8 @@ export interface GoogleConnectionDependencies {
   adminApiUrl: string;
   /** The shared Google app relay; absent until it is available. */
   relayUrl?: string;
+  /** Optional deployment override for the remembered public origin. */
+  publicUrl?: string;
   connectedApps: ConnectedApps;
   scans: Scans;
   /** Builds the new owner's security context, which authors the connection's history. */
@@ -159,11 +119,21 @@ export function createGoogleConnectionService(
     async startConnection(ctx, start) {
       ctx.requireSetupHolder();
       const browserToken = await requireConnectStep(orm, start.setupToken, start.now);
+      const origin = await rememberConsentOrigin(
+        ctx,
+        dependencies,
+        start.browserOrigin ?? start.publicOrigin,
+      );
       return {
         authorizationUrl: await startConsent(
           google,
           secretBox,
-          { ...start, flow: "connect_google_workspace", browserToken },
+          {
+            ...start,
+            publicOrigin: start.googleApp === "broccoli_google_app" ? origin : start.publicOrigin,
+            flow: "connect_google_workspace",
+            browserToken,
+          },
           dependencies.relayUrl,
         ),
       };
@@ -181,7 +151,7 @@ export function createGoogleConnectionService(
           "The consent expired or was not this server's.",
         );
       }
-      const redirectUri = googleRedirectAddress(answer.publicOrigin);
+      const redirectUri = await consentRedirectAddress(dependencies, consent, answer.publicOrigin);
       const grant = await verifyGrant(
         google,
         consent,
@@ -196,11 +166,22 @@ export function createGoogleConnectionService(
       const connection = await requireConnection(connectedApps, orm);
       const stored = await connectedApps.readConnectionWithSecrets(orm, connection.id);
       if (!stored) throw new ApplicationError("CONFLICT", "Google Workspace is not connected.");
+      const origin = await rememberConsentOrigin(
+        ctx,
+        dependencies,
+        start.browserOrigin ?? start.publicOrigin,
+      );
       const browserToken = randomConsentToken();
       const authorizationUrl = await startConsent(
         google,
         secretBox,
-        { ...start, flow: "change_google_app", browserToken, revision: stored.revision },
+        {
+          ...start,
+          publicOrigin: start.googleApp === "broccoli_google_app" ? origin : start.publicOrigin,
+          flow: "change_google_app",
+          browserToken,
+          revision: stored.revision,
+        },
         dependencies.relayUrl,
       );
       return { authorizationUrl, browserToken };
@@ -219,7 +200,7 @@ export function createGoogleConnectionService(
         );
       }
       const connection = await requireConnection(connectedApps, orm);
-      const redirectUri = googleRedirectAddress(answer.publicOrigin);
+      const redirectUri = await consentRedirectAddress(dependencies, change, answer.publicOrigin);
       const grant = await verifyGrant(
         google,
         change,

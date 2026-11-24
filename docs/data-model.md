@@ -79,6 +79,7 @@ Every connector has:
 The one row describing this installation.
 
 - `setup_step`: `connect_google`, `scan`, `select_apps`, `done`.
+- Added: `public_origin`, nullable text, saved once by protected setup or an authenticated admin. Shared Google handoffs use it unless deployment configuration supplies an override; public sign-in never writes it.
 - Kept: `owner_user_id`, `setup_token_hash`, `setup_expires_at`, `mail_source`, `mail_from`, `encrypted_mail_secret`, `mail_link_origin`.
 - Removed: `demo_expires_at`, the `managed_*` columns, `encrypted_instance_credential`, `owner_sign_in_method`, `encrypted_broccoli_ai_token`, `ai_source`, `encrypted_openrouter_key`.
 - The owner is the Google admin who consented in setup.
@@ -93,7 +94,8 @@ The one row describing this installation.
   "mail_source": "smtp_server",
   "mail_from": "access@acme.example",
   "encrypted_mail_secret": "v1:…",
-  "mail_link_origin": "https://access.acme.example"
+  "mail_link_origin": "https://access.acme.example",
+  "public_origin": "https://access.acme.example"
 }
 ```
 

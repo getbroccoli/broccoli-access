@@ -5,14 +5,18 @@ import { createGoogleClient } from "../../../integrations/google";
 import {
   GOOGLE_WORKSPACE,
   GOOGLE_WORKSPACE_SECRETS,
-  googleRedirectAddress,
   parseGoogleWorkspaceSettings,
   UnknownGoogleAccountError,
 } from "../domain";
 import { openConsentState, randomConsentToken } from "../helpers";
 import type { ConnectedApps } from "../ports";
 import type { GoogleConnectionDependencies } from "./googleConnectionService";
-import { verifyIdentity, startConsent } from "./googleConsent";
+import {
+  verifyIdentity,
+  startConsent,
+  sharedConsentOrigin,
+  consentRedirectAddress,
+} from "./googleConsent";
 
 const owners = createOwnerService();
 
@@ -54,7 +58,13 @@ export interface SignInAnswer {
 
 type GoogleSignInDependencies = Pick<
   GoogleConnectionDependencies,
-  "orm" | "secretBox" | "openIdConfigurationUrl" | "adminApiUrl" | "connectedApps" | "relayUrl"
+  | "orm"
+  | "secretBox"
+  | "openIdConfigurationUrl"
+  | "adminApiUrl"
+  | "connectedApps"
+  | "relayUrl"
+  | "publicUrl"
 >;
 
 export function createGoogleSignInService(
@@ -72,7 +82,10 @@ export function createGoogleSignInService(
         {
           ...client,
           flow: "sign_in_with_google",
-          publicOrigin,
+          publicOrigin:
+            client.googleApp === "broccoli_google_app"
+              ? await sharedConsentOrigin(orm, dependencies.publicUrl)
+              : publicOrigin,
           browserToken,
           now,
         },
@@ -98,7 +111,12 @@ export function createGoogleSignInService(
         "codeVerifier" in signIn
           ? signIn
           : { clientId: client.clientId, clientSecret: client.clientSecret!, nonce: signIn.nonce },
-        { code, handle, redirectUri: googleRedirectAddress(publicOrigin), now },
+        {
+          code,
+          handle,
+          redirectUri: await consentRedirectAddress(dependencies, signIn, publicOrigin),
+          now,
+        },
         dependencies.relayUrl,
       );
       if (clientId !== client.clientId) {

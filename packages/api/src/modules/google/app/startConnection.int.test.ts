@@ -37,14 +37,6 @@ test("requests offline consent with all Google Workspace scopes and encrypted cr
   expect(decodeURIComponent(authorizationUrl)).not.toContain(input.clientSecret);
 });
 
-test("refuses a caller who is not the setup holder", async ({ orm, fakeGoogle }) => {
-  const { connection, input } = await googleSetup(orm, fakeGoogle.url);
-
-  await expect(connection.startConnection(EMPLOYEE, input)).rejects.toMatchObject({
-    code: "FORBIDDEN",
-  });
-});
-
 test.for([null, "another-browser"])(
   "refuses the setup token %s",
   async (setupToken, { orm, fakeGoogle }) => {
@@ -95,6 +87,26 @@ test("sends shared Workspace consent to the configured relay with compact state 
     nonce: expect.stringMatching(/^[A-Za-z0-9_-]{1,256}$/) as unknown,
     purpose: "connect",
   });
+});
+
+test("only the setup holder establishes the origin used by later shared consent", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const options = { googleUrl: fakeGoogle.url, relayUrl: GOOGLE_RELAY_URL };
+  const { connection, input } = await googleSetup(orm, fakeGoogle.url, options);
+  const alternate = { ...input, publicOrigin: "https://alias.acme.example", ...SHARED_GOOGLE_APP };
+
+  await expect(connection.startConnection(EMPLOYEE, alternate)).rejects.toMatchObject({
+    code: "FORBIDDEN",
+  });
+  await connection.startConnection(SETUP_HOLDER, input);
+  const restarted = googleConnection(orm, options);
+  const { authorizationUrl } = await restarted.startConnection(SETUP_HOLDER, alternate);
+
+  expect(new URL(authorizationUrl).searchParams.get("return_to")).toBe(
+    input.publicOrigin + "/api/google/callback",
+  );
 });
 
 test("reports that the shared Google app is unavailable when no relay is configured", async ({

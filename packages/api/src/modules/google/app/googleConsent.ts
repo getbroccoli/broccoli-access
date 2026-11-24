@@ -1,3 +1,8 @@
+import type { Orm } from "../../../core/db";
+import { createInstanceService } from "../../../core/instance";
+import type { SecurityContext } from "../../../core/security";
+import type { GoogleConnectionDependencies } from "./googleConnectionService";
+
 import { ApplicationError, type FieldError, invalidInput } from "../../../core/applicationError";
 import {
   createGoogleRelayClient,
@@ -135,7 +140,7 @@ export async function verifyIdentity(
   const openId = await google.discover();
   const { clientId, ...tokens } = await refusingRejectedCode(async () => {
     if ("codeVerifier" in consent) {
-      return relay!.redeem(answer.handle!, consent.codeVerifier);
+      return relay!.redeem(answer.handle!, consent.codeVerifier, answer.redirectUri);
     }
     return {
       ...(await google.exchangeCode(openId, {
@@ -152,6 +157,45 @@ export async function verifyIdentity(
     now: answer.now,
   });
   return { tokens, identity, clientId };
+}
+
+/** Only a protected start can establish the destination; a configured address overrides it. */
+export async function rememberConsentOrigin(
+  ctx: SecurityContext,
+  { transact, publicUrl, logger }: GoogleConnectionDependencies,
+  origin: string,
+): Promise<string> {
+  const configured = publicUrl && new URL(publicUrl).origin;
+  const remembered = await transact((tx) =>
+    createInstanceService().rememberPublicOrigin(ctx, tx, configured || origin),
+  );
+  logger.info({ outcome: "destination_bound" }, "Google consent destination selected");
+  return configured || remembered;
+}
+
+/** Public consent uses only a destination established by setup, an admin or deployment config. */
+export async function sharedConsentOrigin(orm: Orm, publicUrl?: string): Promise<string> {
+  const origin = publicUrl
+    ? new URL(publicUrl).origin
+    : (await createInstanceService().readInstance(orm)).publicOrigin;
+  if (!origin) {
+    throw new ApplicationError(
+      "UNAVAILABLE",
+      "Reconnect Google from Settings to save this instance’s public address.",
+    );
+  }
+  return origin;
+}
+
+/** Shared answers use the stored destination; direct OAuth keeps its registered redirect. */
+export async function consentRedirectAddress(
+  { orm, publicUrl }: Pick<GoogleConnectionDependencies, "orm" | "publicUrl">,
+  consent: ConsentState,
+  origin: string,
+): Promise<string> {
+  return googleRedirectAddress(
+    "codeVerifier" in consent ? await sharedConsentOrigin(orm, publicUrl) : origin,
+  );
 }
 
 function requireGoogleRelay(relayUrl?: string) {
