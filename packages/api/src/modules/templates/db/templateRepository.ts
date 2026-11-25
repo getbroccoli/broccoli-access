@@ -29,6 +29,8 @@ export interface TemplateRepository {
   findByIds(ids: readonly string[]): Promise<Template[]>;
   /** Like `findByIds` for one template, locking its row until the transaction ends. */
   lockById(id: string): Promise<Template | null>;
+  /** Locks templates in ID order and reads the apps needed for new assignments. */
+  lockForAssignment(ids: readonly string[]): Promise<Pick<Template, "id" | "name" | "apps">[]>;
   /** One page of the templates, by name ignoring case. */
   findPage(
     query: TemplatePageQuery,
@@ -76,6 +78,17 @@ export function templateRepository(db: Orm | Tx): TemplateRepository {
       const rows = await orm().select().from(templates).where(eq(templates.id, id)).for("update");
       const [template] = await withAppsAndPeople(rows);
       return template ?? null;
+    },
+    lockForAssignment: async (ids) => {
+      if (!ids.length) return [];
+      const rows = await orm()
+        .select()
+        .from(templates)
+        .where(anyOf(templates.id, ids))
+        .orderBy(templates.id)
+        .for("update");
+      const apps = await readTemplateApps(orm(), ids);
+      return rows.map(({ id, name }) => ({ id, name, apps: apps.get(id) ?? [] }));
     },
     findPage: async ({ after, limit }, assignableTo) => {
       const rows = await orm()
@@ -141,26 +154,31 @@ function nameTakenOr(error: unknown): unknown {
 /** The templates in the order given, each with its apps in the order added and its people count. */
 async function readAppsAndPeople(orm: Orm, rows: readonly StoredTemplate[]): Promise<Template[]> {
   const ids = rows.map(({ id }) => id);
+  const appsByTemplate = await readTemplateApps(orm, ids);
+  const people = await orm
+    .select({ templateId: employeeTemplates.templateId, people: count() })
+    .from(employeeTemplates)
+    .where(anyOf(employeeTemplates.templateId, ids))
+    .groupBy(employeeTemplates.templateId);
+  const peopleByTemplate = new Map(people.map((row) => [row.templateId, row.people]));
+  return rows.map((template) => ({
+    ...template,
+    apps: appsByTemplate.get(template.id) ?? [],
+    peopleCount: peopleByTemplate.get(template.id) ?? 0,
+  }));
+}
+
+async function readTemplateApps(orm: Orm, ids: readonly string[]) {
   const apps = await orm
     .select()
     .from(templateApps)
     .where(anyOf(templateApps.templateId, ids))
     // Ids are UUIDv7, so they sort in the order the apps were added.
     .orderBy(templateApps.id);
-  const people = await orm
-    .select({ templateId: employeeTemplates.templateId, people: count() })
-    .from(employeeTemplates)
-    .where(anyOf(employeeTemplates.templateId, ids))
-    .groupBy(employeeTemplates.templateId);
-  const appsByTemplate = Map.groupBy(apps, ({ templateId }) => templateId);
-  const peopleByTemplate = new Map(people.map((row) => [row.templateId, row.people]));
-  return rows.map((template) => ({
-    ...template,
-    apps: (appsByTemplate.get(template.id) ?? []).map(({ id, appId, role }): TemplateApp => ({
-      id,
-      appId,
-      role,
-    })),
-    peopleCount: peopleByTemplate.get(template.id) ?? 0,
-  }));
+  return new Map(
+    [...Map.groupBy(apps, ({ templateId }) => templateId)].map(([templateId, rows]) => [
+      templateId,
+      rows.map(({ id, appId, role }): TemplateApp => ({ id, appId, role })),
+    ]),
+  );
 }

@@ -3,6 +3,7 @@ import type { ModuleManifest } from "../../core/moduleManifest";
 import { PrincipalSecurityContext } from "../../core/security";
 import type {
   AccountLinkService,
+  AddPersonService,
   AccountChangeService,
   AppService,
   AppUserService,
@@ -14,6 +15,7 @@ export type { PersonPageScope } from "./ports";
 // Public values.
 export {
   createAccountLinkService,
+  createAddPersonService,
   createAccountChangeService,
   createAppAccountService,
   createAppConnectionService,
@@ -26,6 +28,7 @@ export {
 // Public types.
 export type {
   AccountLinkService,
+  AddPersonService,
   AccountChangeService,
   AppAccountService,
   AppConnectionService,
@@ -44,6 +47,7 @@ export function appsModule(
     AppUserService &
     AccountChangeService &
     AccountLinkService &
+    AddPersonService &
     ProvisionService,
   people: Parameters<typeof createResolvers>[1],
   differencePeople: Parameters<typeof createResolvers>[2],
@@ -60,6 +64,17 @@ export function appsModule(
         expireInSeconds: CHANGE_EXPIRE_SECONDS,
         // One change per connection at a time, in the order asked.
         groupConcurrency: 1,
+      },
+      "apps.runDirectoryProvision": {
+        run: (job) => services.runDirectoryProvision(SYSTEM, job),
+        onFailed: ({ changeId }) => services.failChange(SYSTEM, changeId),
+        expireInSeconds: CHANGE_EXPIRE_SECONDS,
+        groupConcurrency: 1,
+      },
+      "apps.expireFirstPasswords": {
+        run: () => services.expireFirstPasswords(SYSTEM),
+        onFailed: () => Promise.resolve(),
+        schedule: { cron: "* * * * *", timeZone: "UTC", payload: {} },
       },
     },
   };

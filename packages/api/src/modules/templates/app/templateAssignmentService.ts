@@ -5,7 +5,8 @@ import type { Orm, Tx } from "../../../core/db";
 import type { ModuleDependencies } from "../../../core/moduleManifest";
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
-import { assignmentRepository } from "../db";
+import { parseUuid } from "../../../utils";
+import { assignmentRepository, templateRepository } from "../db";
 import { appsOfPerson, type PersonApp, type Template } from "../domain";
 import type { EmployeeById, PersonAccess } from "../ports";
 import { clearOffboarded } from "./clearOffboarded";
@@ -28,6 +29,12 @@ export interface TemplateAssignmentService {
     offboarded: { employeeId: string; requestedBy: string },
   ) => Promise<void>;
   assign: (ctx: SecurityContext, input: AssignmentInput) => Promise<Template>;
+  /** Locks templates before Add person waits for account syncs, then assigns within the transaction. */
+  prepareNewPersonAssignments: (
+    ctx: SecurityContext,
+    tx: Tx,
+    templateIds: readonly string[],
+  ) => Promise<{ appIds: string[]; assign: (employeeId: string) => Promise<void> }>;
   takeOff: (ctx: SecurityContext, input: AssignmentInput) => Promise<Template>;
   readEmployeeTemplates: (
     ctx: SecurityContext,
@@ -68,6 +75,27 @@ export function createTemplateAssignmentService(deps: Dependencies): TemplateAss
       clearInactiveReviews(tx, apps, appIds, provenance),
     clearOffboarded: (tx, offboarded) => clearOffboarded(tx, apps, offboarded),
     assign: (ctx, input) => changeAssignment(deps, ctx, input, "assign"),
+    async prepareNewPersonAssignments(ctx, tx, templateIds) {
+      const assignedBy = requireAssignmentOwner(ctx);
+      const ids = [...new Set(templateIds.map(parseUuid))];
+      const templates = await templateRepository(tx).lockForAssignment(
+        ids.flatMap((id) => (id ? [id] : [])),
+      );
+      if (templates.length !== ids.length)
+        throw new ApplicationError("NOT_FOUND", "No template has this id.");
+      return {
+        appIds: [
+          ...new Set(templates.flatMap(({ apps }) => apps.map(({ appId }) => appId))),
+        ].sort(),
+        async assign(employeeId) {
+          const repo = assignmentRepository(tx);
+          for (const template of templates) {
+            await repo.assign({ employeeId, templateId: template.id }, assignedBy);
+            await recordAssignment(ctx, tx, employeeId, template, "assign");
+          }
+        },
+      };
+    },
     takeOff: (ctx, input) => changeAssignment(deps, ctx, input, "takeOff"),
     readEmployeeTemplates(ctx, employeeIds, db: Orm | Tx = orm) {
       ctx.require("MANAGE_WORKSPACE");
@@ -98,10 +126,7 @@ async function changeAssignment(
   input: AssignmentInput,
   action: "assign" | "takeOff",
 ) {
-  ctx.require("MANAGE_WORKSPACE");
-  if (!ctx.user?.isOwner)
-    throw new ApplicationError("FORBIDDEN", "Only the owner can change a person's templates.");
-  const assignedBy = ctx.user.userId;
+  const assignedBy = requireAssignmentOwner(ctx);
   const employee = await employees.readEmployee(ctx, input.employeeId);
   if (!employee) throw new ApplicationError("NOT_FOUND", "No employee has this id.");
   const employeeId = employee.id;
@@ -142,11 +167,18 @@ async function changeAssignment(
   return template;
 }
 
+function requireAssignmentOwner(ctx: SecurityContext): string {
+  ctx.require("MANAGE_WORKSPACE");
+  if (!ctx.user?.isOwner)
+    throw new ApplicationError("FORBIDDEN", "Only the owner can change a person's templates.");
+  return ctx.user.userId;
+}
+
 async function recordAssignment(
   ctx: SecurityContext,
   tx: Tx,
   employeeId: string,
-  template: Template,
+  template: Pick<Template, "id" | "name">,
   action: "assign" | "takeOff",
 ) {
   const change =

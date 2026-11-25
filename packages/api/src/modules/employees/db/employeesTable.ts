@@ -26,6 +26,9 @@ export const employees = pgTable(
     }),
   },
   (table) => [
+    index("employees_manager")
+      .on(table.managerId)
+      .where(sql`${table.managerId} is not null`),
     // Serves the list order, which is also the keyset of its cursor.
     index("employees_name_order_idx").on(
       sql`lower(${table.firstName})`,

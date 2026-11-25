@@ -1,12 +1,26 @@
 import { useQuery } from "@apollo/client/react";
 import { z } from "zod";
 
-import { GoogleUserWritesDocument } from "@/__generated__/graphql";
+import { type AccountChangeFailure, GoogleUserWritesDocument } from "@/__generated__/graphql";
 
 import { postJson } from "./postJson";
 
 /** The catalog key of Google Workspace, whose accounts change only once Google allows it. */
 export const GOOGLE_WORKSPACE = "google_workspace";
+
+/** The next step depends on whether Google confirmed a refusal or returned no usable answer. */
+export function directoryProvisionFailure(failure?: AccountChangeFailure | null) {
+  switch (failure) {
+    case "NOT_ALLOWED":
+      return "people.add.emailExistsInGoogle";
+    case "AUTHENTICATION_FAILED":
+    case "PERMISSION_MISSING":
+    case "WRONG_WORKSPACE":
+      return "people.add.reconnectToCreate";
+    default:
+      return "people.add.notCreated";
+  }
+}
 
 /**
  * Whether Broccoli Access may change the directory's users: `allowed`; `needs_consent`, since

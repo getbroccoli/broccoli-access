@@ -9,9 +9,10 @@ import type {
 } from "@/__generated__/graphql";
 import { type MessageKey, t } from "@/i18n";
 import { dayAndTime } from "@/lib/dayAndTime";
+import { directoryProvisionFailure } from "@/lib/useGoogleUserWrites";
 
 import { ChangeProgress, CouldntChangeDialog } from "../AccountChangeCell";
-import type { AccountChangeRow } from "./accountChangeRow";
+import { type AccountChangeRow, createsDirectoryAccount } from "./accountChangeRow";
 
 type Props = {
   change: Pick<
@@ -28,6 +29,7 @@ type Props = {
 export function ChangeOutcome({ change }: Props) {
   const { status, app } = change;
   if (status === "RUNNING") {
+    if (createsDirectoryAccount(change)) return <span>{t("people.add.creating")}</span>;
     return (
       <div className="w-fit">
         <ChangeProgress app={app.name} change={change} />
@@ -50,6 +52,13 @@ export function ChangeOutcome({ change }: Props) {
           {t("apps.activity.byHand")}
         </span>
         <span className="text-xs text-muted-foreground">{byHandNote(change.finishedAt)}</span>
+      </span>
+    );
+  }
+  if (createsDirectoryAccount(change)) {
+    return (
+      <span className="text-sm text-destructive">
+        {t(directoryProvisionFailure(change.failure))}
       </span>
     );
   }

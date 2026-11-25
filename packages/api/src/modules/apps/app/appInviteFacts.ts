@@ -10,7 +10,7 @@ import {
 import { type AccountChange, inviteStateOf } from "../domain";
 import type { AccountChangeDependencies } from "./accountChangeService";
 import type { AppInvite } from "./appInvite";
-import { findEmployeesInDirectory } from "./directory";
+import { findEmployeesReadyForInvites } from "./directory";
 
 /** An employee the caller may read, with the email an invite goes to. */
 export interface InvitedEmployee {
@@ -54,7 +54,7 @@ interface StoredInviteFacts {
 }
 
 export async function readInviteFacts(
-  { members }: AccountChangeDependencies,
+  dependencies: AccountChangeDependencies,
   db: Orm | Tx,
   {
     employees,
@@ -68,21 +68,19 @@ export async function readInviteFacts(
     expected?: readonly { employeeId: string; appId: string }[];
   },
 ): Promise<StoredInviteFacts> {
+  const { members } = dependencies;
   const connectionIds = connections.map(({ id }) => id);
   const emails = employees.map(({ email }) => email);
   const targets = expected && invitationTargets(expected, employees, connections);
   const [active, lastScans, memberKeys, pending, latest] = await Promise.all([
-    findEmployeesInDirectory(db, connectors, {
-      status: "active",
-      among: employees.map(({ id }) => id),
-    }),
+    findEmployeesReadyForInvites(db, dependencies, employees),
     members.findLastScans(db),
     readMemberKeys(db, members, employees, connections),
     appInvitationRepository(db).findByEmails({ connectionIds, emails, targets }),
     accountChangeRepository(db).findLatestInvites(connectionIds, emails, targets),
   ]);
   return {
-    activeInDirectory: new Set(active),
+    activeInDirectory: active,
     scannedAt: new Map(lastScans.map(({ connectionId, scannedAt }) => [connectionId, scannedAt])),
     memberKeys,
     invitations: new Map(
@@ -94,7 +92,11 @@ export async function readInviteFacts(
     latestInvites: new Map(
       latest.map((change) => [inviteKey(change.connectionId!, change.email), change]),
     ),
-    invitingConnectors: new Set(connectors.filter(canInvite).map(({ key }) => key)),
+    invitingConnectors: new Set(
+      connectors
+        .filter((connector) => !connector.isDirectory && canInvite(connector))
+        .map(({ key }) => key),
+    ),
     knownConnectors: new Set(connectors.map(({ key }) => key)),
     invitationListingConnectors: new Set(connectors.filter(listsInvitations).map(({ key }) => key)),
   };

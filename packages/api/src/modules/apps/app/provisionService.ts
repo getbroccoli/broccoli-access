@@ -20,9 +20,21 @@ import { type AccountChangeDependencies } from "./accountChangeService";
 import { type ChangingConnectors, changingConnectors } from "./accountFacts";
 import { askForInvite } from "./appInvite";
 import { askForChange } from "./askForChange";
-import { findEmployeesInDirectory } from "./directory";
+import { requirePersonOwner } from "./addPersonService";
+import {
+  type DirectoryProvisionJob,
+  expireFirstPasswords,
+  runDirectoryProvision,
+  type SaveDirectoryOutcome,
+  startDirectoryProvision,
+  takeFirstPassword,
+} from "./directoryProvision";
 import { loggingRefusal } from "./loggingRefusal";
-import { type AppProvisionResult, provisionSelectedApp } from "./provisionSelectedApp";
+import {
+  type AppProvisionResult,
+  provisionSelectedApp,
+  refuseUnavailableSelection,
+} from "./provisionSelectedApp";
 
 /** Provision: a person gets every app they are missing, in one step. */
 export interface ProvisionService {
@@ -33,7 +45,6 @@ export interface ProvisionService {
    */
   readProvisionSteps: (
     ctx: SecurityContext,
-    employeeIds: readonly string[],
     pages: readonly PersonPage[],
     db?: Orm | Tx,
   ) => Promise<ProvisionStep[][]>;
@@ -55,6 +66,15 @@ export interface ProvisionService {
     ctx: SecurityContext,
     input: { appId: string; employeeIds: readonly string[] },
   ) => Promise<AppProvisionResult>;
+  /** Creates the directory account, then releases the remaining confirmed apps. System only. */
+  runDirectoryProvision(ctx: SecurityContext, job: DirectoryProvisionJob): Promise<void>;
+  /** Gives the owner the unread first password once, or null after it is read or expires. */
+  takeFirstPassword(
+    ctx: SecurityContext,
+    employeeId: string,
+  ): Promise<{ email: string; password: string } | null>;
+  /** Clears first passwords older than seven days. System only. */
+  expireFirstPasswords(ctx: SecurityContext): Promise<void>;
 }
 
 /** What Provision does for one app of a person. */
@@ -70,8 +90,13 @@ export type ProvisionDependencies = AccountChangeDependencies & {
 
 export function createProvisionService(dependencies: ProvisionDependencies): ProvisionService {
   return {
-    readProvisionSteps: (ctx, employeeIds, pages, db = dependencies.orm) =>
-      readProvisionSteps(dependencies, ctx, { employeeIds, pages, db }),
+    readProvisionSteps(ctx, pages, db = dependencies.orm) {
+      ctx.require("MANAGE_WORKSPACE");
+      return readProvisionPlan(db, pages);
+    },
+    takeFirstPassword: (ctx, employeeId) => takeFirstPassword(dependencies, ctx, employeeId),
+    expireFirstPasswords: (ctx) => expireFirstPasswords(dependencies, ctx),
+    runDirectoryProvision: (ctx, job) => runConfirmedProvision(dependencies, ctx, job),
     provisionEmployee: (ctx, input) => provisionOne(dependencies, ctx, input),
     provisionApp(ctx, input) {
       let listed: Promise<readonly Connector[]> | undefined;
@@ -106,13 +131,14 @@ async function provisionOne(
       throw new ApplicationError("NOT_FOUND", NO_EMPLOYEE);
     }
     // Read before the transaction: the container's list may take a while to answer.
+    const listed = await connectors.list();
     return queueProvision(dependencies, {
       ctx,
       employee,
       appIds: appIds.flatMap((appId) => parseUuid(appId) ?? []).toSorted(),
       requestedBy: ctx.user.userId,
-      connectors: await connectors.list(),
-      changing: await changingConnectors(connectors),
+      connectors: listed,
+      changing: changingConnectors(listed),
       reportBlocked,
       start: { startedFrom: "provision", employeeId: employee.id },
     });
@@ -122,6 +148,48 @@ async function provisionOne(
     "Provision requested",
   );
   return changes;
+}
+
+/** Without a connected app's manifest, retry the job before making changes in Google. */
+async function runConfirmedProvision(
+  dependencies: ProvisionDependencies,
+  ctx: SecurityContext,
+  { changeId, appIds }: DirectoryProvisionJob,
+) {
+  const { transact, logger } = dependencies;
+  await runDirectoryProvision(
+    dependencies,
+    ctx,
+    { changeId, appIds },
+    async (change, connectors, save) => {
+      if (!appIds.length) {
+        if (save) await transact(save);
+        return;
+      }
+      const employeeId = change.employeeId!;
+      const fields = { directoryChangeId: change.id, employeeId };
+      const changes = await queueProvision(dependencies, {
+        ctx,
+        employee: { id: employeeId, email: change.email },
+        appIds,
+        requestedBy: change.requestedBy,
+        connectors,
+        changing: changingConnectors(connectors),
+        start: { startedFrom: "provision", employeeId },
+        directoryJob: { save },
+      }).catch((error: unknown) => {
+        logger.warn(
+          { ...fields, code: error instanceof ApplicationError ? error.code : null },
+          "Could not release the remaining apps after directory account creation",
+        );
+        throw error;
+      });
+      logger.info(
+        { ...fields, changeIds: changes.map(({ id }) => id) },
+        "Provision released following directory account creation",
+      );
+    },
+  );
 }
 
 const NO_EMPLOYEE = "No employee has this id.";
@@ -138,7 +206,8 @@ interface ProvisionRequest {
   connectors: readonly Connector[];
   /** The connectors that change accounts. */
   changing: ChangingConnectors;
-  reportBlocked: boolean;
+  reportBlocked?: boolean;
+  directoryJob?: { save?: SaveDirectoryOutcome };
   start: ChangeStart;
 }
 
@@ -166,6 +235,7 @@ async function startSteps(
   for (const appId of appIds) {
     if (!(await appRepository(tx).tryLockForReview(appId))) return null;
   }
+  if (request.directoryJob?.save && !(await request.directoryJob.save(tx))) return [];
   // Read again under the locks: the address a by-hand invite records is theirs now.
   const [employee] = await dependencies.employees.readEmployees(
     request.ctx,
@@ -173,35 +243,30 @@ async function startSteps(
     tx,
   );
   if (!employee) throw new ApplicationError("NOT_FOUND", NO_EMPLOYEE);
+  if (request.directoryJob && request.employee.email !== employee.email) return [];
   request = { ...request, employee };
   const { page, steps } = await readSteps(dependencies, request, tx);
   const confirmed = page.personApps.filter(({ appId }) => appIds.includes(appId));
   if (confirmed.some((app) => app.state === "missing" && app.roleConflict)) {
     throw new ApplicationError("CONFLICT", PICK_ROLE_FIRST);
   }
-  const chosenSteps = steps.filter(({ appId }) => appIds.includes(appId));
   if (
-    request.reportBlocked &&
-    !chosenSteps.length &&
-    confirmed.some(({ appId, state }) => state === "missing" && !hasRunningStep(page, appId))
-  )
-    throw new ApplicationError("CONFLICT", "This app cannot be provisioned for this person now.");
+    !request.directoryJob &&
+    !request.reportBlocked &&
+    !page.activeInDirectory &&
+    (await dependencies.findPeopleAwaitingDirectory(tx, [employee.id])).has(employee.id)
+  ) {
+    requirePersonOwner(request.ctx);
+    return startDirectoryProvision(dependencies, tx, request);
+  }
+  const chosenSteps = steps.filter(({ appId }) => appIds.includes(appId));
+  if (request.reportBlocked && !chosenSteps.length) refuseUnavailableSelection(page, confirmed);
   const changes: AccountChange[] = [];
   // One after the other, in the order the connections' queues keep.
   for (const step of chosenSteps) {
     changes.push(await startStep(dependencies, tx, request, { step, page }));
   }
   return changes;
-}
-
-function hasRunningStep(page: PersonPage, appId: string) {
-  return (
-    page.appInvites.some((row) => row.appId === appId && row.latestInvite?.status === "running") ||
-    page.appAccounts.some((row) => {
-      const change = row.changeState?.latestChange;
-      return row.appId === appId && change?.action === "reactivate" && change.status === "running";
-    })
-  );
 }
 
 /** Writes the step's change: an Invite or an Enable as the owner's own, or the invite to make by hand. */
@@ -243,35 +308,21 @@ async function readSteps(
 ): Promise<{ page: PersonPage; steps: ProvisionStep[] }> {
   const employeeIds = [employee.id];
   const pages = await dependencies.readPersonPages(ctx, employeeIds, db, { appIds, connectors });
-  const [steps] = await readProvisionSteps(dependencies, ctx, { employeeIds, pages, db });
+  const [steps] = await readProvisionPlan(db, pages);
   return { page: pages[0]!, steps: steps! };
 }
 
-async function readProvisionSteps(
-  { directoryConnectors }: ProvisionDependencies,
-  ctx: SecurityContext,
-  {
-    employeeIds,
-    pages,
-    db,
-  }: { employeeIds: readonly string[]; pages: readonly PersonPage[]; db: Orm | Tx },
+async function readProvisionPlan(
+  db: Orm | Tx,
+  pages: readonly PersonPage[],
 ): Promise<ProvisionStep[][]> {
-  ctx.require("MANAGE_WORKSPACE");
   const appIds = pages.flatMap(({ personApps }) => personApps.map(({ appId }) => appId));
-  const [connections, active] = await Promise.all([
-    appConnectionRepository(db).findByApps([...new Set(appIds)]),
-    findEmployeesInDirectory(db, directoryConnectors, { status: "active", among: employeeIds }),
-  ]);
+  const connections = await appConnectionRepository(db).findByApps([...new Set(appIds)]);
   const connectedApps = new Set(connections.map(({ appId }) => appId));
-  return pages.map((page, index) =>
-    stepsOf(page, { connectedApps, activeInDirectory: active.includes(employeeIds[index]!) }),
-  );
+  return pages.map((page) => stepsOf(page, connectedApps));
 }
 
-function stepsOf(
-  page: PersonPage,
-  { connectedApps, activeInDirectory }: { connectedApps: Set<string>; activeInDirectory: boolean },
-): ProvisionStep[] {
+function stepsOf(page: PersonPage, connectedApps: Set<string>): ProvisionStep[] {
   return page.personApps.flatMap(({ appId, state }) => {
     const invite = page.appInvites.find((row) => row.appId === appId);
     const account = page.appAccounts.find((held) => offersEnable(held, appId));
@@ -280,7 +331,7 @@ function stepsOf(
     const latest = asked?.action === (account ? "reactivate" : "invite") ? asked : null;
     const action = provisionActionOf({
       missing: state === "missing",
-      activeInDirectory,
+      activeInDirectory: page.activeInDirectory,
       connected: connectedApps.has(appId),
       enableOffered: account !== undefined,
       inviteOffered: invite?.offered ?? false,

@@ -11,6 +11,7 @@ import {
 } from "../../../core/graphql";
 import type { SecurityContext } from "../../../core/security";
 import type {
+  AddPersonService,
   AppInvite,
   AppSummary,
   AppUser,
@@ -30,15 +31,60 @@ export const provisionStepResolvers: Pick<NonNullable<Resolvers["ProvisionStep"]
   action: ({ action }) => toEnum(action),
 };
 
+export function directoryProvisionResolver(
+  services: Pick<AddPersonService, "readDirectoryProvisions">,
+): NonNullable<Resolvers["Employee"]>["directoryProvision"] {
+  const provisions = perRequest(
+    (context) =>
+      new DataLoader((ids: readonly string[]) =>
+        services.readDirectoryProvisions(context.getActor(), ids),
+      ),
+  );
+  return async ({ id }, _args, context) => {
+    const state = await provisions(context).load(id);
+    return (
+      state && {
+        ...state,
+        status: state.status && toEnum(state.status),
+        failure: state.failure && toEnum(state.failure),
+      }
+    );
+  };
+}
+
 export function provisionMutations(
-  services: Pick<ProvisionService, "provisionEmployee" | "provisionApp">,
+  services: Pick<ProvisionService, "provisionEmployee" | "provisionApp" | "takeFirstPassword"> &
+    AddPersonService,
   readEmployees: ReadEmployees,
-): Pick<NonNullable<Resolvers["AppsMutations"]>, "provisionEmployee" | "provisionApp"> {
+): Pick<
+  NonNullable<Resolvers["AppsMutations"]>,
+  "provisionEmployee" | "provisionApp" | "addPerson" | "deletePerson" | "takeFirstPassword"
+> {
   return {
     provisionApp: (_parent, { input }, context) =>
       mutationPayload<ResolversTypes["AppProvisionPayload"]>(
         () => services.provisionApp(context.getActor(), input),
         ["INVALID_INPUT"],
+      ),
+    addPerson: (_parent, { input }, context) =>
+      mutationPayload<ResolversTypes["AddPersonPayload"]>(async () => {
+        const ctx = context.getActor();
+        const { id } = await services.addPerson(ctx, input);
+        const [employee] = await readEmployees(ctx, [id]);
+        return { employee: employee ?? null };
+      }, ["INVALID_INPUT", "NOT_FOUND", "CONFLICT"]),
+    deletePerson: (_parent, { employeeId }, context) =>
+      mutationPayload<ResolversTypes["DeletePersonPayload"]>(async () => {
+        await services.deletePerson(context.getActor(), employeeId);
+        return { deleted: true };
+      }, ["NOT_FOUND", "CONFLICT"]),
+    takeFirstPassword: (_parent, { employeeId }, context) =>
+      mutationPayload<ResolversTypes["FirstPasswordPayload"]>(
+        async () =>
+          (await services.takeFirstPassword(context.getActor(), employeeId)) ?? {
+            email: null,
+            password: null,
+          },
       ),
     provisionEmployee: (_parent, { input }, context) =>
       mutationPayload<ResolversTypes["EmployeeProvisionPayload"]>(async () => {

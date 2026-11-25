@@ -26,7 +26,7 @@ connectorContract(test, {
     key: "google_workspace",
     version: 1,
     name: "Google Workspace",
-    capabilities: ["list_accounts", "suspend", "reactivate"],
+    capabilities: ["list_accounts", "suspend", "reactivate", "invite"],
     runtimes: ["server"],
     findingKinds: { ownAppAccounts: "google_directory", otherAppAccounts: "google_sign_in" },
     isDirectory: true,

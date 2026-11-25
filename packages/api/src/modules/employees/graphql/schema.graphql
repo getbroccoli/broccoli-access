@@ -109,7 +109,7 @@ type EmployeeUpdatePayload {
   error: EmployeeUpdateError
 }
 
-union EmployeeUpdateError = InvalidInputError | NotFoundError
+union EmployeeUpdateError = InvalidInputError | NotFoundError | ConflictError
 
 # Adds the employee to an app's user; the server merges the types of the modules.
 type AccountWithoutPerson {

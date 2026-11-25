@@ -86,6 +86,13 @@ export interface ConnectorSession {
    * reads the invitation or the member back. A connector that lists `invite` has it.
    */
   invite?(email: string, role?: string): Promise<InviteResult>;
+  /** Creates a directory account with a first password that the person must change. */
+  createDirectoryAccount?(person: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    password: string;
+  }): Promise<void>;
 }
 
 export interface ConnectionDetails {

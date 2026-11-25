@@ -92,6 +92,7 @@ export const appsEn = {
   "apps.activity.askedOn": "{day} at {time}",
   "apps.activity.fromOffboarding": "Offboarding",
   "apps.activity.fromProvision": "Provision",
+  "apps.activity.createDirectory": "Create Google account",
   "apps.activity.onServer": "On the server",
   "apps.activity.byHand": "By hand",
   "apps.activity.byHandToday": "At {time}, after it couldn’t run",

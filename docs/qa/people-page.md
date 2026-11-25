@@ -24,6 +24,17 @@ A manual check of the People page against a development stack: everyone in Googl
 - [ ] Suspend `elif@acme.example` in the fake Google (`POST <fake>/_fake/users/elif@acme.example/suspend`) and choose "Scan now": the line shows "Scanning…" and the button is disabled; when the scan ends, without a reload, Elif appears with "Figma, Notion, Slack", the tab and the sidebar show 3 and the line shows the new time.
 - [ ] Ignore Slack on Applications and open People: Ben leaves the tab and the counts drop by one.
 
+## Add person
+
+Connect Slack and Linear as in [Connections settings](connections-settings.md#apps). Create two templates, each with one of the apps. For consent, use a fresh workspace connected with its own Google app. Check that Settings → Connections shows **Reads only**.
+
+- [ ] Open Add person on People. Enter a first name, last name and a local part containing `s` before the displayed work email domain. Pick both templates. Check the note describes inviting the person to their apps and says “Uses one paid Google seat.”
+- [ ] Select Add and provision. Allow changing users at Google. The confirmation lists both apps. Confirm Provision, reload before revealing, then choose **Reveal first password**. Check the password appears with the person's email and first sign-in instructions. Copy it and select I have saved it. Reload and check it stays hidden.
+- [ ] Check the fake Google has the new user with `changePasswordAtNextLogin` enabled. Check that the fake Slack and Linear each have one invitation for the new email, and Activity records all three changes under Provision.
+- [ ] Return to People and search for the new person. Scan Google Workspace and check the same person remains and their directory account is active.
+- [ ] After the baseline scan, use the fake Google API to create a user at an unused address. Add and provision the person using that address before scanning again. Provision says to check the existing account in Google, stores no first password, and sends no app invitations. A creation whose response was lost can end the same way. Scan Google Workspace to match the account and manage its password there.
+- [ ] If a scan that finished after account creation omits the person, check that invitations stay unavailable until a scan finds them. For example, delete the new fake Google user before the first matching scan. The person's page tells the owner to scan Google Workspace.
+
 ## Robustness
 
 - [ ] `/people?view=bogus&q=` opens All.

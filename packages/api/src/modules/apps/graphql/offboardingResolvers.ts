@@ -57,7 +57,7 @@ export function offboardingMutations(
         await services.offboardEmployee(ctx, input);
         const [employee] = await readEmployees(ctx, [input.employeeId]);
         return { employee: employee ?? null };
-      }, ["NOT_FOUND"]),
+      }, ["NOT_FOUND", "CONFLICT"]),
     removeEmployeeAccounts: (_parent, { input }, context) =>
       mutationPayload<ResolversTypes["EmployeeRemoveAccountsPayload"]>(async () => {
         const ctx = context.getActor();

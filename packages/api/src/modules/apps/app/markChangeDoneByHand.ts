@@ -6,6 +6,7 @@ import { accountChangeRepository, appAccountRepository, appConnectionRepository 
 import type { AccountChange } from "../domain";
 import type { AccountChangeDependencies, LatestAccountChange } from "./accountChangeService";
 import { applyAccountChange } from "./applyAccountChange";
+import { type DirectoryConnectors, findDirectoryConnection } from "./directory";
 
 /**
  * "I did it by hand": the failed change, its account's latest, becomes `done_by_hand`, and the
@@ -26,7 +27,7 @@ export async function markChangeDoneByHand(
     throw new ApplicationError("NOT_FOUND", NOT_FOUND);
   }
   const done = await dependencies.transact(async (tx) => {
-    const change = await lockLatestFailure(tx, id);
+    const change = await lockLatestFailure(tx, id, dependencies.directoryConnectors);
     const marked = await accountChangeRepository(tx).markDoneByHand(change.id);
     await applyAccountChange(dependencies, ctx, tx, marked, {
       cause: { kind: "DONE_BY_HAND", ref: marked.id },
@@ -57,12 +58,25 @@ const NOT_LATEST_FAILED_INVITE =
  * Locks the change, refusing an unknown change, and one that has not failed or that a Try again
  * followed.
  */
-async function lockLatestFailure(tx: Tx, id: string): Promise<AccountChange> {
+async function lockLatestFailure(
+  tx: Tx,
+  id: string,
+  directoryConnectors: DirectoryConnectors,
+): Promise<AccountChange> {
   // The lock scans take first: a scan deleting the account also locks this change.
   await appAccountRepository(tx).lockForSync();
   const change = await accountChangeRepository(tx).lockById(id);
   if (!change) {
     throw new ApplicationError("NOT_FOUND", NOT_FOUND);
+  }
+  if (
+    change.action === "invite" &&
+    change.connectionId === (await findDirectoryConnection(tx, directoryConnectors))?.id
+  ) {
+    throw new ApplicationError(
+      "CONFLICT",
+      "Scan Google Workspace to find an account created by hand.",
+    );
   }
   if (change.status !== "failed" || (await lockLatestOfSubject(tx, change))?.id !== change.id) {
     const invite = change.action === "invite";

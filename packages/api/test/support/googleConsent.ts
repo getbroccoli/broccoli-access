@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 
 import { ACME } from "@broccoli-access/fake-apps";
+import { expect } from "vitest";
+
+import type { Browser } from "./browser";
 
 /** Registers this test's callback with the local fake Google. */
 export async function registerGoogleRedirect(
@@ -56,4 +59,15 @@ export async function refreshGoogleGrant(
   });
   assert.equal(response.status, 200);
   return response.json() as Promise<{ access_token: string; scope: string }>;
+}
+
+export async function allowGoogleUserWrites(browser: Browser, returnTo: string) {
+  const response = await browser.post("/api/google/user-writes", { returnTo });
+  expect(response.status).toBe(200);
+  expect(response.headers.getSetCookie().length).toBeGreaterThan(0);
+  const body = (await response.json()) as { authorizationUrl: string };
+  const callback = await consentAtGoogle(body.authorizationUrl);
+  const redirect = await browser.getManual(callback.href);
+  expect(redirect.status).toBe(302);
+  return redirect;
 }

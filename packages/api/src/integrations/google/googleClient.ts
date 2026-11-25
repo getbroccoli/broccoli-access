@@ -98,6 +98,7 @@ export interface NewGoogleUser {
   givenName: string;
   familyName: string;
   password: string;
+  changePasswordAtNextLogin?: boolean;
 }
 
 export interface GoogleUserPage {
@@ -196,12 +197,15 @@ export function createGoogleClient({
       } while (pageToken !== null);
       return null;
     },
-    createUser: async (accessToken, { email, givenName, familyName, password }) => {
+    createUser: async (
+      accessToken,
+      { email, givenName, familyName, password, changePasswordAtNextLogin = false },
+    ) => {
       const user = await writeUser(directoryUrl("users"), accessToken, "POST", {
         primaryEmail: email,
         name: { givenName, familyName },
         password,
-        changePasswordAtNextLogin: false,
+        changePasswordAtNextLogin,
       });
       if (!user) {
         throw new Error("Google answered 404 to a new user");

@@ -26,6 +26,8 @@ export class PayloadFailure<PayloadError> extends Error {
 export function usePayloadMutation<Data, Variables extends OperationVariables>(
   document: TypedDocumentNode<Data, Variables>,
   options?: {
+    /** Sensitive answers can opt out of Apollo's cache. */
+    fetchPolicy?: "no-cache";
     update?: MutationUpdaterFunction<Data, Variables, ApolloCache>;
     /** Active queries to refetch after a success; the run and `loading` end once they are back. */
     refetch?: DocumentNode[] | ((payload: PayloadOf<Data>) => DocumentNode[]);
@@ -33,8 +35,8 @@ export function usePayloadMutation<Data, Variables extends OperationVariables>(
 ) {
   const client = useApolloClient();
   const refetch = options?.refetch;
-  // Only `update` reaches Apollo: its other options could treat a payload error as success.
   const [mutate, { reset: resetMutation, ...state }] = useMutation(document, {
+    fetchPolicy: options?.fetchPolicy,
     update: options?.update,
   });
   const [payloadError, setPayloadError] = useState<PayloadErrorOf<Data> | null>(null);

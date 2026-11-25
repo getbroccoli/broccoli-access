@@ -80,6 +80,7 @@
       "src/lib/useGoogleUserWrites",
       "src/lib/dayAndTime",
       "src/components/GoogleUserWritesNotice",
+      "src/lib/useCopyToClipboard",
       "src/lib/useRestoredFromBackCache"
     ],
     "src/features/templates": [

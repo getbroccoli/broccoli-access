@@ -1,0 +1,6 @@
+ALTER TABLE "account_changes" ADD COLUMN "encrypted_first_password" text;--> statement-breakpoint
+CREATE INDEX "record_history_cause_idx" ON "record_history" USING btree ("record_type","cause_kind","operation","record_id","cause_ref") WHERE "record_history"."cause_ref" is not null;--> statement-breakpoint
+CREATE INDEX "account_changes_employee" ON "account_changes" USING btree ("employee_id") WHERE "account_changes"."employee_id" is not null;--> statement-breakpoint
+CREATE INDEX "account_changes_first_password_expiry" ON "account_changes" USING btree ("finished_at") WHERE "account_changes"."encrypted_first_password" is not null;--> statement-breakpoint
+CREATE INDEX "account_changes_provision_invites" ON "account_changes" USING btree ("connection_id","employee_id","requested_at" DESC NULLS LAST,"id" DESC NULLS LAST) WHERE "account_changes"."action" = 'invite' and "account_changes"."started_from" = 'provision';--> statement-breakpoint
+CREATE INDEX "employees_manager" ON "employees" USING btree ("manager_id") WHERE "employees"."manager_id" is not null;

@@ -11,10 +11,10 @@ import {
   type AccountChangeState,
   RUN_JOB,
 } from "./accountChangeService";
-import { type AppInvite, readAppInvites } from "./appInvite";
+import { type AppInvite, readEmployeeInviteRows } from "./appInvite";
 import { type AppUser, toAppUser } from "./appUserService";
 import { changeStatesOf } from "./changeStates";
-import { findDirectoryAppId } from "./directory";
+import { findDirectoryAppId, requireDirectoryMatchForOffboarding } from "./directory";
 import { findInAppFacts } from "./inAppFacts";
 
 /** What Offboard would do for a person now, and when they were last offboarded. */
@@ -130,7 +130,7 @@ export async function readOffboardings(
   const connectors = await dependencies.connectors.list();
   const [accounts, invites, offboardedAt] = await Promise.all([
     readAccounts(dependencies, db, employeeIds, connectors),
-    readAppInvites(dependencies, ctx, employeeIds, db),
+    readEmployeeInviteRows(dependencies, ctx, employeeIds, db).then(({ rows }) => rows),
     accountChangeRepository(db).findLastOffboardings(employeeIds),
   ]);
   const usersByEmployee = Map.groupBy(accounts.users, (user) => user.employeeId);
@@ -174,6 +174,7 @@ async function queueChanges(
 ): Promise<string[]> {
   // The lock scans and a second Offboard take first, so the accounts read below stay as they are.
   await appAccountRepository(tx).lockForSync();
+  if (action === "suspend") await requireDirectoryMatchForOffboarding(dependencies, tx, employeeId);
   const { facts, ...accounts } = await readAccounts(dependencies, tx, [employeeId], connectors);
   const offboarding = offboardingOf({
     employeeId,
@@ -287,7 +288,7 @@ async function readAccounts(
   // The facts read whole accounts, such as their kind.
   const accounts = await appAccountRepository(db).findByIds(found.map(({ id }) => id));
   // The connectors read before any lock, so this never waits for the container under one.
-  const changing = await changingConnectors({ list: () => Promise.resolve(connectors) });
+  const changing = changingConnectors(connectors);
   const facts = await readAccountFacts(dependencies, db, accounts, changing);
   const states = await changeStatesOf(db, facts);
   const suspendedInDirectory = new Set(

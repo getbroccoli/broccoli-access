@@ -2,7 +2,12 @@ import { readSdl } from "../../core/graphql";
 import type { ModuleDependencies, ModuleManifest } from "../../core/moduleManifest";
 import express from "express";
 
-import { createEmployeeReadService, createEmployeeService, employeeRecordType } from "./app";
+import {
+  createEmployeeReadService,
+  createEmployeeService,
+  employeeRecordType,
+  type ReadPeopleAwaitingDirectory,
+} from "./app";
 import { createResolvers } from "./graphql";
 import { avatarRouter } from "./http";
 import type { EmployeeAccounts } from "./ports";
@@ -13,6 +18,7 @@ export {
   createEmployeeReadService,
   createEmployeeService,
   employeeDirectory,
+  findPeopleAwaitingDirectory,
 } from "./app";
 
 // Public types.
@@ -26,6 +32,7 @@ export type { Employee } from "./domain";
 export function employeesModule(
   dependencies: Pick<ModuleDependencies, "orm" | "transact" | "logger"> & {
     accounts: EmployeeAccounts;
+    findPeopleAwaitingDirectory: ReadPeopleAwaitingDirectory;
   },
 ): ModuleManifest {
   const services = {

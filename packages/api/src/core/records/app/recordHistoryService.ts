@@ -1,7 +1,12 @@
 import type { Orm, Tx } from "../../db";
 import { type Connection, type PageArgs, paginate } from "../../pagination";
 import type { SecurityContext } from "../../security";
-import { HISTORY_SORT_VALUES, type HistoryFieldFilter, recordHistoryRepository } from "../db";
+import {
+  HISTORY_SORT_VALUES,
+  type HistoryCauseQuery,
+  type HistoryFieldFilter,
+  recordHistoryRepository,
+} from "../db";
 import {
   authorOf,
   type CauseKind,
@@ -33,6 +38,8 @@ export interface RecordHistoryService {
     recordIds: readonly string[],
     causeKind: CauseKind,
   ) => Promise<Map<string, HistoryLine>>;
+  /** IDs of the records whose history has a cause matching the query. */
+  readRecordIdsWithCause: (db: Orm | Tx, query: HistoryCauseQuery) => Promise<Set<string>>;
 }
 
 /** A history page's arguments: the page, and which lines by the fields they change. */
@@ -105,6 +112,8 @@ export function createRecordHistoryService(): RecordHistoryService {
       );
       return new Map(lines.map((line) => [line.recordId, line]));
     },
+    readRecordIdsWithCause: (db, query) =>
+      recordHistoryRepository(db).findRecordIdsWithCause(query),
   };
 }
 

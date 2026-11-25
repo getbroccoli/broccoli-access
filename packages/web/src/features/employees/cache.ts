@@ -9,6 +9,10 @@ import {
 } from "@/__generated__/graphql";
 import { evictRecord } from "@/apollo";
 
+export function removeEmployee(cache: ApolloCache, id: string): void {
+  evictRecord(cache, "Employee", id);
+}
+
 /** A linked or marked account leaves every cached page of accounts without a person. */
 export function removeAccountWithoutPerson(cache: ApolloCache, id: string): void {
   cache.modify({

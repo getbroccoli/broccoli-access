@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { getTableColumns, isNotNull, sql } from "drizzle-orm";
 import { check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 import { user } from "../../../core/auth";
@@ -44,6 +44,8 @@ export const accountChanges = pgTable(
       .references(() => user.id),
     requestedAt: timestamp("requested_at", { withTimezone: true }).notNull(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
+    /** A directory invite's first password, kept only until the owner sees it or it expires. */
+    encryptedFirstPassword: text("encrypted_first_password"),
     startedFrom: text("started_from", { enum: ACCOUNT_CHANGE_STARTS }).notNull().default("account"),
     /** The person an offboarding or a provision is for; its foreign key is in the migration, as employees are another module's. */
     employeeId: uuid("employee_id"),
@@ -58,6 +60,13 @@ export const accountChanges = pgTable(
       .on(table.connectionId, table.email)
       .where(sql`${table.status} = 'running' and ${table.action} = 'invite'`),
     index("account_changes_app_account").on(table.appAccountId, table.requestedAt),
+    index("account_changes_employee").on(table.employeeId).where(isNotNull(table.employeeId)),
+    index("account_changes_first_password_expiry")
+      .on(table.finishedAt)
+      .where(sql`${table.encryptedFirstPassword} is not null`),
+    index("account_changes_provision_invites")
+      .on(table.connectionId, table.employeeId, table.requestedAt.desc(), table.id.desc())
+      .where(sql`${table.action} = 'invite' and ${table.startedFrom} = 'provision'`),
     check(
       "account_changes_action",
       sql`${table.action} in ('suspend', 'reactivate', 'invite', 'remove')`,
@@ -95,6 +104,10 @@ export const accountChanges = pgTable(
     ),
   ],
 );
+
+/** Ordinary account-change reads exclude directory credentials. */
+export const { encryptedFirstPassword: firstPasswordColumn, ...accountChangeColumns } =
+  getTableColumns(accountChanges);
 
 /** An attempt as JSON stores it, its moment as an ISO date-time. */
 export type StoredAttempt = Omit<AccountChangeAttempt, "at"> & { at: string };
