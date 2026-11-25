@@ -1,0 +1,7 @@
+ALTER TABLE "account_changes" DROP CONSTRAINT "account_changes_started_from";--> statement-breakpoint
+ALTER TABLE "account_changes" DROP CONSTRAINT "account_changes_error";--> statement-breakpoint
+ALTER TABLE "account_changes" ALTER COLUMN "connection_id" DROP NOT NULL;--> statement-breakpoint
+CREATE INDEX "account_changes_without_connection" ON "account_changes" USING btree ("employee_id","app_id","requested_at") WHERE "account_changes"."connection_id" is null;--> statement-breakpoint
+ALTER TABLE "account_changes" ADD CONSTRAINT "account_changes_connection_or_no_connection" CHECK ("account_changes"."connection_id" is not null or ("account_changes"."error" is not null and "account_changes"."error" = 'no_connection'));--> statement-breakpoint
+ALTER TABLE "account_changes" ADD CONSTRAINT "account_changes_started_from" CHECK ("account_changes"."started_from" in ('account', 'offboarding', 'provision'));--> statement-breakpoint
+ALTER TABLE "account_changes" ADD CONSTRAINT "account_changes_error" CHECK ("account_changes"."error" in ('authentication_failed', 'permission_missing', 'rate_limited', 'app_unavailable', 'unexpected_response', 'blocked_by_check', 'account_not_found', 'wrong_workspace', 'not_allowed', 'owner_browser_lost', 'no_connection'));

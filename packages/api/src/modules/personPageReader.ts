@@ -1,21 +1,37 @@
 import DataLoader from "dataloader";
-import { type Orm, readSnapshot } from "../core/db";
+import { type Orm, readSnapshot, type Tx } from "../core/db";
 import { perRequest } from "../core/graphql";
 import type { SecurityContext } from "../core/security";
-import type { AccountChangeService, AppUserService } from "./apps";
+import type { AccountChangeService, AppUserService, ProvisionService } from "./apps";
 import type { TemplateService } from "./templates";
 
 type Reads = Pick<TemplateService, "readEmployeeTemplates" | "readEmployeeApps"> &
   Pick<AccountChangeService, "readAppInvites" | "readChangeStates"> &
   Pick<AppUserService, "readUsersOfEmployees">;
 
-/** Materialise the account controls and their template sources together, before GraphQL resolves their fields. */
-export function createPersonPageReader(orm: Orm, reads: Reads) {
+/**
+ * Materialise the account controls, their template sources and what Provision would do together,
+ * before GraphQL resolves their fields.
+ */
+export function createPersonPageReader(
+  orm: Orm,
+  reads: Reads & Pick<ProvisionService, "readProvisionSteps">,
+) {
   return (ctx: SecurityContext, ids: readonly string[]) =>
-    readSnapshot(orm, (db) => readPages(db, reads, ctx, ids));
+    readSnapshot(orm, async (db) => {
+      const pages = await readPersonPages(db, reads, ctx, ids);
+      const steps = await reads.readProvisionSteps(ctx, ids, pages, db);
+      return pages.map((page, index) => ({ ...page, provisionSteps: steps[index]! }));
+    });
 }
 
-async function readPages(db: Orm, reads: Reads, ctx: SecurityContext, ids: readonly string[]) {
+/** The people's templates, apps, accounts and invite rows, read through `db`, one page per id. */
+export async function readPersonPages(
+  db: Orm | Tx,
+  reads: Reads,
+  ctx: SecurityContext,
+  ids: readonly string[],
+) {
   ctx.require("MANAGE_WORKSPACE");
   const templates = await reads.readEmployeeTemplates(ctx, ids, db);
   const invites = await reads.readAppInvites(ctx, ids, db);

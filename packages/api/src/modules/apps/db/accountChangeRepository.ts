@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lt, max, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, lt, max, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
@@ -24,7 +24,9 @@ export interface AccountChangeRepository {
    * its connection and email already have one running.
    */
   insertRunning(
-    change: Omit<AccountChange, "id" | "status" | "attempts" | "error" | "finishedAt">,
+    change: Omit<AccountChange, "id" | "status" | "attempts" | "error" | "finishedAt"> & {
+      connectionId: string;
+    },
   ): Promise<AccountChange | null>;
   findById(id: string): Promise<AccountChange | null>;
   /** The changes with these ids; an unknown id is left out. */
@@ -40,6 +42,13 @@ export interface AccountChangeRepository {
     },
     expectedStatus?: AccountChange["status"],
   ): Promise<void>;
+  /** Stores a change in an app without a connection, which fails at once with `no_connection`. */
+  insertWithoutConnection(
+    change: Omit<
+      AccountChange,
+      "id" | "connectionId" | "status" | "attempts" | "error" | "finishedAt"
+    >,
+  ): Promise<AccountChange>;
   /** Turns a failed change into `done_by_hand`, keeping its error, attempts and finish. */
   markDoneByHand(id: string): Promise<AccountChange>;
   /** Fails every running change of the connection with `error`, as of `finishedAt`. */
@@ -59,6 +68,11 @@ export interface AccountChangeRepository {
   ): Promise<AccountChange[]>;
   /** When each employee's newest change started from their offboarding was asked; one never offboarded is left out. */
   findLastOffboardings(employeeIds: readonly string[]): Promise<Map<string, Date>>;
+  /** The newest invite without a connection of each of the employees in each app; only in `appIds` when given. */
+  findLatestInvitesWithoutConnection(
+    employeeIds: readonly string[],
+    appIds?: readonly string[],
+  ): Promise<AccountChange[]>;
   /** For each change of `changeIds`, how many running changes of its connection were asked before it. */
   countChangesAhead(changeIds: readonly string[]): Promise<Map<string, number>>;
   /** Up to `limit` changes after the one with sort values `after`, newest first. */
@@ -115,6 +129,20 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .update(accountChanges)
         .set({ status, attempts: attempts.map(storedAttempt), error, finishedAt })
         .where(and(eq(accountChanges.id, id), eq(accountChanges.status, expectedStatus)));
+    },
+    insertWithoutConnection: async (change) => {
+      const [stored] = await orm()
+        .insert(accountChanges)
+        .values({
+          ...change,
+          connectionId: null,
+          status: "failed",
+          attempts: [],
+          error: "no_connection",
+          finishedAt: change.requestedAt,
+        })
+        .returning();
+      return toChange(stored!);
     },
     markDoneByHand: async (id) => {
       const [row] = await orm()
@@ -191,6 +219,26 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         )
         .groupBy(accountChanges.employeeId);
       return new Map(rows.map(({ employeeId, at }) => [employeeId!, at!]));
+    },
+    findLatestInvitesWithoutConnection: async (employeeIds, appIds) => {
+      const rows = await orm()
+        .selectDistinctOn([accountChanges.employeeId, accountChanges.appId])
+        .from(accountChanges)
+        .where(
+          and(
+            eq(accountChanges.action, "invite"),
+            isNull(accountChanges.connectionId),
+            anyOf(accountChanges.employeeId, employeeIds),
+            appIds && anyOf(accountChanges.appId, appIds),
+          ),
+        )
+        .orderBy(
+          accountChanges.employeeId,
+          accountChanges.appId,
+          desc(accountChanges.requestedAt),
+          desc(accountChanges.id),
+        );
+      return rows.map(toChange);
     },
     countChangesAhead: async (changeIds) => {
       const ahead = alias(accountChanges, "ahead");

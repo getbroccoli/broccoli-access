@@ -42,6 +42,7 @@ export {
   appUsers,
   templateReviewTransactor,
   personPages,
+  provisioning,
   templates,
   accountLinks,
 } from "./services";

@@ -57,6 +57,12 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
         }
       }
     }
+    provisionSteps {
+      action
+      app {
+        id
+      }
+    }
     appAccounts {
       email
       offeredChange
@@ -180,6 +186,22 @@ mutation TakeOffTemplate($input: TemplateTakeOffInput!) {
       template {
         id
         peopleCount
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation ProvisionEmployee($input: EmployeeProvisionInput!) {
+  apps {
+    provisionEmployee(input: $input) {
+      employee {
+        id
       }
       error {
         __typename

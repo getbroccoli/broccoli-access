@@ -14,6 +14,7 @@ import {
 } from "@/features/apps";
 import { t } from "@/i18n";
 import { formatSince } from "@/lib/since";
+import { isRoleBlocked } from "./roleBlocked";
 
 type Person = NonNullable<PersonPageQuery["employee"]>;
 type Props = {
@@ -38,8 +39,7 @@ export function PersonAppRow({
   invite,
   showSources,
 }: Props) {
-  const retiredRole = row.role != null && !row.app.roles.some(({ key }) => key === row.role);
-  const roleBlocked = row.roleConflict || retiredRole;
+  const roleBlocked = isRoleBlocked(row);
   const removed = row.choice === "REMOVED_FOR_PERSON";
   return (
     <TableRow className={row.roleConflict ? "bg-amber-50/70" : undefined}>

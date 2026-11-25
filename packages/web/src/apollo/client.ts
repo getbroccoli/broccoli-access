@@ -49,9 +49,11 @@ function withLiveEdges(policies: TypePolicies): TypePolicies {
   };
 }
 
-/** Lists a mutation's payload replaces whole: the newer list wins, also when it is shorter. */
+/** Lists a newer answer replaces whole: the newer list wins, also when it is shorter. */
 const REPLACED_LISTS: TypePolicies = {
   Template: { fields: { apps: { merge: false } } },
+  // Its steps have no id of their own, and each read computes them afresh.
+  Employee: { fields: { provisionSteps: { merge: false } } },
 };
 
 const liveEdges: FieldReadFunction<readonly StoreObject[]> = (edges, { canRead, readField }) =>

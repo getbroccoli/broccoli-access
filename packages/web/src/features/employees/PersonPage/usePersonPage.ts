@@ -16,27 +16,25 @@ export function usePersonPage(id: string) {
           const before = previous.employee,
             next = fetchMoreResult.employee;
           if (!before || !next) return previous;
-          if (field === "templates")
-            return {
-              ...previous,
-              employee: {
-                ...before,
-                templates: {
-                  ...next.templates,
-                  edges: [...before.templates.edges, ...next.templates.edges],
-                },
-              },
-            };
-          return {
-            ...previous,
-            employee: {
-              ...before,
-              personApps: {
-                ...next.personApps,
-                edges: [...before.personApps.edges, ...next.personApps.edges],
-              },
-            },
-          };
+          // The newest answer wins, so rows, invites and steps stay in step; only the paged list
+          // that asked for more keeps what it had loaded.
+          const merged =
+            field === "templates"
+              ? {
+                  personApps: before.personApps,
+                  templates: {
+                    ...next.templates,
+                    edges: [...before.templates.edges, ...next.templates.edges],
+                  },
+                }
+              : {
+                  templates: before.templates,
+                  personApps: {
+                    ...next.personApps,
+                    edges: [...before.personApps.edges, ...next.personApps.edges],
+                  },
+                };
+          return { ...previous, employee: { ...next, ...merged } };
         },
       })
       .catch(() => toast.error(t("people.person.moreFailed")));

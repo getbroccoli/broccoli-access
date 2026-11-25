@@ -18,3 +18,8 @@ export type { EmployeeOffboarding } from "./offboarding";
 export { createAppConnectionService, type AppConnectionService } from "./appConnectionService";
 export { createAppService, type AppService, type AppSummary } from "./appService";
 export { createAppUserService, type AppUser, type AppUserService } from "./appUserService";
+export {
+  createProvisionService,
+  type ProvisionService,
+  type ProvisionStep,
+} from "./provisionService";

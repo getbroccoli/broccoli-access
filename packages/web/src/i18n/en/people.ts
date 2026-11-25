@@ -129,4 +129,21 @@ export const peopleEn = {
   "people.offboard.oneAppNeedsYou": "1 app needs you:",
   "people.offboard.appsNeedYou": "{count} apps need you:",
   "people.offboard.couldntDisable": "Couldn’t disable",
+  "people.provision.missing": "{count} apps missing.",
+  "people.provision.missingOne": "1 app missing.",
+  "people.provision.pickRoleFirst": "Pick {app}’s role first.",
+  "people.provision.updateRoleFirst": "Update {app}’s role in its template first.",
+  "people.provision.byHandIsYours":
+    "Invite {firstName} in each app marked By hand yourself, then confirm it with By hand on this page.",
+  "people.provision.button": "Provision",
+  "people.provision.title": "Provision {name}?",
+  "people.provision.enable": "Enable",
+  "people.provision.byBroccoli": "Broccoli Access",
+  "people.provision.byHand": "By hand",
+  "people.provision.appsInvite": "Each app sends {firstName} its own invitation email.",
+  "people.provision.someAppsInvite":
+    "Each app Broccoli Access invites {firstName} to sends its own invitation email.",
+  "people.provision.confirm": "Provision {count} apps",
+  "people.provision.confirmOne": "Provision 1 app",
+  "people.provision.failed": "Couldn’t provision {name}. Reload the page and try again.",
 } as const;

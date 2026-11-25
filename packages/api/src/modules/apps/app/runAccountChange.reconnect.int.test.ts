@@ -49,7 +49,7 @@ test("fails a queued change with the connection's reconnect cause without disabl
   seed,
   fakeConnectors,
 }) => {
-  await seed.connectionNeedsReconnect(pending.change.connectionId);
+  await seed.connectionNeedsReconnect(pending.linear.connectionId);
 
   await pending.service.runChange(SYSTEM, pending.change.id);
 
@@ -86,7 +86,7 @@ test("fails a change with the stored reconnect cause even after Linear leaves th
   seed,
   fakeConnectors,
 }) => {
-  await seed.connectionNeedsReconnect(pending.change.connectionId);
+  await seed.connectionNeedsReconnect(pending.linear.connectionId);
   const server = await serveManifest(fakeConnectors.url, (manifest) => {
     manifest.connectors = manifest.connectors.filter(({ key }) => key !== "linear");
   });

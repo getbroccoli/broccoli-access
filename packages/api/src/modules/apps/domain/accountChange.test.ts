@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { offeredChange, offersReconnect } from "./accountChange";
+import { offeredChange, offersReconnect, startOfChange } from "./accountChange";
 
 const activeMember = {
   status: "active",
@@ -56,4 +56,42 @@ it.each([
       ...facts,
     }),
   ).toBe(offered);
+});
+
+const FROM_PROVISION = { startedFrom: "provision", employeeId: "emp_ivan" } as const;
+const ASKED_ON_ROW = {
+  startedFrom: "account",
+  employeeId: null,
+  action: "invite",
+  subjectEmployeeId: "emp_ivan",
+} as const;
+
+it("keeps Provision as the start of a Try again after its change failed", () => {
+  const latest = { ...FROM_PROVISION, action: "invite", status: "failed" } as const;
+
+  expect(startOfChange(ASKED_ON_ROW, latest)).toEqual(FROM_PROVISION);
+});
+
+it("starts from Provision when Provision asks after a failed change asked on the row", () => {
+  const latest = { startedFrom: "account", employeeId: null, action: "invite", status: "failed" };
+
+  const asked = { ...FROM_PROVISION, action: "invite", subjectEmployeeId: "emp_ivan" } as const;
+
+  expect(startOfChange(asked, latest as never)).toEqual(FROM_PROVISION);
+});
+
+it("starts from the row when the failed change was provisioned for another person", () => {
+  const latest = { ...FROM_PROVISION, action: "invite", status: "failed" } as const;
+  const asked = { ...ASKED_ON_ROW, subjectEmployeeId: "emp_lena" };
+
+  expect(startOfChange(asked, latest)).toEqual({ startedFrom: "account", employeeId: null });
+});
+
+it("starts from the row when the latest change did not fail or asked for another action", () => {
+  const done = { ...FROM_PROVISION, action: "invite", status: "succeeded" } as const;
+  const other = { ...FROM_PROVISION, action: "suspend", status: "failed" } as const;
+
+  expect(startOfChange(ASKED_ON_ROW, done)).toEqual({ startedFrom: "account", employeeId: null });
+  expect(startOfChange(ASKED_ON_ROW, other)).toEqual({ startedFrom: "account", employeeId: null });
+  expect(startOfChange(ASKED_ON_ROW, null)).toEqual({ startedFrom: "account", employeeId: null });
 });

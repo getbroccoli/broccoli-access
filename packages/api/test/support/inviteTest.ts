@@ -7,7 +7,7 @@ import { PrincipalSecurityContext } from "../../src/core/security";
 import { employeeDirectory } from "../../src/modules/employees";
 import { accountChanges, scannedLinear } from "./accountChanges";
 import { containerConnectors } from "./containerConnections";
-import { templates } from "./services";
+import { personPages, provisioning, templates } from "./services";
 import type { TestSeed } from "./testSeed";
 import { test } from "./fixture";
 import { googleScanSetup } from "./googleScanSetup";
@@ -58,11 +58,38 @@ async function scannedWorkspace(
     employeeDirectory(orm),
   );
   const { jobs, sent } = recordingJobQueue();
-  const service = accountChanges(orm, { connectorsUrl, googleUrl, jobs });
+  const connectors = containerConnectors(connectorsUrl);
+  const service = accountChanges(orm, { connectors, googleUrl, jobs });
   const ivan = employee("ivan@acme.example");
+  const provision = provisioning(orm, { connectors, jobs });
+  const pages = personPages(orm, { connectors });
   const input = { employeeId: ivan.id, appId: linear.appId };
   return {
-    templates: templates(orm, { connectors: containerConnectors(connectorsUrl) }),
+    templates: templates(orm, { connectors }),
+    provision,
+    pages,
+    /** Provisions every step the person's page shows, as confirming its dialog does. */
+    provisionShown: async (employeeId: string) => {
+      const [page] = await pages(owner, [employeeId]);
+      const appIds = page!.provisionSteps.map(({ appId }) => appId);
+      return provision.provisionEmployee(owner, { employeeId, appIds });
+    },
+    /** Gives Ivan a template with an approved app that has no connection. */
+    assignAppWithoutConnection: async () => {
+      const app = await seed.app({
+        name: "Payroll",
+        domain: "payroll.example",
+        catalogKey: null,
+        status: "approved",
+      });
+      await seed.assignedTemplateApp({
+        employeeId: ivan.id,
+        appId: app.id,
+        role: null,
+        assignedBy: google.ownerUserId,
+      });
+      return app;
+    },
     offboardingInput: async (employeeId: string) => {
       const [plan] = await service.readOffboardings(owner, [employeeId]);
       return { employeeId, appIds: plan!.accountsToDisable.map(({ appId }) => appId) };

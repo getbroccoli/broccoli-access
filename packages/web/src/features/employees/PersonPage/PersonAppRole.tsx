@@ -16,6 +16,9 @@ export function PersonAppRole({ row, employeeId }: Props) {
   const [pick, { loading }] = usePayloadMutation(PickPersonAppRoleDocument);
   const { app, role, roleConflict } = row;
   if (!roleConflict) {
+    // An account keeps the role it has in its app, which Broccoli Access does not read: the
+    // template's role is only what an invite asks for.
+    if (row.accountStatus) return "—";
     // No role to show: nothing gives the app, or its connection offers no roles.
     const given = row.choice ? row.choice === "ADDED_FOR_PERSON" : row.templates.length > 0;
     if (!role && (!given || !app.connected || !app.roles.length)) return "—";

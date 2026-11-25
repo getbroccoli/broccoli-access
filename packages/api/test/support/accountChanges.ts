@@ -21,7 +21,20 @@ import { SYSTEM } from "./testSecurityContext";
 import type { TestSeed } from "./testSeed";
 import { testTransactor } from "./testTransactor";
 
-export function accountChanges(
+export function accountChanges(orm: Orm, options: AccountChangeOptions = {}) {
+  return createAccountChangeService(accountChangeDependencies(orm, options));
+}
+
+export interface AccountChangeOptions {
+  connectors?: ConnectorRegistry;
+  connectorsUrl?: string;
+  googleUrl?: string;
+  jobs?: JobQueue;
+  transact?: Transact;
+}
+
+/** What the account change services need, with the fake connectors and no waits. */
+export function accountChangeDependencies(
   orm: Orm,
   {
     connectorsUrl,
@@ -29,13 +42,7 @@ export function accountChanges(
     connectors: suppliedConnectors,
     jobs = recordingJobQueue().jobs,
     transact = testTransactor(orm),
-  }: {
-    connectors?: ConnectorRegistry;
-    connectorsUrl?: string;
-    googleUrl?: string;
-    jobs?: JobQueue;
-    transact?: Transact;
-  } = {},
+  }: AccountChangeOptions,
 ) {
   const container = suppliedConnectors ?? containerConnectors(connectorsUrl);
   const google = createGoogleWorkspaceConnector({
@@ -43,7 +50,7 @@ export function accountChanges(
     adminApiUrl: googleUrl,
   });
   const connectors = { list: async () => [google, ...(await container.list())] };
-  return createAccountChangeService({
+  return {
     readInviteRole,
     directoryConnectors: [google],
     orm,
@@ -57,7 +64,7 @@ export function accountChanges(
     secretBox: TEST_SECRET_BOX,
     logger: createLogger("silent"),
     wait: () => Promise.resolve(),
-  });
+  };
 }
 
 export async function scannedLinear(orm: Orm, url: string) {

@@ -9,6 +9,7 @@ import { t } from "@/i18n";
 import { formatSince } from "@/lib/since";
 
 import { ReconnectButton } from "../ReconnectButton";
+import { ByHandButton } from "./ByHandButton";
 import { ChangeProgress } from "./ChangeProgress";
 import { ConfirmAccountChangeDialog } from "./ConfirmAccountChangeDialog";
 import { failedChangeOptions } from "./couldntChange";
@@ -27,7 +28,8 @@ type Props = {
  * An app the person has no account in: Invite, asked in a dialog; then the invite's progress, and
  * "Invited on <day>" while they are Invited, by this invite or an invitation sent in the app
  * itself, or Try again once it failed, where trying again can help. Reconnect while the app's
- * connection needs it.
+ * connection needs it. In an app without a connection: "By hand", once Provision left the invite
+ * to the owner.
  */
 export function InviteCell({ appInvite, roleBlocked, expectedRole }: Props) {
   const fragment = useFragment({
@@ -61,6 +63,13 @@ export function InviteCell({ appInvite, roleBlocked, expectedRole }: Props) {
     );
   }
   const offeredChange = invite.offered && !roleBlocked ? "INVITE" : null;
+  if (latest?.status === "FAILED" && latest.failure === "NO_CONNECTION") {
+    return (
+      <span className="flex justify-end">
+        <ByHandButton change={latest} employee={invite.employee} app={app.name} />
+      </span>
+    );
+  }
   if (latest?.status === "FAILED") {
     return failedChangeOptions({ offeredChange, latestChange: latest, app }).tryAgain ? (
       <span className="flex justify-end">

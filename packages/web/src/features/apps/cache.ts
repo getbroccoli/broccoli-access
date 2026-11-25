@@ -24,13 +24,14 @@ export function forgetAccessCounts(cache: ApolloCache): void {
 }
 
 /**
- * Drops a person's apps and invite rows after a refused Invite, which what the row offered no
- * longer matches, so their page loads them afresh.
+ * Drops a person's apps, invite rows and provision steps after a refused Invite or Provision, which
+ * what the page offered no longer matches, so their page loads them afresh.
  */
 export function forgetPersonApps(cache: ApolloCache, employeeId: string): void {
   const id = cache.identify({ __typename: "Employee", id: employeeId });
   cache.evict({ id, fieldName: "personApps" });
   cache.evict({ id, fieldName: "appInvites" });
+  cache.evict({ id, fieldName: "provisionSteps" });
 }
 
 /**
