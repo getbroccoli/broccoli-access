@@ -138,8 +138,7 @@ export const peopleEn = {
     "{name} is suspended in Google but still has accounts in {count} approved apps.",
   "people.person.suspendedWithAccessOne":
     "{name} is suspended in Google but still has accounts in 1 approved app.",
-  "people.person.disableWhereConnected":
-    "Disable them here where the app is connected, and in the app itself where it isn’t.",
+  "people.person.disableWhereOffered": "Use Disable where it’s offered.",
   "people.person.disableWhereConnectedOne": "Disable it here.",
   "people.person.assignTemplate": "+ Assign template",
   "people.person.takeOff": "Take {template} off {person}",

@@ -1,4 +1,6 @@
-import { useQuery } from "@apollo/client/react";
+import { useLazyQuery } from "@apollo/client/react";
+import { WarningCircle } from "@phosphor-icons/react";
+import { toast } from "sonner";
 
 import {
   type AccountsWithoutPersonQuery,
@@ -7,6 +9,8 @@ import {
 import {
   ChangeProgress,
   CouldntChangeDialog,
+  couldntChangeChipClassName,
+  couldntChangeCopy,
   showsCouldntChange,
   StatusBadge,
 } from "@/features/apps";
@@ -24,18 +28,44 @@ type Props = {
  */
 export function UnlinkedAccountState({ account, onChanged }: Props) {
   const change = account.latestChange;
-  const failed = change != null && showsCouldntChange(account);
-  const failure = useQuery(UnlinkedAccountChangeDocument, {
-    variables: { id: change?.id ?? "" },
-    skip: !failed,
-  });
+  const [loadFailure, failure] = useLazyQuery(UnlinkedAccountChangeDocument);
+  async function openFailure(id: string) {
+    try {
+      const { data } = await loadFailure({ variables: { id } });
+      if (data?.accountChange) return;
+    } catch {
+      // The failure chip stays available so the owner can try again.
+    }
+    toast.error(t("apps.couldnt.loadFailed"));
+  }
   if (change?.status === "RUNNING") {
     return <ChangeProgress app={account.app.name} change={change} />;
   }
-  if (failed && failure.data?.accountChange) {
+  if (change && showsCouldntChange(account)) {
+    const details = failure.data?.accountChange;
+    const copy = couldntChangeCopy[change.action];
+    if (details?.id !== change.id) {
+      return (
+        <button
+          type="button"
+          className={couldntChangeChipClassName}
+          disabled={failure.loading}
+          aria-label={t(copy.title, {
+            name: account.displayName ?? account.email,
+            app: account.app.name,
+          })}
+          onClick={() => void openFailure(change.id)}
+        >
+          <WarningCircle size={13} weight="bold" aria-hidden />
+          {t(copy.chip)}
+        </button>
+      );
+    }
     return (
       <CouldntChangeDialog
-        change={failure.data.accountChange}
+        key={change.id}
+        initiallyOpen
+        change={details}
         row={{
           id: account.id,
           name: account.displayName,

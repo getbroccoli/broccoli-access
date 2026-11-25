@@ -52,17 +52,35 @@ export async function listAllInvitations(flow: Flow): Promise<Invitation[]> {
 
 export async function listPages(flow: Flow): Promise<unknown[]> {
   const pages: unknown[] = [];
+  for await (const { raw } of accountPages(flow)) pages.push(raw);
+  return pages;
+}
+
+/** Reads only the pages needed to find a member. */
+export async function findListedAccount(
+  flow: Flow,
+  matches: (account: ListedAccount) => boolean,
+): Promise<ListedAccount | undefined> {
+  for await (const { accounts } of accountPages(flow)) {
+    const found = accounts.find(matches);
+    if (found) return found;
+  }
+}
+
+async function* accountPages(flow: Flow) {
   const cursors = new Set<string>();
+  let count = 0;
   let cursor: string | null = null;
   do {
-    const page = await send(flow, "accounts/list", { cursor });
-    pages.push(page);
-    cursor = ACCOUNTS_LIST_ANSWER.parse(page).nextCursor;
+    const raw = await send(flow, "accounts/list", { cursor });
+    const { accounts, nextCursor } = ACCOUNTS_LIST_ANSWER.parse(raw);
+    cursor = nextCursor;
     expect(cursors.has(cursor ?? ""), "a nextCursor seen before").toBe(false);
     if (cursor !== null) cursors.add(cursor);
-  } while (cursor !== null && pages.length < MAX_PAGES);
+    count++;
+    yield { raw, accounts };
+  } while (cursor !== null && count < MAX_PAGES);
   expect(cursor, "the last page's nextCursor").toBeNull();
-  return pages;
 }
 
 /** Skips the check for a connector that does not list `capability`. */

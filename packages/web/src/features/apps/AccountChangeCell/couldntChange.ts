@@ -42,7 +42,6 @@ export function couldntChangeReason(
   about: {
     action?: AccountChangeAction;
     historical?: boolean;
-    canDisableAccounts?: boolean;
     app: string;
     workspace: string;
     person: { name: string; email: string };
@@ -165,9 +164,9 @@ export function couldntChangeHint(
   if (failure === "NOT_ALLOWED") {
     if (action === "REMOVE")
       return t(
-        canDisableAccounts === false
-          ? "apps.couldnt.hintActiveRemoveRefused"
-          : "apps.couldnt.hintRemoveRefused",
+        canDisableAccounts
+          ? "apps.couldnt.hintRemoveRefused"
+          : "apps.couldnt.hintActiveRemoveRefused",
         { firstName, app },
       );
     return t("apps.couldnt.hintByHandOnly", { app });
@@ -257,7 +256,7 @@ function reasonOf(
   failure: AccountChangeFailure,
   about: Parameters<typeof couldntChangeReason>[1],
 ): string {
-  const { action, app, canDisableAccounts, credential, historical, person } = about;
+  const { action, app, credential, historical, person } = about;
   const { connectionUserEmail: email, integrationUser, workspace } = about;
   const causeAbout = {
     app,
@@ -289,13 +288,9 @@ function reasonOf(
     case "ACCOUNT_NOT_FOUND":
       return t("apps.couldnt.accountNotFound", { app, name: person.name, email: person.email });
     case "NOT_ALLOWED":
-      if (action === "REMOVE")
-        return t(
-          canDisableAccounts && !historical
-            ? "apps.couldnt.removeNeedsDisabled"
-            : "apps.couldnt.removeNotAllowed",
-        );
-      return t("apps.couldnt.notAllowed", { app });
+      return t(action === "REMOVE" ? "apps.couldnt.removeNotAllowed" : "apps.couldnt.notAllowed", {
+        app,
+      });
     case "OWNER_BROWSER_LOST":
       return t("apps.couldnt.browserLost", { app });
     case "NO_CONNECTION":

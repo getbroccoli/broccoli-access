@@ -29,6 +29,7 @@ import { dayAndTime } from "@/lib/dayAndTime";
 import { integrationUserOf } from "../reconnectReason";
 import { ReconnectButton } from "../ReconnectButton";
 import { couldntChangeHint, couldntChangeReason, failedChangeOptions } from "./couldntChange";
+import { couldntChangeChipClassName, couldntChangeCopy } from "./couldntChangeCopy";
 import { DoneByHandDialog } from "./DoneByHandDialog";
 import { type ChangeTarget, changeTargetOf, useChangeAccount } from "./useChangeAccount";
 
@@ -56,6 +57,8 @@ type Props = {
   onChanged?: () => void;
   /** The trigger's look; the account row's chip by default. */
   triggerClassName?: string;
+  /** Opens the reason after the row loads it on click. */
+  initiallyOpen?: boolean;
 };
 
 /**
@@ -67,7 +70,8 @@ export function CouldntChangeDialog({
   change: changeRef,
   row,
   onChanged,
-  triggerClassName = CHIP,
+  triggerClassName = couldntChangeChipClassName,
+  initiallyOpen = false,
 }: Props) {
   const fragment = useFragment({
     fragment: CouldntChangeDialog_AccountChangeFragmentDoc,
@@ -75,7 +79,7 @@ export function CouldntChangeDialog({
     fragmentName: "CouldntChangeDialog_accountChange",
     from: changeRef,
   });
-  const [shown, setShown] = useState<"reason" | "byHand" | null>(null);
+  const [shown, setShown] = useState<"reason" | "byHand" | null>(initiallyOpen ? "reason" : null);
   const { changeAccount } = useChangeAccount();
   const [scanNow] = usePayloadMutation(ScanNowDocument);
   const change = fragment.complete ? fragment.data : null;
@@ -89,10 +93,9 @@ export function CouldntChangeDialog({
   const firstName = employee?.firstName ?? accountName;
   const workspace = connection?.scan?.sourceName ?? app.name;
   const options = row ? failedChangeOptions({ ...row, latestChange: change, app }) : NO_OPTIONS;
-  const copy = COPY[change.action];
+  const copy = couldntChangeCopy[change.action];
   const reason = couldntChangeReason(change.failure, {
     action: change.action,
-    canDisableAccounts: connection?.connector.canDisableAccounts,
     app: app.name,
     workspace,
     person: { name, email: change.email },
@@ -220,30 +223,8 @@ export function CouldntChangeDialog({
   );
 }
 
-const CHIP = cn(
-  "inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-red-800",
-  "cursor-pointer transition-colors hover:bg-red-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-);
-
 /** History offers no action: Try again and I did it by hand act on an account's latest change. */
 const NO_OPTIONS = { tryAgain: false, byHand: false, scanNow: false, reconnect: false };
-
-/** The words of a failed Disable, Enable or Invite, which mirror each other. */
-const COPY = {
-  SUSPEND: {
-    chip: "apps.couldnt.disable",
-    title: "apps.couldnt.disableTitle",
-  },
-  REACTIVATE: {
-    chip: "apps.couldnt.enable",
-    title: "apps.couldnt.enableTitle",
-  },
-  REMOVE: { chip: "apps.couldnt.remove", title: "apps.couldnt.removeTitle" },
-  INVITE: {
-    chip: "apps.couldnt.invite",
-    title: "apps.couldnt.inviteTitle",
-  },
-} as const;
 
 type FailedChange = CouldntChangeDialog_AccountChangeFragment;
 

@@ -56,6 +56,10 @@ export const appsEn = {
   "apps.page.connectHint":
     "Connect {app} to see every member and disable or enable their accounts from here. Until then, Broccoli Access sees only who signs in to {app} with Google.",
   "apps.page.connectReadHint": "Connect {app} to see every member.",
+  "apps.connect.description":
+    "Broccoli Access reads your {app} members and disables or enables them when you ask, through {app}’s API.",
+  "apps.connect.readDescription":
+    "Broccoli Access reads members through {app}’s API. Where supported, it can invite people or permanently remove accounts when you ask.",
   "apps.page.openAdmin": "Open {app} admin",
   "apps.page.showMore": "Show {count} more",
   "apps.page.noUsers": "No app accounts linked to people yet.",
@@ -219,6 +223,7 @@ export const appsEn = {
   "apps.couldnt.tryAgainInvite": "Try again to invite {name} to {app}",
   "apps.couldnt.scanNow": "Scan {app} now",
   "apps.couldnt.close": "Close",
+  "apps.couldnt.loadFailed": "Couldn’t load the change. Try again.",
   "apps.byHand.disableTitle": "Did you deactivate {name} in {app} yourself?",
   "apps.byHand.enableTitle": "Did you reactivate {name} in {app} yourself?",
   "apps.byHand.inviteTitle": "Did you invite {name} to {app} yourself?",

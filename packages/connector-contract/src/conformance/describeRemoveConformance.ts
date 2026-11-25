@@ -2,7 +2,15 @@ import { expect, it, type TestContext } from "vitest";
 
 import { ACTION_RUN_ANSWER, CONNECTOR_ERROR_ANSWER } from "../connectorCalls.js";
 import type { ConnectorFixture } from "./describeConnectorConformance.js";
-import { capabilitiesOf, listAll, send, skipUnlessListed, startFlow, type Flow } from "./flow.js";
+import {
+  capabilitiesOf,
+  findListedAccount,
+  listAll,
+  send,
+  skipUnlessListed,
+  startFlow,
+  type Flow,
+} from "./flow.js";
 
 /** The remove checks of one connector; a connector that does not list `remove` skips them. */
 export function describeRemoveConformance(url: string, fixture: ConnectorFixture): void {
@@ -30,7 +38,8 @@ async function checkRepeatedRemove(
     const suspended = await send(flow, "actions/run", { action: "suspend", account: member });
     expect(ACTION_RUN_ANSWER.parse(suspended).account?.values.status).toBe("suspended");
   } else {
-    const listedMember = (await listAll(flow)).find(
+    const listedMember = await findListedAccount(
+      flow,
       ({ sourceKey }) => sourceKey === member.sourceKey,
     );
     expect(listedMember?.values.status, "the fixture's member to remove").toBe("active");
@@ -53,7 +62,7 @@ async function checkRemoveOfConnectionUser(
   skip: TestContext["skip"],
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
-  const own = (await listAll(flow)).find(({ values }) => values.isConnectionUser);
+  const own = await findListedAccount(flow, ({ values }) => values.isConnectionUser);
   if (!own) return skip(`${fixture.connector} lists no connection member`);
   const account = { sourceKey: own.sourceKey, email: own.values.email };
 

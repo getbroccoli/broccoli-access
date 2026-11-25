@@ -1,10 +1,15 @@
 import { expect, it, type TestContext } from "vitest";
 
-import { ACTION_RUN_ANSWER, type ActionRunAnswer, type Invitation } from "../connectorCalls.js";
+import {
+  ACTION_RUN_ANSWER,
+  type AccountStatus,
+  type ActionRunAnswer,
+  type Invitation,
+} from "../connectorCalls.js";
 import type { ConnectorFixture } from "./describeConnectorConformance.js";
 import {
   capabilitiesOf,
-  listAll,
+  findListedAccount,
   listAllInvitations,
   post,
   requestOf,
@@ -89,17 +94,19 @@ async function checkListedInvitation(
 async function checkInviteOfMember(url: string, fixture: ConnectorFixture): Promise<void> {
   const [flow] = await startFlow(url, fixture);
   let member = fixture.member ?? fixture.memberToRemove;
+  let status: AccountStatus = "active";
   if (!member) {
-    const active = (await listAll(flow)).find(({ values }) => values.status === "active");
-    expect(active, "an active member for the invite to read back").toBeDefined();
-    member = { sourceKey: active!.sourceKey, email: active!.values.email };
+    const listed = await findListedAccount(flow, () => true);
+    expect(listed, "a listed member for the invite to read back").toBeDefined();
+    member = { sourceKey: listed!.sourceKey, email: listed!.values.email };
+    status = listed!.values.status;
   }
 
   const answer = await invite(flow, { email: member.email });
 
   expect(answer.changed).toBe(false);
   expect(answer.account?.sourceKey).toBe(member.sourceKey);
-  expect(answer.account?.values.status).toBe("active");
+  expect(answer.account?.values.status).toBe(status);
 }
 
 /** A valid invite with only its runtime changed, which must send nothing. */

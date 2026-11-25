@@ -70,8 +70,8 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
   const app = connector.name;
   const isNewKey = connector.connection !== null;
   const connectDescription = connector.canDisableAccounts
-    ? "settings.apps.dialog.description"
-    : "settings.apps.dialog.readDescription";
+    ? "apps.connect.description"
+    : "apps.connect.readDescription";
   const { loading, error, payloadError, reset } = isNewKey ? reconnecting : connecting;
   const changeOpen = (next: boolean) => {
     // Closed only once the check ends, so a pending connect never runs behind another try.

@@ -26,7 +26,6 @@ export const appsRemoveEn = {
   "apps.couldnt.unconfirmedRemoval":
     "Broccoli Access couldn’t confirm the removal. Check the member list in {app}.",
   "apps.couldnt.removeNotAllowed": "The removal was refused.",
-  "apps.couldnt.removeNeedsDisabled": "Only a disabled member can be removed.",
   "apps.couldnt.hintRemoveRefused":
     "Trying again won’t help. Scan {app} to see whether {firstName} is still disabled, or remove {firstName} from {app} yourself and tell Broccoli Access.",
   "apps.couldnt.hintActiveRemoveRefused": "Scan {app} or remove {firstName} by hand.",

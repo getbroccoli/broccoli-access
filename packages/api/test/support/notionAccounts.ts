@@ -4,7 +4,7 @@ import {
   NOTION_CONNECTION,
   startNotionConnector,
   type NotionAction,
-} from "../../../fake-apps/test/support/notionConnector";
+} from "@broccoli-access/fake-apps/test/support";
 import type { Orm } from "../../src/core/db";
 import { accountChanges } from "./accountChanges";
 import { containerConnections } from "./containerConnections";

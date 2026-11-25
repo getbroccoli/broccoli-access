@@ -75,12 +75,16 @@ test("lists Slack when Linear advertises suspend without reactivate", async ({
   expect(listed.map(({ key }) => key)).toEqual(["slack"]);
 });
 
-test("retries a manifest whose only connector was invalid", async ({ fakeConnectors }) => {
+test("retries a manifest when none of its connectors can be used", async ({ fakeConnectors }) => {
   let restoreManifest!: () => void;
   const server = await serveManifest(fakeConnectors.url, (manifest) => {
     const original = manifest.connectors;
     const linear = original.find(({ key }) => key === "linear")!;
-    manifest.connectors = [{ ...linear, capabilities: ["list_accounts", "suspend"] }];
+    const slack = original.find(({ key }) => key === "slack")!;
+    manifest.connectors = [
+      { ...linear, capabilities: ["list_accounts", "suspend"] },
+      { ...slack, connectionFields: [...slack.connectionFields, slack.connectionFields[0]!] },
+    ];
     restoreManifest = () => {
       manifest.connectors = original;
     };

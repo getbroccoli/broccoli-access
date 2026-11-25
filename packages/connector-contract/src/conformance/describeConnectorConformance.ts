@@ -9,11 +9,7 @@ import {
   type ConnectorCall,
   type ConnectorErrorCode,
 } from "../connectorCalls.js";
-import {
-  CONNECTOR_MANIFEST,
-  type Capability,
-  type ConnectorDescription,
-} from "../connectorManifest.js";
+import { CONNECTOR_MANIFEST, type ConnectorDescription } from "../connectorManifest.js";
 import { describeInviteConformance } from "./describeInviteConformance.js";
 import { describeRemoveConformance } from "./describeRemoveConformance.js";
 import { describeSignInConformance, SIGN_IN_ERROR_CODES } from "./describeSignInConformance.js";
@@ -52,7 +48,7 @@ export interface ConnectorFixture {
   member?: { sourceKey: string; email: string };
   /**
    * An email with no member and no pending invitation, which the suite invites; a connector that
-   * lists `invite` needs it.
+   * lists `invite` needs it and at least one listed member for the unchanged-invite check.
    */
   invitee?: { email: string };
   /** An active member that the suite removes; a connector that lists `remove` needs it. */
@@ -89,13 +85,13 @@ export interface ConnectorFixture {
  */
 export function describeConnectorConformance({ urls, fixtures }: ConformanceOptions): void {
   const [url, otherUrl] = urls;
-  let manifest: Promise<Map<string, ConnectorDescription[]>> | undefined;
-  const readManifest = () => (manifest ??= getManifest(url).then(connectorsByKey));
+  let manifest: Promise<ConnectorDescription[]> | undefined;
+  const readManifest = () =>
+    (manifest ??= getManifest(url).then((raw) => CONNECTOR_MANIFEST.parse(raw).connectors));
   // The checks share the containers and reset their apps, so they never run concurrently.
   describe("container conformance", { timeout: NO_CHECK_TIMEOUT, concurrent: false }, () => {
     it("has a fixture for every connector in a manifest that matches its schema", async () => {
-      const listed = await readManifest();
-      const keys = [...listed.values()].flat().map(({ key }) => key);
+      const keys = (await readManifest()).map(({ key }) => key);
       expect(fixtures.map(({ connector }) => connector).toSorted()).toEqual(keys.toSorted());
     });
   });
@@ -104,7 +100,11 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
       `${fixture.connector} conformance`,
       { timeout: NO_CHECK_TIMEOUT, concurrent: false },
       () => {
-        const description = async () => (await readManifest()).get(fixture.connector)?.[0];
+        let connector: Promise<ConnectorDescription | undefined> | undefined;
+        const description = () =>
+          (connector ??= readManifest().then((listed) =>
+            listed.find(({ key }) => key === fixture.connector),
+          ));
         beforeEach(() => withinDeadline(fixture.reset(url), "the fixture's reset"));
         it("answers a connection test that matches its schema", () => startFlow(url, fixture));
         it("lists members with unique keys on pages that match their schema", () =>
@@ -141,6 +141,8 @@ type ActionErrorCode = Exclude<ConnectorErrorCode, "not_invited">;
 
 /** These errors name a target member or a refused change, neither of which a list requests. */
 const ACTION_ONLY_ERRORS = new Set<ActionErrorCode>(["account_not_found", "not_allowed"]);
+const MEMBER_ACTIONS = ["suspend", "remove"] as const;
+const ERROR_ACTIONS = ["suspend", "invite", "remove"] as const;
 
 /** The errors only some connectors meet: a check that only a robot's page shows, and a lost owner's browser. */
 const OPTIONAL_ERROR_CODES = [
@@ -150,10 +152,6 @@ const OPTIONAL_ERROR_CODES = [
 
 /** Any character that ends a line, which would break a one-line skip note. */
 const LINE_BREAK = /[\n\r\u2028\u2029]/;
-
-function connectorsByKey(manifest: unknown): Map<string, ConnectorDescription[]> {
-  return Map.groupBy(CONNECTOR_MANIFEST.parse(manifest).connectors, ({ key }) => key);
-}
 
 function describeErrors(
   url: string,
@@ -169,9 +167,11 @@ function describeErrors(
     async (code, { skip }) => {
       const reason = cannotCauseReason(fixture, code);
       if (reason !== undefined) skip(`${fixture.connector} cannot cause ${code}: ${reason}`);
-      const action = firstActionOf((await description())?.capabilities ?? [], fixture);
+      const actions = code === "account_not_found" ? MEMBER_ACTIONS : ERROR_ACTIONS;
+      const capabilities = (await description())?.capabilities;
+      const action = actions.find((candidate) => capabilities?.includes(candidate));
       if (!action && ACTION_ONLY_ERRORS.has(code)) skip(`${code} applies only to actions`);
-      return checkError(url, fixture, code, action);
+      return checkError(url, fixture, code, action && actionFields(fixture, action));
     },
   );
 }
@@ -202,7 +202,7 @@ async function checkError(
   url: string,
   fixture: ConnectorFixture,
   code: ActionErrorCode,
-  action: ReturnType<typeof firstActionOf>,
+  action: ReturnType<typeof actionFields> | undefined,
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
   await withinDeadline(fixture.causeError(url, code), "the fixture's causeError");
@@ -212,13 +212,6 @@ async function checkError(
     : await send(flow, "accounts/list", { cursor: null });
 
   expect(CONNECTOR_ERROR_ANSWER.parse(answer).error.code).toBe(code);
-}
-
-function firstActionOf(capabilities: readonly Capability[], fixture: ConnectorFixture) {
-  const action = (["suspend", "invite", "remove"] as const).find((candidate) =>
-    capabilities.includes(candidate),
-  );
-  return action && actionFields(fixture, action);
 }
 
 /**
@@ -256,12 +249,13 @@ async function checkUnlistedRuntimes(
   connector: ConnectorDescription | undefined,
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
-  const action = firstActionOf(connector?.capabilities ?? [], fixture);
   const calls: [ConnectorCall, object][] = [
     ["connections/test", {}],
     ["accounts/list", { cursor: null }],
   ];
-  if (action) calls.push(["actions/run", action]);
+  // Invite has its own unlisted-runtime check.
+  const action = MEMBER_ACTIONS.find((candidate) => connector?.capabilities.includes(candidate));
+  if (action) calls.push(["actions/run", actionFields(fixture, action)]);
 
   for (const runtime of unlistedRuntimes(connector?.runtimes ?? [])) {
     for (const [path, fields] of calls) {

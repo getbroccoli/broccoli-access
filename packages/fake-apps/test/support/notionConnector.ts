@@ -20,9 +20,19 @@ export type NotionAction = "invite" | "remove";
 export async function startNotionConnector(
   actions: readonly NotionAction[] = ["invite", "remove"],
   ownMember: string | null = "david@acme.example",
-  { host = "127.0.0.1", port = 0 } = {},
+  {
+    host = "127.0.0.1",
+    port = 0,
+    onlySuspendedMember = false,
+    onUnlistedRuntimeAction,
+  }: {
+    host?: string;
+    port?: number;
+    onlySuspendedMember?: boolean;
+    onUnlistedRuntimeAction?: (action: ActionRunRequest["action"]) => void;
+  } = {},
 ) {
-  const seed = notionMembers(ownMember);
+  const seed = notionMembers(ownMember, onlySuspendedMember);
   let members = [...seed];
   const invitations = new Set<string>();
   let nextError: ConnectorErrorCode | undefined;
@@ -38,8 +48,14 @@ export async function startNotionConnector(
   });
   app.use(express.json(), (request, response, next) => {
     const call = CONNECTION_TEST_REQUEST.safeParse(request.body);
-    if (!call.success || call.data.connector !== "notion" || call.data.runtime.kind !== "server")
+    if (!call.success || call.data.connector !== "notion") return response.sendStatus(400);
+    if (call.data.runtime.kind !== "server") {
+      if (onUnlistedRuntimeAction && request.path === "/v1/actions/run") {
+        const action = ACTION_RUN_REQUEST.safeParse(request.body);
+        if (action.success) onUnlistedRuntimeAction(action.data.action);
+      }
       return response.sendStatus(400);
+    }
     if (call.data.connection.secrets.apiKey !== NOTION_CONNECTION.secrets.apiKey)
       return response.json({ error: { code: "authentication_failed" } });
     next();
@@ -70,7 +86,10 @@ export async function startNotionConnector(
       nextError = undefined;
     },
     causeError(code: ConnectorErrorCode) {
-      if (errorOperation === "list" && (code === "account_not_found" || code === "not_allowed")) {
+      if (code === "account_not_found" && !actions.includes("remove")) {
+        return Promise.reject(new Error(`${code} requires Remove`));
+      }
+      if (code === "not_allowed" && errorOperation === "list") {
         return Promise.reject(new Error(`${code} requires a write operation`));
       }
       nextError = code;
@@ -79,7 +98,8 @@ export async function startNotionConnector(
   };
 
   function takeError(operation: string) {
-    if (operation !== errorOperation || !nextError) return;
+    const expectedOperation = nextError === "account_not_found" ? "remove" : errorOperation;
+    if (operation !== expectedOperation || !nextError) return;
     const code = nextError;
     nextError = undefined;
     return { error: { code } };
@@ -109,8 +129,9 @@ function description(actions: readonly NotionAction[]): ConnectorDescription {
   };
 }
 
-function notionMembers(ownMember: string | null): ListedAccount[] {
-  return ["chloe", "david", "ana"].map((name) => {
+function notionMembers(ownMember: string | null, onlySuspendedMember: boolean): ListedAccount[] {
+  const names = onlySuspendedMember ? ["chloe"] : ["chloe", "david", "ana"];
+  return names.map((name) => {
     const person = ACME.people.find(({ email }) => email === `${name}@acme.example`)!;
     return {
       sourceKey: `notion-${person.id}`,
@@ -118,7 +139,7 @@ function notionMembers(ownMember: string | null): ListedAccount[] {
       values: {
         email: person.email,
         displayName: `${person.givenName} ${person.familyName}`,
-        status: "active",
+        status: onlySuspendedMember ? "suspended" : "active",
         isConnectionUser: person.email === ownMember,
       },
     };

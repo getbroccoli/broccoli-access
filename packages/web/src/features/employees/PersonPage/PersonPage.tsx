@@ -177,7 +177,7 @@ export function PersonPage() {
                 count: String(appCount),
               })}
           {canDisableHere &&
-            ` ${t(appCount === 1 ? "people.person.disableWhereConnectedOne" : "people.person.disableWhereConnected")}`}
+            ` ${t(appCount === 1 ? "people.person.disableWhereConnectedOne" : "people.person.disableWhereOffered")}`}
         </p>
       )}
       <PersonTemplates
