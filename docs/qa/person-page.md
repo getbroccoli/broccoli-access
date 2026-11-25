@@ -96,6 +96,8 @@ Connect Slack and Linear, assign a template to Chloé Martin, and set `GOOGLE` t
 - [ ] On a fresh stack, where Google Workspace again only reads users, untick Slack for Hugo Laurent, then "Continue to Google" and Allow: back in the dialog Slack is still unticked. Cancel, and open Offboard again: every app is ticked.
 - [ ] On a fresh stack, "Disable" on a Google Workspace row reads "Continue to Google"; after Allow the page says "Google now lets Broccoli Access create and change users. Allowing it changed no account: ask for your change again if you still want it.", and no account changed.
 - [ ] "Enable" on an offboarded person's Google Workspace row makes them "Active" again.
+- [ ] On an offboarded Chloé whose Slack and Linear accounts are disabled (Slack's "Scan now" after its member is suspended), "Remove all…" beside "Apps" opens "Remove Chloé Martin from these apps?" listing Linear and Slack with her email, never Google Workspace, and "This cannot be undone." One "Remove all" removes both after that one confirmation: the rows show "Removing from…", then leave the list; `curl -s "$FAKE/_fake/state"` has her in neither `.slack` nor `.linear`, Google Workspace is still "Disabled" with "Enable", and "Remove all…" is gone. Activity has two "Remove" changes with no "Offboarding" below.
+- [ ] A Remove that fails (the failures control on `actions/run`) reads "Couldn’t remove" on its row while the other app's account is removed.
 
 ## No delete
 

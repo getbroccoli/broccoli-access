@@ -129,6 +129,14 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
           name
         }
       }
+      accountsToRemove {
+        id
+        email
+        app {
+          id
+          name
+        }
+      }
     }
     appInvites {
       id
@@ -314,6 +322,22 @@ mutation UndoPersonAppChoice($input: PersonAppUndoChoiceInput!) {
 mutation OffboardEmployee($input: EmployeeOffboardInput!) {
   apps {
     offboardEmployee(input: $input) {
+      employee {
+        id
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation RemoveEmployeeAccounts($input: EmployeeRemoveAccountsInput!) {
+  apps {
+    removeEmployeeAccounts(input: $input) {
       employee {
         id
       }

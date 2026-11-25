@@ -174,13 +174,14 @@ function changingConnectorsOf(listed: readonly Connector[]): ChangingConnectors 
   };
 }
 
-/** A Disable the connector verified for this member, which no scan has saved as suspended yet. */
+/**
+ * A Disable the connector verified for this member, which no scan has saved as suspended yet; or a
+ * failed Remove of it, which was only asked of a disabled member, so its retry stays offered.
+ */
 function disabledHere(change: AccountChange | null, member: ConnectionMember | null): boolean {
-  return (
-    change?.action === "suspend" &&
-    change.status === "succeeded" &&
-    change.sourceKey === member?.sourceKey
-  );
+  const verifiedDisable = change?.action === "suspend" && change.status === "succeeded";
+  const failedRemove = change?.action === "remove" && change.status === "failed";
+  return (verifiedDisable || failedRemove) && change.sourceKey === member?.sourceKey;
 }
 
 function latestForMember(

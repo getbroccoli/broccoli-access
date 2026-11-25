@@ -32,6 +32,41 @@ export interface EmployeeOffboarding {
   accountsToDisable: AppUser[];
   /** What the owner does by hand, as the offboarding plan orders it. */
   byHandWork: OffboardingByHandWork[];
+  /** Their disabled accounts that offer Remove now, never the directory's, by app name. */
+  accountsToRemove: AppUser[];
+}
+
+/**
+ * Queues a Remove of each of the person's disabled accounts, in the apps the owner confirmed, as
+ * single Removes from their rows would; returns their offboarding as it is afterwards.
+ */
+export async function removeEmployeeAccounts(
+  dependencies: AccountChangeDependencies,
+  ctx: SecurityContext,
+  { employeeId, accountIds }: { employeeId: string; accountIds: readonly string[] },
+): Promise<EmployeeOffboarding> {
+  const { employee, requestedBy } = await readAsker(
+    dependencies,
+    ctx,
+    employeeId,
+    "remove accounts",
+  );
+  const connectors = await dependencies.connectors.list();
+  const changeIds = await dependencies.transact((tx) =>
+    queueChanges(dependencies, tx, {
+      employeeId: employee.id,
+      only: accountIds,
+      requestedBy,
+      connectors,
+      action: "remove",
+    }),
+  );
+  dependencies.logger.info(
+    { employeeId: employee.id, changeIds },
+    "Employee account removals queued",
+  );
+  const [offboarding] = await readOffboardings(dependencies, ctx, [employee.id]);
+  return offboarding!;
 }
 
 /** Queues the person's Disables and publishes their offboarding, as `AccountChangeService` says. */
@@ -40,25 +75,21 @@ export async function offboardEmployee(
   ctx: SecurityContext,
   { employeeId, appIds }: { employeeId: string; appIds: readonly string[] },
 ): Promise<EmployeeOffboarding> {
-  ctx.require("MANAGE_WORKSPACE");
-  if (!ctx.user) {
-    throw new ApplicationError("FORBIDDEN", "Only a signed-in user can offboard a person.");
-  }
-  const requestedBy = ctx.user.userId;
-  const [employee] = parseUuid(employeeId)
-    ? await dependencies.employees.readEmployees(ctx, [employeeId])
-    : [];
-  if (!employee) {
-    throw new ApplicationError("NOT_FOUND", "No employee has this id.");
-  }
+  const { employee, requestedBy } = await readAsker(
+    dependencies,
+    ctx,
+    employeeId,
+    "offboard a person",
+  );
   // Read before the transaction: the container's list may take a while to answer.
   const connectors = await dependencies.connectors.list();
   const changeIds = await dependencies.transact(async (tx) => {
-    const queued = await queueDisables(dependencies, tx, {
+    const queued = await queueChanges(dependencies, tx, {
       employeeId: employee.id,
-      appIds,
+      only: appIds,
       requestedBy,
       connectors,
+      action: "suspend",
     });
     tx.publish("apps.employeeOffboarded", { employeeId: employee.id, requestedBy });
     return queued;
@@ -66,6 +97,26 @@ export async function offboardEmployee(
   dependencies.logger.info({ employeeId: employee.id, changeIds }, "Employee offboarded");
   const [offboarding] = await readOffboardings(dependencies, ctx, [employee.id]);
   return offboarding!;
+}
+
+/** The employee and the signed-in user who asks for a change of their accounts. */
+async function readAsker(
+  dependencies: AccountChangeDependencies,
+  ctx: SecurityContext,
+  employeeId: string,
+  does: string,
+) {
+  ctx.require("MANAGE_WORKSPACE");
+  if (!ctx.user) {
+    throw new ApplicationError("FORBIDDEN", `Only a signed-in user can ${does}.`);
+  }
+  const [employee] = parseUuid(employeeId)
+    ? await dependencies.employees.readEmployees(ctx, [employeeId])
+    : [];
+  if (!employee) {
+    throw new ApplicationError("NOT_FOUND", "No employee has this id.");
+  }
+  return { employee, requestedBy: ctx.user.userId };
 }
 
 /** Each employee's offboarding, in the ids' order. */
@@ -99,28 +150,32 @@ export async function readOffboardings(
 }
 
 /**
- * Writes the employee's running Disables and queues each in its connection's group, the
- * directory's first, joining `tx`; returns the changes' ids.
+ * Writes the employee's running Disables, started from their offboarding, or Removes, as a
+ * single Remove is, and queues each in its connection's group, the directory's first, joining
+ * `tx`; returns the changes' ids.
  */
-async function queueDisables(
+async function queueChanges(
   dependencies: AccountChangeDependencies,
   tx: Tx,
   {
     employeeId,
-    appIds,
+    only,
     requestedBy,
     connectors,
+    action,
   }: {
     employeeId: string;
-    appIds: readonly string[];
+    /** The ids the owner confirmed: of apps for Disable, of accounts for Remove. */
+    only: readonly string[];
     requestedBy: string;
     connectors: readonly Connector[];
+    action: "suspend" | "remove";
   },
 ): Promise<string[]> {
   // The lock scans and a second Offboard take first, so the accounts read below stay as they are.
   await appAccountRepository(tx).lockForSync();
   const { facts, ...accounts } = await readAccounts(dependencies, tx, [employeeId], connectors);
-  const { accountsToDisable } = offboardingOf({
+  const offboarding = offboardingOf({
     employeeId,
     offboardedAt: null,
     invitedAppIds: [],
@@ -129,31 +184,84 @@ async function queueDisables(
   });
   const requestedAt = new Date();
   const changeIds: string[] = [];
-  // Only what the owner confirmed: an account found since the dialog opened stays as it is.
-  for (const account of accountsToDisable.filter(({ appId }) => appIds.includes(appId))) {
-    // An account that offers Disable has its connection and the connection's member.
+  const confirmed = confirmedAccounts(offboarding, action, only);
+  // Locked in id order, so a row's change of the same account cannot deadlock with this; queued in
+  // the plan's order, the directory's first.
+  for (const { id } of confirmed.toSorted((a, b) => a.id.localeCompare(b.id))) {
+    await appAccountRepository(tx).lockById(id);
+  }
+  for (const account of confirmed) {
     const { connection, member } = facts.get(account.id)!;
-    const change = await accountChangeRepository(tx).insertRunning({
-      appAccountId: account.id,
-      appId: account.appId,
-      email: account.email,
-      connectionId: connection!.id,
-      action: "suspend",
-      role: null,
-      sourceKey: member!.sourceKey,
+    const changeId = await queueChange(dependencies, tx, {
+      account,
+      // An account that offers the change has its connection and the connection's member.
+      connection: connection!,
+      member: member!,
+      action,
+      employeeId,
       requestedBy,
       requestedAt,
-      startedFrom: "offboarding",
-      employeeId,
     });
-    // A Disable of the same account asked meanwhile committed first, and does the same.
-    if (!change) {
-      continue;
+    if (changeId) {
+      changeIds.push(changeId);
     }
-    await dependencies.jobs.send(tx, RUN_JOB, { changeId: change.id }, { group: connection!.id });
-    changeIds.push(change.id);
   }
   return changeIds;
+}
+
+/** Only what the owner confirmed: an account found since the dialog opened stays as it is. */
+function confirmedAccounts(
+  { accountsToDisable, accountsToRemove }: EmployeeOffboarding,
+  action: "suspend" | "remove",
+  only: readonly string[],
+): AppUser[] {
+  return action === "suspend"
+    ? accountsToDisable.filter(({ appId }) => only.includes(appId))
+    : accountsToRemove.filter(({ id }) => only.includes(id));
+}
+
+/** Writes one running change and queues its run; null when the same change was asked meanwhile. */
+async function queueChange(
+  dependencies: AccountChangeDependencies,
+  tx: Tx,
+  {
+    account,
+    connection,
+    member,
+    action,
+    employeeId,
+    requestedBy,
+    requestedAt,
+  }: {
+    account: AppUser;
+    connection: { id: string };
+    member: { sourceKey: string };
+    action: "suspend" | "remove";
+    employeeId: string;
+    requestedBy: string;
+    requestedAt: Date;
+  },
+): Promise<string | null> {
+  const change = await accountChangeRepository(tx).insertRunning({
+    appAccountId: account.id,
+    appId: account.appId,
+    email: account.email,
+    connectionId: connection.id,
+    action,
+    role: null,
+    sourceKey: member.sourceKey,
+    requestedBy,
+    requestedAt,
+    // A Remove keeps the offboarding's date and is one of its account's own, as from its row.
+    startedFrom: action === "suspend" ? "offboarding" : "account",
+    employeeId: action === "suspend" ? employeeId : null,
+  });
+  // A change of the same account asked meanwhile committed first, and does the same.
+  if (!change) {
+    return null;
+  }
+  await dependencies.jobs.send(tx, RUN_JOB, { changeId: change.id }, { group: connection.id });
+  return change.id;
 }
 
 /** An account with what its row shows of Disable and Enable. */
@@ -233,5 +341,8 @@ function offboardingOf({
     directoryAccount: users.find(({ appId }) => appId === directoryAppId) ?? null,
     accountsToDisable: plan.accountIdsToDisable.map((id) => byId.get(id)!),
     byHandWork: plan.byHandWork,
+    accountsToRemove: users.filter(
+      ({ appId, changeState }) => appId !== directoryAppId && changeState.offersRemove,
+    ),
   };
 }
