@@ -89,14 +89,7 @@ export async function replaceSecrets(
   return { connector, connection: summary };
 }
 
-/** What a connection's summary reads of the stored connection. */
-interface StoredConnection {
-  id: string;
-  settings: Record<string, unknown>;
-  noticeAcceptedAt: Date | null;
-  sessionFrom: AppSessionSource | null;
-}
-
+/** The connection as Settings and its app's page show it. */
 export function summaryOf(
   connector: ContainerConnector,
   connection: StoredConnection,
@@ -108,4 +101,12 @@ export function summaryOf(
     sessionFrom: connection.sessionFrom,
     connector,
   };
+}
+
+/** What a connection's summary reads of the stored connection. */
+interface StoredConnection {
+  id: string;
+  settings: Record<string, unknown>;
+  noticeAcceptedAt: Date | null;
+  sessionFrom: AppSessionSource | null;
 }
