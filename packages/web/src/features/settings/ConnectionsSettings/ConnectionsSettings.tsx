@@ -26,7 +26,8 @@ export function ConnectionsSettings({ integrationUserError }: Props) {
   const connection = data?.setup.googleWorkspace;
   const isSettingUpSignIn =
     data?.setup.integrationUser?.signInStatus === "SETTING_UP_TWO_STEP_SIGN_IN";
-  usePollWhileScanning(connection?.scan?.status === "SCANNING" || isSettingUpSignIn, query);
+  const isScanning = connection?.scan?.status === "SCANNING";
+  usePollWhileScanning(isScanning || isSettingUpSignIn, query);
 
   return (
     <div className="flex max-w-4xl flex-col">
@@ -68,7 +69,7 @@ export function ConnectionsSettings({ integrationUserError }: Props) {
             />
           </section>
         )}
-        <ContainerConnectorsSettings />
+        <ContainerConnectorsSettings directoryScanning={isScanning} />
       </div>
       <ChromeExtensionCard />
     </div>

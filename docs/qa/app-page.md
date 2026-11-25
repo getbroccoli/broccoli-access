@@ -100,7 +100,7 @@ Slack connected as the integration user, as in the Connections checklist.
 
 - [ ] After `curl -s -X POST "$FAKE/_fake/slack/sessions/expire"`, disabling Ana on Slack's page ends with "Disabled" and the header stays "Connected": the session was renewed by itself.
 - [ ] After the expiry and a planned `blocked_by_check` on `connections/sign-in`, disabling Ana ends with "Couldn’t disable"; the header reads "Reconnect" with an amber banner naming the integration user and the check, and "Sign in again as the integration user"; "Couldn’t disable" explains the same and offers that button.
-- [ ] After suspending `broccoli@acme.example` in the fake Google and a Google Workspace scan, Slack's page, without a Slack scan, reads "Reconnect" with "Slack stopped: the integration user is suspended in Google." and "Restore the integration user in Google, then sign in again.", and its people's rows end with "Reconnect" instead of Disable; the person page of someone with a Slack account shows the same. Unsuspending and scanning Google brings back "Connected".
+- [ ] After suspending `broccoli@acme.example` in the fake Google and a Google Workspace scan, Slack's page, without a Slack scan, reads "Reconnect" with "Slack stopped: the integration user is suspended in Google." and "Restore the integration user in Google, then sign in again.", and its people's rows end with "Sign in again as the integration user" instead of Disable; the person page of someone with a Slack account shows the same. Unsuspending and scanning Google brings back "Connected".
 
 ## Not found
 
