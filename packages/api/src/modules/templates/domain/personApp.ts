@@ -7,6 +7,8 @@ export interface PersonApp {
   templates: Template[];
   roleConflict: boolean;
   role: string | null;
+  /** The owner's own choice for this person, while it changes what their templates give. */
+  choice: "added" | "removed" | null;
   accountStatus: AccountStatus | null;
   state: "active" | "suspended" | "missing" | "invited" | "extra" | null;
 }
@@ -54,11 +56,11 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
     const source = sources.get(appId);
     const templates = source?.templates ?? [];
     const choice = choices.get(appId);
-    const expected =
-      choice?.choice === "added" || (templates.length > 0 && choice?.choice !== "removed");
+    const ownChoice = effectiveChoice(templates, choice);
+    const expected = ownChoice === "added" || (templates.length > 0 && ownChoice !== "removed");
     const account = accounts.get(appId);
     const invite = invites.get(appId);
-    if (!expected && !account && !invite) continue;
+    if (!expected && !account && !invite && !ownChoice) continue;
     const extra =
       choice?.choice === "to_review" || (facts.templates.length > 0 && facts.listedApps.has(appId));
     const state = appState({ expected, account, invited: !!invite?.invitedAt, extra });
@@ -66,6 +68,7 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
       appId,
       templates,
       ...personAppRole(source?.roles ?? new Set(), choice),
+      choice: ownChoice,
       accountStatus: account ?? null,
       state,
     });
@@ -75,7 +78,7 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
 
 /** A choice of default is as explicit as any other picked role. */
 export function personAppRole(roles: ReadonlySet<string | null>, choice?: EmployeeAppChoice) {
-  if (choice?.choice === "added") return { role: choice.role, roleConflict: false };
+  if (choice?.choice === "added" && !roles.size) return { role: choice.role, roleConflict: false };
   if (choice?.choice === "removed") return { role: null, roleConflict: false };
   if (roles.size < 2) return { role: roles.values().next().value ?? null, roleConflict: false };
   if (choice?.choice === "role_picked" && pickStillApplies(roles, choice.role)) {
@@ -87,6 +90,13 @@ export function personAppRole(roles: ReadonlySet<string | null>, choice?: Employ
 /** A saved choice lasts only while its role belongs to a disagreement. */
 export function pickStillApplies(roles: ReadonlySet<string | null>, role: string | null) {
   return roles.size > 1 && roles.has(role);
+}
+
+/** An addition counts only while no template gives the app, and a removal only while one does. */
+function effectiveChoice(templates: readonly Template[], choice?: EmployeeAppChoice) {
+  if (choice?.choice === "added" && !templates.length) return "added";
+  if (choice?.choice === "removed" && templates.length) return "removed";
+  return null;
 }
 
 function appState({

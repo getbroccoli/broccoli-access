@@ -50,6 +50,7 @@ test("lists a shared app once with both template sources and the apps each templ
     templates: [fromEveryone],
     role: null,
     roleConflict: false,
+    choice: null,
     state: "active",
   });
   expect.soft(rows).toContainEqual({
@@ -58,6 +59,7 @@ test("lists a shared app once with both template sources and the apps each templ
     templates: [fromEngineer],
     role: null,
     roleConflict: false,
+    choice: null,
     state: "missing",
   });
   const shared = rows!.find(({ appId }) => appId === slack.id);
