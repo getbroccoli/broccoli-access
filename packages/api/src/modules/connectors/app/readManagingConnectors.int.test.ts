@@ -1,4 +1,5 @@
 import {
+  apps,
   containerConnections,
   EMPLOYEE,
   expect,
@@ -7,6 +8,36 @@ import {
   serveManifest,
   test,
 } from "#test/support";
+
+test("matches only Slack among discovered apps even when everyone uses Figma", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  await seed.app({ name: "Slack", catalogKey: "slack" });
+  const figma = await seed.app({ name: "Figma", domain: "figma.com", catalogKey: "figma" });
+  const directory = await seed.app({
+    name: "Google Workspace",
+    domain: "workspace.google.com",
+    catalogKey: "google_workspace",
+    status: "approved",
+  });
+  const employee = await seed.employee();
+  const account = { employeeId: employee.id, email: employee.email };
+  await seed.appAccount({ ...account, appId: directory.id, foundVia: ["google_directory"] });
+  await seed.appAccount({ ...account, appId: figma.id });
+  const { edges } = await apps(orm).listApps(OWNER, { status: "discovered" });
+  const catalogKeys = edges.flatMap(({ node }) => (node.catalogKey ? [node.catalogKey] : []));
+  const { service } = containerConnections(orm, fakeConnectors.url);
+
+  const managing = await service.readManagingConnectors(OWNER, catalogKeys);
+
+  expect(edges.map(({ node }) => node)).toMatchObject([
+    { catalogKey: "figma", peopleCount: 1 },
+    { catalogKey: "slack", peopleCount: 0 },
+  ]);
+  expect([...managing.keys()]).toEqual(["slack"]);
+});
 
 test("only Slack and Linear have managing connectors among the requested apps", async ({
   orm,

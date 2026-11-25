@@ -4,7 +4,7 @@ A manual check of the Applications page, the home page, against a development st
 
 ## Setup
 
-1. Start the stack with `pnpm dev --drop-db`, connect Google Workspace and finish setup with the six preselected apps, as in [QA setup](setup.md) and [QA setup page](setup-page.md).
+1. Start the stack with `pnpm dev --drop-db` and connect Google Workspace as in [QA setup](setup.md). Keep Slack selected and also select Notion, Figma, Miro, Loom and Claude before finishing setup.
 2. Use the browser that finished setup.
 
 ## Header and tabs
@@ -32,6 +32,7 @@ A manual check of the Applications page, the home page, against a development st
 ## Scan now
 
 - [ ] Add a grant for a new app in the fake Google (`POST /_fake/grants` with an `email`, a new `clientId` and an `appName`, see [the fake apps](../fake-apps.md#control-endpoints)), then "Scan now": the button turns inactive and the header reads "Scanning…"; within a minute, without a reload, the header shows the new time and the counts and the left menu's badge show the new app in Discovered.
+- [ ] Add a Linear grant and scan again before connecting Linear. In Discovered, Linear shows "Manageable" after its name, with the description "Broccoli Access can manage accounts in this app once you connect it." The app without a connector has no chip.
 - [ ] A Discovered row has "Approve" and no "Ignore"; "Approve" moves it to Approved and the left menu's badge goes.
 
 ## Connection

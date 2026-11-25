@@ -22,7 +22,6 @@ import {
   type AppStatus,
   countSuspendedWithAccess,
   type FoundApp,
-  isPreselected,
   planAppMatches,
   type Since,
 } from "../domain";
@@ -122,7 +121,6 @@ export interface AppSummary extends App {
   foundVia: string[];
   /** Null without users. */
   since: Since | null;
-  preselected: boolean;
   /** How many of its users still have an active account though the directory suspended them. */
   suspendedWithAccessCount: number;
   /** Whether a connection reads it; a connected app stays approved. */
@@ -282,8 +280,8 @@ async function settleDiscoveredApps(
 }
 
 /**
- * The apps with their people, how those were found, since when, whether setup preselects them, who
- * keeps access though suspended, and whether they are connected.
+ * The apps with their people, how those were found, since when, who keeps access though suspended,
+ * and whether they are connected.
  */
 async function summarize(
   dependencies: Pick<AppDependencies, "orm" | "connectors" | "members">,
@@ -293,10 +291,8 @@ async function summarize(
   const accounts = appAccountRepository(orm);
   const appIds = apps.map(({ id }) => id);
   const inAppFacts = await findInAppFacts(orm, dependencies);
-  const [accountsOfUsers, directoryPeople, connections, suspended] = await Promise.all([
+  const [accountsOfUsers, connections, suspended] = await Promise.all([
     accounts.findUsersOfApps(appIds, inAppFacts),
-    // Every employee holds a directory account, so they are the directory's people.
-    accounts.countEmployeesWithAccounts(),
     appConnectionRepository(orm).findByApps(appIds),
     findEmployeesInDirectory(orm, connectors, { status: "suspended" }),
   ]);
@@ -312,7 +308,6 @@ async function summarize(
       peopleCount,
       foundVia: [...new Set(appUsers.flatMap(({ foundVia }) => foundVia))].sort(),
       since: appSince(appUsers),
-      preselected: isPreselected(peopleCount, directoryPeople),
       suspendedWithAccessCount: countSuspendedWithAccess(appUsers, suspendedInDirectory),
       connected: connectedAppIds.has(app.id),
     };

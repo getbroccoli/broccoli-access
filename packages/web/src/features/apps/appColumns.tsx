@@ -5,6 +5,7 @@ import { t } from "@/i18n";
 import { FoundVia } from "@/components/FoundVia";
 import { formatSince } from "@/lib/since";
 
+import { StatusBadge } from "./AppPage";
 import { AppRowActions } from "./AppRowActions";
 import {
   AppNameCell,
@@ -21,19 +22,30 @@ const APP_COLUMN: DataTableColumn<ApprovedAppRow> = {
   id: "app",
   header: t("apps.column.app"),
   className: "w-[34%] min-w-48",
-  cell: (row) =>
-    isAppToConnect(row) ? (
+  cell: (row) => {
+    if (isAppToConnect(row)) {
       // An app to connect has no page until connecting adds it; its id is its catalog key.
-      <AppNameCell name={row.name} domain={row.domain} catalogKey={row.id} />
-    ) : (
+      return <AppNameCell name={row.name} domain={row.domain} catalogKey={row.id} />;
+    }
+    const manageable = row.status === "DISCOVERED" && row.preselected === true;
+    const description = manageable ? t("apps.manageableDescription") : undefined;
+    return (
       <Link
         to="/apps/$appId"
         params={{ appId: row.id }}
         className="block rounded-md hover:opacity-80"
+        aria-description={description}
+        title={description}
       >
-        <AppNameCell name={row.name} domain={row.domain} catalogKey={row.catalogKey} />
+        <AppNameCell
+          name={row.name}
+          domain={row.domain}
+          catalogKey={row.catalogKey}
+          badge={manageable && <StatusBadge tone="muted">{t("apps.manageable")}</StatusBadge>}
+        />
       </Link>
-    ),
+    );
+  },
 };
 
 const FOUND_VIA_COLUMN: DataTableColumn<AppRow> = {

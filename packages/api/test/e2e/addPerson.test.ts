@@ -5,7 +5,7 @@ import {
   connectorTest as test,
   createdGoogleUsers,
   expect,
-  finishSetupWithPreselectedApps,
+  finishSetupWithDemoApps,
   linearInvitations,
   NEW_PERSON,
 } from "#test/support";
@@ -95,7 +95,7 @@ test("the owner corrects a wrong-domain email and can discard the pending person
   env,
 }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const input = { ...NEW_PERSON, templateIds: [] };
   const invalid = await browser.graphql(ADD_PERSON, {
     input: { ...input, email: "robin@other.example" },
@@ -133,7 +133,7 @@ test("the owner corrects a wrong-domain email and can discard the pending person
 
 test("editing a pending person's work email returns a typed conflict", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const saved = await browser.graphql(ADD_PERSON, { input: { ...NEW_PERSON, templateIds: [] } });
   const result = (await saved.json()) as {
     data: { apps: { addPerson: { employee: { id: string } } } };

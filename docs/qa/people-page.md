@@ -4,7 +4,7 @@ A manual check of the People page against a development stack: everyone in Googl
 
 ## Setup
 
-1. Start the stack, connect Google Workspace as `admin@acme.example`, and finish setup with the six preselected apps ("Approve 6 and finish") as in [QA setup](setup.md).
+1. Start the stack and connect Google Workspace as `admin@acme.example`, as in [QA setup](setup.md). Keep Slack selected and also select Notion, Figma, Miro, Loom and Claude before finishing setup.
 2. Note the fake Google's address that `pnpm dev` prints; its controls are under `/_fake` (see `docs/fake-apps.md`).
 
 ## All

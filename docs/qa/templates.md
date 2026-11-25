@@ -4,7 +4,7 @@ A manual check of the Templates page and a template's page against a development
 
 ## Setup
 
-1. Start the stack, connect Google Workspace as `admin@acme.example`, and finish setup with the six preselected apps ("Approve 6 and finish") as in [QA setup](setup.md).
+1. Start the stack, connect Google Workspace as `admin@acme.example`, and finish setup with Slack preselected ("Approve 1 and finish") as in [QA setup](setup.md).
 2. On Applications, connect Linear with the key `lin_api_acme_fake`, so Slack and Linear are both approved.
 
 ## Templates

@@ -171,7 +171,6 @@ export function createResolvers(
       peopleCount: async (app, _args, context) => (await summary(app, context)).peopleCount,
       foundVia: async (app, _args, context) => (await summary(app, context)).foundVia,
       since: async (app, _args, context) => (await summary(app, context)).since,
-      preselected: async (app, _args, context) => (await summary(app, context)).preselected,
       suspendedWithAccessCount: async (app, _args, context) =>
         (await summary(app, context)).suspendedWithAccessCount,
       connected: async (app, _args, context) => (await summary(app, context)).connected,

@@ -1,10 +1,10 @@
 import { ACME } from "@broccoli-access/fake-apps";
 
-import { expect, finishSetupWithPreselectedApps, test, type Browser } from "#test/support";
+import { expect, finishSetupWithDemoApps, test, type Browser } from "#test/support";
 
 test("reads a suspended person's app accounts through the API", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const people = await browser.graphql(`{
     employees(filter: { search: "ana@acme.example" }) { edges { node { id } } }
   }`);

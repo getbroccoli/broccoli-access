@@ -102,48 +102,87 @@ test("refuses an app user limit below one with a field error", async ({ env }) =
   });
 }, 90_000);
 
-test("the owner's consent and scan open the app list and selecting apps finishes setup", async ({
-  env,
-}) => {
-  const { browser } = await env.signInAsOwner();
-  const discovered = await scannedApps(browser);
-  const approvedAppIds = discovered.filter(({ preselected }) => preselected).map(({ id }) => id);
+connectorTest(
+  "preselects discovered apps with a managing connector",
+  async ({ env }) => {
+    const { browser } = await env.signInAsOwner();
+    await scannedApps(browser);
 
-  const response = await browser.graphql(
-    `
+    const response = await browser.graphql(`{
+    apps(status: DISCOVERED) {
+      edges { node { name preselected managingConnector { id } } }
+    }
+  }`);
+
+    type DiscoveredApp = {
+      name: string;
+      preselected: boolean;
+      managingConnector: { id: string } | null;
+    };
+    const body = (await response.json()) as {
+      data: { apps: { edges: { node: DiscoveredApp }[] } };
+    };
+    expect(body).not.toHaveProperty("errors");
+    const { edges } = body.data.apps;
+    expect(edges.find(({ node }) => node.name === "Slack")?.node).toEqual({
+      name: "Slack",
+      preselected: true,
+      managingConnector: { id: "slack" },
+    });
+    expect(edges.find(({ node }) => node.name === "Figma")?.node).toEqual({
+      name: "Figma",
+      preselected: false,
+      managingConnector: null,
+    });
+  },
+  90_000,
+);
+
+connectorTest(
+  "finishes setup with Slack as the only default selection",
+  async ({ env }) => {
+    const { browser } = await env.signInAsOwner();
+    const discovered = await scannedApps(browser);
+    const selected = discovered.filter(({ preselected }) => preselected);
+    expect(selected.map(({ name }) => name)).toEqual(["Slack"]);
+
+    const response = await browser.graphql(
+      `
     mutation FinishSetup($input: SetupFinishInput!) {
       apps { finishSetup(input: $input) { setup { step } error { __typename } } }
     }
   `,
-    { input: { approvedAppIds } },
-  );
+      { input: { approvedAppIds: selected.map(({ id }) => id) } },
+    );
 
-  expect(await response.json()).toEqual({
-    data: { apps: { finishSetup: { setup: { step: "DONE" }, error: null } } },
-  });
-  const counts = await browser.graphql(
-    "{ appCounts { approved discovered ignored } setup { step } }",
-  );
-  expect(await counts.json()).toEqual({
-    data: { appCounts: { approved: 7, discovered: 0, ignored: 31 }, setup: { step: "DONE" } },
-  });
-}, 90_000);
+    expect(await response.json()).toEqual({
+      data: { apps: { finishSetup: { setup: { step: "DONE" }, error: null } } },
+    });
+    const counts = await browser.graphql(
+      "{ appCounts { approved discovered ignored } setup { step } }",
+    );
+    expect(await counts.json()).toEqual({
+      data: { appCounts: { approved: 2, discovered: 0, ignored: 36 }, setup: { step: "DONE" } },
+    });
+  },
+  90_000,
+);
 
 test("updates app counts when ignoring and approving apps after setup", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
   const discovered = await scannedApps(browser);
-  const approvedAppIds = discovered.filter(({ preselected }) => preselected).map(({ id }) => id);
+  const slack = discovered.find(({ name }) => name === "Slack")!;
   const claude = discovered.find(({ name }) => name === "Claude")!;
   const chatgpt = discovered.find(({ name }) => name === "ChatGPT")!;
   const finished = await browser.graphql(
     "mutation FinishSetup($input: SetupFinishInput!) { apps { finishSetup(input: $input) { error { __typename } } } }",
-    { input: { approvedAppIds } },
+    { input: { approvedAppIds: [slack.id, claude.id] } },
   );
   expect(await finished.json()).toEqual({ data: { apps: { finishSetup: { error: null } } } });
 
   const initial = await browser.graphql("{ appCounts { approved discovered ignored } }");
   expect(await initial.json()).toEqual({
-    data: { appCounts: { approved: 7, discovered: 0, ignored: 31 } },
+    data: { appCounts: { approved: 3, discovered: 0, ignored: 35 } },
   });
 
   const ignored = await browser.graphql(
@@ -159,7 +198,7 @@ test("updates app counts when ignoring and approving apps after setup", async ({
   });
   const afterIgnoring = await browser.graphql("{ appCounts { approved discovered ignored } }");
   expect(await afterIgnoring.json()).toEqual({
-    data: { appCounts: { approved: 6, discovered: 0, ignored: 32 } },
+    data: { appCounts: { approved: 2, discovered: 0, ignored: 36 } },
   });
 
   const approved = await browser.graphql(
@@ -175,7 +214,7 @@ test("updates app counts when ignoring and approving apps after setup", async ({
   });
   const afterApproving = await browser.graphql("{ appCounts { approved discovered ignored } }");
   expect(await afterApproving.json()).toEqual({
-    data: { appCounts: { approved: 7, discovered: 0, ignored: 31 } },
+    data: { appCounts: { approved: 3, discovered: 0, ignored: 35 } },
   });
 
   const list = await browser.graphql(
@@ -196,11 +235,10 @@ test("updates app counts when ignoring and approving apps after setup", async ({
 test("reads Figma and its users with their directory status after setup", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
   const discovered = await scannedApps(browser);
-  const approvedAppIds = discovered.filter(({ preselected }) => preselected).map(({ id }) => id);
   const figma = discovered.find(({ name }) => name === "Figma")!;
   const finished = await browser.graphql(
     "mutation FinishSetup($input: SetupFinishInput!) { apps { finishSetup(input: $input) { error { __typename } } } }",
-    { input: { approvedAppIds } },
+    { input: { approvedAppIds: [figma.id] } },
   );
   expect(await finished.json()).toEqual({ data: { apps: { finishSetup: { error: null } } } });
 

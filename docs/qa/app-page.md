@@ -4,7 +4,7 @@ A manual check of an app's page, `/apps/<id>`, against a development stack.
 
 ## Setup
 
-1. Start the stack with `pnpm dev --drop-db`, connect Google Workspace and finish setup with the six preselected apps, as in [QA setup](setup.md).
+1. Start the stack with `pnpm dev --drop-db` and connect Google Workspace as in [QA setup](setup.md). Keep Slack selected and also select Notion, Figma, Miro, Loom and Claude before finishing setup.
 2. Use the browser that finished setup, and open Figma from Applications.
 
 ## Figma
@@ -46,7 +46,7 @@ Connect Linear in Settings → Apps as in [Apps settings](apps-settings.md#apps)
 
 ## Connecting from the page
 
-On a new stack (`pnpm dev --drop-db`), add Linear grants for a few Acme people with `POST /_fake/grants` (`appName` "Linear", see [the fake apps](../fake-apps.md#control-endpoints)) before setup, then finish setup with the preselected apps; Linear is ignored.
+On a new stack (`pnpm dev --drop-db`), add Linear grants for a few Acme people with `POST /_fake/grants` (`appName` "Linear", see [the fake apps](../fake-apps.md#control-endpoints)) before setup. Clear Linear before finishing setup so it moves to Ignored.
 
 - [ ] Linear's page shows "Approve", "Connect Linear" and the note.
 - [ ] Connecting it there with `lin_api_acme_fake` turns the page, without a reload, to "Approved" and "Connected" with "Open Linear admin" and "Scan now", and lists the users with "In Linear" once the scan ends.

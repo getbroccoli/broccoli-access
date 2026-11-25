@@ -11,26 +11,7 @@ import {
   storedRecordHistory,
 } from "#test/support";
 
-test("finishes setup with the six preselected apps and Google Workspace approved", async ({
-  orm,
-  fakeGoogle,
-}) => {
-  const { scans, sourceId } = await googleScanSetup(orm, fakeGoogle.url);
-  await scans.runScan(SYSTEM, sourceId);
-  const service = apps(orm);
-  const { edges } = await service.listApps(OWNER, { status: "discovered" });
-  const approvedAppIds = edges.filter(({ node }) => node.preselected).map(({ node }) => node.id);
-
-  await service.finishSetup(OWNER, { approvedAppIds });
-
-  expect(await service.countApps(OWNER)).toEqual({ approved: 7, discovered: 0, ignored: 31 });
-  expect(
-    (await service.listApps(OWNER, { status: "approved" })).edges.map(({ node }) => node.name),
-  ).toEqual(["Google Workspace", "Slack", "Notion", "Figma", "Miro", "Loom", "Claude"]);
-  expect((await instances.readInstance(orm)).step).toBe("done");
-});
-
-test("follows the owner's changed selection of ChatGPT instead of Claude", async ({
+test("finishes setup with the selected apps and Google Workspace approved", async ({
   orm,
   fakeGoogle,
 }) => {
@@ -39,15 +20,31 @@ test("follows the owner's changed selection of ChatGPT instead of Claude", async
   const service = apps(orm);
   const { edges } = await service.listApps(OWNER, { status: "discovered" });
   const approvedAppIds = edges
-    .filter(({ node }) => (node.preselected && node.name !== "Claude") || node.name === "ChatGPT")
+    .filter(({ node }) => ["Slack", "Figma"].includes(node.name))
     .map(({ node }) => node.id);
 
   await service.finishSetup(OWNER, { approvedAppIds });
 
+  expect(await service.countApps(OWNER)).toEqual({ approved: 3, discovered: 0, ignored: 35 });
+  expect(
+    (await service.listApps(OWNER, { status: "approved" })).edges.map(({ node }) => node.name),
+  ).toEqual(["Google Workspace", "Slack", "Figma"]);
+  expect((await instances.readInstance(orm)).step).toBe("done");
+});
+
+test("follows the owner's selection of ChatGPT instead of Slack", async ({ orm, fakeGoogle }) => {
+  const { scans, sourceId } = await googleScanSetup(orm, fakeGoogle.url);
+  await scans.runScan(SYSTEM, sourceId);
+  const service = apps(orm);
+  const { edges } = await service.listApps(OWNER, { status: "discovered" });
+  const chatgpt = edges.find(({ node }) => node.name === "ChatGPT")!.node;
+
+  await service.finishSetup(OWNER, { approvedAppIds: [chatgpt.id] });
+
   const saved = await storedApps(orm);
   expect(saved.find(({ name }) => name === "ChatGPT")!.status).toBe("approved");
-  expect(saved.find(({ name }) => name === "Claude")!.status).toBe("ignored");
-  expect(await service.countApps(OWNER)).toEqual({ approved: 7, discovered: 0, ignored: 31 });
+  expect(saved.find(({ name }) => name === "Slack")!.status).toBe("ignored");
+  expect(await service.countApps(OWNER)).toEqual({ approved: 2, discovered: 0, ignored: 36 });
 });
 
 test("records one owner-authored status change per discovered app and none for Google Workspace", async ({
@@ -58,7 +55,7 @@ test("records one owner-authored status change per discovered app and none for G
   await scans.runScan(SYSTEM, sourceId);
   const service = apps(orm);
   const { edges } = await service.listApps(OWNER, { status: "discovered" });
-  const approvedAppIds = edges.filter(({ node }) => node.preselected).map(({ node }) => node.id);
+  const approvedAppIds = [edges.find(({ node }) => node.name === "Slack")!.node.id];
   const before = await storedRecordHistory(orm);
 
   await service.finishSetup(OWNER, { approvedAppIds });
@@ -97,8 +94,8 @@ test("refuses to finish setup twice without changing apps, history or the step",
   await scans.runScan(SYSTEM, sourceId);
   const service = apps(orm);
   const { edges } = await service.listApps(OWNER, { status: "discovered" });
-  const approvedAppIds = edges.filter(({ node }) => node.preselected).map(({ node }) => node.id);
-  await service.finishSetup(OWNER, { approvedAppIds });
+  const slack = edges.find(({ node }) => node.name === "Slack")!.node;
+  await service.finishSetup(OWNER, { approvedAppIds: [slack.id] });
   const before = { apps: await storedApps(orm), history: await storedRecordHistory(orm) };
 
   await expect(service.finishSetup(OWNER, { approvedAppIds: [] })).rejects.toMatchObject({

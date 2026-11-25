@@ -5,7 +5,7 @@ import {
   expect,
   test as baseTest,
   connectorTest as test,
-  finishSetupWithPreselectedApps,
+  finishSetupWithDemoApps,
   LINEAR_INPUT,
   NOTION_INPUT,
   testNotion,
@@ -37,7 +37,7 @@ test("the owner connects Linear and reads its seven employees with their status"
     },
   ]);
 
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const response = await browser.graphql(CONNECT, { input: LINEAR_INPUT });
 
   const connected = (await response.json()) as {
@@ -102,7 +102,7 @@ test("the owner connects Linear and reads its seven employees with their status"
 
 test("reconnects Linear over GraphQL and returns the connected status", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const response = await browser.graphql(CONNECT, { input: LINEAR_INPUT });
   const connected = (await response.json()) as {
     data: { connectors: { connect: { containerConnector: { connection: { id: string } } } } };
@@ -135,7 +135,7 @@ test("reconnects Linear over GraphQL and returns the connected status", async ({
 
 test("Applications offers Linear to connect, then shows it connected", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
 
   const before = await browser.graphql(APPLICATIONS);
   expect(await before.json()).toEqual({
@@ -257,7 +257,7 @@ baseTest.for([
 );
 
 baseTest(
-  "the server starts and lists no connectors when the container is unavailable",
+  "the server starts with no connectors or default app selections when the container is unavailable",
   async ({ fakeGoogle }) => {
     const env = await TestEnv.start({
       googleUrl: fakeGoogle.url,
@@ -267,9 +267,12 @@ baseTest(
     const { browser } = await env.signInAsOwner();
 
     const response = await browser.graphql("{ containerConnectors { id } }");
+    const discovered = await scannedApps(browser);
 
     expect(await response.json()).toEqual({ data: { containerConnectors: [] } });
+    expect(discovered.filter(({ preselected }) => preselected).map(({ name }) => name)).toEqual([]);
   },
+  90_000,
 );
 
 const APPLICATIONS = `{

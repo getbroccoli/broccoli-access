@@ -78,6 +78,8 @@ type App {
   containerConnection: ContainerConnection
   "The container connector that can read its accounts: the one whose key is its catalog key; null when none can, such as for Google Workspace, and while the container has not listed its connectors since the API started."
   managingConnector: ContainerConnector
+  "Whether setup selects this app by default. True when it has a managing connector."
+  preselected: Boolean!
 }
 
 "An app a container connector can manage that no scan has found and nothing has connected, as the catalog names it; computed when read, never stored."
