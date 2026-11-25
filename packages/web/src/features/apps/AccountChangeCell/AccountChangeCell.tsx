@@ -12,7 +12,7 @@ import { t } from "@/i18n";
 import { ReconnectButton } from "../ReconnectButton";
 import { ChangeProgress } from "./ChangeProgress";
 import { ConfirmAccountChangeDialog } from "./ConfirmAccountChangeDialog";
-import { failedChangeOptions, showsCouldntChange } from "./couldntChange";
+import { failedChangeOptions, offersFreshRemove, showsCouldntChange } from "./couldntChange";
 import { RemoveAccountDialog } from "./RemoveAccountDialog";
 import { TryAgainButton } from "./TryAgainButton";
 import { changeTargetOf } from "./useChangeAccount";
@@ -97,9 +97,14 @@ export function AccountChangeCell({ appUser }: Props) {
           retryOf={change.id}
         />
       )}
-      {user.offersRemove && !failedRemove && (
+      {offersFreshRemove(user) && (
         <>
-          <Button size="sm" variant="outline" onClick={() => setRemoving(true)}>
+          <Button
+            size="sm"
+            variant="outline"
+            aria-label={t("apps.change.removeName", { name: user.email, app: user.app.name })}
+            onClick={() => setRemoving(true)}
+          >
             {t("apps.change.remove")}
           </Button>
           <RemoveAccountDialog

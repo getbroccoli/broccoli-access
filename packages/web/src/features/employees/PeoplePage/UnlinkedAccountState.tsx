@@ -38,6 +38,7 @@ export function UnlinkedAccountState({ account, onChanged }: Props) {
         change={failure.data.accountChange}
         row={{
           id: account.id,
+          name: account.displayName,
           offeredChange: account.offeredChange ?? null,
           offersRemove: account.offersRemove,
         }}

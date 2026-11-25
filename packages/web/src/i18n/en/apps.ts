@@ -108,6 +108,7 @@ export const appsEn = {
   "apps.change.inviteRefused":
     "Couldn’t ask to invite {name} to {app}. Check the invite status and the role on their templates, then try again.",
   "apps.change.remove": "Remove",
+  "apps.change.removeName": "Remove {name} from {app}",
   "apps.change.removeTitle": "Remove {name} from {app}?",
   "apps.change.removeWarning": "This cannot be undone.",
   "apps.change.confirmRemove": "Remove from {app}",

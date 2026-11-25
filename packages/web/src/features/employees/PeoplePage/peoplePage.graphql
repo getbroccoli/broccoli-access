@@ -74,6 +74,8 @@ query AccountsWithoutPerson($after: String, $first: Int = 100) {
           action
           status
           changesAhead
+          failure
+          finishedAt
         }
         app {
           id
@@ -86,6 +88,7 @@ query AccountsWithoutPerson($after: String, $first: Int = 100) {
             scan {
               id
               sourceName
+              readAt
             }
           }
         }

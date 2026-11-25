@@ -41,6 +41,8 @@ type Props = {
    */
   row?: {
     id: string;
+    /** How the row names an account without an employee; its email otherwise. */
+    name?: string | null;
     roleConflict?: boolean;
     offeredChange?: AccountChangeAction | null;
     offersRemove?: boolean;
@@ -80,8 +82,9 @@ export function CouldntChangeDialog({
   }
   const { employee, app } = change;
   const connection = app.containerConnection;
-  const name = employee ? `${employee.firstName} ${employee.lastName}` : change.email;
-  const firstName = employee?.firstName ?? change.email;
+  const accountName = row?.name ?? change.email;
+  const name = employee ? `${employee.firstName} ${employee.lastName}` : accountName;
+  const firstName = employee?.firstName ?? accountName;
   const workspace = connection?.scan?.sourceName ?? app.name;
   const options = row ? failedChangeOptions({ ...row, latestChange: change, app }) : NO_OPTIONS;
   const copy = COPY[change.action];
@@ -104,7 +107,7 @@ export function CouldntChangeDialog({
       change.action === "REMOVE" ? change.id : undefined,
     ).then(onChanged);
   };
-  const target = row && rowTarget(row.id, change);
+  const target = row && rowTarget(row.id, change, name);
   const scan = (connectionId: string) => {
     setShown(null);
     scanNow({ variables: { connectionId } }).catch(() => toast.error(t("scans.scanNowFailed")));
@@ -239,11 +242,11 @@ const COPY = {
 type FailedChange = CouldntChangeDialog_AccountChangeFragment;
 
 /** What Try again asks for: an invite goes to an employee; an account without one goes by its email. */
-function rowTarget(rowId: string, { action, employee, email, app }: FailedChange) {
+function rowTarget(rowId: string, { action, employee, app }: FailedChange, name: string) {
   if (employee) {
     return changeTargetOf({ id: rowId, employee, app }, action);
   }
-  return action === "INVITE" ? undefined : { name: email, app: app.name, accountId: rowId };
+  return action === "INVITE" ? undefined : { name, app: app.name, accountId: rowId };
 }
 
 /** "Asked by Mia Novak today at 10:14.", or on an earlier day. */

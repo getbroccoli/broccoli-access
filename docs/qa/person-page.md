@@ -34,6 +34,11 @@ Approve Slack again on its page, connect Linear as in [Connections settings](con
 - [ ] Assign Linear users to Chloé again. The row shows both **Disabled** and **Missing**. Set `fail unexpected_response` as described above, then choose **Enable**. Open the failure and choose **I did it by hand**. With the Network panel recording, use a local test proxy to allow the confirmation mutation and fail the next person-page read once. Confirm. The page says the change was saved, explains that the displayed access could not refresh and offers a retry.
 - [ ] Retry from that message. The Network panel shows a read and just one confirmation mutation across both attempts. Without a reload, the row shows **Active** and **Disable**, and Missing clears.
 
+## Remove
+
+- [ ] On Hannah Weber's page the Linear row (disabled) offers "Enable" and "Remove". "Remove" asks "Remove Hannah Weber from Linear?" as on [Linear's page](app-page.md#remove); confirming shows "Removing from Linear…", then the row leaves the list without a reload.
+- [ ] A failed Remove reads "Couldn’t remove" on the row and opens the same dialog as on Linear's page.
+
 ## Invite
 
 Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page](app-page.md) says, and open Ivan Petrov's page: he is active in Google and has no Linear member.

@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RemoveAccountDialog } from "@/features/apps";
+import { offersFreshRemove, RemoveAccountDialog } from "@/features/apps";
 import { t } from "@/i18n";
 
 import { removeAccountWithoutPerson } from "../cache";
@@ -126,7 +126,7 @@ export function AccountsWithoutPersonTable({
                     <DecideAccountMenu
                       disabled={mutation.loading || loading}
                       offeredChange={account.offeredChange ?? null}
-                      offersRemove={account.offersRemove}
+                      offersRemove={offersFreshRemove(account)}
                       onChoose={(action) => setChoosing({ id: account.id, action })}
                     />
                   </span>
