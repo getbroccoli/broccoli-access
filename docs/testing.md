@@ -195,10 +195,10 @@ export AGENT_BROWSER_HEADED=1
 export AGENT_BROWSER_PROFILE="$(mktemp -d)"
 export AGENT_BROWSER_EXTENSIONS="$PWD/packages/extension/dist"
 export AGENT_BROWSER_ARGS="--no-sandbox"
-agent-browser open "$URL/settings/connections"
+agent-browser open "$URL/settings/apps"
 ```
 
-- Settings → Connections finds the extension by loading `chrome-extension://<id>/installed.txt`. Without it the "Chrome extension" card shows Not installed.
+- Settings → Apps finds the extension by loading `chrome-extension://<id>/installed.txt`. Without it the "Chrome extension" card shows Not installed.
 - "Pair this Chrome" opens the pair page in a small window, a tab for agent-browser (`agent-browser tab list`). The page clears its one-time code from the address as it opens. Its Pair button asks Chrome for access to the instance's origin in Chrome's own prompt, which is browser UI outside the page: answer it on the display, such as `xdotool key Tab Return` for Allow. Chrome remembers an allowed origin even after unpairing removes the access, so the prompt shows again only for an origin the profile never allowed; use a new profile to see it again.
 - Never record with `agent-browser record start`, nor anything that runs it, such as ProofShot's `start`: it moves the page into a new browser context where the extension does not run, so Settings shows "Not installed", Connect stays on its first step and `chrome-extension://` addresses fail to load. Record the display instead, such as `/usr/bin/ffmpeg -f x11grab -video_size 1440x900 -framerate 10 -i "$DISPLAY" session.webm`, stopped with `q`.
 - agent-browser turns Chrome's popup blocker off, and can list the pair window as `about:blank`; `agent-browser eval location.pathname` tells. Check pop-up blocking in a Chrome started without `--disable-popup-blocking`.

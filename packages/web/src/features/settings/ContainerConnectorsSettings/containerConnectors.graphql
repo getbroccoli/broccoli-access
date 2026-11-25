@@ -1,4 +1,14 @@
 query ContainerConnectorsSettings {
+  setup {
+    id
+    googleWorkspace {
+      id
+      scan {
+        id
+        status
+      }
+    }
+  }
   containerConnectors {
     id
     name

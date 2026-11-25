@@ -161,24 +161,26 @@ it("sends the owner selecting apps from People to Apps", () => {
   expect(caught.options).toMatchObject({ to: "/apps", replace: true });
 });
 
-it("opens Google app recovery for the signed-in owner during the first scan", () => {
-  const me = { id: "owner" };
-  const path = "/settings/connections/google-app";
+it.each(["/settings/connections/google-app", "/settings/google-workspace/google-app"])(
+  "opens Google app recovery at %s for the signed-in owner during the first scan",
+  (path) => {
+    const me = { id: "owner" };
 
-  expect(
-    requireFinishedSetup({
-      context: { me, holdsSetup: false, setupStep: "SCAN" },
-      location: { href: path, pathname: path },
-    }),
-  ).toBe(me);
-});
+    expect(
+      requireFinishedSetup({
+        context: { me, holdsSetup: false, setupStep: "SCAN" },
+        location: { href: path, pathname: path },
+      }),
+    ).toBe(me);
+  },
+);
 
 it("keeps unrelated settings behind the first scan", () => {
   let caught: unknown;
   try {
     requireFinishedSetup({
       context: { me: { id: "owner" }, holdsSetup: false, setupStep: "SCAN" },
-      location: { href: "/settings/connections", pathname: "/settings/connections" },
+      location: { href: "/settings/google-workspace", pathname: "/settings/google-workspace" },
     });
   } catch (error) {
     caught = error;

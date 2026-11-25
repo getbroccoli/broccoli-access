@@ -1,3 +1,4 @@
 export { ChangeGoogleApp, changeSearch } from "./ChangeGoogleApp";
-export { ConnectionsSettings, connectionsSearch } from "./ConnectionsSettings";
+export { ContainerConnectorsSettings } from "./ContainerConnectorsSettings";
+export { GoogleWorkspaceSettings, googleWorkspaceSearch } from "./GoogleWorkspaceSettings";
 export { EmailSettings } from "./EmailSettings";

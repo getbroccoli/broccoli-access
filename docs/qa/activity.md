@@ -24,7 +24,7 @@ A manual check of the Activity page, which lists every Disable, Enable, Remove a
 
 - [ ] From Hannah Weber’s person page choose Remove on Linear. Check her name, email, the app, the workspace and “This cannot be undone.” Cancel and check she still appears.
 - [ ] Confirm “Remove from Linear”. Scan Linear again. Hannah has no Linear account in the fake or on her page, and Activity lists Remove with “On the server”.
-- [ ] Connect Slack as "Connect Slack" in [Connections settings](connections-settings.md#connect-slack) says and wait for its first scan. On Slack’s app page disable Elif Demir, then remove her without scanning in between. After Scan now Slack’s page still lists her, as “Not in Slack”, through her Google sign-in, and her person page shows Slack with “No account”. Activity lists the Slack removal.
+- [ ] Connect Slack as "Connect Slack" in [Apps settings](apps-settings.md#connect-slack-with-your-own-session) says and wait for its first scan. On Slack’s app page disable Elif Demir, then remove her without scanning in between. After Scan now Slack’s page still lists her, as “Not in Slack”, through her Google sign-in, and her person page shows Slack with “No account”. Activity lists the Slack removal.
 - [ ] Disable an unlinked member in the fake and scan its app. In People → Accounts without a person, open Decide and choose Remove. After confirmation the member leaves the list.
 
 ## Narrow screens

@@ -65,7 +65,7 @@ test("protected setup remembers the browser's HTTPS origin behind a TLS proxy", 
   }
 });
 
-test("the change-app route accepts shared consent and returns the owner to connections", async ({
+test("the change-app route accepts shared consent and returns the owner to Google Workspace", async ({
   env,
   fakeGoogle,
 }) => {
@@ -78,7 +78,7 @@ test("the change-app route accepts shared consent and returns the owner to conne
   expect(start.status).toBe(200);
   const { authorizationUrl } = (await start.json()) as { authorizationUrl: string };
   expect(await finishCallback(browser, authorizationUrl, fakeGoogle.url, relay)).toBe(
-    "/settings/connections",
+    "/settings/google-workspace",
   );
 });
 
@@ -122,7 +122,7 @@ test.for([
 
     expect(refused.status).toBe(302);
     expect(refused.headers.get("location")).toBe(
-      "/settings/connections/google-app?changeError=failed",
+      "/settings/google-workspace/google-app?changeError=failed",
     );
     expect(exchanges).toEqual([]);
   },

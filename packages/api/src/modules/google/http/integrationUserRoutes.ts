@@ -12,6 +12,7 @@ import {
   type Callback,
   cancelledOrFailed,
   consentCookie,
+  GOOGLE_WORKSPACE_SETTINGS_PAGE,
   type GoogleRoutes,
   logRefusal,
   requireSecurity,
@@ -42,7 +43,7 @@ export async function startIntegrationUserCreation(
   }
 }
 
-/** Google's answer: back to Connections, with the integration user created or why it was not. */
+/** Google's answer: back to Google Workspace, with the integration user created or why it was not. */
 export async function finishIntegrationUserCreation(
   { integrationUsers, http, logger }: GoogleRoutes,
   { request, response, answer }: Callback,
@@ -51,7 +52,7 @@ export async function finishIntegrationUserCreation(
   if (!hasConsentAnswer(answer)) {
     const failure = cancelledOrFailed(answer);
     logger.info({ failure }, "Integration user consent ended without an answer");
-    sendBackToConnections(response, failure);
+    sendBackToGoogleWorkspace(response, failure);
     return;
   }
   try {
@@ -64,15 +65,13 @@ export async function finishIntegrationUserCreation(
       browserToken: parseCookies(request.headers.cookie ?? "").get(INTEGRATION_USER_COOKIE) ?? null,
       now: new Date(),
     });
-    response.redirect(302, CONNECTIONS_PAGE);
+    response.redirect(302, GOOGLE_WORKSPACE_SETTINGS_PAGE);
   } catch (error) {
     const failure = creationFailureOf(error);
     logRefusal(logger, error, failure, "Integration user creation refused");
-    sendBackToConnections(response, failure);
+    sendBackToGoogleWorkspace(response, failure);
   }
 }
-
-const CONNECTIONS_PAGE = "/settings/connections";
 
 const NOT_OWNER = "Only the owner can create the integration user.";
 
@@ -81,7 +80,7 @@ const INTEGRATION_USER_COOKIE = "broccoli_access_google_integration_user";
 
 const CREATION_START = z.object({ email: z.string().catch("") });
 
-/** Why creating the integration user failed, as Connections shows it. */
+/** Why creating the integration user failed, as the Google Workspace page shows it. */
 type CreationFailure =
   | "cancelled"
   | "permission_refused"
@@ -103,6 +102,6 @@ function creationFailureOf(error: unknown): CreationFailure {
   return error instanceof NotSuperAdminError ? "not_super_admin" : "failed";
 }
 
-function sendBackToConnections(response: Response, failure: CreationFailure): void {
-  response.redirect(302, `${CONNECTIONS_PAGE}?integrationUserError=${failure}`);
+function sendBackToGoogleWorkspace(response: Response, failure: CreationFailure): void {
+  response.redirect(302, `${GOOGLE_WORKSPACE_SETTINGS_PAGE}?integrationUserError=${failure}`);
 }

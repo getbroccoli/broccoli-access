@@ -91,7 +91,7 @@ export function ScanStep() {
           </p>
           {needsReconnect && (
             <Link
-              to="/settings/connections/google-app"
+              to="/settings/google-workspace/google-app"
               className={buttonVariants({ variant: "outline" })}
             >
               {t("apps.reconnect.button")}

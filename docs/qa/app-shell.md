@@ -15,9 +15,10 @@ A manual check of the left menu, the workspace menu, Settings and the profile me
 
 ## Settings
 
-- [ ] "Settings" in the workspace menu opens `/settings/connections`: the left menu slides to the settings menu, the backdrop turns a shade darker and the page card takes a deeper shadow.
-- [ ] The settings menu shows "Back to the app", "Settings", then "Connections" and "Email", with the profile button at the bottom; the open section is highlighted.
-- [ ] `/settings` opens `/settings/connections`.
+- [ ] "Settings" in the workspace menu opens `/settings/google-workspace`: the left menu slides to the settings menu, the backdrop turns a shade darker and the page card takes a deeper shadow.
+- [ ] The settings menu shows "Back to the app", "Settings", then "Google Workspace", "Apps" and "Email", with the profile button at the bottom; the open section is highlighted.
+- [ ] `/settings` opens `/settings/google-workspace`.
+- [ ] `/settings/connections?integrationUserError=cancelled` opens Google Workspace with the cancelled consent message. `/settings/connections/google-app?changeError=cancelled` opens Change Google app with its cancelled consent message.
 - [ ] "Back to the app" slides back and opens Applications.
 - [ ] With the system's reduce motion setting on, the menus swap without sliding.
 - [ ] Tab never reaches the menu that is out of view.
@@ -28,4 +29,4 @@ A manual check of the left menu, the workspace menu, Settings and the profile me
 
 ## Narrow screens
 
-- [ ] At 390 px wide, the menu sits above the page in one row, which scrolls sideways when its items do not fit, with the workspace menu whole and the profile button as an avatar only; Settings swaps the row to "Back to the app", "Connections" and "Email".
+- [ ] At 390 px wide, the menu sits above the page in one row, which scrolls sideways when its items do not fit, with the workspace menu whole and the profile button as an avatar only; Settings swaps the row to "Back to the app", "Google Workspace", "Apps" and "Email".

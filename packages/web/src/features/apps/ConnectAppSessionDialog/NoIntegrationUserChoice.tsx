@@ -24,16 +24,15 @@ export function NoIntegrationUserChoice({ exists, onOwnSession }: Props) {
             {t(exists ? "settings.connectWay.notSetUp" : "settings.connectWay.none")}
           </p>
         </div>
-        {/* Creating it and its sign-in live on Connections, where Google's answer returns too. */}
         <DialogClose
           render={
             <Link
-              to="/settings/connections"
+              to="/settings/google-workspace"
               className={buttonVariants({ size: "lg", className: "shrink-0 px-4" })}
             />
           }
         >
-          {t(exists ? "settings.connectWay.openConnections" : "settings.connectWay.create")}
+          {t(exists ? "settings.connectWay.openGoogleWorkspace" : "settings.connectWay.create")}
         </DialogClose>
       </div>
       {onOwnSession && (

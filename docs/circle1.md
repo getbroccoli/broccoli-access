@@ -47,7 +47,7 @@ The setup page has three steps: Connect Google Workspace, Scan your workspace, S
 ### 5. Sign in
 
 - After setup, the owner signs in with Google. There is no password, and in circle 1 only the owner signs in.
-- Settings has two tabs, Connections and Email. Connections shows Google Workspace with its domain, admin, last scan, "Scan now" and "Change Google app".
+- Settings lists Google Workspace, Apps and Email. Google Workspace shows the directory with its domain, admin, last scan, "Scan now" and "Change Google app".
 - **Done when:** the owner signs out, signs in with Google and lands on Applications.
 
 ## Testing

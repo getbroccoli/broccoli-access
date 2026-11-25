@@ -1,7 +1,7 @@
-import type { ConnectionsSettingsQuery } from "@/__generated__/graphql";
+import type { GoogleWorkspaceSettingsQuery } from "@/__generated__/graphql";
 import { t, type MessageKey } from "@/i18n";
 
-import type { IntegrationUserError } from "./connectionsSearch";
+import type { IntegrationUserError } from "./googleWorkspaceSearch";
 import { CreatedIntegrationUserCard } from "./CreatedIntegrationUserCard";
 import { CreateIntegrationUserDialog } from "./CreateIntegrationUserDialog";
 import { IntegrationUserMark } from "./IntegrationUserMark";
@@ -16,7 +16,7 @@ const FAILURE_MESSAGES: Record<IntegrationUserError, MessageKey> = {
 };
 
 type Props = {
-  integrationUser: ConnectionsSettingsQuery["setup"]["integrationUser"];
+  integrationUser: GoogleWorkspaceSettingsQuery["setup"]["integrationUser"];
   /** The workspace's domain, which the integration user's address is in. */
   domain: string;
   /** Whether the connection uses the instance's own Google app, which alone can ask to create users. */

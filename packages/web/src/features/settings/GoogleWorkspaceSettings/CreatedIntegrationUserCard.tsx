@@ -2,8 +2,8 @@ import { ArrowUpRight } from "@phosphor-icons/react";
 import { useRef } from "react";
 
 import {
-  ConnectionsSettingsDocument,
-  type ConnectionsSettingsQuery,
+  GoogleWorkspaceSettingsDocument,
+  type GoogleWorkspaceSettingsQuery,
   type IntegrationUserSignInFailure,
   type IntegrationUserSignInStatus,
   SignInAsIntegrationUserDocument,
@@ -34,7 +34,7 @@ const FAILURE_MESSAGES: Record<IntegrationUserSignInFailure, MessageKey> = {
 };
 
 type Props = {
-  integrationUser: NonNullable<ConnectionsSettingsQuery["setup"]["integrationUser"]>;
+  integrationUser: NonNullable<GoogleWorkspaceSettingsQuery["setup"]["integrationUser"]>;
 };
 
 /** The created integration user: whether Broccoli Access signs in to Google as it, or why not. */
@@ -42,7 +42,7 @@ export function CreatedIntegrationUserCard({ integrationUser }: Props) {
   // The page's query, asked again after the retry: an answer read before it would undo "Setting up".
   const [signIn, { loading: isStarting, error: startError }] = usePayloadMutation(
     SignInAsIntegrationUserDocument,
-    { refetch: [ConnectionsSettingsDocument] },
+    { refetch: [GoogleWorkspaceSettingsDocument] },
   );
   const status = useRef<HTMLParagraphElement>(null);
   const { signInStatus, signInFailure } = integrationUser;

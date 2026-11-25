@@ -26,7 +26,7 @@ A manual check of the People page against a development stack: everyone in Googl
 
 ## Add person
 
-Connect Slack and Linear as in [Connections settings](connections-settings.md#apps). Create two templates, each with one of the apps. For consent, use a fresh workspace connected with its own Google app. Check that Settings → Connections shows **Reads only**.
+Connect Slack and Linear as in [Apps settings](apps-settings.md#apps). Create two templates, each with one of the apps. For consent, use a fresh workspace connected with its own Google app. Check that Settings → Google Workspace shows **Reads only**.
 
 - [ ] Open Add person on People. Enter a first name, last name and a local part containing `s` before the displayed work email domain. Pick both templates. Check the note describes inviting the person to their apps and says “Uses one paid Google seat.”
 - [ ] Select Add and provision. Allow changing users at Google. The confirmation lists both apps. Confirm Provision, reload before revealing, then choose **Reveal first password**. Check the password appears with the person's email and first sign-in instructions. Copy it and select I have saved it. Reload and check it stays hidden.
@@ -53,7 +53,7 @@ Connect Slack and Linear as in [Connections settings](connections-settings.md#ap
 
 - [ ] Start from the setup above with Slack approved. Use the fake Google's unsuspend control for Ana, then scan Google Workspace. Connect Slack and Linear and let their scans finish. The tab shows four accounts. Ana’s private Slack address suggests Ana Ruiz. The other three show "Nobody".
 - [ ] Choose "Link" beside Ana’s suggestion. The count drops to three. Open Ana from All. Her Slack work account and the account labelled `ana.ruiz@gmail.example` both appear under Current access.
-- [ ] In Settings → Connections, choose "Scan now" on Slack. Once the scan finishes, reopen Ana’s page and the tab. The private account stays on Ana’s page and the tab still shows three.
+- [ ] In Settings → Apps, choose "Scan now" on Slack. Once the scan finishes, reopen Ana’s page and the tab. The private account stays on Ana’s page and the tab still shows three.
 - [ ] Choose "Decide", then "Link to a person" beside a different account, leaving Linear’s `deploys@acme.example` for Disable. Search by work email, select the employee and choose "Link". The account appears on that person’s page.
 - If the member changes their app email, the new unmatched address needs a new link.
 
@@ -65,5 +65,5 @@ Connect Slack and Linear as in [Connections settings](connections-settings.md#ap
 - [ ] From "Decide", mark two unlinked accounts, one as a service account and one as external. Save a note for each. The tab count drops by two and both move to Marked accounts with the right labels and notes.
 - [ ] Save stays disabled for a note of spaces only. A note over 500 characters shows "Keep the note to 500 characters or fewer." and Save stays disabled.
 - [ ] Edit an owner's note, reload, and scan the app again. The edited note and both marks stay.
-- [ ] Create the integration user in Settings → Connections. People shows "Scanning…" by itself; once it ends, the integration user's Google Workspace account is under Marked accounts as "Integration user" with no Edit button, and never in the list above or its count.
+- [ ] Create the integration user in Settings → Google Workspace. People shows "Scanning…" by itself; once it ends, the integration user's Google Workspace account is under Marked accounts as "Integration user" with no Edit button, and never in the list above or its count.
 - [ ] Invite the integration user to the fake Linear workspace and accept the invitation. Scan Linear. Its Linear account also shows under Marked accounts as "Integration user" with no Edit button.

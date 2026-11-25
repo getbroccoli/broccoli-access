@@ -22,6 +22,8 @@ import {
 import { CONSENT_LIFETIME_MS } from "../helpers";
 import type { ConsentAnswer } from "./googleConsentInput";
 
+export const GOOGLE_WORKSPACE_SETTINGS_PAGE = "/settings/google-workspace";
+
 /** What the callback's handlers use. */
 export interface GoogleRoutes {
   connection: GoogleConnectionService;

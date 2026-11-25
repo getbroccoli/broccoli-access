@@ -3,6 +3,6 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 /** Settings opens on its first section. */
 export const Route = createFileRoute("/_authenticated/settings/")({
   beforeLoad: () => {
-    throw redirect({ to: "/settings/connections", replace: true });
+    throw redirect({ to: "/settings/google-workspace", replace: true });
   },
 });

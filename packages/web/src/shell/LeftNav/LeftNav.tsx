@@ -15,7 +15,8 @@ import { WorkspaceMenu } from "../WorkspaceMenu";
 import { NavList, type NavItem } from "./NavList";
 
 const SETTINGS_ITEMS: NavItem[] = [
-  { to: "/settings/connections", label: t("settings.connections.title") },
+  { to: "/settings/google-workspace", label: t("settings.googleWorkspace.title") },
+  { to: "/settings/apps", label: t("settings.apps.title") },
   { to: "/settings/email", label: t("settings.email.title") },
 ];
 
