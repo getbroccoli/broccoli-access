@@ -21,6 +21,7 @@ query PeoplePage($filter: EmployeeFilter, $skipPeople: Boolean! = false) {
 query AddPersonForm {
   setup {
     id
+    broccoliGoogleAppAvailable
     googleWorkspace {
       id
       domain

@@ -20,14 +20,14 @@ export const settingsEn = {
   "settings.integrationUser.section": "Integration user",
   "settings.integrationUser.offerTitle": "Give Broccoli Access its own user",
   "settings.integrationUser.offerBody":
-    "An integration user is a separate Google Workspace account, such as broccoli@{domain}, that Broccoli Access signs in to your apps with. It creates, changes and removes accounts as this user, not with your own session.",
+    "An integration user is a separate Google Workspace account, such as broccoli@{domain}. Broccoli Access uses it to sign in to other apps and manage accounts there.",
   "settings.integrationUser.offerBlocks":
     "If an app blocks automation, it blocks this user, not you.",
   "settings.integrationUser.offerKeepsWorking": "Keeps working when you are signed out or away.",
-  "settings.integrationUser.offerSuspend": "Suspend it in Google to stop everything at once.",
-  "settings.integrationUser.needsOwnGoogleApp":
-    "Creating it needs your own Google app. Change the Google app above first.",
+  "settings.integrationUser.offerSuspend":
+    "Suspend it in Google to stop work done as this user. The Google Workspace connection stays active.",
   "settings.integrationUser.create": "Create integration user",
+  "settings.integrationUser.ownerRequired": "Only the owner can create the integration user.",
   "settings.integrationUser.created": "Created",
   "settings.integrationUser.openInGoogleAdmin": "Open in Google admin",
   "settings.integrationUser.settingUp": "Setting up",
@@ -48,7 +48,7 @@ export const settingsEn = {
   "settings.integrationUser.dialogTitle": "Create the integration user",
   "settings.integrationUser.address": "Its email address",
   "settings.integrationUser.dialogNote":
-    "Google will ask you to allow creating users. This uses one paid Google seat.",
+    "Google will ask you to let Broccoli Access create and change Google Workspace accounts. The integration user uses one paid Google seat.",
   "settings.integrationUser.cancel": "Cancel",
   "settings.integrationUser.continueToGoogle": "Continue to Google",
   "settings.integrationUser.invalidAddress":
@@ -56,7 +56,7 @@ export const settingsEn = {
   "settings.integrationUser.startFailed": "Couldn’t go to Google. Try again.",
   "settings.integrationUser.cancelled": "You cancelled at Google. No integration user was created.",
   "settings.integrationUser.permissionRefused":
-    "Google didn’t get your permission to create users, so no integration user was created. Try again and allow it.",
+    "Broccoli Access didn’t get permission to create and change Google Workspace accounts. No integration user was created.",
   "settings.integrationUser.emailTaken":
     "That address is already used in your Google Workspace. Pick another one.",
   "settings.integrationUser.failed": "Couldn’t create the integration user. Try again.",

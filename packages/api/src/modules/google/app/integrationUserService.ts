@@ -11,14 +11,13 @@ import {
   type IntegrationUserSignIn,
   parseIntegrationUserEmail,
 } from "../domain";
-import { openConsentState } from "../helpers";
 import {
   findIntegrationAccountEmail,
   isIntegrationUserSuspended,
 } from "./findIntegrationAccountEmail";
 import type { ScannedMembers } from "../ports";
 import type { GoogleConnectionDependencies } from "./googleConnectionService";
-import { createDirectoryUser, verifyWriteGrant, type WriteGrant } from "./integrationUserDirectory";
+import { createDirectoryUser } from "./integrationUserDirectory";
 import {
   type AppSignIn,
   createIntegrationUserSignInAttempts,
@@ -27,10 +26,15 @@ import {
 } from "./integrationUserSignIn";
 import {
   type ConnectedGoogleApp,
+  type WriteConsent,
+  type WriteConsentDestination,
+  type WriteGrant,
   googleAppChanged,
-  readOwnGoogleApp,
+  openWriteConsent,
+  readConnectedGoogleApp,
   saveWriteGrant,
   startWriteConsent,
+  verifyWriteGrant,
 } from "./userWriteGrant";
 
 /**
@@ -42,16 +46,15 @@ import {
 export interface IntegrationUserService {
   /**
    * For the owner: Google's consent address for the one scope that creates users, added to what
-   * the Google app was granted, its `state` carrying the address picked, encrypted for
-   * `browserToken`, a new token the caller keeps in this browser until Google answers. Refuses an
+   * the Google app was granted. The consent binds the chosen address to this browser until Google
+   * answers. Refuses an
    * address outside the workspace's domain with INVALID_INPUT, another caller with FORBIDDEN, and
-   * with CONFLICT before Google Workspace is connected with the instance's own Google app, or once
-   * the integration user exists.
+   * with CONFLICT before Google Workspace is connected or once the integration user exists.
    */
   startCreation: (
     ctx: SecurityContext,
     start: IntegrationUserStart,
-  ) => Promise<{ authorizationUrl: string; browserToken: string }>;
+  ) => Promise<WriteConsentDestination>;
   /**
    * Google's answer to that consent: creates the user in the directory with a random password,
    * then stores it, with the password encrypted, and the connection's grown grant, and queues a
@@ -119,6 +122,8 @@ export type IntegrationUserDependencies = Pick<
   | "logger"
   | "openIdConfigurationUrl"
   | "adminApiUrl"
+  | "relayUrl"
+  | "publicUrl"
   | "connectedApps"
   | "scans"
 > & {
@@ -146,26 +151,22 @@ export function createIntegrationUserService(
   return {
     async startCreation(ctx, { email: input, publicOrigin, now }) {
       requireOwner(ctx);
-      const { settings, revision } = await readOwnGoogleApp(connectedApps, orm);
-      const parsed = parseIntegrationUserEmail(input, settings.domain);
+      const googleApp = await readConnectedGoogleApp(connectedApps, orm);
+      const parsed = parseIntegrationUserEmail(input, googleApp.settings.domain);
       if ("problem" in parsed) {
         throw invalidInput([{ field: "email", code: parsed.problem }]);
       }
       await refuseSecondIntegrationUser(orm);
-      return startWriteConsent({ google, secretBox }, { settings, publicOrigin, now }, (nonce) => ({
+      return startWriteConsent({ ...dependencies, google }, googleApp, {
         flow: "create_integration_user",
         email: parsed.email,
-        revision,
-        nonce,
-      }));
+        publicOrigin,
+        now,
+      });
     },
     async finishCreation(ctx, answer) {
       const createdBy = requireOwner(ctx);
-      const { browserToken, now } = answer;
-      const creation =
-        browserToken === null
-          ? null
-          : openConsentState(secretBox, answer.state, { browserToken, now });
+      const creation = openWriteConsent(secretBox, answer);
       if (creation?.flow !== "create_integration_user") {
         throw new ApplicationError(
           "INVALID_INPUT",
@@ -179,9 +180,7 @@ export function createIntegrationUserService(
       try {
         await createFromConsent(dependencies, google, ctx, {
           ...answer,
-          email: creation.email,
-          nonce: creation.nonce,
-          revision: creation.revision,
+          consent: creation,
           createdBy,
         });
       } finally {
@@ -231,21 +230,17 @@ async function createFromConsent(
   dependencies: IntegrationUserDependencies,
   google: GoogleClient,
   ctx: SecurityContext,
-  consent: Omit<IntegrationUserAnswer, "state" | "browserToken"> & {
-    email: string;
-    nonce: string;
-    revision: string;
+  answer: IntegrationUserAnswer & {
+    consent: Extract<WriteConsent, { flow: "create_integration_user" }>;
     createdBy: string;
   },
 ): Promise<void> {
   const { orm, connectedApps } = dependencies;
-  const { email, createdBy, now } = consent;
+  const { createdBy, now, consent } = answer;
+  const { email } = consent;
   await refuseSecondIntegrationUser(orm);
-  const googleApp = await readOwnGoogleApp(connectedApps, orm);
-  if (googleApp.revision !== consent.revision) {
-    throw googleAppChanged();
-  }
-  const grant = await verifyWriteGrant(google, googleApp, consent);
+  const googleApp = await readConnectedGoogleApp(connectedApps, orm);
+  const grant = await verifyWriteGrant({ ...dependencies, google }, googleApp, answer);
   const password = randomPassword();
   const googleUserId = await createDirectoryUser(google, grant.accessToken, { email, password });
   await saveIntegrationUser(dependencies, ctx, {

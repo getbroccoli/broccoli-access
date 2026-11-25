@@ -27,6 +27,7 @@ import {
   randomConsentToken,
   type ConsentState,
   type RelayConsentState,
+  type WriteConsentState,
   type GoogleIdentity,
   verifyIdToken,
 } from "../helpers";
@@ -92,7 +93,7 @@ export async function startConsent(
 
 interface GoogleConsentStart {
   revision?: string;
-  flow: RelayConsentState["flow"];
+  flow: Exclude<RelayConsentState["flow"], WriteConsentState["flow"]>;
   googleApp?: GoogleWorkspaceSettings["googleApp"];
   clientId?: string;
   clientSecret?: string;
@@ -203,14 +204,15 @@ export async function consentRedirectAddress(
   );
 }
 
-function requireGoogleRelay(relayUrl?: string) {
+export function requireGoogleRelay(relayUrl?: string) {
   if (!relayUrl)
     throw new ApplicationError("UNAVAILABLE", "The Broccoli Google app is not available.");
   return createGoogleRelayClient(relayUrl);
 }
 
 type IdentityConsent =
-  { clientId: string; clientSecret: string; nonce: string } | RelayConsentState;
+  | { clientId: string; clientSecret: string; nonce: string }
+  | Pick<RelayConsentState, "codeVerifier" | "nonce">;
 interface ConsentExchange {
   code?: string;
   handle?: string;

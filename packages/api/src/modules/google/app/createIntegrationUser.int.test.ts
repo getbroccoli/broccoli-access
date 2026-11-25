@@ -6,7 +6,6 @@ import {
   ADMIN,
   consentAnswer,
   CREATION_START as START,
-  finishSharedGoogleSetup,
   createdGoogleUsers,
   changeStoredGoogleDomain,
   connectionSecrets,
@@ -296,16 +295,6 @@ test("creates just the winning user when two consents finish together", async ({
   const { rows, created } = await workspace.readState();
   expect(rows.map((row) => row.email)).toEqual([winner]);
   expect(created.map((user) => user.primaryEmail)).toEqual([winner]);
-});
-
-test("requires the owner's own Google app to start creation", async ({ orm, fakeGoogle }) => {
-  await finishSharedGoogleSetup(orm, fakeGoogle.url);
-  const users = integrationUsers(orm, { googleUrl: fakeGoogle.url });
-
-  await expect(users.startCreation(OWNER, START)).rejects.toMatchObject({
-    code: "CONFLICT",
-    message: "Creating and changing Google users needs your own Google app.",
-  });
 });
 
 test.for([

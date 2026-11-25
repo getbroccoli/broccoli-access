@@ -136,15 +136,16 @@ export const appsEn = {
   "apps.change.continueToGoogle": "Continue to Google",
   "apps.change.googleAsks":
     "Google will ask you to let Broccoli Access create and change users in your Google Workspace. This won’t change any account yet: ask for this change again afterwards.",
-  "apps.change.googleNeedsOwnApp":
-    "Changing Google accounts needs your own Google app. Change the Google app in Settings › Google Workspace first.",
   "apps.change.googleCheckFailed":
     "Couldn’t check whether Google allows this. Reload the page and try again.",
+  "apps.change.googleRelayUnavailable":
+    "The Broccoli Google app is unavailable. Reconnect Google Workspace to make changes.",
+  "apps.change.googleOwnerRequired": "Only the owner can grant permission to change Google users.",
   "apps.googleWrites.allowed":
     "Google now lets Broccoli Access create and change users. Allowing it changed no account: ask for your change again if you still want it.",
   "apps.googleWrites.cancelled": "You cancelled at Google. No account was changed.",
   "apps.googleWrites.refused":
-    "Google was not allowed to create and change users. No account was changed.",
+    "Broccoli Access didn’t get permission to create and change Google Workspace accounts. No account was changed.",
   "apps.googleWrites.notSuperAdmin":
     "Only a Google super admin can allow this. No account was changed.",
   "apps.googleWrites.otherWorkspace":

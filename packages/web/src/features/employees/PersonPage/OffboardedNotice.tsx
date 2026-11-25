@@ -1,7 +1,6 @@
 import type { PersonPageQuery } from "@/__generated__/graphql";
 import { showsCouldntChange } from "@/features/apps";
 import { t } from "@/i18n";
-import { useGoogleUserWrites } from "@/lib/useGoogleUserWrites";
 
 import { BY_HAND_REASONS } from "./byHandReasons";
 
@@ -14,7 +13,6 @@ type Props = {
  * comes first, then the work Broccoli Access never could do. Nothing shows once nothing is left.
  */
 export function OffboardedNotice({ person }: Props) {
-  const google = useGoogleUserWrites();
   const failed = [person.directoryAccount, ...person.appAccounts].flatMap((account) =>
     // As the account's own row: a Disable that failed and that no scan has seen done since.
     account?.latestChange?.action === "SUSPEND" && showsCouldntChange(account)
@@ -26,21 +24,7 @@ export function OffboardedNotice({ person }: Props) {
     app: app.name,
     why: t(BY_HAND_REASONS[reason]),
   }));
-  // With the shared Google app the server still offers the directory's Disable, which nothing can run.
-  const { directoryAccount, offboarding } = person;
-  const googleByHand =
-    google === "unsupported" &&
-    directoryAccount &&
-    offboarding.accountsToDisable.some(({ id }) => id === directoryAccount.id)
-      ? [
-          {
-            key: directoryAccount.id,
-            app: directoryAccount.app.name,
-            why: t("people.offboard.needsOwnGoogleApp"),
-          },
-        ]
-      : [];
-  const work = [...failed, ...googleByHand, ...byHand];
+  const work = [...failed, ...byHand];
   if (!work.length) {
     return null;
   }

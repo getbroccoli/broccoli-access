@@ -46,15 +46,19 @@ export async function consentAtGoogle(
 /** Uses the connection's saved grant against the fake token endpoint. */
 export async function refreshGoogleGrant(
   googleUrl: string,
-  secrets: { clientSecret: string; refreshToken: string },
+  {
+    clientId = ACME.oauthClient.clientId,
+    clientSecret,
+    refreshToken,
+  }: { clientId?: string; clientSecret: string; refreshToken: string },
 ) {
   const response = await fetch(`${googleUrl}/token`, {
     method: "POST",
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      client_id: ACME.oauthClient.clientId,
-      client_secret: secrets.clientSecret,
-      refresh_token: secrets.refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
     }),
   });
   assert.equal(response.status, 200);

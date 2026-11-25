@@ -61,7 +61,6 @@ export const peopleEn = {
   "people.add.confirmTitle": "Create {name}’s Google account?",
   "people.add.confirmDescription": "The selected apps follow once Google creates the account.",
   "people.add.loadingApps": "Loading apps…",
-  "people.add.needsOwnGoogleApp": "Connect your own Google app to create this account.",
   "people.add.provisionFailed": "Couldn’t start Provision. Check the person's apps and try again.",
   "people.add.delete": "Delete person",
   "people.add.deleteTitle": "Delete {name}?",
@@ -179,7 +178,6 @@ export const peopleEn = {
   "people.offboard.button": "Offboard",
   "people.offboard.title": "Offboard {name}?",
   "people.offboard.disablesNow": "Broccoli Access disables these now",
-  "people.offboard.suspend": "Suspend",
   "people.offboard.byHand": "You do these by hand",
   "people.offboard.openInvitation": "Open invitation",
   "people.offboard.reconnectNeeded": "Reconnect needed",
@@ -189,13 +187,13 @@ export const peopleEn = {
   "people.offboard.continueToGoogle": "Continue to Google",
   "people.offboard.googleAsks":
     "Google will ask you to let Broccoli Access create and change users in your Google Workspace. Nobody is offboarded until you confirm here again.",
-  "people.offboard.needsOwnGoogleApp": "Needs your own Google app",
   "people.offboard.googleCheckFailed":
-    "Couldn’t check whether Google allows suspending. Reload the page, or untick Google Workspace.",
+    "Couldn’t check whether Google allows disabling accounts. Reload the page, or untick Google Workspace.",
   "people.offboard.changeRunning": "An Enable or Invite is still running; check again when it ends",
   "people.offboard.googleStartFailed": "Couldn’t go to Google. Try again.",
   "people.offboard.googleCancelled": "You cancelled at Google. Nobody was offboarded.",
-  "people.offboard.googleRefused": "Google was not allowed to change users. Nobody was offboarded.",
+  "people.offboard.googleRefused":
+    "Broccoli Access didn’t get permission to change Google Workspace accounts. Nobody was offboarded.",
   "people.offboard.googleNotSuperAdmin":
     "Only a Google super admin can allow this. Nobody was offboarded.",
   "people.offboard.googleOtherWorkspace":
@@ -221,6 +219,8 @@ export const peopleEn = {
   "people.provision.byHandIsYours":
     "Invite {firstName} in each app marked By hand yourself, then confirm it with By hand on this page.",
   "people.provision.button": "Provision",
+  "people.provision.beforeConsent":
+    "Google will ask for permission. You can confirm provisioning when you return.",
   "people.provision.title": "Provision {name}?",
   "people.provision.enable": "Enable",
   "people.provision.byBroccoli": "Broccoli Access",

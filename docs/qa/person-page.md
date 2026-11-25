@@ -85,8 +85,9 @@ A run of its own: start from [Setup](#setup), and also select Zoom before "Appro
 
 Connect Slack and Linear, assign a template to Chloé Martin, and set `GOOGLE` to the fake Google's address.
 
-- [ ] Chloé's page has "Offboard". It opens "Offboard Chloé Martin?" with her email, "Broccoli Access disables these now" listing Google Workspace with "Suspend" first, then Linear and Slack with "Disable", each ticked, and "You do these by hand" listing each app without a connection with "No connection".
-- [ ] While Settings › Google Workspace shows that Google Workspace only reads users, the button reads "Continue to Google". After `curl -s -H 'content-type: application/json' -d '{"scope": "https://www.googleapis.com/auth/admin.directory.user"}' "$GOOGLE/_fake/consent/refuse-scope"`, Allow at Google comes back to the open dialog with "Google was not allowed to change users. Nobody was offboarded."; Activity has no new row and her template is still assigned.
+- [ ] Chloé's page has "Offboard". It opens "Offboard Chloé Martin?" with her email, "Broccoli Access disables these now" listing Google Workspace first, then Linear and Slack, all with "Disable", each ticked, and "You do these by hand" listing each app without a connection with "No connection".
+- [ ] While Settings › Google Workspace shows that Google Workspace only reads users, the button reads "Continue to Google". After `curl -s -H 'content-type: application/json' -d '{"scope": "https://www.googleapis.com/auth/admin.directory.user"}' "$GOOGLE/_fake/consent/refuse-scope"`, Allow at Google comes back to the open dialog with "Broccoli Access didn’t get permission to change Google Workspace accounts. Nobody was offboarded."; Activity has no new row and her template is still assigned.
+- [ ] A non-owner admin with Google Workspace selected sees that the owner must grant permission. Unticking Google Workspace enables offboarding for the remaining apps.
 - [ ] "Continue to Google" again, then Allow, comes back to the dialog with "Offboard Chloé". Confirming closes it: each row shows its progress, then "Disabled" with "Enable"; the header shows "Suspended in Google" and "Offboarded today"; Templates is empty; a notice lists the apps that need the owner, each with its reason; and no row shows Missing or Extra.
 - [ ] `curl -s "$GOOGLE/_fake/state"` counts one more suspended person, and `curl -s "$FAKE/_fake/state"` shows chloe@acme.example `suspended` in `.slack` and `.linear`.
 - [ ] Activity lists her three changes, each "Disable" with "Offboarding" below.
@@ -101,7 +102,7 @@ Connect Slack and Linear, assign a template to Chloé Martin, and set `GOOGLE` t
 
 ## Delete a person awaiting their Google account
 
-- [ ] On a fresh workspace with its own Google app and **Reads only** in Settings → Google Workspace, start adding a person and cancel at Google's consent. The person's page offers Delete person. Cancel the deletion and check the person stays. Confirm it and check the person leaves People.
+- [ ] On a fresh workspace with either Google app and **Reads only** in Settings → Google Workspace, start adding a person and cancel at Google's consent. The person's page offers Delete person. Cancel the deletion and check the person stays. Confirm it and check the person leaves People.
 - [ ] Open a person listed by Google Workspace. Their page offers Offboard and has no Delete person action.
 
 ## Not found

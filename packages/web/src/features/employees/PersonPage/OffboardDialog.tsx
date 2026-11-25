@@ -21,6 +21,7 @@ import { t } from "@/i18n";
 import { useRestoredFromBackCache } from "@/lib/useRestoredFromBackCache";
 import {
   askGoogleForUserWrites,
+  googleUserWritesBlock,
   type GoogleUserWritesOutcome,
   useGoogleUserWrites,
 } from "@/lib/useGoogleUserWrites";
@@ -58,19 +59,14 @@ export function OffboardDialog({ person, onClose, googleUserWrites, initialSkipp
   const { accountsToDisable, accountsToRemove, byHandWork } = person.offboarding;
   const removeLater = new Set(activeAccountsToRemove(accountsToRemove).map(({ app }) => app.name));
   const directoryAppId = person.directoryAccount?.app.id;
-  // An app with two accounts of theirs shows once: unticking it keeps both. With the shared
-  // Google app, which cannot ask Google for the permission, suspending is the owner's work.
-  const apps = [...new Map(accountsToDisable.map(({ app }) => [app.id, app])).values()].filter(
-    ({ id }) => google !== "unsupported" || id !== directoryAppId,
-  );
-  const googleByHand =
-    google === "unsupported" &&
-    apps.length < new Set(accountsToDisable.map(({ app }) => app.id)).size;
+  // An app with two accounts of theirs shows once: unticking it keeps both.
+  const apps = [...new Map(accountsToDisable.map(({ app }) => [app.id, app])).values()];
   const tickedAppIds = apps.map(({ id }) => id).filter((id) => !skippedAppIds.includes(id));
-  const suspendsInGoogle = directoryAppId !== undefined && tickedAppIds.includes(directoryAppId);
-  const asksGoogle = suspendsInGoogle && google === "needs_consent";
-  // Suspending waits until Google's permission is known; Cancel never does.
-  const googleUnknown = suspendsInGoogle && (google === "loading" || google === "failed");
+  const disablesInGoogle = directoryAppId !== undefined && tickedAppIds.includes(directoryAppId);
+  const asksGoogle = disablesInGoogle && google === "needs_consent";
+  const googleBlock = disablesInGoogle && googleUserWritesBlock(google);
+  // Disabling waits until Google's permission is known.
+  const googleUnknown = disablesInGoogle && (google === "loading" || google === "failed");
   const busy = offboarding.loading || goingToGoogle;
   const toggle = (appId: string) =>
     setSkippedAppIds((skipped) =>
@@ -120,29 +116,17 @@ export function OffboardDialog({ person, onClose, googleUserWrites, initialSkipp
                       onChange={() => toggle(app.id)}
                     />
                     <span className="w-40 font-medium">{app.name}</span>
-                    <span className="text-foreground/70">
-                      {t(
-                        app.id === directoryAppId
-                          ? "people.offboard.suspend"
-                          : "apps.change.disable",
-                      )}
-                    </span>
+                    <span className="text-foreground/70">{t("apps.change.disable")}</span>
                   </label>
                 </li>
               ))}
             </ul>
           </section>
         )}
-        {(byHandWork.length > 0 || googleByHand) && (
+        {byHandWork.length > 0 && (
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">{t("people.offboard.byHand")}</h3>
             <ul className="divide-y divide-amber-200 rounded-xl border border-amber-200 bg-amber-50 text-amber-950">
-              {googleByHand && person.directoryAccount && (
-                <li className="flex gap-3 px-4 py-3 text-sm">
-                  <span className="w-40 font-medium">{person.directoryAccount.app.name}</span>
-                  <span>{t("people.offboard.needsOwnGoogleApp")}</span>
-                </li>
-              )}
               {byHandWork.map(({ app, reason }) => (
                 <li key={`${app.id} ${reason}`} className="flex gap-3 px-4 py-3 text-sm">
                   <span className="w-40 font-medium">{app.name}</span>
@@ -166,6 +150,11 @@ export function OffboardDialog({ person, onClose, googleUserWrites, initialSkipp
             {t("people.offboard.googleCheckFailed")}
           </p>
         )}
+        {googleBlock && (
+          <p role="alert" className="text-sm text-destructive">
+            {t(googleBlock)}
+          </p>
+        )}
         {refusal && (
           <p role="alert" className="text-sm text-destructive">
             {t(refusal)}
@@ -180,7 +169,7 @@ export function OffboardDialog({ person, onClose, googleUserWrites, initialSkipp
           <Button
             type="button"
             size="lg"
-            disabled={busy || googleUnknown}
+            disabled={busy || googleUnknown || Boolean(googleBlock)}
             onClick={() => void confirm()}
           >
             {asksGoogle

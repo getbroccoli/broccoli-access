@@ -22,7 +22,7 @@ interface RelayAuthorization {
   state: string;
   codeVerifier: string;
   nonce: string;
-  purpose: "connect" | "sign_in";
+  purpose: "connect" | "sign_in" | "user_write";
 }
 
 export function createGoogleRelayClient(relayUrl: string): GoogleRelayClient {

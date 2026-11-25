@@ -1,9 +1,11 @@
 import { useQuery } from "@apollo/client/react";
+import { useRouteContext } from "@tanstack/react-router";
 
 import { GoogleWorkspaceSettingsDocument } from "@/__generated__/graphql";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
+import { googleConsentAvailable } from "@/lib/useGoogleUserWrites";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { PageHeader } from "@/shell";
 
@@ -17,6 +19,7 @@ type Props = {
 };
 
 export function GoogleWorkspaceSettings({ integrationUserError }: Props) {
+  const { me } = useRouteContext({ from: "/_authenticated" });
   // A scan started elsewhere, such as in another tab, changes the connection outside this cache.
   const query = useQuery(GoogleWorkspaceSettingsDocument, { fetchPolicy: "cache-and-network" });
   const { data, error, refetch } = query;
@@ -61,8 +64,17 @@ export function GoogleWorkspaceSettings({ integrationUserError }: Props) {
             <IntegrationUserCard
               integrationUser={data.setup.integrationUser}
               domain={connection.domain}
-              usesOwnGoogleApp={connection.googleApp === "OWN_GOOGLE_APP"}
               failure={integrationUserError}
+              creationBlock={
+                !me.isOwner
+                  ? "settings.integrationUser.ownerRequired"
+                  : googleConsentAvailable(
+                        connection.googleApp,
+                        data.setup.broccoliGoogleAppAvailable,
+                      )
+                    ? undefined
+                    : "apps.change.googleRelayUnavailable"
+              }
             />
           </section>
         )}

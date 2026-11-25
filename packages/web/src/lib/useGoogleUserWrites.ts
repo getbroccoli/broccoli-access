@@ -1,7 +1,12 @@
 import { useQuery } from "@apollo/client/react";
+import { useRouteContext } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { type AccountChangeFailure, GoogleUserWritesDocument } from "@/__generated__/graphql";
+import {
+  type AccountChangeFailure,
+  type GoogleApp,
+  GoogleUserWritesDocument,
+} from "@/__generated__/graphql";
 
 import { postJson } from "./postJson";
 
@@ -24,21 +29,38 @@ export function directoryProvisionFailure(failure?: AccountChangeFailure | null)
 
 /**
  * Whether Broccoli Access may change the directory's users: `allowed`; `needs_consent`, since
- * setup's consent only reads and the first change sends the owner to Google once; `unsupported`
- * with the shared Google app, which cannot ask for it; or not known, while `loading` or `failed`.
+ * setup's consent only reads and the first change sends the owner to Google once; or unknown
+ * while `loading` or `failed`. A disabled relay or missing owner consent can block the action.
  */
-export type GoogleUserWrites = "allowed" | "needs_consent" | "unsupported" | "loading" | "failed";
+export type GoogleUserWrites =
+  "allowed" | "needs_consent" | "owner_required" | "unavailable" | "loading" | "failed";
 
 export function useGoogleUserWrites(): GoogleUserWrites {
+  const { me } = useRouteContext({ from: "/_authenticated" });
   const { data, error } = useQuery(GoogleUserWritesDocument);
-  const google = data?.setup.googleWorkspace;
+  const setup = data?.setup;
+  const google = setup?.googleWorkspace;
   if (!google) {
     return error ? "failed" : "loading";
   }
-  if (google.canChangeUsers) {
-    return "allowed";
+  if (!googleConsentAvailable(google.googleApp, setup.broccoliGoogleAppAvailable)) {
+    return "unavailable";
   }
-  return google.googleApp === "OWN_GOOGLE_APP" ? "needs_consent" : "unsupported";
+  if (google.canChangeUsers) return "allowed";
+  return me.isOwner ? "needs_consent" : "owner_required";
+}
+
+export function googleConsentAvailable(
+  app: GoogleApp,
+  broccoliGoogleAppAvailable: boolean,
+): boolean {
+  return app === "OWN_GOOGLE_APP" || broccoliGoogleAppAvailable;
+}
+
+export function googleUserWritesBlock(google: GoogleUserWrites) {
+  if (google === "unavailable") return "apps.change.googleRelayUnavailable";
+  if (google === "owner_required") return "apps.change.googleOwnerRequired";
+  return undefined;
 }
 
 /**
