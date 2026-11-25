@@ -1,6 +1,7 @@
 fragment ConnectContainerConnectorDialog_connector on ContainerConnector {
   id
   name
+  canDisableAccounts
   connectionFields {
     key
     label
