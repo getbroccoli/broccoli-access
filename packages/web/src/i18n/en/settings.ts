@@ -124,7 +124,9 @@ export const settingsEn = {
   "settings.connectWay.integrationUser": "Integration user",
   "settings.connectWay.recommended": "Recommended",
   "settings.connectWay.invite": "In {app}, invite {email} as an admin. Then press Connect.",
-  "settings.connectWay.inviteToSwitch": "In {app}, invite {email} as an admin. Then press Switch.",
+  "settings.connectWay.inviteToSwitch":
+    "In the connected {app} workspace, invite {email} as an admin. Then press Switch.",
+  "settings.connectWay.useOwnSession": "Use my own session",
   "settings.connectWay.ownSession": "My own session",
   "settings.connectWay.needsExtension": "Needs the Chrome extension.",
   "settings.connectWay.none": "You have none yet. Create it once, for all apps.",
@@ -136,6 +138,11 @@ export const settingsEn = {
   "settings.connectWay.switch": "Switch",
   "settings.connectWay.switchTitle": "Switch {app} to the integration user",
   "settings.connectWay.loadFailed": "Couldn’t load the integration user. Close this and try again.",
+  "settings.integrationUserConnect.failedStep": "Failed",
+  "settings.integrationUserConnect.membersNotRead":
+    "{app} is connected, but its members couldn’t be read. Close this and try Scan now.",
+  "settings.integrationUserConnect.scanRunning":
+    "{app} is being scanned. Try again when the scan ends.",
   "settings.integrationUserConnect.title": "Connecting {app}",
   "settings.integrationUserConnect.stepInvitation": "Accept the invitation",
   "settings.integrationUserConnect.stepSignIn": "Sign in to {app}",
@@ -153,11 +160,11 @@ export const settingsEn = {
   "settings.integrationUserConnect.notAdmin":
     "The integration user isn’t an admin in {app}. Make it an admin in {app}, then try again.",
   "settings.integrationUserConnect.blockedByCheck":
-    "Google or {app} showed a check, which Broccoli Access never gets around. Try again later, or connect with your own session.",
+    "Google or {app} showed a check, which Broccoli Access never gets around. Nothing changed. Try again later.",
   "settings.integrationUserConnect.authenticationFailed":
     "Google refused the integration user’s sign-in. Check the integration user under Connections, then try again.",
   "settings.integrationUserConnect.otherWorkspace":
-    "The integration user’s invitation opens another {app} workspace than the connected one. Invite it to the connected workspace, then try again.",
+    "The integration user signed in to another {app} workspace than the connected one. Nothing changed. Make it an admin in the connected workspace, then try again.",
   "settings.integrationUserConnect.notSetUp":
     "The integration user’s sign-in to Google isn’t set up yet. Finish it under Connections, then try again.",
   "settings.integrationUserConnect.failed": "Couldn’t sign in to {app}. Try again.",

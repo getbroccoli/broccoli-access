@@ -3,10 +3,13 @@ import type { SecurityContext } from "../../../core/security";
 
 /** What the connectors module needs from the imports module: the first scan of a new connection. */
 export interface Scans {
-  /** Queues a scan of the connection, into a source named `sourceName` on the first, joining `tx`. */
+  /**
+   * Queues a scan of the connection, into a source named `sourceName` on the first, joining `tx`;
+   * `queued` is false when one already runs, which reads with the secrets it started with.
+   */
   scanConnection(
     ctx: SecurityContext,
     tx: Tx,
     scan: { connectionId: string; sourceName: string },
-  ): Promise<{ sourceId: string }>;
+  ): Promise<{ sourceId: string; queued: boolean }>;
 }

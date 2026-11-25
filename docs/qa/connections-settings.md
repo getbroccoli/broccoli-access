@@ -73,16 +73,17 @@ Start with Slack not connected, no integration user, and a Chrome without the ex
 - [ ] Connect shows "Before you connect Slack" with Slack's notice; "Accept and continue" stays disabled until "I’ve read this and choose to connect Slack." is ticked.
 - [ ] Before any invitation, "Accept and continue" shows "Connecting Slack" with "The integration user has no invitation in Slack. Invite it as an admin in Slack, then try again." and "Try again"; Slack stays "Not connected".
 - [ ] After the invite of `docs/testing.md` without its `role`, "Try again" shows "The integration user isn’t an admin in Slack. Make it an admin in Slack, then try again."
-- [ ] With the fake failing the sign-in (`POST $FAKE/_fake/failures` for `slack`, `connections/sign-in`, `blocked_by_check`, count 1), "Try again" shows "Google or Slack showed a check, which Broccoli Access never gets around. Try again later, or connect with your own session."
+- [ ] With the fake failing the sign-in (`POST $FAKE/_fake/failures` for `slack`, `connections/sign-in`, `blocked_by_check`, count 1), "Try again" shows "Google or Slack showed a check, which Broccoli Access never gets around. Nothing changed. Try again later."
 - [ ] After `curl -s -H 'content-type: application/json' -d '{"role": "admin"}' "$FAKE/_fake/slack/members/broccoli@acme.example/role"` and a delay of 4000 ms (`POST $FAKE/_fake/delay`), "Try again" lists "Accept the invitation" and "Sign in to Slack" as "Working" and "Read the members" as "Next", with "You can close this. Slack shows as connected when it is done."; then the first two read "Done" and the third "Working", then "Done" with "Slack is connected."
-- [ ] Closed while it works, the dialog reopens on the same steps, and the card turns "Connected" by itself.
+- [ ] Closed while it works, the dialog reopens on the same steps, and the card turns "Connected" by itself. Closed while a sign-in that fails works, it reopens on the reason with "Try again".
+- [ ] With the fake failing the list (`accounts/list`, `app_unavailable`, count 3) before Connect, the last step reads "Failed" with "Slack is connected, but its members couldn’t be read. Close this and try Scan now."
 - [ ] The card reads "Connected", "Acts as the integration user", "The Acme workspace, connected with the Slack session of broccoli@acme.example." and, once scanned, "45 members.", with "Scan now" and no "Switch"; "Broccoli Access for Chrome" still reads "Not installed".
 - [ ] Slack's app page shows "Acts as the integration user" beside "Connected". After Disable on Ana there, `curl -s "$FAKE/_fake/state"` lists under `changes.slack` a `suspend` of `ana@acme.example` with `madeBy` `broccoli@acme.example`.
 - [ ] At 390 px wide, the dialog fits the screen in each of these states without scrolling sideways.
 
 ## Connect Slack with your own session
 
-Start with the owner unpaired (Unpair in Settings) and a Chrome profile without the extension: the first checks download it and load it unpacked. "The Chrome extension" in `docs/testing.md` says how to run Chrome with an extension and answer its prompts.
+Start with Slack not connected (`pnpm dev --drop-db`, then setup again), the owner unpaired (Unpair in Settings) and a Chrome profile without the extension: the first checks download it and load it unpacked. "The Chrome extension" in `docs/testing.md` says how to run Chrome with an extension and answer its prompts.
 
 - [ ] Without the extension, "Connect Slack", then "My own session" and Connect (or "Continue" while no integration user signs in), opens on step 1, "Add the Broccoli Access extension to Chrome", with "Download the extension", five numbered steps, the note for a company-managed Chrome with the extension's ID, "Waiting for the extension. This moves on by itself once it’s installed." and "Works in Chrome only."
 - [ ] Before installing, the Chrome extension card reads "Not installed" with the same download and steps. At a plain http address other than this computer's (such as `http://app.localhost:<port>`, signed in again there), both places say to open Broccoli Access at its https address instead of offering the download.
@@ -100,7 +101,7 @@ Start with the owner unpaired (Unpair in Settings) and a Chrome profile without 
 - [ ] In a profile without the extension, while this owner is paired in another Chrome, "Connect Slack" still opens on step 1; with the extension installed but not paired there, the extension's window says "This Chrome isn't paired…", and after closing it the dialog offers "Pair this Chrome".
 - [ ] "Connect Acme" closes the dialog; the card reads "Connected", "Uses your own session", "The Acme workspace, connected with the Slack session of admin@acme.example." and, once scanned, "41 members. Scanned today at HH:MM. You accepted Slack’s notice on <today>."
 - [ ] Slack's app page lists 41 users with their "In Slack" status, Elif "Disabled".
-- [ ] With the integration user created and invited to Slack as an admin, the card's "Switch" opens "Switch Slack to the integration user" with only "Integration user" and "Then press Switch."; Switch shows the three steps with no notice, and the card then reads "Acts as the integration user", "connected with the Slack session of broccoli@acme.example" once scanned, and has no "Switch".
+- [ ] With the integration user created and invited to Slack as an admin, the card's "Switch" opens "Switch Slack to the integration user" with only "Integration user" and "In the connected Slack workspace, invite **broccoli@acme.example** as an admin. Then press Switch."; while Slack's scan runs, Switch ends with "Slack is being scanned. Try again when the scan ends."; Switch shows the three steps with no notice, and the card then reads "Acts as the integration user", "connected with the Slack session of broccoli@acme.example" once scanned, and has no "Switch".
 - [ ] At 390 px wide, every step fits without horizontal scrolling.
 
 ## Reconnect

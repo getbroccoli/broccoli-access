@@ -248,6 +248,26 @@ test("refuses to switch to a session that opens another workspace, keeping the o
   expect(before).toMatchObject([{ id: connectionId, sessionFrom: "extension" }]);
 });
 
+test("refuses to switch the owner's session while the connection's scan is running", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const { service, scans, connectionId } = await slackOnOwnSession(orm, seed, fakeConnectors);
+  await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
+  await scans.scanNow(OWNER, connectionId);
+  const before = await storedAppConnections(orm);
+
+  await expect(
+    service.connectWithIntegrationUser(OWNER, { connector: "slack" }),
+  ).rejects.toMatchObject({
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "integrationUser", code: "scan_running" }],
+  });
+  expect(await storedAppConnections(orm)).toEqual(before);
+  expect(before).toMatchObject([{ id: connectionId, sessionFrom: "extension" }]);
+});
+
 /** Slack connected with the owner's handed-over session and scanned, with a ready integration user. */
 async function slackOnOwnSession(
   orm: Parameters<typeof ownerHandOver>[0],

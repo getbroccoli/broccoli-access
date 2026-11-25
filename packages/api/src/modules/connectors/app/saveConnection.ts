@@ -1,3 +1,4 @@
+import { invalidInput } from "../../../core/applicationError";
 import type { AppSessionSource, ConnectionDetails } from "../../../core/connectors";
 import type { SecurityContext } from "../../../core/security";
 import { adminUrlOf } from "../domain";
@@ -54,7 +55,11 @@ export async function saveConnection(
   return { connector, connection: summary };
 }
 
-/** Replaces a connection's secrets and queues its scan together, then logs the outcome. */
+/**
+ * Replaces a connection's secrets and queues its scan together, then logs the outcome. With
+ * `refusesRunningScan`, for secrets of another member than the stored ones, a scan already running
+ * refuses it with INVALID_INPUT: its results would name the old member as the connection's.
+ */
 export async function replaceSecrets(
   { transact, connectedApps, scans, logger }: ContainerConnectionDependencies,
   ctx: SecurityContext,
@@ -63,11 +68,13 @@ export async function replaceSecrets(
     stored,
     secrets,
     sessionFrom,
+    refusesRunningScan = false,
   }: {
     connector: ContainerConnector;
     stored: StoredConnection;
     secrets: Record<string, unknown>;
     sessionFrom: AppSessionSource | undefined;
+    refusesRunningScan?: boolean;
   },
 ): Promise<ConnectorWithConnection> {
   const connectionId = stored.id;
@@ -75,6 +82,13 @@ export async function replaceSecrets(
     // The source first, then the connection, as a failing scan locks them, so they never deadlock.
     // The source exists since the first scan, which named it.
     const scan = await scans.scanConnection(ctx, tx, { connectionId, sourceName: connector.name });
+    if (refusesRunningScan && !scan.queued) {
+      logger.warn(
+        { connector: connector.key, connectionId },
+        "Switch refused: the connection's scan is running",
+      );
+      throw invalidInput([{ field: "integrationUser", code: "scan_running" }]);
+    }
     await connectedApps.reconnect(ctx, tx, { connectionId, secrets, sessionFrom });
     return scan;
   });

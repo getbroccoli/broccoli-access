@@ -25,7 +25,7 @@ test("a second request for a queued scan returns its source without queuing anot
     scans.scanConnection(OWNER, tx, { connectionId, sourceName: "acme.example" }),
   );
 
-  expect(result).toEqual({ sourceId });
+  expect(result).toEqual({ sourceId, queued: false });
   expect(await storedImportSources(orm)).toMatchObject([{ id: sourceId, status: "scanning" }]);
   expect(sent).toEqual([{ name: "imports.scanConnection", payload: { sourceId } }]);
 });

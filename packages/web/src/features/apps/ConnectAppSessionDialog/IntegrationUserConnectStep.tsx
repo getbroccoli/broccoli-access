@@ -1,7 +1,11 @@
+import { useQuery } from "@apollo/client/react";
+
+import { ContainerConnectorScansDocument, type ScanStatus } from "@/__generated__/graphql";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { t, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/class-names";
+import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 
 import { ConnectHeader } from "./ConnectHeader";
 import type { useConnectWithIntegrationUser } from "./useConnectWithIntegrationUser";
@@ -9,8 +13,6 @@ import type { useConnectWithIntegrationUser } from "./useConnectWithIntegrationU
 type Props = {
   connector: { id: string; name: string };
   signIn: ReturnType<typeof useConnectWithIntegrationUser>;
-  /** Whether the connection's scan still reads the members. */
-  isScanning: boolean;
   onTryAgain: () => void;
 };
 
@@ -19,19 +21,31 @@ type Props = {
  * signing in, which the connector does in one go, then reading the members; or why it stopped and
  * what to do.
  */
-export function IntegrationUserConnectStep({ connector, signIn, isScanning, onTryAgain }: Props) {
+export function IntegrationUserConnectStep({ connector, signIn, onTryAgain }: Props) {
   const [, { loading, error, payloadError }] = signIn;
   const app = connector.name;
   const failure = failureOf(payloadError, error !== undefined);
   const signedIn: StepStatus = loading ? "working" : failure ? "next" : "done";
+  // The connection's scan, read here so the last step ends wherever the dialog is open.
+  const scans = useQuery(ContainerConnectorScansDocument, {
+    skip: signedIn !== "done",
+    fetchPolicy: "cache-and-network",
+  });
+  const scan = scans.data?.containerConnectors.find(({ id }) => id === connector.id)?.connection
+    ?.scan;
+  usePollWhileScanning(signedIn === "done" && (!scan || scan.status === "SCANNING"), scans);
+  const members = membersStatus(signedIn, scan?.status);
   const steps: { label: MessageKey; status: StepStatus }[] = [
     { label: "settings.integrationUserConnect.stepInvitation", status: signedIn },
     { label: "settings.integrationUserConnect.stepSignIn", status: signedIn },
-    {
-      label: "settings.integrationUserConnect.stepMembers",
-      status: signedIn !== "done" ? "next" : isScanning ? "working" : "done",
-    },
+    { label: "settings.integrationUserConnect.stepMembers", status: members },
   ];
+  const note: MessageKey =
+    members === "failed"
+      ? "settings.integrationUserConnect.membersNotRead"
+      : members === "done"
+        ? "settings.integrationUserConnect.connected"
+        : "settings.integrationUserConnect.canClose";
 
   return (
     <>
@@ -63,14 +77,7 @@ export function IntegrationUserConnectStep({ connector, signIn, isScanning, onTr
           {t(failure, { app })}
         </p>
       ) : (
-        <p className="text-[13px] text-muted-foreground">
-          {t(
-            steps.every(({ status }) => status === "done")
-              ? "settings.integrationUserConnect.connected"
-              : "settings.integrationUserConnect.canClose",
-            { app },
-          )}
-        </p>
+        <p className="text-[13px] text-muted-foreground">{t(note, { app })}</p>
       )}
       <DialogFooter className="m-0 flex-row justify-end gap-2 border-0 bg-transparent p-0">
         <DialogClose render={<Button type="button" variant="outline" size="lg" />}>
@@ -86,12 +93,27 @@ export function IntegrationUserConnectStep({ connector, signIn, isScanning, onTr
   );
 }
 
-type StepStatus = "done" | "working" | "next";
+type StepStatus = "done" | "working" | "next" | "failed";
+
+/** Where reading the members stands: after the sign-in, as the connection's scan goes. */
+function membersStatus(signedIn: StepStatus, scan: ScanStatus | undefined): StepStatus {
+  if (signedIn !== "done") {
+    return "next";
+  }
+  if (scan === "SCAN_FAILED") {
+    return "failed";
+  }
+  return scan === "SCANNED" ? "done" : "working";
+}
 
 const BADGES: Record<StepStatus, { label: MessageKey; style: string }> = {
   done: { label: "settings.integrationUserConnect.done", style: "bg-brand-soft text-brand-deep" },
   working: { label: "settings.integrationUserConnect.working", style: "bg-blue-100 text-blue-900" },
   next: { label: "settings.integrationUserConnect.next", style: "bg-muted text-foreground/70" },
+  failed: {
+    label: "settings.integrationUserConnect.failedStep",
+    style: "bg-destructive/10 text-destructive",
+  },
 };
 
 /** Why signing in stopped, with what the owner does about it; undefined while it runs or once it is done. */
@@ -114,4 +136,5 @@ const FAILURES: Partial<Record<string, MessageKey>> = {
   authentication_failed: "settings.integrationUserConnect.authenticationFailed",
   wrong_workspace: "settings.integrationUserConnect.otherWorkspace",
   not_set_up: "settings.integrationUserConnect.notSetUp",
+  scan_running: "settings.integrationUserConnect.scanRunning",
 };

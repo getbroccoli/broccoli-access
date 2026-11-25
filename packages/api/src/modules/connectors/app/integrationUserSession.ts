@@ -1,33 +1,46 @@
 import { isDeepStrictEqual } from "node:util";
 
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
-import { signsInAsIntegrationUser } from "../../../core/connectors";
+import {
+  CONNECTOR_ERROR_CODES,
+  ConnectorError,
+  type ConnectorErrorCode,
+  signsInAsIntegrationUser,
+  withConnectorRetries,
+} from "../../../core/connectors";
 import type { SecurityContext } from "../../../core/security";
+import { parseAppSession } from "../domain";
 import type { SignedInConnection, SignInFailure } from "../ports";
 import type { ContainerConnectionDependencies } from "./containerConnectionService";
-import type { ContainerConnector } from "./containerConnectors";
+import { appSessionFieldOf, type ContainerConnector } from "./containerConnectors";
 
 /**
- * The connection the integration user's sign-in to the connector's app made. Refuses a connector
- * that cannot sign in with CONFLICT; a sign-in the owner can put right, or one that opens another
- * workspace than `stored`'s, with INVALID_INPUT on `integrationUser` and its code; any other
- * failure with UNAVAILABLE.
+ * The connection the integration user's sign-in to the connector's app made, trying a rate-limited
+ * or unavailable sign-in again. Refuses a connector that cannot sign in with CONFLICT; a sign-in
+ * the owner can put right, or one that opens another workspace than `stored`'s, with
+ * INVALID_INPUT on `integrationUser` and its code; any other failure, and an answer without the
+ * app session the connector names, with UNAVAILABLE.
  */
 export async function integrationUserSession(
-  { integrationUser, logger }: ContainerConnectionDependencies,
+  dependencies: ContainerConnectionDependencies,
   ctx: SecurityContext,
   connector: ContainerConnector,
   stored: { id: string; settings: Record<string, unknown> } | undefined,
 ): Promise<SignedInConnection> {
+  const { logger } = dependencies;
   if (!signsInAsIntegrationUser(connector)) {
     throw new ApplicationError(
       "CONFLICT",
       "This connector cannot sign in as the integration user.",
     );
   }
-  const signedIn = await integrationUser.signInToApp(ctx, connector.key);
+  const signedIn = await signInWithRetries(dependencies, ctx, connector);
   if ("failure" in signedIn) {
     throw refusalOf(signedIn.failure);
+  }
+  if (!holdsAppSession(connector, signedIn)) {
+    logger.warn({ connector: connector.key }, "Sign-in answered without the app session");
+    throw refusalOf("unexpected_response");
   }
   if (stored && !isDeepStrictEqual(signedIn.connection.settings, stored.settings)) {
     logger.warn(
@@ -37,6 +50,52 @@ export async function integrationUserSession(
     throw refusalOf("wrong_workspace");
   }
   return signedIn;
+}
+
+/** The sign-in's answer, after up to three attempts at one that is rate-limited or unavailable. */
+async function signInWithRetries(
+  { integrationUser, logger, wait }: ContainerConnectionDependencies,
+  ctx: SecurityContext,
+  connector: ContainerConnector,
+): Promise<SignedInConnection | SignInFailure> {
+  try {
+    return await withConnectorRetries(
+      async () => {
+        const signedIn = await integrationUser.signInToApp(ctx, connector.key);
+        // Thrown, so the shared retries decide which of the connector's errors pass on their own.
+        if ("failure" in signedIn && isConnectorError(signedIn.failure)) {
+          throw new ConnectorError(signedIn.failure);
+        }
+        return signedIn;
+      },
+      {
+        wait,
+        onRetry: (failure, attempt) =>
+          logger.info(
+            { connector: connector.key, failure, attempt },
+            "Integration user's sign-in to the app failed; trying again",
+          ),
+      },
+    );
+  } catch (error) {
+    if (!(error instanceof ConnectorError)) {
+      throw error;
+    }
+    return { failure: error.code };
+  }
+}
+
+function isConnectorError(failure: SignInFailure["failure"]): failure is ConnectorErrorCode {
+  return (CONNECTOR_ERROR_CODES as readonly string[]).includes(failure);
+}
+
+/** Whether the answer's secrets hold the app session the connector's manifest names. */
+function holdsAppSession(
+  connector: ContainerConnector,
+  { connection }: SignedInConnection,
+): boolean {
+  const field = appSessionFieldOf(connector);
+  return field !== undefined && parseAppSession(connection.secrets[field.key], field) !== null;
 }
 
 function refusalOf(failure: SignInFailure["failure"]): ApplicationError {

@@ -52,7 +52,14 @@ export function ConnectWayStep({ connector, isSwitching, onChoose }: Props) {
             {t("settings.connectWay.loadFailed")}
           </p>
         )}
-        <DialogFooter className={FOOTER}>{cancel}</DialogFooter>
+        <DialogFooter className={FOOTER}>
+          {cancel}
+          {error && !isSwitching && (
+            <Button type="button" size="lg" onClick={() => onChoose("ownSession")}>
+              {t("settings.connectWay.useOwnSession")}
+            </Button>
+          )}
+        </DialogFooter>
       </>
     );
   }

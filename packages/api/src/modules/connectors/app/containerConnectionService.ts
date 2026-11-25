@@ -69,8 +69,9 @@ export interface ContainerConnectionService {
    * NOT_FOUND, one that cannot sign in with CONFLICT, a first connection without the notice
    * accepted with INVALID_INPUT, a sign-in the owner can put right with INVALID_INPUT on
    * `integrationUser` and its code (`not_invited`, `permission_missing`, `blocked_by_check`,
-   * `authentication_failed`, `wrong_workspace`, `not_set_up`), and any other failing sign-in with
-   * UNAVAILABLE; a refusal changes nothing.
+   * `authentication_failed`, `wrong_workspace`, `not_set_up`, or `scan_running` for a switch while
+   * the connection's scan runs), and any other failing sign-in, after trying a rate-limited or
+   * unavailable one again, with UNAVAILABLE; a refusal changes nothing.
    */
   connectWithIntegrationUser: (
     ctx: SecurityContext,
@@ -245,8 +246,13 @@ export function createContainerConnectionService(
       );
       const sessionFrom = "server_sign_in";
       if (stored) {
-        const { secrets } = connection;
-        return replaceSecrets(dependencies, ctx, { connector, stored, secrets, sessionFrom });
+        return replaceSecrets(dependencies, ctx, {
+          connector,
+          stored,
+          secrets: connection.secrets,
+          sessionFrom,
+          refusesRunningScan: stored.sessionFrom !== sessionFrom,
+        });
       }
       const noticeAcceptedAt = connector.notice === null ? undefined : now();
       return saveConnection(dependencies, ctx, {

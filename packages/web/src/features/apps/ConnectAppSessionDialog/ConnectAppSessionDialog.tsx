@@ -6,10 +6,12 @@ import {
   type ConnectAppSessionDialog_ConnectorFragment,
   ConnectAppSessionDialog_ConnectorFragmentDoc,
 } from "@/__generated__/graphql";
+import { useCache } from "@/apollo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { t } from "@/i18n";
 
+import { forgetAppLists } from "../cache";
 import { ConnectAppSessionSteps } from "./ConnectAppSessionSteps";
 import { ConnectHeader } from "./ConnectHeader";
 import { type ConnectWay, ConnectWayStep } from "./ConnectWayStep";
@@ -41,6 +43,7 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
   const [way, setWay] = useState<ConnectWay | "notice" | null>(null);
   const connection = useConnectAppSession();
   const signIn = useConnectWithIntegrationUser();
+  const cache = useCache();
   if (!complete) {
     return null;
   }
@@ -54,8 +57,8 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
       return;
     }
     setOpen(next);
-    // The integration user's sign-in carries on while closed, and shows again when reopened.
-    if (!signIn[1].loading) {
+    // The integration user's sign-in carries on while closed, and its end shows when reopened.
+    if (!next && !signIn[1].loading) {
       setWay(null);
       connection[1].reset();
       signIn[1].reset();
@@ -64,8 +67,18 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
   const connectAsIntegrationUser = () => {
     setWay("integrationUser");
     const input = { connector: connector.id, noticeAccepted: true };
+    const approvesApp = !isSwitching;
     // `usePayloadMutation` keeps a failure for display, so the rejection needs no handling here.
-    signIn[0]({ variables: { input } }).then(onConnected, () => undefined);
+    signIn[0]({ variables: { input } }).then(
+      () => {
+        // A first connection approves the app, which moves the app lists and their counts.
+        if (approvesApp) {
+          forgetAppLists(cache);
+        }
+        onConnected?.();
+      },
+      () => undefined,
+    );
   };
   const choose = (chosen: ConnectWay) => {
     if (chosen === "ownSession") {
@@ -105,7 +118,6 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
           <IntegrationUserConnectStep
             connector={connector}
             signIn={signIn}
-            isScanning={stored?.scan?.status === "SCANNING"}
             onTryAgain={connectAsIntegrationUser}
           />
         )}

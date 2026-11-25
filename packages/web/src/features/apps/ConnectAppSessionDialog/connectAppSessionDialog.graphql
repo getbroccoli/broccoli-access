@@ -4,14 +4,10 @@ fragment ConnectAppSessionDialog_connector on ContainerConnector {
   appDomain
   notice
   signsInAsIntegrationUser
-  # Once connected, the dialog offers Switch for the owner's own session, and shows its scan.
+  # Once connected, the dialog offers Switch for the owner's own session.
   connection {
     id
     sessionFrom
-    scan {
-      id
-      status
-    }
   }
 }
 

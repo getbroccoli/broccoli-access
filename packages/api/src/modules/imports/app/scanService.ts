@@ -24,7 +24,7 @@ export interface ScanService {
     ctx: SecurityContext,
     tx: Tx,
     scan: { connectionId: string; sourceName: string },
-  ) => Promise<{ sourceId: string }>;
+  ) => Promise<{ sourceId: string; queued: boolean }>;
   /**
    * "Scan now": queues a scan of the connection as `scanConnection` does, in its own transaction,
    * and returns the scan, now scanning. Needs MANAGE_WORKSPACE; refuses a connection never scanned
@@ -87,7 +87,7 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
       const sources = importSourceRepository(tx);
       const source = await sources.lockByConnection(connectionId);
       if (source?.status === "scanning") {
-        return { sourceId: source.id };
+        return { sourceId: source.id, queued: false };
       }
       let sourceId = source?.id;
       if (sourceId) {
@@ -96,7 +96,7 @@ export function createScanService(dependencies: ScanDependencies): ScanService {
         sourceId = (await sources.insertScanning({ connectionId, name: sourceName })).id;
       }
       await jobs.send(tx, SCAN_JOB, { sourceId });
-      return { sourceId };
+      return { sourceId, queued: true };
     },
     async scanNow(ctx, connectionId) {
       ctx.require("MANAGE_WORKSPACE");
