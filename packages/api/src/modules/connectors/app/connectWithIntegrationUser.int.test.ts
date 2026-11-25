@@ -8,12 +8,12 @@ import {
   test,
   OWNER,
   SYSTEM,
+  connectAsIntegrationUser,
   containerConnections,
   INTEGRATION_USER_EMAIL,
   INTEGRATION_USER_PASSWORD,
   inviteIntegrationUserToFakeSlack,
   ownerHandOver,
-  postFakeControl,
   readyIntegrationUser,
   serveConnectorRoutes,
   storedAppAccounts,
@@ -26,16 +26,18 @@ import {
 
 const SLACK = { connector: "slack", noticeAccepted: true };
 
-test("connects Slack with the session the integration user signs in to, and scans as it", async ({
+test("connects the confirmed workspace with the integration user's session, and scans as it", async ({
   orm,
   seed,
   fakeConnectors,
 }) => {
-  const now = new Date("2026-01-01T12:00:00Z");
+  let now = new Date("2026-01-01T12:00:00Z");
   const { service, scans, sent } = await readyIntegrationUser(orm, seed, fakeConnectors, () => now);
   await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
 
-  const result = await service.connectWithIntegrationUser(OWNER, SLACK);
+  const { handOver } = await service.connectWithIntegrationUser(OWNER, SLACK);
+  now = new Date("2026-01-01T12:01:00Z");
+  const result = await service.connect(OWNER, { ...SLACK, appSession: handOver!.appSession });
 
   expect(result.connection).toMatchObject({ sessionFrom: "server_sign_in", noticeAcceptedAt: now });
   expect(await storedAppConnections(orm)).toMatchObject([
@@ -60,6 +62,58 @@ test("connects Slack with the session the integration user signs in to, and scan
   );
 });
 
+test("stores nothing until the owner confirms the workspace the sign-in reached", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const { service, sent } = await readyIntegrationUser(orm, seed, fakeConnectors);
+  await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
+
+  const result = await service.connectWithIntegrationUser(OWNER, SLACK);
+
+  expect(result).toMatchObject({
+    connection: null,
+    handOver: {
+      requestId: expect.any(String) as unknown,
+      organizationName: "Acme",
+      domain: "acme.slack.com",
+      appSession: expect.any(String) as unknown,
+    },
+  });
+  expect(await storedAppConnections(orm)).toEqual([]);
+  expect(sent).toEqual([]);
+});
+
+test("lets the owner read the sign-in hand-over for five minutes", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  let now = new Date("2026-01-01T12:00:00Z");
+  const { service } = await readyIntegrationUser(orm, seed, fakeConnectors, () => now);
+  await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
+  const { handOver } = await service.connectWithIntegrationUser(OWNER, SLACK);
+
+  now = new Date("2026-01-01T12:04:59.999Z");
+  expect(await service.readAppSessionHandOver(OWNER, handOver!.requestId)).toEqual(handOver);
+  now = new Date("2026-01-01T12:05:00Z");
+  expect(await service.readAppSessionHandOver(OWNER, handOver!.requestId)).toBeNull();
+});
+
+test("keeps the session sealed in the hand-over", async ({ orm, seed, fakeConnectors }) => {
+  const { service } = await readyIntegrationUser(orm, seed, fakeConnectors);
+  await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
+
+  const result = await service.connectWithIntegrationUser(OWNER, SLACK);
+
+  expect(result.handOver?.appSession).toEqual(expect.any(String));
+  const shown = inspect(result, { depth: null, maxStringLength: null });
+  expect(shown).not.toContain(INTEGRATION_USER_PASSWORD);
+  expect(shown).not.toContain(INTEGRATION_USER_TOTP_SECRET);
+  expect(shown).not.toContain("xoxc-");
+});
+
 test("keeps the integration user's secrets out of the answer and history", async ({
   orm,
   seed,
@@ -68,80 +122,12 @@ test("keeps the integration user's secrets out of the answer and history", async
   const { service } = await readyIntegrationUser(orm, seed, fakeConnectors);
   await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
 
-  const result = await service.connectWithIntegrationUser(OWNER, SLACK);
+  const result = await connectAsIntegrationUser(service);
 
   const shown = inspect([result, await storedRecordHistory(orm)], { depth: null });
   expect(shown).not.toContain(INTEGRATION_USER_PASSWORD);
   expect(shown).not.toContain(INTEGRATION_USER_TOTP_SECRET);
   expect(shown).not.toContain("xoxc-");
-});
-
-test("refuses an integration user that Slack has not invited, saying so", async ({
-  orm,
-  seed,
-  fakeConnectors,
-}) => {
-  const { service, sent } = await readyIntegrationUser(orm, seed, fakeConnectors);
-
-  await expect(service.connectWithIntegrationUser(OWNER, SLACK)).rejects.toMatchObject({
-    code: "INVALID_INPUT",
-    fieldErrors: [{ field: "integrationUser", code: "not_invited" }],
-  });
-  expect(await storedAppConnections(orm)).toEqual([]);
-  expect(sent).toEqual([]);
-});
-
-test("refuses an integration user that is not an admin in Slack, saying so", async ({
-  orm,
-  seed,
-  fakeConnectors,
-}) => {
-  const { service } = await readyIntegrationUser(orm, seed, fakeConnectors);
-  await inviteIntegrationUserToFakeSlack(fakeConnectors);
-
-  await expect(service.connectWithIntegrationUser(OWNER, SLACK)).rejects.toMatchObject({
-    code: "INVALID_INPUT",
-    fieldErrors: [{ field: "integrationUser", code: "permission_missing" }],
-  });
-  expect(await storedAppConnections(orm)).toEqual([]);
-});
-
-test.for(["blocked_by_check", "authentication_failed"] as const)(
-  "refuses a sign-in that ends with %s, saying so",
-  async (code, { orm, seed, fakeConnectors }) => {
-    const { service } = await readyIntegrationUser(orm, seed, fakeConnectors);
-    await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
-    await postFakeControl(fakeConnectors.url, "failures", {
-      connector: "slack",
-      call: "connections/sign-in",
-      code,
-      count: 1,
-    });
-
-    await expect(service.connectWithIntegrationUser(OWNER, SLACK)).rejects.toMatchObject({
-      code: "INVALID_INPUT",
-      fieldErrors: [{ field: "integrationUser", code }],
-    });
-    expect(await storedAppConnections(orm)).toEqual([]);
-  },
-);
-
-test("reports a sign-in the container cannot finish as unavailable", async ({
-  orm,
-  seed,
-  fakeConnectors,
-}) => {
-  const { service } = await readyIntegrationUser(orm, seed, fakeConnectors);
-  await postFakeControl(fakeConnectors.url, "failures", {
-    connector: "slack",
-    call: "connections/sign-in",
-    code: "unexpected_response",
-    count: 1,
-  });
-
-  await expect(service.connectWithIntegrationUser(OWNER, SLACK)).rejects.toMatchObject({
-    code: "UNAVAILABLE",
-  });
 });
 
 test("refuses to connect before the integration user signs in with two steps", async ({
@@ -203,6 +189,7 @@ test("switches an own-session connection to the integration user's session and k
 
   const result = await service.connectWithIntegrationUser(OWNER, { connector: "slack" });
 
+  expect(result.handOver).toBeNull();
   expect(result.connection).toMatchObject({ id: connectionId, sessionFrom: "server_sign_in" });
   const [connection] = await storedAppConnections(orm);
   expect(connection).toMatchObject({ id: connectionId, sessionFrom: "server_sign_in" });

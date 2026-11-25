@@ -56,15 +56,12 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
           ["INVALID_INPUT", "NOT_FOUND", "UNAVAILABLE"],
         ),
       connectWithIntegrationUser: (_parent, { input }, context) =>
-        mutationPayload<ResolversTypes["ContainerConnectorConnectWithIntegrationUserPayload"]>(
-          async () => ({
-            containerConnector: await connections.connectWithIntegrationUser(
-              context.getActor(),
-              input,
-            ),
-          }),
-          ["INVALID_INPUT", "NOT_FOUND", "CONFLICT", "UNAVAILABLE"],
-        ),
+        mutationPayload<
+          ResolversTypes["ContainerConnectorConnectWithIntegrationUserPayload"]
+        >(async () => {
+          const signedIn = await connections.connectWithIntegrationUser(context.getActor(), input);
+          return { containerConnector: signedIn, appSessionHandOver: signedIn.handOver };
+        }, ["INVALID_INPUT", "NOT_FOUND", "CONFLICT", "UNAVAILABLE"]),
     },
     ContainerConnector: {
       id: ({ connector }) => connector.key,

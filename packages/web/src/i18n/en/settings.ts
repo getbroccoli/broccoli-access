@@ -211,6 +211,10 @@ export const settingsEn = {
     "Couldn’t check whether the extension handed over your session. Connect {app} again.",
   "settings.appSession.confirmTitle": "Connect the {workspace} workspace?",
   "settings.appSession.confirmBody": "Your {app} session in this Chrome opens this workspace.",
+  "settings.appSession.confirmBodyIntegrationUser":
+    "The integration user signed in to this {app} workspace. Nothing is connected until you confirm it.",
+  "settings.appSession.notThisWorkspaceIntegrationUser":
+    "Not this workspace? Cancel, take the integration user out of it in {app}, invite it to the right one, then Connect {app} again.",
   "settings.appSession.approvesNow": "Broccoli Access approves {app} and reads its members now.",
   "settings.appSession.readsDaily":
     "Each day it reads them again, which also keeps the session fresh.",

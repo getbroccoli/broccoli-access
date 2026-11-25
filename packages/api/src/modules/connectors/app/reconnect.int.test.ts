@@ -5,6 +5,7 @@ import { ACME_LINEAR, ACME_SLACK } from "@broccoli-access/fake-apps";
 import express from "express";
 
 import {
+  connectAsIntegrationUser,
   connectLinear,
   containerConnections,
   createAppConnectionService,
@@ -143,7 +144,7 @@ test("refuses to reconnect with the owner's session while the integration user's
 }) => {
   const { service } = await readyIntegrationUser(orm, seed, fakeConnectors);
   await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
-  await service.connectWithIntegrationUser(OWNER, { connector: "slack", noticeAccepted: true });
+  await connectAsIntegrationUser(service);
   const before = await storedAppConnections(orm);
   const owner = await ownerHandOver(orm, fakeConnectors);
 

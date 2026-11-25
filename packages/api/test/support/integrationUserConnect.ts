@@ -31,6 +31,17 @@ export async function readyIntegrationUser(
   return containerConnections(orm, fake.url, undefined, now);
 }
 
+/** Signs in as the integration user and confirms the Slack workspace it reached. */
+export async function connectAsIntegrationUser(
+  service: ReturnType<typeof containerConnections>["service"],
+  ctx = OWNER,
+) {
+  const input = { connector: "slack", noticeAccepted: true };
+  const { handOver } = await service.connectWithIntegrationUser(ctx, input);
+  assert.ok(handOver, "Expected a workspace to confirm");
+  return service.connect(ctx, { ...input, appSession: handOver.appSession });
+}
+
 /** Invites the integration user to the fake Slack as its admin Mia would; no `role` is the default one. */
 export async function inviteIntegrationUserToFakeSlack(
   fake: RunningFakeConnectors,

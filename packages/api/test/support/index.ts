@@ -22,6 +22,7 @@ export {
 export { TEST_OWNER, TestEnv, type SignedInOwner, type TestEnvOptions } from "./testEnv";
 export { INTEGRATION_USER_PASSWORD, TestSeed } from "./testSeed";
 export {
+  connectAsIntegrationUser,
   INTEGRATION_USER_EMAIL,
   inviteIntegrationUserToFakeSlack,
   readyIntegrationUser,

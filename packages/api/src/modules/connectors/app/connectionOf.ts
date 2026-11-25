@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 
 import { invalidInput } from "../../../core/applicationError";
-import type { ConnectionDetails } from "../../../core/connectors";
+import type { AppSessionSource, ConnectionDetails } from "../../../core/connectors";
 import type { Logger } from "../../../core/logger";
 import type { SecurityContext } from "../../../core/security";
 import { parseAppSession } from "../domain";
@@ -15,6 +15,8 @@ export interface Connection {
   secrets: Record<string, unknown>;
   /** For a handed-over session: the workspace the owner confirmed, which connecting must still reach. */
   workspace?: ConfirmedWorkspace;
+  /** For a session: who made it, the extension's hand-over or the integration user's sign-in. */
+  sessionFrom?: AppSessionSource;
 }
 
 /**
@@ -48,8 +50,8 @@ export function connectionOf(
     );
     throw invalidInput([{ field: "appSession", code: "invalid" }]);
   }
-  const { settings, workspace } = handedOver;
-  return { settings, secrets: { [field.key]: session }, workspace };
+  const { settings, workspace, sessionFrom } = handedOver;
+  return { settings, secrets: { [field.key]: session }, workspace, sessionFrom };
 }
 
 /** Whether the test found another workspace than the one the owner confirmed at the hand-over. */

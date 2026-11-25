@@ -17,22 +17,46 @@ connectorTest(
     const browser = await ownerWithIntegrationUser(env);
     await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
 
-    const connected = await browser.graphql(CONNECT, { input: SLACK });
+    const signIn = await browser.graphql(SIGN_IN, { input: SLACK });
+    const body = (await signIn.json()) as {
+      data: {
+        connectors: { connectWithIntegrationUser: { appSessionHandOver: { appSession: string } } };
+      };
+    };
 
-    expect(await connected.json()).toEqual({
+    expect(body).toEqual({
       data: {
         connectors: {
           connectWithIntegrationUser: {
             containerConnector: {
               id: "slack",
               signsInAsIntegrationUser: true,
-              connection: { sessionFrom: "SERVER_SIGN_IN" },
+              connection: null,
+            },
+            appSessionHandOver: {
+              id: expect.any(String) as unknown,
+              organizationName: "Acme",
+              domain: "acme.slack.com",
+              appSession: expect.any(String) as unknown,
             },
             error: null,
           },
         },
       },
     });
+    const { appSession } = body.data.connectors.connectWithIntegrationUser.appSessionHandOver;
+    const connected = await browser.graphql(CONFIRM, { input: { ...SLACK, appSession } });
+    expect(await connected.json()).toEqual({
+      data: {
+        connectors: {
+          connect: {
+            containerConnector: { connection: { sessionFrom: "SERVER_SIGN_IN" } },
+            error: null,
+          },
+        },
+      },
+    });
+
     await expect
       .poll(() => slackUser(browser, "ana@acme.example"), ACCOUNT_CHANGE_POLL)
       .toMatchObject({ offeredChange: "SUSPEND" });
@@ -57,13 +81,14 @@ connectorTest(
   async ({ env }) => {
     const browser = await ownerWithIntegrationUser(env);
 
-    const refused = await browser.graphql(CONNECT, { input: SLACK });
+    const refused = await browser.graphql(SIGN_IN, { input: SLACK });
 
     expect(await refused.json()).toEqual({
       data: {
         connectors: {
           connectWithIntegrationUser: {
             containerConnector: null,
+            appSessionHandOver: null,
             error: {
               __typename: "InvalidInputError",
               fields: [{ field: "integrationUser", code: "not_invited" }],
@@ -77,7 +102,7 @@ connectorTest(
 );
 
 connectorTest("connecting with the integration user requires a session", async ({ env }) => {
-  const response = await env.browser().graphql(CONNECT, { input: SLACK });
+  const response = await env.browser().graphql(SIGN_IN, { input: SLACK });
 
   expect(await response.json()).toMatchObject({
     errors: [{ extensions: { code: "UNAUTHENTICATED" } }],
@@ -86,10 +111,18 @@ connectorTest("connecting with the integration user requires a session", async (
 
 const SLACK = { connector: "slack", noticeAccepted: true };
 
-const CONNECT = `mutation ($input: ContainerConnectorConnectWithIntegrationUserInput!) {
+const SIGN_IN = `mutation ($input: ContainerConnectorConnectWithIntegrationUserInput!) {
   connectors { connectWithIntegrationUser(input: $input) {
+    appSessionHandOver { id organizationName domain appSession }
     containerConnector { id signsInAsIntegrationUser connection { sessionFrom } }
     error { __typename ... on InvalidInputError { fields { field code } } }
+  } }
+}`;
+
+const CONFIRM = `mutation ($input: ContainerConnectorConnectInput!) {
+  connectors { connect(input: $input) {
+    containerConnector { connection { sessionFrom } }
+    error { __typename }
   } }
 }`;
 

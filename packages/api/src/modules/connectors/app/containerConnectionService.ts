@@ -8,8 +8,8 @@ import { parseAppSession } from "../domain";
 import type { ConnectedApps, IntegrationUserSignIn, Scans } from "../ports";
 import { type AppSessionHandOver, createAppSessionHandOvers } from "./appSessionHandOvers";
 import { connectionOf, isOtherWorkspace, refuseOtherWorkspace } from "./connectionOf";
-import { integrationUserSession } from "./integrationUserSession";
-import { replaceSecrets, saveConnection, scanRunning, summaryOf } from "./saveConnection";
+import { connectWithIntegrationUser } from "./connectWithIntegrationUser";
+import { replaceSecrets, saveConnection, summaryOf } from "./saveConnection";
 import { testedConnection } from "./testedConnection";
 import {
   appSessionFieldOf,
@@ -62,21 +62,22 @@ export interface ContainerConnectionService {
     },
   ) => Promise<ConnectorWithConnection>;
   /**
-   * Connects a container connector with the session Broccoli Access makes by signing in to its app
-   * as the integration user, then saves and scans as `connect` does. On a connected connector it
-   * switches instead: the new session, which must open the connection's workspace, replaces the
-   * stored one, and its scan is queued. Needs MANAGE_WORKSPACE. Refuses an unknown connector with
-   * NOT_FOUND, one that cannot sign in with CONFLICT, a first connection without the notice
-   * accepted with INVALID_INPUT, a sign-in the owner can put right with INVALID_INPUT on
-   * `integrationUser` and its code (`not_invited`, `permission_missing`, `blocked_by_check`,
-   * `authentication_failed`, `wrong_workspace`, `not_set_up`, or `scan_running` for a switch while
-   * the connection's scan runs), and any other failing sign-in, after trying a rate-limited or
-   * unavailable one again, with UNAVAILABLE; a refusal changes nothing.
+   * Signs in to a container connector's app as the integration user. For a connector not connected
+   * yet it stores nothing: the session waits sealed as `handOver`, for five minutes, until the
+   * owner confirms the workspace it reached with `connect`. On a connected connector it switches:
+   * the new session, which must open the connection's workspace, replaces the stored one, and its
+   * scan is queued. Needs MANAGE_WORKSPACE. Refuses an unknown connector with NOT_FOUND, one that
+   * cannot sign in with CONFLICT, a first sign-in without the notice accepted with INVALID_INPUT,
+   * a sign-in the owner can put right with INVALID_INPUT on `integrationUser` and its code
+   * (`not_invited`, `permission_missing`, `blocked_by_check`, `authentication_failed`,
+   * `wrong_workspace`, `not_set_up`, or `scan_running` for a switch while the connection's scan
+   * runs), and any other failing sign-in, after trying a rate-limited or unavailable one again,
+   * with UNAVAILABLE; a refusal changes nothing.
    */
   connectWithIntegrationUser: (
     ctx: SecurityContext,
     input: { connector: string; noticeAccepted?: boolean },
-  ) => Promise<ConnectorWithConnection>;
+  ) => Promise<IntegrationUserConnection>;
   /**
    * What the extension collects for the connector's app session field. Trusted: the extension's
    * token was checked. Refuses an unknown connector with NOT_FOUND, and one without an app session
@@ -131,6 +132,12 @@ export interface ConnectorWithConnection {
   connection: ContainerConnection | null;
 }
 
+/** What signing in as the integration user gave: the switched connection, or the session to confirm. */
+export interface IntegrationUserConnection extends ConnectorWithConnection {
+  /** The workspace a first sign-in reached, sealed with its session; null after a switch. */
+  handOver: AppSessionHandOver | null;
+}
+
 /** A connection through the connectors container, as Settings and its app's page show it. */
 export interface ContainerConnection {
   id: string;
@@ -183,8 +190,6 @@ export function createContainerConnectionService(
   const { orm, containerConnectors, connectedApps, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
   const handOvers = createAppSessionHandOvers({ secretBox: dependencies.secretBox, now });
-  const isScanning = async (ctx: SecurityContext, connectionId: string) =>
-    (await dependencies.scans.readScan(ctx, connectionId))?.status === "scanning";
   return {
     async connect(ctx, input) {
       ctx.require("MANAGE_WORKSPACE");
@@ -211,7 +216,7 @@ export function createContainerConnectionService(
         connection,
         details,
         noticeAcceptedAt,
-        sessionFrom: sessionFromOwner(connector),
+        sessionFrom: connection.sessionFrom,
       });
     },
     async reconnect(ctx, input) {
@@ -227,43 +232,11 @@ export function createContainerConnectionService(
       const details = await testedConnection(dependencies, connector, connection);
       refuseOtherWorkspace({ connector, connection, details, stored }, logger);
       const secrets = details.connection?.secrets ?? connection.secrets;
-      const sessionFrom = sessionFromOwner(connector);
+      const { sessionFrom } = connection;
       return replaceSecrets(dependencies, ctx, { connector, stored, secrets, sessionFrom });
     },
-    async connectWithIntegrationUser(ctx, input) {
-      ctx.require("MANAGE_WORKSPACE");
-      const connector = await containerConnectors.find(input.connector);
-      const stored = (await connectedApps.readConnections(orm)).find(
-        (candidate) => candidate.connector === connector.key,
-      );
-      // A connected connector's notice was accepted when it first connected.
-      if (connector.notice !== null && !stored && input.noticeAccepted !== true) {
-        throw invalidInput([{ field: "noticeAccepted", code: "required" }]);
-      }
-      // Before signing in, which accepts the invitation in the app; checked again when it saves.
-      if (stored && stored.sessionFrom !== "server_sign_in" && (await isScanning(ctx, stored.id))) {
-        throw scanRunning("server_sign_in");
-      }
-      const { details, connection } = await integrationUserSession(
-        dependencies,
-        ctx,
-        connector,
-        stored,
-      );
-      const sessionFrom = "server_sign_in";
-      if (stored) {
-        const { secrets } = connection;
-        return replaceSecrets(dependencies, ctx, { connector, stored, secrets, sessionFrom });
-      }
-      const noticeAcceptedAt = connector.notice === null ? undefined : now();
-      return saveConnection(dependencies, ctx, {
-        connector,
-        connection,
-        details,
-        noticeAcceptedAt,
-        sessionFrom,
-      });
-    },
+    connectWithIntegrationUser: (ctx, input) =>
+      connectWithIntegrationUser(dependencies, handOvers, ctx, input),
     async describeAppSession(key) {
       const { connector, field } = await findAppSessionConnector(containerConnectors, key);
       const { domains, storageKeys } = field;
@@ -357,9 +330,4 @@ async function connectorsWithConnections({
     const connection = connections.find((candidate) => candidate.connector === connector.key);
     return { connector, connection: connection ? summaryOf(connector, connection) : null };
   });
-}
-
-/** Who made the session the owner gives: the extension, for a connector with an app session field. */
-function sessionFromOwner(connector: ContainerConnector): AppSessionSource | undefined {
-  return appSessionFieldOf(connector) ? "extension" : undefined;
 }

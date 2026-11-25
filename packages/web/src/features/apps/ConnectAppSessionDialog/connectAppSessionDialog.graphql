@@ -26,6 +26,13 @@ query ConnectWayIntegrationUser {
 mutation ConnectWithIntegrationUser($input: ContainerConnectorConnectWithIntegrationUserInput!) {
   connectors {
     connectWithIntegrationUser(input: $input) {
+      # A first connection waits here until the owner confirms the workspace the sign-in reached.
+      appSessionHandOver {
+        id
+        organizationName
+        domain
+        appSession
+      }
       containerConnector {
         id
         connection {

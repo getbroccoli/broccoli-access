@@ -6,12 +6,11 @@ import {
   type ConnectAppSessionDialog_ConnectorFragment,
   ConnectAppSessionDialog_ConnectorFragmentDoc,
 } from "@/__generated__/graphql";
-import { useCache } from "@/apollo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { t } from "@/i18n";
 
-import { forgetAppLists } from "../cache";
+import { ConfirmStep } from "./ConfirmStep";
 import { ConnectAppSessionSteps } from "./ConnectAppSessionSteps";
 import { ConnectHeader } from "./ConnectHeader";
 import { type ConnectWay, ConnectWayStep } from "./ConnectWayStep";
@@ -44,7 +43,6 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
   const [way, setWay] = useState<ConnectWay | "notice" | "switch" | null>(null);
   const connection = useConnectAppSession();
   const signIn = useConnectWithIntegrationUser();
-  const cache = useCache();
   if (!complete) {
     return null;
   }
@@ -68,16 +66,10 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
   const connectAsIntegrationUser = () => {
     setWay(isSwitching ? "switch" : "integrationUser");
     const input = { connector: connector.id, noticeAccepted: true };
-    const approvesApp = !isSwitching;
     // `usePayloadMutation` keeps a failure for display, so the rejection needs no handling here.
     signIn[0]({ variables: { input } }).then(
-      () => {
-        // A first connection approves the app, which moves the app lists and their counts.
-        if (approvesApp) {
-          forgetAppLists(cache);
-        }
-        onConnected?.();
-      },
+      // A first connection is not made yet: the owner confirms its workspace first.
+      (payload) => payload.appSessionHandOver ?? onConnected?.(),
       () => undefined,
     );
   };
@@ -90,6 +82,10 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
       connectAsIntegrationUser();
     }
   };
+  // The workspace a first sign-in reached, until the owner connects it.
+  const signedIn = signIn[1].data?.connectors.connectWithIntegrationUser;
+  const workspaceToConfirm =
+    (!stored && way === "integrationUser" && signedIn?.appSessionHandOver) || null;
   const openButton = stored
     ? offersSwitch && (
         <Button type="button" variant="outline" size="lg" className="px-4">
@@ -115,7 +111,17 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
             <NoticeStep app={app} notice={connector.notice} onAccept={connectAsIntegrationUser} />
           </>
         )}
-        {open && (way === "integrationUser" || way === "switch") && (
+        {open && workspaceToConfirm && (
+          <ConfirmStep
+            connector={connector}
+            handOver={workspaceToConfirm}
+            connection={connection}
+            isIntegrationUser
+            onBack={() => changeOpen(false)}
+            onConnected={() => onConnected?.()}
+          />
+        )}
+        {open && (way === "integrationUser" || way === "switch") && !workspaceToConfirm && (
           <IntegrationUserConnectStep
             connector={connector}
             signIn={signIn}

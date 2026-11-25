@@ -1,5 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 
+import type { AppSession } from "@broccoli-access/connector-contract";
+
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
 import {
   CONNECTOR_ERROR_CODES,
@@ -19,14 +21,14 @@ import { appSessionFieldOf, type ContainerConnector } from "./containerConnector
  * or unavailable sign-in again. Refuses a connector that cannot sign in with CONFLICT; a sign-in
  * the owner can put right, or one that opens another workspace than `stored`'s, with
  * INVALID_INPUT on `integrationUser` and its code; any other failure, and an answer without the
- * app session the connector names, with UNAVAILABLE.
+ * app session the connector names, with UNAVAILABLE. The session comes parsed, beside the answer.
  */
 export async function integrationUserSession(
   dependencies: ContainerConnectionDependencies,
   ctx: SecurityContext,
   connector: ContainerConnector,
   stored: { id: string; settings: Record<string, unknown> } | undefined,
-): Promise<SignedInConnection> {
+): Promise<SignedInConnection & { appSession: AppSession }> {
   const { logger } = dependencies;
   if (!signsInAsIntegrationUser(connector)) {
     throw new ApplicationError(
@@ -38,7 +40,8 @@ export async function integrationUserSession(
   if ("failure" in signedIn) {
     throw refusalOf(signedIn.failure);
   }
-  if (!holdsAppSession(connector, signedIn)) {
+  const appSession = appSessionOf(connector, signedIn);
+  if (!appSession) {
     logger.warn({ connector: connector.key }, "Sign-in answered without the app session");
     throw refusalOf("unexpected_response");
   }
@@ -49,7 +52,7 @@ export async function integrationUserSession(
     );
     throw refusalOf("wrong_workspace");
   }
-  return signedIn;
+  return { ...signedIn, appSession };
 }
 
 /** The sign-in's answer, after up to three attempts at one that is rate-limited or unavailable. */
@@ -89,14 +92,16 @@ function isConnectorError(failure: SignInFailure["failure"]): failure is Connect
   return (CONNECTOR_ERROR_CODES as readonly string[]).includes(failure);
 }
 
-/** Whether the answer's secrets hold, under the key the connector's manifest names, a session that is not empty. */
-function holdsAppSession(
+/** The session the answer's secrets hold under the key the connector's manifest names; null without one, or for an empty one. */
+function appSessionOf(
   connector: ContainerConnector,
   { connection }: SignedInConnection,
-): boolean {
+): AppSession | null {
   const field = appSessionFieldOf(connector);
   const session = field && parseAppSession(connection.secrets[field.key], field);
-  return !!session && (session.cookies.length > 0 || Object.keys(session.storage ?? {}).length > 0);
+  const holdsAny =
+    !!session && (session.cookies.length > 0 || Object.keys(session.storage ?? {}).length > 0);
+  return holdsAny ? session : null;
 }
 
 function refusalOf(failure: SignInFailure["failure"]): ApplicationError {
