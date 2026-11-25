@@ -14,10 +14,11 @@ RUN pnpm install --frozen-lockfile \
 FROM node:24.21.0-bookworm-slim
 ENV NODE_ENV=production PORT=3000 WEB_DIR=/app/web
 WORKDIR /app/api
-COPY --from=build /out/api ./
-COPY --from=build /repo/packages/web/dist /app/web
 # A new named volume copies this folder's owner, so the app can write its secrets.
 RUN mkdir /data && chown node:node /data
+# The API and web can reuse their layers independently.
+COPY --link --from=build /out/api ./
+COPY --link --from=build /repo/packages/web/dist /app/web
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=30s \
