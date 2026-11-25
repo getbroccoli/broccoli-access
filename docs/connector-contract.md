@@ -336,7 +336,7 @@ To check a connector against the real app, a caller can ask for every call the c
   - every error uses a listed code;
   - a request without the debug header gets no `appCalls`;
   - for a connector that lists `suspend` and `reactivate`, each repeated twice changes the member once;
-  - errors are caused through the first action the connector lists, in the order `suspend`, `invite`, `remove`, or through `accounts/list` when it lists none;
+  - errors are caused through the first action the connector lists, in the order `suspend`, `invite`, `remove`, or through `accounts/list` when it lists none; `account_not_found` needs a member, so it is caused through the first of `suspend` and `remove` the connector lists, and is skipped when it lists neither;
   - for a connector that lists `remove`: removing the connection's own member is `not_allowed` only when its list marks one member `isConnectionUser`, and is skipped when it marks none (a key that belongs to no person); removing an active member is `not_allowed` only when the connector also lists `suspend`.
   - an action reports the status read afterwards;
   - `invite` repeated twice sends one invitation;

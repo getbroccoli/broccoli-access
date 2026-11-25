@@ -435,7 +435,7 @@ Binary files, kept for employee photos in a later circle.
 - `connector`: also a key from the connectors container. Still unique: one Slack workspace and one Linear workspace per instance.
 - `app_id`: the catalog app whose key equals the connector's key, else the app with the connector's name, else a new app from the connector's `name` and `appDomain`. Connecting approves it.
 - `status` (new): `connected`, `reconnect`.
-  - It turns to `reconnect` on `authentication_failed` on the server, `permission_missing` or `wrong_workspace`, from a scan or an account change.
+  - It turns to `reconnect` on `authentication_failed` on the server, `permission_missing` or `wrong_workspace`, from a scan or an account change, and on `blocked_by_check` when a check stops the renewal of the integration user's session. A connection acting as the integration user also turns to `reconnect` with `authentication_failed` when the last directory scan shows the integration user suspended.
   - A connection test that passes when the owner reconnects turns it back to `connected`.
 - `reconnect_cause` (new): that error code, set exactly when `reconnect`.
 - `notice_accepted_at`, `notice_accepted_by` (new): when, and which user, accepted the connector's notice. Set exactly for a connector with a notice, which the owner accepts before connecting.
@@ -479,9 +479,9 @@ Binary files, kept for employee photos in a later circle.
 
 ### import_records (changed)
 
-- `values` version 2 adds `isConnectionUser`: true for the member whose key or session the connection uses, false for every Google record. Scans write version 2; a version 1 record reads as false until its next scan.
+- `values` version 2 adds `isConnectionUser`: true for the member whose key or session the connection uses, false for every Google record. Scans write the latest version; a version 1 record reads as false until its next scan.
 - `values` version 3 adds `displayName`: the member's name as the app shows it, from a container connector's `values.displayName`. Google records keep `firstName` and `lastName` and have it null; a version 2 record reads as null until its next scan.
-- A container connector's record: `source_key` is the contract's `sourceKey`, and `raw` its `raw`. `email`, `status` and `isConnectionUser` come from its `values`, and `appName` is the connector's name. `appExternalId` is null, because the account belongs to the connection's app; the other values are null.
+- A container connector's record: `source_key` is the contract's `sourceKey`, and `raw` its `raw`. `email`, `status`, `isConnectionUser` and `displayName` come from its `values`, and `appName` is the connector's name. `appExternalId` is null, because the account belongs to the connection's app; the other values are null.
 
 ### app_accounts (changed)
 
@@ -703,8 +703,10 @@ The one Google Workspace user that broccoli-access creates for itself and connec
 - `encrypted_secrets`: its password and its two-step secret (`totpSecret`), which broccoli-access makes and the owner never sees.
 - `created_by`, `created_at`.
 - broccoli-access sets up its two-step sign-in in Google itself, in the server's browser. Nobody else signs in as it.
-- Its directory account creates no employee. Its account in any other app has the kind `service`, set by the sync.
+- Its directory account creates no employee.
+- Its accounts, the directory's included, have the kind `service`, set by the sync, unless the owner marked one `external` or linked it to a person.
 - Creating it queues a scan of the directory, which reads the email its accounts in other apps are known by.
+- Once the directory scan identifies the integration user, its accounts offer no Disable, Enable or Remove, whatever the owner marked them as.
 
 ```json
 {
