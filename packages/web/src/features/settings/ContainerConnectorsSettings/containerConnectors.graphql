@@ -1,4 +1,4 @@
-query ContainerConnectorsSettings {
+query GoogleWorkspaceScanStatus {
   setup {
     id
     googleWorkspace {
@@ -9,10 +9,12 @@ query ContainerConnectorsSettings {
       }
     }
   }
+}
+
+query ContainerConnectorsSettings {
   containerConnectors {
     id
     name
-    canDisableAccounts
     signsInAsIntegrationUser
     connectionFields {
       kind

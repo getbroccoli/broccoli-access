@@ -87,8 +87,7 @@ export function requireFinishedSetup<Me>({ context, location }: Gate<Me>): Me {
   const recoveringGoogle =
     context.me &&
     context.setupStep === "SCAN" &&
-    (location.pathname === "/settings/google-workspace/google-app" ||
-      location.pathname === "/settings/connections/google-app");
+    location.pathname === "/settings/google-workspace/google-app";
   if (context.setupStep !== "DONE" && location.pathname !== stepPage && !recoveringGoogle) {
     throw redirect({ to: stepPage, replace: true });
   }

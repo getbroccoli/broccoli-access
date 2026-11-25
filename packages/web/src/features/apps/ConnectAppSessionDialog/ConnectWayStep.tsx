@@ -6,6 +6,7 @@ import { OptionCard } from "@/components/form";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { t } from "@/i18n";
+import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 
 import { ConnectHeader } from "./ConnectHeader";
 import { IntegrationUserTitle } from "./IntegrationUserTitle";
@@ -27,12 +28,15 @@ type Props = {
  */
 export function ConnectWayStep({ connector, isSwitching, onChoose }: Props) {
   // Read on each opening: the integration user may have been created since the last.
-  const { data, error } = useQuery(ConnectWayIntegrationUserDocument, {
+  const query = useQuery(ConnectWayIntegrationUserDocument, {
     fetchPolicy: "cache-and-network",
   });
+  const { data, error } = query;
   const [way, setWay] = useState<ConnectWay>("integrationUser");
   const app = connector.name;
   const integrationUser = data?.setup.integrationUser;
+  const isSettingUpSignIn = integrationUser?.signInStatus === "SETTING_UP_TWO_STEP_SIGN_IN";
+  usePollWhileScanning(isSettingUpSignIn, query);
   const signsIn = integrationUser?.signInStatus === "SIGNS_IN_WITH_TWO_STEP_SIGN_IN";
   const title = t(isSwitching ? "settings.connectWay.switchTitle" : "settings.apps.connect", {
     app,

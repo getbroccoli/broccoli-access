@@ -26,7 +26,7 @@ A manual check of the People page against a development stack: everyone in Googl
 
 ## Add person
 
-Connect Slack and Linear as in [Apps settings](apps-settings.md#apps). Create two templates, each with one of the apps. For consent, use a fresh workspace connected with its own Google app. Check that Settings → Google Workspace shows **Reads only**.
+Connect [Slack](apps-settings.md#connect-slack-with-your-own-session) and [Linear](apps-settings.md#apps). Create two templates, each with one of the apps. For consent, use a fresh workspace connected with its own Google app. Check that Settings → Google Workspace shows **Reads only**.
 
 - [ ] Open Add person on People. Enter a first name, last name and a local part containing `s` before the displayed work email domain. Pick both templates. Check the note describes inviting the person to their apps and says “Uses one paid Google seat.”
 - [ ] Select Add and provision. Allow changing users at Google. The confirmation lists both apps. Confirm Provision, reload before revealing, then choose **Reveal first password**. Check the password appears with the person's email and first sign-in instructions. Copy it and select I have saved it. Reload and check it stays hidden.

@@ -103,8 +103,7 @@ export const settingsEn = {
   "settings.connections.directory": "Directory",
   "settings.apps.title": "Apps",
   "settings.apps.description":
-    "Connect an app to see its members, and disable or enable their accounts from here.",
-  "settings.apps.intro": "Connect apps to see their members and manage access where supported.",
+    "Connect apps to see their members and manage access where supported.",
   "settings.apps.notConnected": "Not connected",
   "settings.apps.throughApi": "Through {app}’s API, with a {field} made by a {app} admin.",
   "settings.apps.throughAppSession":

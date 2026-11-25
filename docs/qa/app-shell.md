@@ -18,7 +18,8 @@ A manual check of the left menu, the workspace menu, Settings and the profile me
 - [ ] "Settings" in the workspace menu opens `/settings/google-workspace`: the left menu slides to the settings menu, the backdrop turns a shade darker and the page card takes a deeper shadow.
 - [ ] The settings menu shows "Back to the app", "Settings", then "Google Workspace", "Apps" and "Email", with the profile button at the bottom; the open section is highlighted.
 - [ ] `/settings` opens `/settings/google-workspace`.
-- [ ] `/settings/connections?integrationUserError=cancelled` opens Google Workspace with the cancelled consent message. `/settings/connections/google-app?changeError=cancelled` opens Change Google app with its cancelled consent message.
+- [ ] On a workspace without an integration user, `/settings/connections?integrationUserError=cancelled` opens Google Workspace with the cancelled consent message.
+- [ ] `/settings/connections/google-app?changeError=cancelled` opens Change Google app with its cancelled consent message.
 - [ ] "Back to the app" slides back and opens Applications.
 - [ ] With the system's reduce motion setting on, the menus swap without sliding.
 - [ ] Tab never reaches the menu that is out of view.
