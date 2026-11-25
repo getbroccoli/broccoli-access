@@ -214,16 +214,19 @@ async function createDirectoryAccount(
       secrets: stored.secrets,
     });
     if (!session.createDirectoryAccount) return "app_unavailable";
-    // A duplicate address can belong to an account created elsewhere. Only a confirmed
-    // creation releases the other apps, including after an interrupted Google call.
-    await withConnectorRetries(() => session.createDirectoryAccount!({ ...person, password }), {
-      wait,
-      onRetry: (failure, attempt) =>
-        logger.info(
-          { changeId: change.id, failure, attempt },
-          "Directory account creation will retry",
-        ),
-    });
+    // A duplicate address can belong to an account created elsewhere; the person's id as the key
+    // tells an earlier try's account apart. Only a confirmed creation releases the other apps.
+    await withConnectorRetries(
+      () => session.createDirectoryAccount!({ ...person, key: change.employeeId!, password }),
+      {
+        wait,
+        onRetry: (failure, attempt) =>
+          logger.info(
+            { changeId: change.id, failure, attempt },
+            "Directory account creation will retry",
+          ),
+      },
+    );
     return null;
   } catch (error) {
     if (error instanceof ConnectorError) return error.code;

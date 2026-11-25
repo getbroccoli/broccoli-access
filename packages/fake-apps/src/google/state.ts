@@ -22,6 +22,8 @@ export interface GoogleState {
 /** A directory user: a seeded person, or one the Directory API created. */
 export interface DirectoryPerson extends SeedPerson {
   changePasswordAtNextLogin: boolean;
+  /** The ids another system gave the user when creating it, as Google keeps them. */
+  externalIds?: ExternalId[];
   /** Created through the Directory API since the last reset, which `/_fake/state` lists. */
   createdSinceReset: boolean;
 }
@@ -161,4 +163,11 @@ export function fullName(person: SeedPerson): string {
 
 export function isInsideGrantLog(time: Date, now: Date): boolean {
   return time.getTime() > now.getTime() - GRANT_LOG_DAYS * DAY_MS && time <= now;
+}
+
+/** One of a user's `externalIds`, such as a creator's own key for it. */
+export interface ExternalId {
+  type: string;
+  customType?: string;
+  value: string;
 }

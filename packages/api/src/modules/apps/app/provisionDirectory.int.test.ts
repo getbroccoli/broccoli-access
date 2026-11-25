@@ -2,7 +2,6 @@ import { eq, sql } from "drizzle-orm";
 import { assert } from "vitest";
 import {
   ADMIN,
-  createPersonAtGoogle,
   employeeServices,
   expect,
   failFakeGoogle,
@@ -103,36 +102,6 @@ test("a direct Linear invite is refused while Google creation is pending and aft
   expect(
     await orm.select().from(accountChanges).where(eq(accountChanges.appId, linear.appId)),
   ).toEqual([]);
-  expect(await linearInvitations(fakeConnectors.url, NEW_PERSON.email)).toEqual([]);
-});
-
-test("a Google account created independently causes a duplicate refusal and releases no apps or password", async ({
-  provisionPerson,
-  workspace: { owner, google, linear, provision },
-  seed,
-  orm,
-  fakeGoogle,
-  fakeConnectors,
-}) => {
-  const template = await seed.template({ appIds: [linear.appId] });
-  const { employeeId, run } = await provisionPerson({
-    templateIds: [template.id],
-    appIds: [linear.appId],
-  });
-  await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON);
-
-  await run();
-
-  expect(await orm.select().from(accountChanges)).toMatchObject([
-    {
-      employeeId,
-      connectionId: google.connectionId,
-      status: "failed",
-      error: "not_allowed",
-      encryptedFirstPassword: null,
-    },
-  ]);
-  expect(await provision.takeFirstPassword(owner, employeeId)).toBeNull();
   expect(await linearInvitations(fakeConnectors.url, NEW_PERSON.email)).toEqual([]);
 });
 

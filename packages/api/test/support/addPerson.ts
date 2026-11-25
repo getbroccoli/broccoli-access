@@ -75,6 +75,7 @@ export async function createPersonAtGoogle(
   googleUrl: string,
   owner: SecurityContext,
   { email, firstName, lastName }: typeof NEW_PERSON,
+  creationKey?: string,
 ) {
   await allowDirectoryWrites(orm, googleUrl, owner);
   const row = (await storedAppConnections(orm)).find(
@@ -91,6 +92,7 @@ export async function createPersonAtGoogle(
     givenName: firstName,
     familyName: lastName,
     password: "external-test-password",
+    creationKey,
   });
 }
 

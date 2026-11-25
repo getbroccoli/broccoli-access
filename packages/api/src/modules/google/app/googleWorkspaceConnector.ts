@@ -13,6 +13,7 @@ import {
   type GoogleUser,
 } from "../../../integrations/google";
 import { UnsuccessfulAnswerError } from "../../../utils";
+import { CONFLICT_STATUS, createOrTakeOverUser } from "./createOrTakeOverUser";
 import {
   GOOGLE_WORKSPACE,
   GOOGLE_USER_WRITE_SCOPE,
@@ -86,20 +87,20 @@ export function createGoogleWorkspaceConnector(addresses: {
           }),
         readPhoto: (userId) =>
           asConnectorError(directoryError, async () => google.readPhoto(accessToken, userId)),
-        createDirectoryAccount: ({ email, firstName, lastName, password }) =>
+        createDirectoryAccount: ({ key, email, firstName, lastName, password }) =>
           asConnectorError(
-            (status) => (status === 409 ? "not_allowed" : directoryError(status)),
+            (status) => (status === CONFLICT_STATUS ? "not_allowed" : directoryError(status)),
             async () => {
               if (!grantedScopes.includes(GOOGLE_USER_WRITE_SCOPE))
                 throw new ConnectorError("permission_missing");
               if (email.split("@").at(-1) !== domain.toLowerCase())
                 throw new ConnectorError("wrong_workspace");
-              const user = await google.createUser(accessToken, {
+              const user = await createOrTakeOverUser(google, accessToken, {
                 email,
                 givenName: firstName,
                 familyName: lastName,
                 password,
-                changePasswordAtNextLogin: true,
+                creationKey: key,
               });
               if (user.email !== email || user.suspended)
                 throw new ConnectorError("unexpected_response");

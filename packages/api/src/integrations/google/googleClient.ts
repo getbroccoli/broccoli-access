@@ -4,6 +4,7 @@ import { z } from "zod";
 import { imageTypeOf, type ImageType } from "../../utils";
 import { bearer, fetchGoogleJson, fetchRequired } from "./fetchGoogleJson";
 import { shortScopeName } from "./shortScopeName";
+import { creationKeyIds, type GoogleUser, parseGoogleUser } from "./directoryUser";
 import { type GoogleGrantEventPage, readGrantEventPage } from "./grantEventPage";
 
 /** Google's OAuth 2.0, OpenID Connect and Directory endpoints, at the addresses the settings give. */
@@ -18,10 +19,12 @@ export interface GoogleClient {
   readSigningKeys(openId: OpenIdConfiguration): Promise<JWTVerifyGetKey>;
   /** The Workspace customer of the access token's admin. */
   readCustomer(accessToken: string): Promise<GoogleCustomer>;
-  /** The customer's user with Google's user id `userId`, paging the Directory; null when absent. */
-  findUser(accessToken: string, userId: string): Promise<GoogleUser | null>;
+  /** The customer's user whose Google id or primary email is `userKey`, paging the Directory; null when absent. */
+  findUser(accessToken: string, userKey: string): Promise<GoogleUser | null>;
   /** Creates a user who keeps the password given; Google refuses a taken address with a 409. */
   createUser(accessToken: string, user: NewGoogleUser): Promise<GoogleUser>;
+  /** Gives the user a password they must change at their next sign-in; null for an unknown user. */
+  setPassword(accessToken: string, userId: string, password: string): Promise<GoogleUser | null>;
   /** Suspends or restores the user and answers the user as Google then has it; null for an unknown one. */
   setUserSuspended(
     accessToken: string,
@@ -78,27 +81,14 @@ export interface GoogleCustomer {
   organizationName: string;
 }
 
-export interface GoogleUser {
-  id: string;
-  /** Lowercased. */
-  email: string;
-  givenName: string;
-  familyName: string;
-  fullName: string;
-  isAdmin: boolean;
-  suspended: boolean;
-  /** The manager the user's relations name, lowercased; null without one. */
-  managerEmail: string | null;
-  /** The user as Google sent it. */
-  raw: Record<string, unknown>;
-}
-
 export interface NewGoogleUser {
   email: string;
   givenName: string;
   familyName: string;
   password: string;
   changePasswordAtNextLogin?: boolean;
+  /** Kept on the user as an external id, so a retry finds the user an earlier try created. */
+  creationKey?: string;
 }
 
 export interface GoogleUserPage {
@@ -185,11 +175,13 @@ export function createGoogleClient({
     },
     // shortcut: pages the user list because the fake Google has no `users.get`; read the one user
     // with `users.get` once the fake serves it, so a large directory takes one request.
-    findUser: async (accessToken, userId) => {
+    findUser: async (accessToken, userKey) => {
       let pageToken: string | null = null;
       do {
         const page: GoogleUserPage = await readUserPage(directoryUrl, accessToken, pageToken);
-        const user = page.users.find((candidate) => candidate.id === userId);
+        const user = page.users.find(
+          ({ id, email }) => id === userKey || email === userKey.toLowerCase(),
+        );
         if (user) {
           return user;
         }
@@ -199,19 +191,27 @@ export function createGoogleClient({
     },
     createUser: async (
       accessToken,
-      { email, givenName, familyName, password, changePasswordAtNextLogin = false },
+      { email, givenName, familyName, password, changePasswordAtNextLogin = false, creationKey },
     ) => {
       const user = await writeUser(directoryUrl("users"), accessToken, "POST", {
         primaryEmail: email,
         name: { givenName, familyName },
         password,
         changePasswordAtNextLogin,
+        ...(creationKey && {
+          externalIds: creationKeyIds(creationKey),
+        }),
       });
       if (!user) {
         throw new Error("Google answered 404 to a new user");
       }
       return user;
     },
+    setPassword: (accessToken, userId, password) =>
+      writeUser(directoryUrl(`users/${encodeURIComponent(userId)}`), accessToken, "PUT", {
+        password,
+        changePasswordAtNextLogin: true,
+      }),
     setUserSuspended: (accessToken, userId, suspended) =>
       writeUser(directoryUrl(`users/${encodeURIComponent(userId)}`), accessToken, "PUT", {
         suspended,
@@ -259,19 +259,6 @@ const CUSTOMER = z.object({
   postalAddress: z.object({ organizationName: z.string().optional() }).optional(),
 });
 
-const DIRECTORY_USER = z.object({
-  id: z.string(),
-  primaryEmail: z.string(),
-  name: z.object({
-    givenName: z.string(),
-    familyName: z.string(),
-    fullName: z.string().optional(),
-  }),
-  isAdmin: z.boolean(),
-  suspended: z.boolean(),
-  relations: z.array(z.object({ type: z.string(), value: z.string() })).optional(),
-});
-
 const RAW_RECORD = z.record(z.string(), z.unknown());
 
 // Users stay as Google sent them, so each keeps every field for its import record.
@@ -303,7 +290,7 @@ async function readUserPage(
   }).toString();
   const page = await fetchRequired(url, USERS_PAGE, bearer(accessToken));
   return {
-    users: (page.users ?? []).map((user) => toGoogleUser(DIRECTORY_USER.parse(user), user)),
+    users: (page.users ?? []).map((user) => parseGoogleUser(user)),
     nextPageToken: page.nextPageToken ?? null,
   };
 }
@@ -324,7 +311,7 @@ async function writeUser(
     headers: { ...bearer(accessToken).headers, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  return user && toGoogleUser(DIRECTORY_USER.parse(user), user);
+  return user && parseGoogleUser(user);
 }
 
 function parsePhoto({ mimeType, photoData }: z.infer<typeof USER_PHOTO>): GooglePhoto {
@@ -342,23 +329,4 @@ function parsePhoto({ mimeType, photoData }: z.infer<typeof USER_PHOTO>): Google
 
 function toGoogleToken(token: z.infer<typeof TOKEN>, raw: Record<string, unknown>): GoogleToken {
   return { clientId: token.clientId, displayText: token.displayText ?? token.clientId, raw };
-}
-
-function toGoogleUser(
-  user: z.infer<typeof DIRECTORY_USER>,
-  raw: Record<string, unknown>,
-): GoogleUser {
-  const { givenName, familyName, fullName = `${givenName} ${familyName}` } = user.name;
-  const manager = user.relations?.find(({ type }) => type === "manager");
-  return {
-    id: user.id,
-    email: user.primaryEmail.toLowerCase(),
-    givenName,
-    familyName,
-    fullName,
-    isAdmin: user.isAdmin,
-    suspended: user.suspended,
-    managerEmail: manager ? manager.value.toLowerCase() : null,
-    raw,
-  };
 }

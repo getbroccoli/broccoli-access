@@ -33,9 +33,19 @@ const NEW_USER = z.object({
   name: z.object({ givenName: z.string().min(1), familyName: z.string().min(1) }),
   password: z.string().min(PASSWORD_LENGTH.min).max(PASSWORD_LENGTH.max),
   changePasswordAtNextLogin: z.boolean().default(false),
+  externalIds: z
+    .array(z.object({ type: z.string(), customType: z.string().optional(), value: z.string() }))
+    .optional(),
 });
 
-const USER_UPDATE = z.object({ suspended: z.boolean() });
+// The password is checked and dropped, as on creation.
+const USER_UPDATE = z
+  .object({
+    suspended: z.boolean().optional(),
+    password: z.string().min(PASSWORD_LENGTH.min).max(PASSWORD_LENGTH.max).optional(),
+    changePasswordAtNextLogin: z.boolean().optional(),
+  })
+  .refine((update) => Object.values(update).some((value) => value !== undefined));
 
 /** The id Google's own example of a created user has; each later one counts up from it. */
 const FIRST_CREATED_USER_ID = 118204455667788990011n;
@@ -47,7 +57,7 @@ function createUser(context: FakeGoogleContext): RequestHandler {
     if (!body.success || !isInDomain(body.data.primaryEmail, state.customer.domain)) {
       return sendGoogleError(response, "invalid");
     }
-    const { primaryEmail, name, changePasswordAtNextLogin } = body.data;
+    const { primaryEmail, name, changePasswordAtNextLogin, externalIds } = body.data;
     if (findPerson(state, primaryEmail) !== undefined) {
       return sendGoogleError(response, "duplicate");
     }
@@ -62,6 +72,7 @@ function createUser(context: FakeGoogleContext): RequestHandler {
       creationTime: context.now().toISOString(),
       photo: null,
       changePasswordAtNextLogin,
+      ...(externalIds && { externalIds }),
       createdSinceReset: true,
     };
     state.createdUserCount += 1;
@@ -76,7 +87,11 @@ function updateUser(context: FakeGoogleContext): RequestHandler<{ userKey: strin
     if (person === undefined) return sendGoogleError(response, "notFound");
     const body = USER_UPDATE.safeParse(request.body);
     if (!body.success) return sendGoogleError(response, "invalid");
-    person.suspended = body.data.suspended;
+    const { suspended, changePasswordAtNextLogin } = body.data;
+    if (suspended !== undefined) person.suspended = suspended;
+    if (changePasswordAtNextLogin !== undefined) {
+      person.changePasswordAtNextLogin = changePasswordAtNextLogin;
+    }
     response.json(directoryUser(context.state, person));
   };
 }

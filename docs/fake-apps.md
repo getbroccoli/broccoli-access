@@ -341,8 +341,8 @@ The real connector's sign-in, in a real browser against fake Google sign-in page
 
 Google's paths and bodies, as for the reads. Each needs the scope `https://www.googleapis.com/auth/admin.directory.user`.
 
-- `POST /admin/directory/v1/users` creates a user from `primaryEmail`, `name.givenName`, `name.familyName`, `password` and `changePasswordAtNextLogin`. It answers with the user, with a new `id`. An email that exists gets `409` with reason `duplicate`; an email outside the customer's domain gets `400` with reason `invalid`.
-- `PUT /admin/directory/v1/users/{userKey}` with `{ "suspended": true }` or `false` suspends or restores a user and answers with the user. An unknown user gets `404` with reason `notFound`.
+- `POST /admin/directory/v1/users` creates a user from `primaryEmail`, `name.givenName`, `name.familyName`, `password`, `changePasswordAtNextLogin` and optional `externalIds`, which the user keeps and lists. It answers with the user, with a new `id`. An email that exists gets `409` with reason `duplicate`; an email outside the customer's domain gets `400` with reason `invalid`.
+- `PUT /admin/directory/v1/users/{userKey}` with any of `suspended`, `password` and `changePasswordAtNextLogin` suspends or restores a user, or gives them a password, and answers with the user, never the password. An unknown user gets `404` with reason `notFound`.
 - A token without the scope gets `403` with reason `insufficientPermissions`, as for the reads.
 - A created user shows in `users.list` at once.
 

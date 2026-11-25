@@ -136,6 +136,7 @@ export function directoryUser(state: GoogleState, person: DirectoryPerson) {
     }),
     customerId: state.customer.id,
     creationTime: person.creationTime,
+    ...(person.externalIds && { externalIds: person.externalIds }),
     ...(person.photo && { thumbnailPhotoEtag: photoEtag(person.photo) }),
   };
 }
