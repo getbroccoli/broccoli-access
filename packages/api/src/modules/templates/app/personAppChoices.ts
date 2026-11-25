@@ -3,9 +3,11 @@ import type { Tx } from "../../../core/db";
 import type { ModuleDependencies } from "../../../core/moduleManifest";
 import { createRecordHistoryService } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
+import { parseUuid } from "../../../utils";
 import { assignmentRepository, type EmployeeAppPair } from "../db";
 import type { EmployeeAppChoice } from "../domain";
 import type { AppsById, EmployeeById, PersonAccess } from "../ports";
+import { employeeAppsOf } from "./employeeAppsOf";
 import { reviewLostApps } from "./reviewLostApps";
 import { checkedAppId, checkedRole } from "./templateRoles";
 
@@ -23,6 +25,8 @@ export interface PersonAppChoices {
     ctx: SecurityContext,
     input: EmployeeAppPair & { role?: string | null },
   ) => Promise<string>;
+  /** Accepts a current extra account as an app for this person, with no account change. */
+  keepExtraApp: (ctx: SecurityContext, input: EmployeeAppPair) => Promise<string>;
   /** Keeps an app their templates give from the person; refuses any other app with CONFLICT. */
   removePersonApp: (ctx: SecurityContext, input: EmployeeAppPair) => Promise<string>;
   /**
@@ -62,16 +66,13 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
           throw new ApplicationError("CONFLICT", "A template already gives this person the app.");
         if (choice?.choice === "added" && choice.role === role) return false;
         const before = REPLACED_BY_ADDING.has(choice?.choice) ? choice : undefined;
-        await assignmentRepository(tx).saveChoice({ ...pair, choice: "added", role });
-        await recordChoice(ctx, tx, pair, {
-          oldLabel: before && choiceLabel(appName, before),
-          newLabel: choiceLabel(appName, { choice: "added", role }),
-        });
+        await saveAddedChoice(ctx, tx, pair, { appName, role, before });
         return true;
       });
       if (changed) logger.info(pair, "App added for one employee");
       return pair.employeeId;
     },
+    keepExtraApp: (ctx, input) => keepExtraApp(deps, ctx, input),
     async removePersonApp(ctx, input) {
       const pair = await ownersPair(deps, ctx, input);
       const changed = await transact(async (tx) => {
@@ -103,6 +104,55 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
       return pair.employeeId;
     },
   };
+}
+
+async function keepExtraApp(deps: Dependencies, ctx: SecurityContext, input: EmployeeAppPair) {
+  const { apps, transact, logger } = deps;
+  try {
+    const pair = await ownersPair(deps, ctx, input);
+    const changed = await transact(async (db) => {
+      const { choice, appName } = await lockedFacts(deps, db, pair);
+      if (choice?.choice === "added") return false;
+      // An extra app has an active account, so invitations cannot change this decision.
+      const [rows] = await employeeAppsOf({
+        db,
+        apps,
+        ctx,
+        employeeIds: [pair.employeeId],
+        invites: [],
+      });
+      if (!rows?.some(({ appId, state }) => appId === pair.appId && state === "extra"))
+        throw new ApplicationError("CONFLICT", "This app is no longer extra for this person.");
+      await saveAddedChoice(ctx, db, pair, { appName, before: choice, role: null });
+      return true;
+    });
+    logger.info({ ...pair, changed }, "Extra app kept for one employee");
+    return pair.employeeId;
+  } catch (error) {
+    logger.info(
+      {
+        employeeId: parseUuid(input.employeeId),
+        appId: parseUuid(input.appId),
+        code: error instanceof ApplicationError ? error.code : "unexpected",
+      },
+      "Keep extra app failed",
+    );
+    throw error;
+  }
+}
+
+async function saveAddedChoice(
+  ctx: SecurityContext,
+  tx: Tx,
+  pair: EmployeeAppPair,
+  { appName, role, before }: { appName?: string; role: string | null; before?: EmployeeAppChoice },
+) {
+  const added = { ...pair, choice: "added", role } as const;
+  await assignmentRepository(tx).saveChoice(added);
+  await recordChoice(ctx, tx, pair, {
+    oldLabel: before && choiceLabel(appName, before),
+    newLabel: choiceLabel(appName, added),
+  });
 }
 
 /** The stored ids of the pair, once the caller is the owner and the employee exists. */

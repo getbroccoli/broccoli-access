@@ -6,9 +6,10 @@ import type { ModuleDependencies } from "../../../core/moduleManifest";
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { assignmentRepository } from "../db";
-import { appsOfPerson, type PersonApp, type Template } from "../domain";
+import type { PersonApp, Template } from "../domain";
 import type { EmployeeById, PersonAccess } from "../ports";
 import { clearOffboarded } from "./clearOffboarded";
+import { employeeAppsOf } from "./employeeAppsOf";
 import { employeeTemplatesOf } from "./employeeTemplates";
 import { lockTemplate } from "./lockTemplate";
 import { clearInactiveReviews, reviewLostApps } from "./reviewLostApps";
@@ -82,28 +83,9 @@ export function createTemplateAssignmentService(deps: Dependencies): TemplateAss
           ),
       });
     },
-    async readEmployeeApps(ctx, employeeIds, shared, db: Orm | Tx = orm) {
+    readEmployeeApps(ctx, employeeIds, shared, db: Orm | Tx = orm) {
       ctx.require("MANAGE_WORKSPACE");
-      const repo = assignmentRepository(db);
-      const [templates, choices, accounts, invites] = await Promise.all([
-        shared?.templates ?? employeeTemplatesOf(db, employeeIds),
-        repo.choicesFor(employeeIds),
-        apps.findEmployeeAccounts(db, employeeIds),
-        shared?.invites ?? apps.readAppInvites(ctx, employeeIds),
-      ]);
-      const listedApps = await repo.listedApps(accounts.map((account) => account.appId));
-      const choicesByPerson = Map.groupBy(choices, (choice) => choice.employeeId);
-      const accountsByPerson = Map.groupBy(accounts, (account) => account.employeeId);
-      const invitesByPerson = Map.groupBy(invites, (invite) => invite.employeeId);
-      return employeeIds.map((id, index) =>
-        appsOfPerson({
-          templates: templates[index]!,
-          choices: choicesByPerson.get(id) ?? [],
-          accounts: accountsByPerson.get(id) ?? [],
-          invites: invitesByPerson.get(id) ?? [],
-          listedApps,
-        }),
-      );
+      return employeeAppsOf({ db, apps, ctx, employeeIds, ...shared });
     },
   };
 }

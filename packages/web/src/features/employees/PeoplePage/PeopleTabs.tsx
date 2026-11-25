@@ -9,19 +9,32 @@ type Props = {
   /** How many people each tab holds; undefined while they load. */
   isOwner: boolean;
   accountCount: number | undefined;
+  differenceCount: number | undefined;
   counts: PeoplePageQuery["employeeCounts"] | undefined;
   onViewChange: (view: PeopleView) => void;
 };
 
 /** The People page's tabs, everyone and those suspended with access, each with its number of people. */
-export function PeopleTabs({ view, counts, isOwner, accountCount, onViewChange }: Props) {
+export function PeopleTabs({
+  view,
+  counts,
+  isOwner,
+  accountCount,
+  differenceCount,
+  onViewChange,
+}: Props) {
   const values = {
     all: counts?.all,
     suspendedWithAccess: counts?.suspendedWithAccess,
     accountsWithoutPerson: accountCount,
+    differences: differenceCount,
   };
   return (
-    <Tabs value={view} onValueChange={(value: PeopleView) => onViewChange(value)}>
+    <Tabs
+      value={view}
+      className={view === "differences" ? "w-full" : undefined}
+      onValueChange={(value: PeopleView) => onViewChange(value)}
+    >
       <TabsList aria-label={t("people.tabs")} className="flex-wrap gap-1">
         {PEOPLE_VIEWS.filter((value) => value !== "accountsWithoutPerson" || isOwner).map(
           (value) => (

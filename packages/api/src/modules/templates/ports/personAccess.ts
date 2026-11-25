@@ -20,6 +20,7 @@ export interface PersonAccess {
   readAppInvites(
     ctx: SecurityContext,
     employeeIds: readonly string[],
+    db?: Orm | Tx,
   ): Promise<
     {
       employeeId: string;

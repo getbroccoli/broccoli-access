@@ -181,3 +181,62 @@ test("refuses an over-budget membership page even when the template has no peopl
     ],
   });
 });
+
+test("the owner sees who is missing an app and keeps another person's extra account", async ({
+  env,
+}) => {
+  const { browser, user } = await env.signInAsOwner();
+  const assigned = await env.seed.employee();
+  const formerMember = await env.seed.employee();
+  const app = await env.seed.app({
+    name: "Studio",
+    domain: "studio.example",
+    catalogKey: null,
+    status: "approved",
+  });
+  const template = await env.seed.assignedTemplateApp({
+    employeeId: assigned.id,
+    appId: app.id,
+    role: null,
+    assignedBy: user.id,
+  });
+  const pair = { employeeId: formerMember.id, appId: app.id };
+  await env.seed.appAccount(pair);
+  await env.seed.employeeAppChoice({ ...pair, choice: "to_review" });
+
+  const differences = await browser.graphql(
+    `
+    query ($id: ID!) {
+      template(id: $id) { differenceSummary { missingCount extraCount missingApp { id } } }
+      accessDifferences {
+        missing { employee { id } app { id } }
+        extra { employee { id } app { id } }
+      }
+    }`,
+    { id: template.id },
+  );
+  expect(await differences.json()).toEqual({
+    data: {
+      template: {
+        differenceSummary: { missingCount: 1, extraCount: 0, missingApp: { id: app.id } },
+      },
+      accessDifferences: {
+        missing: [{ employee: { id: assigned.id }, app: { id: app.id } }],
+        extra: [{ employee: { id: formerMember.id }, app: { id: app.id } }],
+      },
+    },
+  });
+
+  const kept = await browser.graphql(
+    `
+    mutation ($employeeId: ID!, $appId: ID!) {
+      templates { keepExtraApp(input: { employeeId: $employeeId, appId: $appId }) {
+        employee { id } error { __typename }
+      } }
+    }`,
+    pair,
+  );
+  expect(await kept.json()).toEqual({
+    data: { templates: { keepExtraApp: { employee: { id: formerMember.id }, error: null } } },
+  });
+});

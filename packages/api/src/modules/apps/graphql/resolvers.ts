@@ -33,7 +33,11 @@ import {
   type OffboardingServices,
   type ReadEmployees,
 } from "./offboardingResolvers";
-import { provisionMutations, provisionStepResolvers } from "./provisionResolvers";
+import {
+  accessDifferenceResolvers,
+  provisionMutations,
+  provisionStepResolvers,
+} from "./provisionResolvers";
 
 type AppResolverServices = AccountLinkService &
   Pick<
@@ -130,6 +134,7 @@ export function createResolvers(
     AppInvite: { app: appOf },
     ProvisionStep: { app: appOf, ...provisionStepResolvers },
     PersonApp: { app: appOf },
+    ...accessDifferenceResolvers(people, loaders),
     TemplateApp: { app: appOf },
     ContainerConnection: {
       app: async ({ id }, _args, context) =>

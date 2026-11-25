@@ -5,18 +5,22 @@ import { useNavigate, useRouteContext, useRouter, useSearch } from "@tanstack/re
 import {
   AccountsWithoutPersonCountDocument,
   DirectoryScanDocument,
+  PeopleDifferencesDocument,
   PeoplePageDocument,
 } from "@/__generated__/graphql";
 import { TableSearchField } from "@/components/dataTable";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
+import { cn } from "@/lib/class-names";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 import { useRefetchAfterScan } from "@/lib/useRefetchAfterScan";
+import { PageHeader } from "@/shell";
 
 import { SEARCH_MAX_LENGTH } from "../peopleSearch";
 import { AccountsWithoutPersonTable } from "./AccountsWithoutPersonTable";
+import { DifferencesPanel } from "./DifferencesPanel";
 import { MarkedAccountsTable } from "./MarkedAccountsTable";
 import { PeopleHeader } from "./PeopleHeader";
 import { PeopleTable } from "./PeopleTable";
@@ -30,16 +34,29 @@ export function PeoplePage() {
   const router = useRouter();
   const view = !me.isOwner && requestedView === "accountsWithoutPerson" ? "all" : requestedView;
   const showAccounts = view === "accountsWithoutPerson";
+  const showDifferences = view === "differences";
   const suspendedOnly = view === "suspendedWithAccess";
   // The suspended tab shows no search field, so it never searches.
   const { data, error, refetch } = useQuery(PeoplePageDocument, {
     variables: {
-      showAccounts,
+      skipPeople: showAccounts || showDifferences,
       filter: suspendedOnly ? { suspendedWithAccess: true } : { search: q },
     },
     fetchPolicy: "cache-and-network",
   });
   const directory = useQuery(DirectoryScanDocument, { fetchPolicy: "cache-and-network" });
+  const differences = useQuery(PeopleDifferencesDocument, {
+    variables: { showDifferences },
+    fetchPolicy: "cache-and-network",
+  });
+  const access = differences.data?.accessDifferences;
+  const isChanging = Boolean(
+    access?.missing?.some(({ provisioning }) => provisioning) ||
+    access?.extra?.some(({ activeAccounts }) =>
+      activeAccounts.some(({ latestChange }) => latestChange?.status === "RUNNING"),
+    ),
+  );
+  usePollWhileScanning(showDifferences && isChanging, differences);
   const badge = useQuery(AccountsWithoutPersonCountDocument, {
     skip: !me.isOwner,
     fetchPolicy: "cache-and-network",
@@ -56,6 +73,7 @@ export function PeoplePage() {
   const refresh = () =>
     Promise.allSettled([
       refetch(),
+      differences.refetch(),
       ...(me.isOwner ? [badge.refetch()] : []),
       ...(showAccounts ? [accounts.refresh(), marked.refresh()] : []),
     ]);
@@ -65,12 +83,22 @@ export function PeoplePage() {
 
   return (
     <div className="flex flex-col">
-      <PeopleHeader connection={connection} loaded={directory.data !== undefined} />
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      {showDifferences ? (
+        <PageHeader title={t("people.title")} />
+      ) : (
+        <PeopleHeader connection={connection} loaded={directory.data !== undefined} />
+      )}
+      <div
+        className={cn(
+          "flex flex-wrap items-center justify-between gap-3",
+          showDifferences ? "mb-5" : "mb-6",
+        )}
+      >
         <PeopleTabs
           view={view}
           isOwner={me.isOwner}
           accountCount={badge.data?.accountsWithoutPersonCount}
+          differenceCount={access && access.missingCount + access.extraCount}
           counts={data?.employeeCounts}
           // All is the default, so its URL holds no view.
           onViewChange={(next) =>
@@ -124,7 +152,16 @@ export function PeoplePage() {
           loadMore={() => void marked.loadMore()}
         />
       )}
-      {!showAccounts && people && (
+      {showDifferences && differences.error && !access && (
+        <LoadError message={t("people.differences.loadFailed")} retry={differences.refetch} />
+      )}
+      {showDifferences && !access && !differences.error && (
+        <Skeleton className="h-[300px] rounded-xl" />
+      )}
+      {showDifferences && access && (
+        <DifferencesPanel access={access} isOwner={me.isOwner} refresh={differences.refetch} />
+      )}
+      {!showAccounts && !showDifferences && people && (
         <PeopleTable
           // A new tab or search starts with its first people only.
           key={`${view} ${q ?? ""}`}

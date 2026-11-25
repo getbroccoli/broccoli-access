@@ -10,7 +10,7 @@ A manual check of the Templates page and a template's page against a development
 ## Templates
 
 - [ ] The left menu shows "Templates" between "People" and "Activity"; it opens `/templates` and is highlighted there and on a template's page.
-- [ ] With no template, the table shows "No templates yet." under the columns "Template", "Apps" and "People".
+- [ ] With no template, the table shows "No templates yet." under "Template", "Apps", "People" and "Differences".
 - [ ] "New template" opens a dialog with the field "Name". "Create template" with an empty name shows "Give the template a name."; Cancel closes it.
 - [ ] Creating "Engineer" opens its page, `/templates/<id>`. Back on Templates, the row shows "Engineer", "No apps yet" and 0.
 - [ ] Creating "engineer" shows "Another template already has this name." and the dialog stays open.

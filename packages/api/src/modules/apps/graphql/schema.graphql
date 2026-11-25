@@ -535,6 +535,21 @@ type PersonApp {
   app: App!
 }
 
+type AccessDifference {
+  app: App!
+  "The accounts that hold extra access in this app."
+  activeAccounts: [AppUser!]!
+  "What Provision currently offers for this person and app."
+  provisionStep: ProvisionStep
+  "Whether an Invite or Enable for this app is still running."
+  provisioning: Boolean!
+}
+
+type TemplateDifferenceSummary {
+  "The missing app when every missing row is for the same app."
+  missingApp: App
+}
+
 type TemplateApp {
   "The app the template lists."
   app: App!

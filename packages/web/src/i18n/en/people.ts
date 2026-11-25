@@ -1,5 +1,22 @@
 /** English copy under `people.*`. */
 export const peopleEn = {
+  "people.tab.differences": "Differences",
+  "people.differences.loadFailed": "Couldn’t load differences.",
+  "people.differences.noMissing": "Nobody is missing an app.",
+  "people.differences.noExtra": "No extra accounts.",
+  "people.differences.peopleCount": "{count} people",
+  "people.differences.provisionTitle": "Provision {app}?",
+  "people.differences.provisionDescription": "Review how each person gets access.",
+  "people.differences.provisioning": "Provisioning…",
+  "people.differences.invites": "Send invitation",
+  "people.differences.provisionUnavailable": "Check their person page",
+  "people.differences.provisionFailed":
+    "Couldn’t provision everyone in {app}. Check the people still missing access.",
+  "people.differences.why": "Why",
+  "people.differences.extraReason": "Outside their expected access",
+  "people.differences.keep": "Keep",
+  "people.differences.keepLabel": "Keep {app} for {name}",
+  "people.differences.keepFailed": "Couldn’t keep the app. Reload and try again.",
   "people.title": "People",
   "people.description": "Everyone in your Google Workspace.",
   "people.tabs": "Which people",

@@ -7,6 +7,14 @@ query TemplatesPage {
         id
         name
         peopleCount
+        differenceSummary {
+          missingCount
+          extraCount
+          missingApp {
+            id
+            name
+          }
+        }
         apps {
           id
           app {

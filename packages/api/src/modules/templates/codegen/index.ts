@@ -5,4 +5,9 @@ export const codegenMappers = {
   Template: "../../modules/templates/domain#Template as TemplateModel",
   PersonApp: "../../modules/templates/domain#PersonApp as PersonAppModel",
   TemplateApp: "../../modules/templates/domain#TemplateApp as TemplateAppModel",
+  AccessDifferences:
+    "../../modules/templates/app/readDifferences#AccessDifferences as AccessDifferencesModel",
+  AccessDifference: "../../modules/templates/db#EmployeeAppPair as AccessDifferenceModel",
+  TemplateDifferenceSummary:
+    "../../modules/templates/app/readDifferences#TemplateDifferenceSummary as TemplateDifferenceSummaryModel",
 };

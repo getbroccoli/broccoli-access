@@ -8,6 +8,7 @@ import { templateApps } from "./templateAppsTable";
 /** Template assignments and exceptions, read in batches and changed in the caller's transaction. */
 export interface AssignmentRepository {
   forEmployees(ids: readonly string[]): Promise<Assignment[]>;
+  employeesWithAccessSources(): Promise<string[]>;
   employeeIds(templateId: string): Promise<string[]>;
   assign(assignment: Assignment, assignedBy: string): Promise<boolean>;
   takeOff(assignment: Assignment): Promise<boolean>;
@@ -57,6 +58,13 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
   return {
     forEmployees: (ids) =>
       assignments().where(anyOf(employeeTemplates.employeeId, ids)).orderBy(employeeTemplates.id),
+    async employeesWithAccessSources() {
+      const rows = await orm
+        .select({ employeeId: employeeTemplates.employeeId })
+        .from(employeeTemplates)
+        .union(orm.select({ employeeId: employeeAppChoices.employeeId }).from(employeeAppChoices));
+      return rows.map(({ employeeId }) => employeeId);
+    },
     employeeIds: async (templateId) =>
       (
         await orm
