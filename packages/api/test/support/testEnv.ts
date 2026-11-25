@@ -11,7 +11,9 @@ import { inject } from "vitest";
 import { session, user } from "../../src/core/auth";
 import { connectDatabase, type Database } from "../../src/core/db";
 import { createLogger } from "../../src/core/logger";
+import { createSecretBox, readSecret } from "../../src/core/secrets";
 import type { RunningServer } from "../../src/core/server";
+import { createAppConnectionService } from "../../src/modules/apps";
 import { createTestDatabase, type TestDatabase } from "./testDatabases";
 import { registerGoogleRedirect, consentAtGoogle } from "./googleConsent";
 import { TestSeed } from "./testSeed";
@@ -106,6 +108,13 @@ export class TestEnv {
       .from(user)
       .where(eq(user.email, email));
     return users.map(({ id }) => id);
+  }
+
+  async readConnectionWithSecrets(connectionId: string) {
+    const key = await readSecret(this.dataDir, "encryption-key");
+    assert(key, "Test server has no encryption key");
+    const connections = createAppConnectionService({ secretBox: createSecretBox(key) });
+    return connections.readConnectionWithSecrets(this.database.orm, connectionId);
   }
 
   async changeUserEmail(userId: string, email: string): Promise<void> {

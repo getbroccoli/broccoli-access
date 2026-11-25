@@ -25,12 +25,12 @@ export async function startUserWriteConsent(
     const returnTo = CONSENT_START.safeParse(request.body).data?.returnTo ?? "";
     const security = await requireSecurity(http.resolveSecurity, request, NOT_OWNER);
     const origin = await http.publicOrigin(request);
-    const { authorizationUrl, browserToken } = await userWrites.start(security, {
+    const { authorizationUrl, browserToken, callbackOrigin } = await userWrites.start(security, {
       returnTo,
       publicOrigin: origin,
       now: new Date(),
     });
-    response.cookie(USER_WRITES_COOKIE, browserToken, consentCookie(origin));
+    response.cookie(USER_WRITES_COOKIE, browserToken, consentCookie(callbackOrigin));
     response.json({ authorizationUrl });
   } catch (error) {
     sendStartFailure(error, response, logger);

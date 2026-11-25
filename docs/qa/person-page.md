@@ -101,7 +101,7 @@ Connect Slack and Linear, assign a template to Chloé Martin, and set `GOOGLE` t
 
 ## Delete a person awaiting their Google account
 
-- [ ] On a fresh workspace with its own Google app and **Reads only** in Settings → Google Workspace, start adding a person and cancel at Google's consent. The person's page offers Delete person. Cancel the deletion and check the person stays. Confirm it and check the person leaves People.
+- [ ] On a fresh workspace with either Google app and **Reads only** in Settings → Google Workspace, start adding a person and cancel at Google's consent. The person's page offers Delete person. Cancel the deletion and check the person stays. Confirm it and check the person leaves People.
 - [ ] Open a person listed by Google Workspace. Their page offers Offboard and has no Delete person action.
 
 ## Not found

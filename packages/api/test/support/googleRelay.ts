@@ -8,6 +8,7 @@ import { consentAtGoogle, registerGoogleRedirect } from "./googleConsent";
 import { GOOGLE_SCOPES } from "./googleSetup";
 
 export const GOOGLE_RELAY_URL = "https://relay.acme.example/integrations";
+export const GOOGLE_USER_WRITE_SCOPE = "https://www.googleapis.com/auth/admin.directory.user";
 export const SHARED_GOOGLE_APP = { googleApp: "broccoli_google_app" } as const;
 export const RELAY_HANDLE = "acme-handoff";
 export const SHARED_CLIENT_ID = "acme-shared-google-client";
@@ -61,11 +62,20 @@ export async function googleRelayGrant(
   }: { nonce?: string | null; clientId?: string; account?: string } = {},
 ) {
   assert(nonce);
+  const purpose = authorization.searchParams.get("purpose");
+  const signIn = purpose === "sign_in";
+  const userWrite = purpose === "user_write";
+  if (userWrite) {
+    assert.match(
+      authorization.searchParams.get("state") ?? "",
+      /^[A-Za-z0-9_-]{1,256}$/,
+      "The relay requires URL-safe state of at most 256 characters",
+    );
+  }
   const client = { clientId, clientSecret: ACME.oauthClient.clientSecret };
   await registerGoogleRedirect(googleUrl, GOOGLE_RELAY_URL, client);
   const redirectUri = GOOGLE_RELAY_URL + "/api/google/callback";
-  const signIn = authorization.searchParams.get("purpose") === "sign_in";
-  const scopes = signIn ? ["openid", "email", "profile"] : GOOGLE_SCOPES;
+  const scopes = scopesFor(purpose);
   const consent = new URL("/o/oauth2/v2/auth", googleUrl);
   consent.search = new URLSearchParams({
     client_id: clientId,
@@ -80,6 +90,7 @@ export async function googleRelayGrant(
       )
       .join(" "),
     ...(!signIn && { access_type: "offline", prompt: "consent" }),
+    ...(userWrite && { include_granted_scopes: "true" }),
   }).toString();
   const callback = await consentAtGoogle(consent, { account });
   const code = callback.searchParams.get("code");
@@ -133,4 +144,10 @@ export function recordTokenRequests() {
 
 function unexpectedRelayRequest(): never {
   throw new Error("Unexpected relay request");
+}
+
+function scopesFor(purpose: string | null) {
+  if (purpose === "user_write") return ["openid", GOOGLE_USER_WRITE_SCOPE];
+  if (purpose === "sign_in") return ["openid", "email", "profile"];
+  return GOOGLE_SCOPES;
 }

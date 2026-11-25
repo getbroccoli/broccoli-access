@@ -68,7 +68,7 @@ export function ConfirmAccountChangeDialog({
   // consent, and the owner asks again once back.
   const isGoogle = app.catalogKey === GOOGLE_WORKSPACE;
   const asksGoogle = isGoogle && google === "needs_consent";
-  // Never asked for while Google's permission is unknown, or cannot be asked for.
+  // Wait until Google's permission is known before starting a change.
   const blocked = isGoogle && google !== "allowed" && !asksGoogle;
   const confirm = async () => {
     setOpen(false);
@@ -136,7 +136,6 @@ export function ConfirmAccountChangeDialog({
         <AlertDialogDescription className="flex flex-col gap-3">
           <span>{t(copy.effect, { firstName: employee.firstName, app: app.name })}</span>
           {asksGoogle && <span>{t("apps.change.googleAsks")}</span>}
-          {blocked && google === "unsupported" && <span>{t("apps.change.googleNeedsOwnApp")}</span>}
           {blocked && google === "failed" && <span>{t("apps.change.googleCheckFailed")}</span>}
           {actor && <span className="text-xs">{t(howItWorks, { actor, app: app.name })}</span>}
         </AlertDialogDescription>

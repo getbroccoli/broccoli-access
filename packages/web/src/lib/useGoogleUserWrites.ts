@@ -24,10 +24,10 @@ export function directoryProvisionFailure(failure?: AccountChangeFailure | null)
 
 /**
  * Whether Broccoli Access may change the directory's users: `allowed`; `needs_consent`, since
- * setup's consent only reads and the first change sends the owner to Google once; `unsupported`
- * with the shared Google app, which cannot ask for it; or not known, while `loading` or `failed`.
+ * setup's consent only reads and the first change sends the owner to Google once; or unknown
+ * while `loading` or `failed`.
  */
-export type GoogleUserWrites = "allowed" | "needs_consent" | "unsupported" | "loading" | "failed";
+export type GoogleUserWrites = "allowed" | "needs_consent" | "loading" | "failed";
 
 export function useGoogleUserWrites(): GoogleUserWrites {
   const { data, error } = useQuery(GoogleUserWritesDocument);
@@ -35,10 +35,7 @@ export function useGoogleUserWrites(): GoogleUserWrites {
   if (!google) {
     return error ? "failed" : "loading";
   }
-  if (google.canChangeUsers) {
-    return "allowed";
-  }
-  return google.googleApp === "OWN_GOOGLE_APP" ? "needs_consent" : "unsupported";
+  return google.canChangeUsers ? "allowed" : "needs_consent";
 }
 
 /**

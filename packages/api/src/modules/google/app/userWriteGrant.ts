@@ -10,16 +10,36 @@ import {
   googleRedirectAddress,
   type GoogleWorkspaceSettings,
   parseGoogleWorkspaceSettings,
+  requireSameWorkspace,
+  UserWriteRefusedError,
 } from "../domain";
-import { randomConsentToken, sealConsentState } from "../helpers";
+import {
+  openConsentState,
+  randomConsentToken,
+  sealConsentState,
+  type WriteConsentState,
+} from "../helpers";
 import type { ConnectedApps } from "../ports";
 import { consentUrl } from "./consentUrl";
-import type { WriteGrant } from "./integrationUserDirectory";
+import {
+  consentRedirectAddress,
+  readSuperAdmin,
+  requireGoogleRelay,
+  sharedConsentOrigin,
+  verifyIdentity,
+} from "./googleConsent";
+import type { GoogleConnectionDependencies } from "./googleConnectionService";
 
-// shortcut: the Broccoli Google app's relay asks for its own fixed scopes, so only a connection
-// with the instance's own Google app can add the write scope; teach the relay the scope to lift this.
-/** The connection's own Google app; refuses with CONFLICT before it exists or with the Broccoli app. */
-export async function readOwnGoogleApp(
+/** The Google Workspace connection and its secrets, as one stored version. */
+export interface ConnectedGoogleApp {
+  connectionId: string;
+  settings: GoogleWorkspaceSettings;
+  clientSecret: string | undefined;
+  revision: string;
+}
+
+/** The Google app in use; refuses with CONFLICT before the workspace is connected. */
+export async function readConnectedGoogleApp(
   connectedApps: ConnectedApps,
   orm: Orm,
 ): Promise<ConnectedGoogleApp> {
@@ -30,32 +50,53 @@ export async function readOwnGoogleApp(
   }
   const settings = parseGoogleWorkspaceSettings(stored.connection.settings);
   const { clientSecret } = GOOGLE_WORKSPACE_SECRETS.parse(stored.secrets);
-  if (settings.googleApp !== "own_google_app" || clientSecret === undefined) {
+  if (settings.googleApp === "own_google_app" && clientSecret === undefined) {
     throw new ApplicationError(
       "CONFLICT",
-      "Creating and changing Google users needs your own Google app.",
+      "Reconnect Google Workspace to create and change Google users.",
     );
   }
-  return { connectionId: stored.connection.id, settings, clientSecret, revision: stored.revision };
+  return {
+    connectionId: stored.connection.id,
+    settings,
+    clientSecret: settings.googleApp === "own_google_app" ? clientSecret : undefined,
+    revision: stored.revision,
+  };
 }
 
 /**
- * Google's consent address for the one write scope, added to what the Google app was granted, with
- * the state `stateOf` gives for its nonce, encrypted for `browserToken`: a new token the caller
- * keeps in the browser until Google answers.
+ * Asks for the write scope alongside the existing grant. The browser keeps the returned token
+ * until Google answers.
  */
 export async function startWriteConsent(
-  { google, secretBox }: { google: GoogleClient; secretBox: SecretBox },
-  {
-    settings,
-    publicOrigin,
-    now,
-  }: { settings: GoogleWorkspaceSettings; publicOrigin: string; now: Date },
-  stateOf: (nonce: string) => Parameters<typeof sealConsentState>[1],
-): Promise<{ authorizationUrl: string; browserToken: string }> {
+  { google, orm, secretBox, publicUrl, relayUrl }: WriteConsentDependencies,
+  { settings, revision }: ConnectedGoogleApp,
+  { publicOrigin, now, ...details }: WriteConsentStart,
+): Promise<WriteConsentDestination> {
   const nonce = randomConsentToken();
+  const consent = { ...details, nonce, revision };
+  if (settings.googleApp === "broccoli_google_app") {
+    const relay = requireGoogleRelay(relayUrl);
+    const callbackOrigin = await sharedConsentOrigin(orm, publicUrl);
+    const codeVerifier = randomConsentToken();
+    // The relay caps state length. Bind the email or return path to the same proof in the cookie.
+    const browserToken = sealConsentState(secretBox, consent, { browserToken: codeVerifier, now });
+    const state = sealConsentState(
+      secretBox,
+      { flow: consent.flow, revision, nonce, codeVerifier },
+      { browserToken, now },
+    );
+    const authorizationUrl = relay.authorize({
+      returnTo: googleRedirectAddress(callbackOrigin),
+      state,
+      codeVerifier,
+      nonce,
+      purpose: "user_write",
+    });
+    return { authorizationUrl, browserToken, callbackOrigin };
+  }
   const browserToken = randomConsentToken();
-  const state = sealConsentState(secretBox, stateOf(nonce), { browserToken, now });
+  const state = sealConsentState(secretBox, consent, { browserToken, now });
   const { authorizationEndpoint } = await google.discover();
   const authorizationUrl = consentUrl(
     authorizationEndpoint,
@@ -68,7 +109,60 @@ export async function startWriteConsent(
     },
     INCREMENTAL_OFFLINE_CONSENT,
   );
-  return { authorizationUrl, browserToken };
+  return { authorizationUrl, browserToken, callbackOrigin: publicOrigin };
+}
+
+/** Opens the write consent and, for a relay answer, its details from the same browser. */
+export function openWriteConsent(
+  secretBox: SecretBox,
+  { state, browserToken, now }: { state: string; browserToken: string | null; now: Date },
+): WriteConsent | null {
+  if (browserToken === null) return null;
+  const opened = openConsentState(secretBox, state, { browserToken, now });
+  if (opened?.flow !== "create_integration_user" && opened?.flow !== "allow_user_writes")
+    return null;
+  if (!("codeVerifier" in opened)) return opened;
+  const { codeVerifier } = opened;
+  const details = openConsentState(secretBox, browserToken, { browserToken: codeVerifier, now });
+  return details?.flow === opened.flow && !("codeVerifier" in details)
+    ? { ...details, codeVerifier }
+    : null;
+}
+
+/** Verifies a super admin of the connected workspace granted write access and kept earlier scopes. */
+export async function verifyWriteGrant(
+  dependencies: WriteConsentDependencies,
+  { settings, clientSecret, revision }: ConnectedGoogleApp,
+  { consent, ...answer }: WriteConsentAnswer & { consent: WriteConsent },
+): Promise<WriteGrant> {
+  const { google, relayUrl } = dependencies;
+  const shared = "codeVerifier" in consent;
+  if (consent.revision !== revision || shared !== (settings.googleApp === "broccoli_google_app")) {
+    throw googleAppChanged();
+  }
+  const { tokens, identity, clientId } = await verifyIdentity(
+    google,
+    shared
+      ? consent
+      : { clientId: settings.clientId, clientSecret: clientSecret!, nonce: consent.nonce },
+    {
+      ...answer,
+      redirectUri: await consentRedirectAddress(dependencies, consent, answer.publicOrigin),
+    },
+    relayUrl,
+  );
+  if (clientId !== settings.clientId) throw googleAppChanged();
+  if (!tokens.scopes.includes(GOOGLE_USER_WRITE_SCOPE)) {
+    throw new UserWriteRefusedError();
+  }
+  const admin = await readSuperAdmin(google, tokens.accessToken, identity);
+  requireSameWorkspace(settings, admin.domain);
+  const { accessToken, refreshToken, scopes } = tokens;
+  // The new refresh token must keep the access needed by directory scans.
+  if (refreshToken === null || settings.grantedScopes.some((scope) => !scopes.includes(scope))) {
+    throw new ApplicationError("INVALID_INPUT", "Google's grant does not hold the earlier one.");
+  }
+  return { accessToken, refreshToken, scopes, adminEmail: admin.email };
 }
 
 /**
@@ -84,7 +178,10 @@ export function saveWriteGrant(
 ): Promise<boolean> {
   return connectedApps.changeConnection(ctx, tx, connectionId, {
     settings: { ...settings, adminEmail: grant.adminEmail, grantedScopes: grant.scopes },
-    secrets: { clientSecret, refreshToken: grant.refreshToken },
+    secrets: {
+      ...(clientSecret !== undefined && { clientSecret }),
+      refreshToken: grant.refreshToken,
+    },
     replacingRevision: revision,
   });
 }
@@ -92,6 +189,39 @@ export function saveWriteGrant(
 /** The connection is no longer the version the consent started from, such as after a reconnect. */
 export function googleAppChanged(): ApplicationError {
   return new ApplicationError("CONFLICT", "The Google app changed during consent. Try again.");
+}
+
+export interface WriteConsentDestination {
+  authorizationUrl: string;
+  browserToken: string;
+  callbackOrigin: string;
+}
+
+type WriteConsentDependencies = Pick<
+  GoogleConnectionDependencies,
+  "orm" | "secretBox" | "publicUrl" | "relayUrl"
+> & { google: GoogleClient };
+
+type WriteConsentStart = { publicOrigin: string; now: Date } & (
+  | { flow: "create_integration_user"; email: string }
+  | { flow: "allow_user_writes"; returnTo: string }
+);
+
+export type WriteConsent = WriteConsentState | (WriteConsentState & { codeVerifier: string });
+
+interface WriteConsentAnswer {
+  code?: string;
+  handle?: string;
+  publicOrigin: string;
+  now: Date;
+}
+
+/** The access token for immediate writes and the expanded offline grant to store. */
+export interface WriteGrant {
+  accessToken: string;
+  refreshToken: string;
+  scopes: string[];
+  adminEmail: string;
 }
 
 /**
@@ -109,12 +239,3 @@ const INCREMENTAL_OFFLINE_CONSENT = {
   access_type: "offline",
   prompt: "consent",
 };
-
-/** The Google Workspace connection with its own Google app's secret, as one stored version. */
-export interface ConnectedGoogleApp {
-  connectionId: string;
-  settings: GoogleWorkspaceSettings;
-  clientSecret: string;
-  /** The stored version read, which the save replaces or refuses. */
-  revision: string;
-}

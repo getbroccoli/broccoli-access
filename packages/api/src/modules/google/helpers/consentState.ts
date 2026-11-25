@@ -13,13 +13,16 @@ export type ConsentState =
   | WorkspaceConsentState
   | SignInState
   | GoogleAppChangeState
-  | IntegrationUserCreationState
-  | UserWriteConsentState
+  | WriteConsentState
   | RelayConsentState;
 
 /** The relay's compact state carries the proof needed to redeem its one-use handoff. */
 export interface RelayConsentState {
-  flow: WorkspaceConsentState["flow"] | SignInState["flow"] | GoogleAppChangeState["flow"];
+  flow:
+    | WorkspaceConsentState["flow"]
+    | SignInState["flow"]
+    | GoogleAppChangeState["flow"]
+    | WriteConsentState["flow"];
   nonce: string;
   codeVerifier: string;
   revision?: string;
@@ -80,6 +83,8 @@ export interface UserWriteConsentState {
   /** Epoch milliseconds after which Google's answer is refused. */
   expiresAt: number;
 }
+
+export type WriteConsentState = IntegrationUserCreationState | UserWriteConsentState;
 
 /** How long a person has between starting a consent and Google's answer: ten minutes. */
 export const CONSENT_LIFETIME_MS = 10 * 60_000;
@@ -226,5 +231,7 @@ const RELAY_PREFIXES = {
   connect_google_workspace: "r0_",
   sign_in_with_google: "r1_",
   change_google_app: "r2_",
+  create_integration_user: "r3_",
+  allow_user_writes: "r4_",
 } as const;
 const RELAY_STATE = z.tuple([z.string(), z.string(), z.number(), z.string().optional()]);

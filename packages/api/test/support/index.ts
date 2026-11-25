@@ -155,6 +155,7 @@ export { inviteTest, linearInvitations } from "./inviteTest";
 export { offboardedTest } from "./offboardedTest";
 export {
   GOOGLE_RELAY_URL,
+  GOOGLE_USER_WRITE_SCOPE,
   RELAY_HANDLE,
   SHARED_GOOGLE_APP,
   SHARED_CLIENT_ID,

@@ -25,7 +25,6 @@ query AddPersonForm {
       id
       domain
       canChangeUsers
-      googleApp
     }
   }
 }

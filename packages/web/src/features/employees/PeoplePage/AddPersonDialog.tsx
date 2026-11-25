@@ -42,7 +42,6 @@ export function AddPersonDialog({ onClose, onAdded }: Props) {
         ? "people.add.enterLastName"
         : null;
   const google = form.data?.setup.googleWorkspace;
-  const readOnly = google && google.googleApp !== "OWN_GOOGLE_APP" && !google.canChangeUsers;
   const templateWindow = picker.data?.templates;
   const templates = templateWindow?.edges.map(({ node }) => node) ?? [];
   const selectedApps = templates
@@ -80,7 +79,7 @@ export function AddPersonDialog({ onClose, onAdded }: Props) {
         await provision({ variables: { input: { employeeId: employee.id, appIds } } }).catch(() =>
           toast.error(t("people.add.provisionFailed")),
         );
-      } else if (!roleConflict && google.googleApp === "OWN_GOOGLE_APP") {
+      } else if (!roleConflict) {
         if (await askGoogleForUserWrites(`/people/${employee.id}?provision=true`)) return;
         toast.error(t("people.offboard.googleStartFailed"));
       }
@@ -132,22 +131,18 @@ export function AddPersonDialog({ onClose, onAdded }: Props) {
           />
           <DialogDescription className="text-foreground/80">
             {t(
-              readOnly
-                ? "people.add.needsOwnGoogleApp"
-                : roleConflict
-                  ? "people.add.resolveRoles"
-                  : hasAutomaticInvites
-                    ? "people.add.summaryApps"
-                    : "people.add.summary",
+              roleConflict
+                ? "people.add.resolveRoles"
+                : hasAutomaticInvites
+                  ? "people.add.summaryApps"
+                  : "people.add.summary",
             )}
-            {!readOnly &&
-              !roleConflict &&
+            {!roleConflict &&
               appsByHand.length > 0 &&
               ` ${t("people.add.byHandSummary", { apps: appsByHand.join(", ") })}`}
             {google &&
               !google.canChangeUsers &&
               !roleConflict &&
-              google.googleApp === "OWN_GOOGLE_APP" &&
               ` ${t("people.add.beforeConsent")}`}
           </DialogDescription>
           {form.error && !form.data && (
@@ -180,7 +175,7 @@ export function AddPersonDialog({ onClose, onAdded }: Props) {
               {t("apps.change.cancel")}
             </Button>
             <Button type="submit" disabled={!google || submitting} className="h-9">
-              {t(readOnly || roleConflict ? "people.add.title" : "people.add.submit")}
+              {t(roleConflict ? "people.add.title" : "people.add.submit")}
             </Button>
           </div>
         </form>

@@ -8,5 +8,6 @@ export {
   type RelayConsentState,
   type GoogleAppChangeState,
   type WorkspaceConsentState,
+  type WriteConsentState,
 } from "./consentState";
 export { verifyIdToken, type GoogleIdentity } from "./verifyIdToken";

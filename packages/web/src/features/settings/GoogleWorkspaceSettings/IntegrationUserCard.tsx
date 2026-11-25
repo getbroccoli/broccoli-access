@@ -19,14 +19,12 @@ type Props = {
   integrationUser: GoogleWorkspaceSettingsQuery["setup"]["integrationUser"];
   /** The workspace's domain, which the integration user's address is in. */
   domain: string;
-  /** Whether the connection uses the instance's own Google app, which alone can ask to create users. */
-  usesOwnGoogleApp: boolean;
   /** Why the last creation failed, from Google's redirect back. */
   failure: IntegrationUserError | undefined;
 };
 
 /** The integration user: what it is with the offer to create it, or the one created. */
-export function IntegrationUserCard({ integrationUser, domain, usesOwnGoogleApp, failure }: Props) {
+export function IntegrationUserCard({ integrationUser, domain, failure }: Props) {
   if (integrationUser) {
     return <CreatedIntegrationUserCard integrationUser={integrationUser} />;
   }
@@ -46,14 +44,13 @@ export function IntegrationUserCard({ integrationUser, domain, usesOwnGoogleApp,
           <li>{t("settings.integrationUser.offerKeepsWorking")}</li>
           <li>{t("settings.integrationUser.offerSuspend")}</li>
         </ul>
-        {!usesOwnGoogleApp && <p>{t("settings.integrationUser.needsOwnGoogleApp")}</p>}
         {failure && (
           <p role="alert" className="text-destructive">
             {t(FAILURE_MESSAGES[failure])}
           </p>
         )}
       </div>
-      {usesOwnGoogleApp && <CreateIntegrationUserDialog domain={domain} />}
+      <CreateIntegrationUserDialog domain={domain} />
     </article>
   );
 }

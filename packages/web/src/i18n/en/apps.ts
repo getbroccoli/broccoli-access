@@ -133,8 +133,6 @@ export const appsEn = {
   "apps.change.continueToGoogle": "Continue to Google",
   "apps.change.googleAsks":
     "Google will ask you to let Broccoli Access create and change users in your Google Workspace. This won’t change any account yet: ask for this change again afterwards.",
-  "apps.change.googleNeedsOwnApp":
-    "Changing Google accounts needs your own Google app. Change the Google app in Settings › Google Workspace first.",
   "apps.change.googleCheckFailed":
     "Couldn’t check whether Google allows this. Reload the page and try again.",
   "apps.googleWrites.allowed":

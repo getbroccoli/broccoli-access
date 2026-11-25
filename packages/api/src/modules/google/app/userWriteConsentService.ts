@@ -1,14 +1,15 @@
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
 import type { SecurityContext } from "../../../core/security";
 import { createGoogleClient } from "../../../integrations/google";
-import { openConsentState } from "../helpers";
-import { verifyWriteGrant } from "./integrationUserDirectory";
 import type { GoogleConnectionDependencies } from "./googleConnectionService";
 import {
+  type WriteConsentDestination,
   googleAppChanged,
-  readOwnGoogleApp,
+  openWriteConsent,
+  readConnectedGoogleApp,
   startWriteConsent,
   saveWriteGrant,
+  verifyWriteGrant,
 } from "./userWriteGrant";
 
 /**
@@ -21,12 +22,9 @@ export interface UserWriteConsentService {
    * the Google app was granted, its `state` carrying `returnTo`, encrypted for `browserToken`, a
    * new token the caller keeps in this browser until Google answers. Refuses a `returnTo` that is
    * no path of this instance with INVALID_INPUT, another caller with FORBIDDEN, and with CONFLICT
-   * before Google Workspace is connected with the instance's own Google app.
+   * before Google Workspace is connected.
    */
-  start: (
-    ctx: SecurityContext,
-    start: UserWriteConsentStart,
-  ) => Promise<{ authorizationUrl: string; browserToken: string }>;
+  start: (ctx: SecurityContext, start: UserWriteConsentStart) => Promise<WriteConsentDestination>;
   /**
    * Google's answer to that consent: stores the connection's grown grant and returns where the
    * owner came from. Refuses a consent without the scope with `UserWriteRefusedError`, a consent
@@ -67,6 +65,8 @@ export type UserWriteConsentDependencies = Pick<
   | "logger"
   | "openIdConfigurationUrl"
   | "adminApiUrl"
+  | "relayUrl"
+  | "publicUrl"
   | "connectedApps"
 >;
 
@@ -75,13 +75,8 @@ export function createUserWriteConsentService(
 ): UserWriteConsentService {
   const { orm, transact, secretBox, connectedApps, logger } = dependencies;
   const google = createGoogleClient(dependencies);
-  const openState = ({
-    state,
-    browserToken,
-    now,
-  }: Pick<UserWriteConsentAnswer, "state" | "browserToken" | "now">) => {
-    const opened =
-      browserToken === null ? null : openConsentState(secretBox, state, { browserToken, now });
+  const openState = (answer: Pick<UserWriteConsentAnswer, "state" | "browserToken" | "now">) => {
+    const opened = openWriteConsent(secretBox, answer);
     return opened?.flow === "allow_user_writes" ? opened : null;
   };
   return {
@@ -90,13 +85,13 @@ export function createUserWriteConsentService(
       if (!OWN_PATH.test(returnTo)) {
         throw invalidInput([{ field: "returnTo", code: "invalid" }]);
       }
-      const { settings, revision } = await readOwnGoogleApp(connectedApps, orm);
-      return startWriteConsent({ google, secretBox }, { settings, publicOrigin, now }, (nonce) => ({
+      const googleApp = await readConnectedGoogleApp(connectedApps, orm);
+      return startWriteConsent({ ...dependencies, google }, googleApp, {
         flow: "allow_user_writes",
         returnTo,
-        revision,
-        nonce,
-      }));
+        publicOrigin,
+        now,
+      });
     },
     async finish(ctx, answer) {
       requireOwner(ctx);
@@ -107,11 +102,11 @@ export function createUserWriteConsentService(
           "The consent expired or was not this browser's.",
         );
       }
-      const googleApp = await readOwnGoogleApp(connectedApps, orm);
-      if (googleApp.revision !== consent.revision) {
-        throw googleAppChanged();
-      }
-      const grant = await verifyWriteGrant(google, googleApp, { ...answer, nonce: consent.nonce });
+      const googleApp = await readConnectedGoogleApp(connectedApps, orm);
+      const grant = await verifyWriteGrant({ ...dependencies, google }, googleApp, {
+        ...answer,
+        consent,
+      });
       const saved = await transact((tx) =>
         saveWriteGrant(connectedApps, ctx, tx, googleApp, grant),
       );

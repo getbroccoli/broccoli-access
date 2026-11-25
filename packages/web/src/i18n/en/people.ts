@@ -61,7 +61,6 @@ export const peopleEn = {
   "people.add.confirmTitle": "Create {name}’s Google account?",
   "people.add.confirmDescription": "The selected apps follow once Google creates the account.",
   "people.add.loadingApps": "Loading apps…",
-  "people.add.needsOwnGoogleApp": "Connect your own Google app to create this account.",
   "people.add.provisionFailed": "Couldn’t start Provision. Check the person's apps and try again.",
   "people.add.delete": "Delete person",
   "people.add.deleteTitle": "Delete {name}?",
@@ -189,7 +188,6 @@ export const peopleEn = {
   "people.offboard.continueToGoogle": "Continue to Google",
   "people.offboard.googleAsks":
     "Google will ask you to let Broccoli Access create and change users in your Google Workspace. Nobody is offboarded until you confirm here again.",
-  "people.offboard.needsOwnGoogleApp": "Needs your own Google app",
   "people.offboard.googleCheckFailed":
     "Couldn’t check whether Google allows suspending. Reload the page, or untick Google Workspace.",
   "people.offboard.changeRunning": "An Enable or Invite is still running; check again when it ends",

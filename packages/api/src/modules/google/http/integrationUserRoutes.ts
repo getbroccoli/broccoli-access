@@ -31,12 +31,15 @@ export async function startIntegrationUserCreation(
     const email = CREATION_START.safeParse(request.body).data?.email ?? "";
     const security = await requireSecurity(http.resolveSecurity, request, NOT_OWNER);
     const origin = await http.publicOrigin(request);
-    const { authorizationUrl, browserToken } = await integrationUsers.startCreation(security, {
-      email,
-      publicOrigin: origin,
-      now: new Date(),
-    });
-    response.cookie(INTEGRATION_USER_COOKIE, browserToken, consentCookie(origin));
+    const { authorizationUrl, browserToken, callbackOrigin } = await integrationUsers.startCreation(
+      security,
+      {
+        email,
+        publicOrigin: origin,
+        now: new Date(),
+      },
+    );
+    response.cookie(INTEGRATION_USER_COOKIE, browserToken, consentCookie(callbackOrigin));
     response.json({ authorizationUrl });
   } catch (error) {
     sendStartFailure(error, response, logger);

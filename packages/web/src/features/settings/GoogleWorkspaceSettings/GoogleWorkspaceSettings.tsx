@@ -61,7 +61,6 @@ export function GoogleWorkspaceSettings({ integrationUserError }: Props) {
             <IntegrationUserCard
               integrationUser={data.setup.integrationUser}
               domain={connection.domain}
-              usesOwnGoogleApp={connection.googleApp === "OWN_GOOGLE_APP"}
               failure={integrationUserError}
             />
           </section>

@@ -90,6 +90,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   const integrationUsers = createIntegrationUserService({
     ...core,
     ...googleAddresses,
+    publicUrl,
     connectedApps,
     connectorsUrl: settings.connectorsUrl,
     records: importRecords,

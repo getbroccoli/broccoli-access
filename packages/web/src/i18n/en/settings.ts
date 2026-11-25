@@ -25,8 +25,6 @@ export const settingsEn = {
     "If an app blocks automation, it blocks this user, not you.",
   "settings.integrationUser.offerKeepsWorking": "Keeps working when you are signed out or away.",
   "settings.integrationUser.offerSuspend": "Suspend it in Google to stop everything at once.",
-  "settings.integrationUser.needsOwnGoogleApp":
-    "Creating it needs your own Google app. Change the Google app above first.",
   "settings.integrationUser.create": "Create integration user",
   "settings.integrationUser.created": "Created",
   "settings.integrationUser.openInGoogleAdmin": "Open in Google admin",

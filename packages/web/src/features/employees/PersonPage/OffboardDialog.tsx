@@ -58,14 +58,8 @@ export function OffboardDialog({ person, onClose, googleUserWrites, initialSkipp
   const { accountsToDisable, accountsToRemove, byHandWork } = person.offboarding;
   const removeLater = new Set(activeAccountsToRemove(accountsToRemove).map(({ app }) => app.name));
   const directoryAppId = person.directoryAccount?.app.id;
-  // An app with two accounts of theirs shows once: unticking it keeps both. With the shared
-  // Google app, which cannot ask Google for the permission, suspending is the owner's work.
-  const apps = [...new Map(accountsToDisable.map(({ app }) => [app.id, app])).values()].filter(
-    ({ id }) => google !== "unsupported" || id !== directoryAppId,
-  );
-  const googleByHand =
-    google === "unsupported" &&
-    apps.length < new Set(accountsToDisable.map(({ app }) => app.id)).size;
+  // An app with two accounts of theirs shows once: unticking it keeps both.
+  const apps = [...new Map(accountsToDisable.map(({ app }) => [app.id, app])).values()];
   const tickedAppIds = apps.map(({ id }) => id).filter((id) => !skippedAppIds.includes(id));
   const suspendsInGoogle = directoryAppId !== undefined && tickedAppIds.includes(directoryAppId);
   const asksGoogle = suspendsInGoogle && google === "needs_consent";
@@ -133,16 +127,10 @@ export function OffboardDialog({ person, onClose, googleUserWrites, initialSkipp
             </ul>
           </section>
         )}
-        {(byHandWork.length > 0 || googleByHand) && (
+        {byHandWork.length > 0 && (
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">{t("people.offboard.byHand")}</h3>
             <ul className="divide-y divide-amber-200 rounded-xl border border-amber-200 bg-amber-50 text-amber-950">
-              {googleByHand && person.directoryAccount && (
-                <li className="flex gap-3 px-4 py-3 text-sm">
-                  <span className="w-40 font-medium">{person.directoryAccount.app.name}</span>
-                  <span>{t("people.offboard.needsOwnGoogleApp")}</span>
-                </li>
-              )}
               {byHandWork.map(({ app, reason }) => (
                 <li key={`${app.id} ${reason}`} className="flex gap-3 px-4 py-3 text-sm">
                   <span className="w-40 font-medium">{app.name}</span>
