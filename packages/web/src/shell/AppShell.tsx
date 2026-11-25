@@ -23,8 +23,9 @@ export function AppShell({ children }: Props) {
   const inSettings = useInSettings();
   const { setupStep } = useRouteContext({ from: "/_authenticated" });
   const selectingApps = setupStep === "SELECT_APPS";
-  // Only a menu that was hidden slides in, not one opened with the page.
-  const [revealMenu] = useState(selectingApps);
+  // Only a menu this shell hid slides in, not one opened with the page.
+  const [revealMenu, setRevealMenu] = useState(selectingApps);
+  if (selectingApps && !revealMenu) setRevealMenu(true);
   useFocusHeadingOnNavigation(main);
 
   return (

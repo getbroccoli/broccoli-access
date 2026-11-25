@@ -58,8 +58,8 @@ Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page
 
 ## Assign templates
 
-1. In Templates, create Everyone with Google Workspace and Miro, and Engineer with Figma. Open Ivan Petrov from People.
-2. Choose **+ Assign template**, then Everyone. Repeat for Engineer. Both chips show their names and a take-off button. Each app appears once, with its template in **From**. Apps Ivan lacks show **Missing**.
+1. In Templates, create Everyone with Miro, and Engineer with Figma. "Add app" never offers Google Workspace. Open Ivan Petrov from People.
+2. Choose **+ Assign template**, then Everyone. Repeat for Engineer. Both chips show their names and a take-off button. Each app appears once, with its template in **From**. Miro and Figma, which have no connection and no account of Ivan's, show **App not connected**.
 3. Open Engineer. Follow Ivan's link under **People with this template** back to his page. Take Engineer off and check that Ivan leaves its people list and the count drops by one.
 4. Add Notion to Everyone and Engineer, then assign Engineer to Ivan again. Ivan already has an active Notion account. His single Notion row lists both templates. Take off Engineer. Notion stays active with Everyone as its only source. Take off Everyone. Notion now shows **Extra**.
 

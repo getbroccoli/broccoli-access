@@ -115,6 +115,7 @@ type TemplateRoleSource {
 enum PersonAppState {
   ACTIVE
   SUSPENDED
+  "They should have it and have no active account or pending invitation in it, or a disabled account found even without a connection."
   MISSING
   "They should have it, but the app has no connection and no account of theirs is known."
   APP_NOT_CONNECTED

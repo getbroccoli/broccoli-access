@@ -75,6 +75,27 @@ test("taking a template off keeps the other sources and records each new review 
   }
 });
 
+test("taking the directory's app out of a template puts no directory account up for review", async ({
+  orm,
+  seed,
+}) => {
+  const user = await seed.user({ email: "owner@example.com" });
+  const directory = await seed.app({ catalogKey: "google_workspace", status: "approved" });
+  await seed.appConnection({ appId: directory.id, connector: "google_workspace" });
+  const template = await seed.template({ appIds: [directory.id] });
+  const ivan = await seed.employee();
+  await seed.employeeTemplate({
+    employeeId: ivan.id,
+    templateId: template.id,
+    assignedBy: user.id,
+  });
+  await seed.appAccount({ employeeId: ivan.id, appId: directory.id });
+
+  await templates(orm).takeOutApp(OWNER, { id: template.id, appId: directory.id });
+
+  expect(await storedEmployeeAppChoices(orm)).toEqual([]);
+});
+
 test.for(["taking out the app", "deleting the template"] as const)(
   "%s marks each active account that loses its last source for review",
   async (operation, { orm, seed }) => {

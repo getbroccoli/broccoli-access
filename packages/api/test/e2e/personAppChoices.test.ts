@@ -11,7 +11,7 @@ test("the owner adds an app for one person, removes a template's app for them an
 
   expect(await changeChoice(browser, "addPersonApp", "PersonAppAddInput", input)).toEqual({
     choice: "ADDED_FOR_PERSON",
-    state: "MISSING",
+    state: "APP_NOT_CONNECTED",
   });
 
   const template = await env.seed.template({ appIds: [intranet.id] });
@@ -23,7 +23,7 @@ test("the owner adds an app for one person, removes a template's app for them an
 
   expect(
     await changeChoice(browser, "undoPersonAppChoice", "PersonAppUndoChoiceInput", input),
-  ).toEqual({ choice: null, state: "MISSING" });
+  ).toEqual({ choice: null, state: "APP_NOT_CONNECTED" });
 });
 
 test("refuses a signed-out caller who adds an app for a person", async ({ env }) => {

@@ -47,7 +47,7 @@ export const templatesEn = {
   "templates.apps.title": "Apps",
   "templates.apps.empty": "No apps yet. Add the apps people with this template should have.",
   "templates.addApp": "Add app",
-  "templates.addApp.none": "Every approved app is in this template.",
+  "templates.addApp.none": "No approved apps to add.",
   "templates.addAppFailed": "Couldn’t add {app}. Try again.",
   "templates.addAppUnavailable": "{app} is no longer an approved app. Reload the page.",
   "templates.takeOut": "Take out",

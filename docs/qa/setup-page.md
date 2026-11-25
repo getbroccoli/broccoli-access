@@ -43,7 +43,7 @@ A manual check of setup held by one browser, which connects Google Workspace wit
 - [ ] Below the first twelve apps, "Show 25 more apps" shows the rest.
 - [ ] Unchecking Slack leaves its chip visible and makes the button "Approve 0 and finish". Checking ChatGPT leaves it without a chip and makes the button "Approve 1 and finish". The header checkbox selects all apps, and again none.
 - [ ] Reloading keeps the owner on Applications; `/setup`, `/people` and `/` lead back to it.
-- [ ] Clear Slack and select ChatGPT, then choose "Approve 1 and finish". Approved lists Google Workspace and ChatGPT, and Slack appears in Ignored. The tabs show "Discovered 0" and "Ignored 36". The banner is gone, and the left menu slides in with no count on Applications. Reloading stays there, and `/setup` and `/` open it too.
+- [ ] Clear Slack and select ChatGPT, then choose "Approve 1 and finish". Approved lists Google Workspace and ChatGPT, and Slack appears in Ignored. The tabs show "Discovered 0" and "Ignored 36". The banner is gone and the left menu appears with no count on Applications; on a wide screen with reduced motion off, it widens and fades in. Reloading stays there, and `/setup` and `/` open it too.
 
 ## Starting over
 

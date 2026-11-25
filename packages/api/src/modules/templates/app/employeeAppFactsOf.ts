@@ -26,13 +26,9 @@ export async function employeeAppFactsOf(read: EmployeeAppRead): Promise<Employe
     apps.findEmployeeAccounts(db, employeeIds, read.appIds),
     read.invites ?? apps.readAppInvites(ctx, employeeIds, db),
   ]);
-  const expectedApps = [
-    ...templates.flat().flatMap((template) => template.apps.map(({ appId }) => appId)),
-    ...choices.map(({ appId }) => appId),
-  ];
   const [listedApps, connectedApps] = await Promise.all([
     repo.listedApps([...new Set(accounts.map(({ appId }) => appId))]),
-    apps.connectedAppIds(db, [...new Set(expectedApps)]),
+    apps.connectedAppIds(db, read.appIds ?? expectedAppIds(templates, choices)),
   ]);
   const choicesByPerson = Map.groupBy(choices, (choice) => choice.employeeId);
   const accountsByPerson = Map.groupBy(accounts, (account) => account.employeeId);
@@ -51,6 +47,15 @@ export async function employeeAppFactsOf(read: EmployeeAppRead): Promise<Employe
     listedApps,
     connectedApps,
   }));
+}
+
+/** The apps any of these templates or choices may give, each once. */
+function expectedAppIds(templates: Template[][], choices: readonly { appId: string }[]) {
+  const ids = new Set(choices.map(({ appId }) => appId));
+  for (const template of new Map(templates.flat().map((one) => [one.id, one])).values()) {
+    for (const { appId } of template.apps) ids.add(appId);
+  }
+  return [...ids];
 }
 
 type EmployeeAppFacts = Omit<PersonAppFacts, "accounts"> & {

@@ -18,14 +18,18 @@ export async function reviewLostApps(
   lostAppIds: string[],
 ) {
   if (!employeeIds.length || !lostAppIds.length) return;
+  // Every person keeps the directory's app whatever their templates, so losing it reviews nothing.
+  const directoryAppId = await apps.directoryAppId(tx);
+  const appIds = lostAppIds.filter((appId) => appId !== directoryAppId);
+  if (!appIds.length) return;
   const repo = assignmentRepository(tx);
   // A directory scan already holds its employees when it reaches the apps.
   await employees.holdForReference(tx, employeeIds);
-  const names = await apps.lockAppsForReview(tx, lostAppIds);
-  const active = (await apps.findEmployeeAccounts(tx, employeeIds, lostAppIds)).filter(
+  const names = await apps.lockAppsForReview(tx, appIds);
+  const active = (await apps.findEmployeeAccounts(tx, employeeIds, appIds)).filter(
     (account) => account.status === "active",
   );
-  const picks = await repo.choicesFor(employeeIds, lostAppIds, "role_picked");
+  const picks = await repo.choicesFor(employeeIds, appIds, "role_picked");
   if (!active.length && !picks.length) return;
   const sources = await repo.sources([...active, ...picks]);
   await clearStaleRolePicks(ctx, tx, picks, sources);

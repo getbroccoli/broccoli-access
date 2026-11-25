@@ -2,7 +2,7 @@ import { ApplicationError, invalidInput } from "../../../core/applicationError";
 import type { SecurityContext } from "../../../core/security";
 import type { Logger } from "../../../core/logger";
 import { parseUuid } from "../../../utils";
-import type { AccountChange } from "../domain";
+import { type AccountChange, lacksApp } from "../domain";
 import type { PersonPage } from "../ports";
 import type { ProvisionService } from "./provisionService";
 
@@ -13,7 +13,7 @@ export interface AppProvisionResult {
 
 /** Differences reports a refusal for missing access with no offered or running change. */
 export function refuseUnavailableSelection(page: PersonPage, confirmed: PersonPage["personApps"]) {
-  if (confirmed.some(({ appId, state }) => state === "missing" && !hasRunningStep(page, appId))) {
+  if (confirmed.some(({ appId, state }) => lacksApp(state) && !hasRunningStep(page, appId))) {
     throw new ApplicationError("CONFLICT", "This app cannot be provisioned for this person now.");
   }
 }

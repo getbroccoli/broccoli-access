@@ -91,6 +91,29 @@ test("Differences refuses a pending joiner who can still be provisioned from the
   ]);
 });
 
+test("Differences refuses a pending joiner whose app has no connection", async ({
+  orm,
+  seed,
+  workspace: { owner, provision, sent },
+}) => {
+  const app = await seed.app({
+    name: "Intranet",
+    domain: "intranet.example.com",
+    catalogKey: null,
+    status: "approved",
+  });
+  const template = await seed.template({ appIds: [app.id] });
+  const { id: employeeId } = await addPersonService(orm).addPerson(owner, {
+    ...NEW_PERSON,
+    templateIds: [template.id],
+  });
+
+  expect(await provision.provisionApp(owner, { appId: app.id, employeeIds: [employeeId] })).toEqual(
+    { changes: [], refusedEmployeeIds: [employeeId] },
+  );
+  expect(sent).toEqual([]);
+});
+
 test("a failed enqueue rolls back just that person and returns the other committed invites", async ({
   workspace: { owner, ivan, employee, linear, assignLinearRole },
   seed,

@@ -43,3 +43,8 @@ export function provisionActionOf(facts: ProvisionFacts): ProvisionAction | null
   }
   return facts.inviteOffered ? "invite" : null;
 }
+
+/** Whether a person's app state leaves them without it: missing, or not connected and given by hand. */
+export function lacksApp(state: string | null): boolean {
+  return state === "missing" || state === "app_not_connected";
+}
