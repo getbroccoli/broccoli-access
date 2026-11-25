@@ -1,4 +1,4 @@
-import type { AccountChangeActor_ConnectionFragment } from "@/__generated__/graphql";
+import type { AppSessionSource } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 
 import { connectingFieldName } from "../connectingFieldName";
@@ -6,9 +6,9 @@ import { connectingFieldName } from "../connectingFieldName";
 type ActorApp = {
   name: string;
   containerConnection: {
-    sessionFrom: AccountChangeActor_ConnectionFragment["sessionFrom"];
+    sessionFrom: AppSessionSource | null;
     connector: {
-      connectionFields: AccountChangeActor_ConnectionFragment["connector"]["connectionFields"];
+      connectionFields: readonly { label: string; secret: boolean }[];
     };
   } | null;
 };
@@ -18,13 +18,9 @@ export function accountChangeActor({ name, containerConnection }: ActorApp): str
   if (!containerConnection) return null;
   const { sessionFrom, connector } = containerConnection;
   if (sessionFrom === "SERVER_SIGN_IN") return t("apps.change.actor.integrationUser");
-  if (
-    sessionFrom === "EXTENSION" ||
-    connector.connectionFields.some(({ kind }) => kind === "APP_SESSION")
-  ) {
+  if (sessionFrom === "EXTENSION") {
     return t("apps.change.actor.ownerSession", { app: name });
   }
-  return t("apps.change.actor.credential", {
-    field: connectingFieldName(connector.connectionFields),
-  });
+  const field = connectingFieldName(connector.connectionFields);
+  return field ? t("apps.change.actor.credential", { field }) : null;
 }

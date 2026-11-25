@@ -3,9 +3,12 @@ fragment AccountChangeActor_connection on ContainerConnection {
   sessionFrom
   connector {
     id
+    # The cache replaces this list in one write. Keep the fields Settings also reads.
     connectionFields {
+      key
       kind
       label
+      help
       secret
     }
   }

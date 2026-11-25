@@ -16,7 +16,7 @@ describe("accountChangeActor", () => {
         containerConnection: {
           sessionFrom,
           connector: {
-            connectionFields: [{ label: "Slack admin session", secret: true, kind: "APP_SESSION" }],
+            connectionFields: [{ label: "Slack admin session", secret: true }],
           },
         },
       });
@@ -31,12 +31,21 @@ describe("accountChangeActor", () => {
       containerConnection: {
         sessionFrom: null,
         connector: {
-          connectionFields: [{ label: "Personal API key", secret: true, kind: "TEXT" }],
+          connectionFields: [{ label: "Personal API key", secret: true }],
         },
       },
     });
 
     expect(actor).toBe("with your personal API key");
+  });
+
+  it("returns no actor copy when the connector has no session or connection fields", () => {
+    const actor = accountChangeActor({
+      name: "Linear",
+      containerConnection: { sessionFrom: null, connector: { connectionFields: [] } },
+    });
+
+    expect(actor).toBeNull();
   });
 
   it("returns no actor copy for an app without a container connection", () => {

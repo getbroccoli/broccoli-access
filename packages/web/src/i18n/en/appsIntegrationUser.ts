@@ -1,9 +1,11 @@
-/** English copy for a connection that signs in as the integration user, under `apps.*`. */
+/** English copy for acting through an app connection and its integration user. */
 export const appsIntegrationUserEn = {
   "apps.change.howItWorks":
     "Broccoli Access makes the change {actor}, then reads the account back from {app}.",
   "apps.change.howInviteWorks":
     "Broccoli Access asks {app} to send the invitation {actor}, then reads it back from {app}.",
+  "apps.change.howInviteAsIntegrationUserWorks":
+    "Broccoli Access acts {actor} to ask {app} to send the invitation, then reads it back from {app}.",
   "apps.change.actor.credential": "with your {field}",
   "apps.change.actor.integrationUser": "as the integration user",
   "apps.change.actor.ownerSession": "with your {app} admin session",

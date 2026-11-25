@@ -113,7 +113,7 @@ union EmployeeUpdateError = InvalidInputError | NotFoundError | ConflictError
 
 # Adds the employee to an app's user; the server merges the types of the modules.
 type AccountWithoutPerson {
-  "The active directory employee whose name or email username (the part before @) resembles the account's, when there is one clear match."
+  "The employee with a directory account whose name or email username (the part before @) resembles the account's, when there is one clear match."
   suggestedEmployee: Employee
 }
 
