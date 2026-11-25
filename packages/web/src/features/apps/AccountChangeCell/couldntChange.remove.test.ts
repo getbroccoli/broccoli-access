@@ -47,6 +47,19 @@ it("shows a failed Remove for an active member without a Remove offer when the c
   expect(showsCouldntChange(account)).toBe(true);
 });
 
+it("hides a failed Remove for an active member in Differences", () => {
+  const account = {
+    status: "ACTIVE",
+    offersRemove: true,
+    latestChange: { status: "FAILED", action: "REMOVE" },
+    app: { containerConnection: { connector: { canDisableAccounts: false } } },
+  } as const;
+  const extraAccount = { ...account, onlyIfExtra: true };
+
+  expect(showsCouldntChange(account)).toBe(true);
+  expect(showsCouldntChange(extraAccount)).toBe(false);
+});
+
 it("keeps a refused Remove visible on a removable active member until a scan allows a fresh Remove", () => {
   const connector = { canDisableAccounts: false };
   const active = {
@@ -86,6 +99,18 @@ it("offers Remove as the server does when no Remove failed", () => {
   expect(offersFreshRemove({ status: "SUSPENDED", offersRemove: false, app })).toBe(false);
   const refused = refusedRemove("2026-11-22T10:00:01Z", "NOT_ALLOWED");
   expect(offersFreshRemove({ ...refused, offersRemove: false })).toBe(false);
+});
+
+it("hides a fresh Remove for a removable active member in Differences", () => {
+  const account = {
+    status: "ACTIVE",
+    offersRemove: true,
+    app: { containerConnection: { connector: { canDisableAccounts: false } } },
+  } as const;
+  const extraAccount = { ...account, onlyIfExtra: true };
+
+  expect(offersFreshRemove(account)).toBe(true);
+  expect(offersFreshRemove(extraAccount)).toBe(false);
 });
 
 it.for([

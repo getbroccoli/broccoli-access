@@ -18,17 +18,20 @@ export function showsCouldntChange({
   status,
   app,
   latestChange,
+  onlyIfExtra,
 }: {
   status: AppAccountStatus;
   app?: RemovalApp;
   latestChange?: { status: AccountChangeStatus; action: AccountChangeAction } | null;
+  onlyIfExtra?: boolean;
 }): boolean {
   if (latestChange?.status !== "FAILED") {
     return false;
   }
   if (latestChange.action === "REMOVE")
     return (
-      status === "SUSPENDED" || app?.containerConnection?.connector?.canDisableAccounts === false
+      !onlyIfExtra &&
+      (status === "SUSPENDED" || app?.containerConnection?.connector?.canDisableAccounts === false)
     );
   return status !== (latestChange.action === "SUSPEND" ? "SUSPENDED" : "ACTIVE");
 }
@@ -122,14 +125,16 @@ export function offersFreshRemove({
   offersRemove,
   latestChange,
   app,
+  onlyIfExtra,
 }: {
   app: RemovalApp;
   status: AppAccountStatus;
   offersRemove: boolean;
+  onlyIfExtra?: boolean;
   latestChange?:
     (NonNullable<FailedChangeFacts["latestChange"]> & { status: AccountChangeStatus }) | null;
 }): boolean {
-  if (!offersRemove) return false;
+  if (onlyIfExtra || !offersRemove) return false;
   if (latestChange?.action !== "REMOVE" || !showsCouldntChange({ status, app, latestChange })) {
     return true;
   }

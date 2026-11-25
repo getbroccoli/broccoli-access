@@ -28,7 +28,7 @@ export function AppAccountStatusCell({ appUser, onlyIfExtra }: Props) {
     return null;
   }
   const user = fragment.data;
-  if (user.latestChange && showsCouldntChange(user)) {
+  if (user.latestChange && showsCouldntChange({ ...user, onlyIfExtra })) {
     return (
       <CouldntChangeDialog
         change={user.latestChange}
@@ -41,5 +41,5 @@ export function AppAccountStatusCell({ appUser, onlyIfExtra }: Props) {
       />
     );
   }
-  return <AppAccountStatusBadge status={user.status} />;
+  return onlyIfExtra ? null : <AppAccountStatusBadge status={user.status} />;
 }
