@@ -85,6 +85,8 @@ export interface AppConnectionService {
       error: ConnectorErrorCode;
       ref: string;
       secretsUsed: Record<string, unknown> | null;
+      /** The error is what signing in again answered, so a check also counts as a cause. */
+      afterRenewal?: boolean;
     },
   ) => Promise<boolean>;
   /**

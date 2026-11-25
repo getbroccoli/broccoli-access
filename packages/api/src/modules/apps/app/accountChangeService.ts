@@ -1,5 +1,10 @@
 import { ApplicationError } from "../../../core/applicationError";
-import type { AccountAction, Connector, ConnectorRegistry } from "../../../core/connectors";
+import type {
+  AccountAction,
+  Connector,
+  ConnectorRegistry,
+  SessionRenewals,
+} from "../../../core/connectors";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import type { JobQueue } from "../../../core/jobs";
 import type { Logger } from "../../../core/logger";
@@ -227,6 +232,8 @@ export interface AccountChangeDependencies {
   employees: EmployeesByName;
   /** Whose accounts never offer a change. */
   integrationUser: IntegrationUser;
+  /** Signs in again for a connection made by the integration user's sign-in. */
+  renewals: SessionRenewals;
   /** Waits between attempts of a call; tests pass one that does not wait. */
   wait?: (ms: number) => Promise<void>;
 }

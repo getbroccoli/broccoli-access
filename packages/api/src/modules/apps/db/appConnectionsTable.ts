@@ -38,7 +38,7 @@ export const appConnections = pgTable(
     check("app_connections_status", sql`${table.status} in ('connected', 'reconnect')`),
     check(
       "app_connections_reconnect_cause",
-      sql`${table.reconnectCause} in ('authentication_failed', 'permission_missing', 'wrong_workspace')`,
+      sql`${table.reconnectCause} in ('authentication_failed', 'permission_missing', 'wrong_workspace', 'blocked_by_check')`,
     ),
     check(
       "app_connections_reconnect_cause_when_reconnect",

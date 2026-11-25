@@ -3,26 +3,23 @@ import {
   canInvite,
   offersInviteRole,
   canRemoveAccounts,
-  type ConnectionUpdate,
   type Connector,
-  ConnectorError,
   type ConnectorErrorCode,
-  type ConnectorSession,
-  withConnectorRetries,
 } from "../../../core/connectors";
 import type { Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { accountChangeRepository, appAccountRepository, appConnectionRepository } from "../db";
-import { type AccountChange, reconnectCauseOf, statusAfter } from "../domain";
+import { type AccountChange, reconnectCauseOf } from "../domain";
 import type { AccountChangeDependencies } from "./accountChangeService";
 import type { AppConnectionService } from "./appConnectionService";
 import { applyAccountChange } from "./applyAccountChange";
+import { type ActionOutcome, callChange, NOT_CALLED } from "./callAccountChange";
 
 /** What a run needs: the service's dependencies and its connection service. */
-type RunDependencies = AccountChangeDependencies & { connections: AppConnectionService };
+export type RunDependencies = AccountChangeDependencies & { connections: AppConnectionService };
 
 /** A change the job runs: one without a connection fails when asked and never runs. */
-type RunnableChange = AccountChange & { connectionId: string };
+export type RunnableChange = AccountChange & { connectionId: string };
 
 /** Runs a running change through its connector and saves how it ended; skips any other. */
 export async function runAccountChange(
@@ -40,27 +37,24 @@ export async function runAccountChange(
     );
     return;
   }
-  const { error, calledServer, secretsUsed, reconnects } = await runAction(
+  const { error, calledServer, secretsUsed, reconnects, afterRenewal } = await runAction(
     dependencies,
     ctx,
     change,
   );
   if (!error) {
-    const finished = await finishSucceeded(dependencies, ctx, change);
-    logger.info(
-      {
-        changeId,
-        appAccountId: change.appAccountId,
-        connectionId: change.connectionId,
-        action: change.action,
-        finished,
-      },
-      "Account change succeeded",
-    );
+    await succeed(dependencies, ctx, change);
     return;
   }
   const { finished, turnedToReconnect } = await transact((tx) =>
-    failChange(dependencies, ctx, tx, { change, error, calledServer, secretsUsed, reconnects }),
+    failChange(dependencies, ctx, tx, {
+      change,
+      error,
+      calledServer,
+      secretsUsed,
+      reconnects,
+      afterRenewal,
+    }),
   );
   logger.warn(
     {
@@ -73,6 +67,24 @@ export async function runAccountChange(
       turnedToReconnect,
     },
     "Account change failed",
+  );
+}
+
+async function succeed(
+  dependencies: RunDependencies,
+  ctx: SecurityContext,
+  change: RunnableChange,
+): Promise<void> {
+  const finished = await finishSucceeded(dependencies, ctx, change);
+  dependencies.logger.info(
+    {
+      changeId: change.id,
+      appAccountId: change.appAccountId,
+      connectionId: change.connectionId,
+      action: change.action,
+      finished,
+    },
+    "Account change succeeded",
   );
 }
 
@@ -90,9 +102,10 @@ async function failChange(
     calledServer,
     secretsUsed,
     reconnects,
+    afterRenewal,
   }: ActionOutcome & { change: RunnableChange; error: ConnectorErrorCode },
 ): Promise<{ finished: boolean; turnedToReconnect: boolean }> {
-  if (!reconnects || !reconnectCauseOf(error)) {
+  if (!reconnects || !reconnectCauseOf(error, { afterRenewal })) {
     return {
       finished: await finishFailed(tx, change.id, error, calledServer),
       turnedToReconnect: false,
@@ -106,6 +119,7 @@ async function failChange(
     error,
     ref: change.id,
     secretsUsed,
+    afterRenewal,
   });
   return { finished, turnedToReconnect };
 }
@@ -121,16 +135,6 @@ export async function failRunningChange(
   logger.warn({ changeId, failed }, "Account change failed after its job's last attempt");
 }
 
-/** How the action ended: its error, null once the member read back changed; and whether the server was called. */
-interface ActionOutcome {
-  error: ConnectorErrorCode | null;
-  calledServer: boolean;
-  /** The secrets its call used; null when it made none. */
-  secretsUsed: Record<string, unknown> | null;
-  /** Whether its connection turns to Reconnect on an error that needs it: never the directory's. */
-  reconnects: boolean;
-}
-
 function isRunnable(change: AccountChange): change is RunnableChange {
   return change.connectionId !== null;
 }
@@ -140,7 +144,7 @@ async function runAction(
   ctx: SecurityContext,
   change: RunnableChange,
 ): Promise<ActionOutcome> {
-  const { orm, connections, connectors, wait, logger } = dependencies;
+  const { orm, connections, connectors } = dependencies;
   // One stored version, so a connection changed meanwhile never pairs old settings with new secrets.
   const { connection, secrets } = (await connections.readConnectionWithSecrets(
     orm,
@@ -159,87 +163,14 @@ async function runAction(
   if (change.action === "remove" && !(await canStillRemove(dependencies, change))) {
     return { ...NOT_CALLED, error: "not_allowed", reconnects: false };
   }
-  let calledServer = false;
-  try {
-    const session = await connector.openSession({ settings: connection.settings, secrets });
-    const result = await withConnectorRetries(
-      () => {
-        calledServer = true;
-        return makeChange(session, change);
-      },
-      {
-        wait,
-        onRetry: (failure, attempt) =>
-          logger.info(
-            { changeId: change.id, failure, attempt },
-            "Account change call failed; trying again",
-          ),
-      },
-    );
-    await saveConnectionUpdate(dependencies, ctx, change, {
-      ...result.connection,
-      replacing: secrets,
-    });
-    return {
-      error: result.readBack ? null : "unexpected_response",
-      calledServer,
-      secretsUsed: secrets,
-      reconnects,
-    };
-  } catch (error) {
-    if (error instanceof ConnectorError) {
-      return { error: error.code, calledServer, secretsUsed: secrets, reconnects };
-    }
-    throw error;
-  }
+  return callChange(dependencies, ctx, change, { connector, connection, secrets, reconnects });
 }
-
-/** An outcome decided before any call to the app. */
-const NOT_CALLED = { calledServer: false, secretsUsed: null } as const;
 
 /** Whether the connector makes the change: it supports the requested action on the server. */
 function canMake(connector: Connector, { action, role }: AccountChange): boolean {
   if (action === "remove") return canRemoveAccounts(connector);
   if (action !== "invite") return canChangeAccounts(connector);
   return canInvite(connector) && offersInviteRole(connector.roles, role);
-}
-
-/**
- * Makes the change in one call and tells whether it read back: the member's new status, or for an
- * invite, the invitation or the email's member, which the session checks. Success is what is read
- * back, never a call that went through.
- */
-async function makeChange(
-  session: ConnectorSession,
-  change: AccountChange,
-): Promise<{ readBack: boolean; connection?: ConnectionUpdate }> {
-  if (change.action === "invite") {
-    return { ...(await session.invite!(change.email, change.role ?? undefined)), readBack: true };
-  }
-  // A change to an existing account always copies the member's source key.
-  const account = { sourceKey: change.sourceKey!, email: change.email };
-  if (change.action === "remove") return { ...(await session.remove!(account)), readBack: true };
-  const { status, connection } = await session.runAction!(change.action, account);
-  return { readBack: status === statusAfter(change.action), connection };
-}
-
-/** Saves what the answer renewed, unless a reconnect replaced the secrets its call used meanwhile. */
-async function saveConnectionUpdate(
-  { transact, connections, logger }: RunDependencies,
-  ctx: SecurityContext,
-  change: RunnableChange,
-  update: ConnectionUpdate & { replacing: Record<string, unknown> },
-): Promise<void> {
-  if (!update.settings && !update.secrets) {
-    return;
-  }
-  const saved = await transact((tx) =>
-    connections.changeConnection(ctx, tx, change.connectionId, update),
-  );
-  logger.info(
-    { changeId: change.id, connectionId: change.connectionId, saved },
-    "Account change answered with renewed settings or secrets",
-  );
 }
 
 /**
@@ -291,7 +222,7 @@ async function finishSucceeded(
       change.action === "remove" &&
       stored.attempts.length === 0 &&
       stored.error &&
-      reconnectCauseOf(stored.error);
+      reconnectCauseOf(stored.error, { afterRenewal: true });
     if (!stored || (stored.status !== "running" && !failedDuringCall)) {
       return false;
     }

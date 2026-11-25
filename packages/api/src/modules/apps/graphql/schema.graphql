@@ -186,6 +186,8 @@ enum ReconnectCause {
   PERMISSION_MISSING
   "The key or session reaches another workspace than the connection's."
   WRONG_WORKSPACE
+  "Signing in again as the integration user stopped at a check a person must pass, such as a CAPTCHA."
+  BLOCKED_BY_CHECK
 }
 
 # Adds the person's app accounts and invites to the employees module's Employee; the server merges the types.

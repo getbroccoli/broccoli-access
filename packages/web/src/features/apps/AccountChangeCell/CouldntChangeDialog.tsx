@@ -26,6 +26,7 @@ import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { dayAndTime } from "@/lib/dayAndTime";
 
+import { integrationUserOf } from "../reconnectReason";
 import { ReconnectButton } from "../ReconnectButton";
 import { couldntChangeHint, couldntChangeReason, failedChangeOptions } from "./couldntChange";
 import { DoneByHandDialog } from "./DoneByHandDialog";
@@ -98,6 +99,8 @@ export function CouldntChangeDialog({
     connectionUserEmail: row ? (connection?.connectionUserEmail ?? null) : null,
     credential: connection?.connector.connectionFields.find(({ secret }) => secret)?.kind ?? "TEXT",
     toReconnect: options.reconnect,
+    // Today's connection says nothing about who a change in history was made as.
+    integrationUser: row && connection ? integrationUserOf(connection) : null,
     historical: !row,
   });
   const tryAgain = (target: ChangeTarget) => {

@@ -1,9 +1,12 @@
+import type { ConnectionSignInRequest } from "@broccoli-access/connector-contract";
+import { ACME_SLACK } from "@broccoli-access/fake-apps";
 import express from "express";
 
 import {
   expect,
   test,
   OWNER,
+  connectAsIntegrationUser,
   containerConnections,
   inviteIntegrationUserToFakeSlack,
   postFakeControl,
@@ -11,6 +14,27 @@ import {
   serveConnectorRoutes,
   storedAppConnections,
 } from "#test/support";
+
+test("sends the stored Slack workspace only when signing in to an existing connection", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const workspaces: ConnectionSignInRequest["connection"][] = [];
+  const proxy = express();
+  proxy.post("/v1/connections/sign-in", express.json(), (req, _res, next) => {
+    workspaces.push((req.body as ConnectionSignInRequest).connection);
+    next();
+  });
+  const server = await serveConnectorRoutes(fakeConnectors.url, proxy);
+  const { service } = await readyIntegrationUser(orm, seed, { ...fakeConnectors, url: server.url });
+  await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
+  await connectAsIntegrationUser(service);
+
+  await service.connectWithIntegrationUser(OWNER, SLACK);
+
+  expect(workspaces).toMatchObject([null, { settings: ACME_SLACK.settings }]);
+});
 
 test("refuses an integration user that Slack has not invited, saying so", async ({
   orm,

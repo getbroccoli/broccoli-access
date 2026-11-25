@@ -10,6 +10,7 @@ export const RECONNECT_CAUSES = [
   "authentication_failed",
   "permission_missing",
   "wrong_workspace",
+  "blocked_by_check",
 ] as const;
 
 export type ReconnectCause = (typeof RECONNECT_CAUSES)[number];
@@ -17,9 +18,16 @@ export type ReconnectCause = (typeof RECONNECT_CAUSES)[number];
 /**
  * The cause a connector error turns a connection to `reconnect` with; null for an error that
  * leaves it connected. The core calls connectors on the server only, so `authentication_failed`
- * always counts.
+ * always counts. `blocked_by_check` counts only as the answer of signing in again, never of a
+ * call: a check in the app's own call leaves the connection connected.
  */
-export function reconnectCauseOf(error: AccountChangeError): ReconnectCause | null {
+export function reconnectCauseOf(
+  error: AccountChangeError,
+  { afterRenewal = false }: { afterRenewal?: boolean } = {},
+): ReconnectCause | null {
+  if (error === "blocked_by_check" && !afterRenewal) {
+    return null;
+  }
   return RECONNECT_CAUSES.find((cause) => cause === error) ?? null;
 }
 

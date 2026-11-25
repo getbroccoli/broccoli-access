@@ -16,6 +16,7 @@ import {
   connectorsModule,
   createContainerConnectionService,
   createContainerConnectors,
+  createSessionRenewals,
 } from "./connectors";
 import {
   createDirectorySyncService,
@@ -86,6 +87,12 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     // The scans read the integration user, so its creation reaches them once both exist.
     scans: { scanConnection: (...scan) => scans.scanConnection(...scan) },
   });
+  const renewals = createSessionRenewals({
+    ...core,
+    containerConnectors,
+    connectedApps,
+    integrationUser: integrationUsers,
+  });
   const apps = createAppService({
     ...core,
     connectors: directoryConnectors,
@@ -103,6 +110,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     },
     directory: createDirectorySyncService(),
     integrationUser: integrationUsers,
+    renewals,
   });
   // One service for Settings and the extension, which share the app sessions handed over.
   const containerConnections = createContainerConnectionService({
@@ -123,6 +131,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     members: importRecords,
     employees,
     integrationUser: integrationUsers,
+    renewals,
   };
   const changes = createAccountChangeService(changeDependencies);
   const users = createAppUserService({

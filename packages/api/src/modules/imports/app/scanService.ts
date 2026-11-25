@@ -3,6 +3,7 @@ import {
   type Connector,
   type ConnectorErrorCode,
   type ConnectorRegistry,
+  type SessionRenewals,
 } from "../../../core/connectors";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import type { JobQueue } from "../../../core/jobs";
@@ -68,6 +69,8 @@ export interface ScanDependencies {
   directory: DirectoryPeople;
   /** Whose directory account creates no employee. */
   integrationUser: IntegrationUser;
+  /** Signs in again for a connection made by the integration user's sign-in. */
+  renewals: SessionRenewals;
   /** Waits between attempts of a call; tests pass one that does not wait. */
   wait?: (ms: number) => Promise<void>;
 }
@@ -190,6 +193,7 @@ async function failScanOfConnection(
     failure,
     secretsUsed,
     reconnects,
+    afterRenewal,
     directoryRevision,
   }: ScanFailure & { sourceId: string; connectionId: string },
 ): Promise<boolean> {
@@ -207,6 +211,7 @@ async function failScanOfConnection(
       error: failure,
       ref: sourceId,
       secretsUsed,
+      afterRenewal,
     });
   });
 }

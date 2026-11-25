@@ -1,0 +1,2 @@
+ALTER TABLE "app_connections" DROP CONSTRAINT "app_connections_reconnect_cause";--> statement-breakpoint
+ALTER TABLE "app_connections" ADD CONSTRAINT "app_connections_reconnect_cause" CHECK ("app_connections"."reconnect_cause" in ('authentication_failed', 'permission_missing', 'wrong_workspace', 'blocked_by_check'));

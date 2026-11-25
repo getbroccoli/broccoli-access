@@ -30,15 +30,17 @@ export async function turnToReconnect(
     error,
     ref,
     secretsUsed,
+    afterRenewal,
   }: {
     connectionId: string;
     error: ConnectorErrorCode;
     ref: string;
     secretsUsed: Record<string, unknown> | null;
+    afterRenewal?: boolean;
   },
 ): Promise<boolean> {
   ctx.requireSystem();
-  const cause = reconnectCauseOf(error);
+  const cause = reconnectCauseOf(error, { afterRenewal });
   const connections = appConnectionRepository(tx);
   const connection = await connections.lockById(connectionId);
   const stillUsed = await holdsSecrets(secretBox, tx, connectionId, secretsUsed);

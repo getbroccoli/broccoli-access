@@ -77,6 +77,7 @@ export function createIntegrationUserSignInAttempts(
 export async function signInToApp(
   dependencies: IntegrationUserSignInDependencies,
   connector: string,
+  renewing?: { settings: Record<string, unknown>; secrets: Record<string, unknown> },
 ): Promise<AppSignIn> {
   const { orm, connectorsContainer, logger } = dependencies;
   const [user, secrets] = await Promise.all([
@@ -90,7 +91,7 @@ export async function signInToApp(
   const signedIn = (await connectorsContainer?.signInToApp({
     connector,
     integrationUser: { email: user.email, password, totpSecret },
-    connection: null,
+    connection: renewing ?? null,
   })) ?? { error: "app_unavailable" as const };
   if ("error" in signedIn) {
     logger.warn(

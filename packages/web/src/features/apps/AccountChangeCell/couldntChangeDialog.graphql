@@ -21,6 +21,8 @@ fragment CouldntChangeDialog_accountChange on AccountChange {
       id
       adminUrl
       status
+      sessionFrom
+      integrationUserSuspended
       connectionUserEmail
       scan {
         id

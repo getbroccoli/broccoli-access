@@ -1,5 +1,6 @@
 import { appEn } from "./en/app";
 import { appsEn } from "./en/apps";
+import { appsIntegrationUserEn } from "./en/appsIntegrationUser";
 import { authEn } from "./en/auth";
 import { navEn } from "./en/nav";
 import { notFoundEn } from "./en/notFound";
@@ -13,6 +14,7 @@ import { templatesEn } from "./en/templates";
 export const en = {
   ...appEn,
   ...appsEn,
+  ...appsIntegrationUserEn,
   ...authEn,
   ...setupEn,
   ...navEn,

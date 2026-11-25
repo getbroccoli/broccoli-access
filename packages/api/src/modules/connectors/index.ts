@@ -4,7 +4,11 @@ import type { ContainerConnectionService } from "./app";
 import { createResolvers } from "./graphql";
 
 // Public values.
-export { createContainerConnectionService, createContainerConnectors } from "./app";
+export {
+  createContainerConnectionService,
+  createContainerConnectors,
+  createSessionRenewals,
+} from "./app";
 
 /**
  * Apps connected through the connectors container, with no code for any of them. It shares the

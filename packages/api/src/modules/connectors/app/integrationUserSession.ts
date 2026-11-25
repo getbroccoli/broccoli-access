@@ -16,6 +16,12 @@ import type { SignedInConnection, SignInFailure } from "../ports";
 import type { ContainerConnectionDependencies } from "./containerConnectionService";
 import { appSessionFieldOf, type ContainerConnector } from "./containerConnectors";
 
+/** What signing in as the integration user needs. */
+export type SignInDependencies = Pick<
+  ContainerConnectionDependencies,
+  "integrationUser" | "logger" | "wait"
+>;
+
 /**
  * The connection the integration user's sign-in to the connector's app made, trying a rate-limited
  * or unavailable sign-in again. Refuses a connector that cannot sign in with CONFLICT; a sign-in
@@ -24,47 +30,69 @@ import { appSessionFieldOf, type ContainerConnector } from "./containerConnector
  * app session the connector names, with UNAVAILABLE. The session comes parsed, beside the answer.
  */
 export async function integrationUserSession(
-  dependencies: ContainerConnectionDependencies,
+  dependencies: SignInDependencies,
   ctx: SecurityContext,
   connector: ContainerConnector,
   stored: { id: string; settings: Record<string, unknown> } | undefined,
 ): Promise<SignedInConnection & { appSession: AppSession }> {
-  const { logger } = dependencies;
   if (!signsInAsIntegrationUser(connector)) {
     throw new ApplicationError(
       "CONFLICT",
       "This connector cannot sign in as the integration user.",
     );
   }
-  const signedIn = await signInWithRetries(dependencies, ctx, connector);
+  // A connection that exists names its workspace, so a user in several signs in to that one.
+  const renewing = stored && { settings: stored.settings, secrets: {} };
+  const signedIn = await signInAgain(dependencies, ctx, connector, stored, renewing);
   if ("failure" in signedIn) {
     throw refusalOf(signedIn.failure);
+  }
+  return signedIn;
+}
+
+/**
+ * The integration user's sign-in as `integrationUserSession` makes it, answering why not instead of
+ * refusing. With `renewing`, the stored connection goes to the container, which signs in to that
+ * workspace.
+ */
+export async function signInAgain(
+  dependencies: SignInDependencies,
+  ctx: SecurityContext,
+  connector: ContainerConnector,
+  stored: { id: string; settings: Record<string, unknown> } | undefined,
+  renewing?: { settings: Record<string, unknown>; secrets: Record<string, unknown> },
+): Promise<(SignedInConnection & { appSession: AppSession }) | SignInFailure> {
+  const { logger } = dependencies;
+  const signedIn = await signInWithRetries(dependencies, ctx, connector, renewing);
+  if ("failure" in signedIn) {
+    return signedIn;
   }
   const appSession = appSessionOf(connector, signedIn);
   if (!appSession) {
     logger.warn({ connector: connector.key }, "Sign-in answered without the app session");
-    throw refusalOf("unexpected_response");
+    return { failure: "unexpected_response" };
   }
   if (stored && !isDeepStrictEqual(signedIn.connection.settings, stored.settings)) {
     logger.warn(
       { connector: connector.key, connectionId: stored.id },
-      "Switch refused: the integration user's session opens another workspace",
+      "Sign-in refused: the integration user's session opens another workspace",
     );
-    throw refusalOf("wrong_workspace");
+    return { failure: "wrong_workspace" };
   }
   return { ...signedIn, appSession };
 }
 
 /** The sign-in's answer, after up to three attempts at one that is rate-limited or unavailable. */
 async function signInWithRetries(
-  { integrationUser, logger, wait }: ContainerConnectionDependencies,
+  { integrationUser, logger, wait }: SignInDependencies,
   ctx: SecurityContext,
   connector: ContainerConnector,
+  renewing?: { settings: Record<string, unknown>; secrets: Record<string, unknown> },
 ): Promise<SignedInConnection | SignInFailure> {
   try {
     return await withConnectorRetries(
       async () => {
-        const signedIn = await integrationUser.signInToApp(ctx, connector.key);
+        const signedIn = await integrationUser.signInToApp(ctx, connector.key, renewing);
         // Thrown, so the shared retries decide which of the connector's errors pass on their own.
         if ("failure" in signedIn && isConnectorError(signedIn.failure)) {
           throw new ConnectorError(signedIn.failure);

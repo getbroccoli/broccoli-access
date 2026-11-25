@@ -3,7 +3,7 @@ import { t } from "@/i18n";
 
 import { connectsWithText } from "../connectsWithText";
 import { ReconnectButton } from "../ReconnectButton";
-import { failsUntilLine, reconnectCauseLine } from "../reconnectReason";
+import { failsUntilLine, integrationUserOf, reconnectCauseLine } from "../reconnectReason";
 
 type Props = {
   connection: NonNullable<NonNullable<AppPageQuery["app"]>["containerConnection"]>;
@@ -17,10 +17,12 @@ export function ReconnectBanner({ connection }: Props) {
     withSession: !connectsWithText(connector),
     email: connection.connectionUserEmail ?? null,
     workspace: connection.scan?.sourceName ?? connector.name,
+    integrationUser: integrationUserOf(connection),
   };
   const lines = [
     reconnectReason && reconnectCauseLine(reconnectReason.cause, reconnecting),
     failsUntilLine(reconnecting),
+    reconnecting.integrationUser?.suspended && t("apps.reconnect.integrationUserSuspendedHint"),
   ];
 
   return (

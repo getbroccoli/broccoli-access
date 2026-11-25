@@ -13,8 +13,10 @@ export {
   signsInAsIntegrationUser,
 } from "./connector";
 export { withConnectorRetries } from "./connectorRetries";
+export { callWithRenewal, RenewalError, RenewedSessionRefusedError } from "./sessionRenewal";
 
 // Public types.
+export type { SessionRenewal, SessionRenewals } from "./sessionRenewal";
 export type {
   AccountAction,
   AccountPage,

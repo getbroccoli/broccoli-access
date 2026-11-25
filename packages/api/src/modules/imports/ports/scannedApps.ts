@@ -57,6 +57,7 @@ export interface ScannedApps {
       error: ConnectorErrorCode;
       ref: string;
       secretsUsed: Record<string, unknown> | null;
+      afterRenewal?: boolean;
     },
   ): Promise<boolean>;
   /**

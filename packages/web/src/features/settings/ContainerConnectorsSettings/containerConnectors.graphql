@@ -29,6 +29,7 @@ query ContainerConnectorsSettings {
         }
       }
       sessionFrom
+      integrationUserSuspended
       connectionUserEmail
       noticeAcceptedAt
       scan {

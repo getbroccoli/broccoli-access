@@ -1,4 +1,10 @@
-import { connectsWithText, failsUntilLine, foundLine, reconnectCauseLine } from "@/features/apps";
+import {
+  connectsWithText,
+  failsUntilLine,
+  foundLine,
+  integrationUserOf,
+  reconnectCauseLine,
+} from "@/features/apps";
 import { t } from "@/i18n";
 
 import type { ContainerConnector } from "./ContainerConnectorCard";
@@ -17,6 +23,7 @@ export function ReconnectSummary({ connector, connection }: Props) {
     withSession: !withKey,
     email: connection.connectionUserEmail ?? null,
     workspace: connection.scan?.sourceName ?? connector.name,
+    integrationUser: integrationUserOf(connection),
   };
 
   return (
@@ -27,7 +34,12 @@ export function ReconnectSummary({ connector, connection }: Props) {
         </p>
       )}
       <p className="text-sm text-foreground/80">{failsUntilLine(reconnecting)}</p>
-      {!withKey && (
+      {reconnecting.integrationUser?.suspended && (
+        <p className="text-sm text-muted-foreground">
+          {t("apps.reconnect.integrationUserSuspendedHint")}
+        </p>
+      )}
+      {!withKey && !reconnecting.integrationUser && (
         <p className="text-sm text-muted-foreground">
           {t("apps.reconnect.signInHint", { app: connector.name })}
         </p>
