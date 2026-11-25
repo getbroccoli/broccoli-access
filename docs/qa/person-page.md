@@ -70,6 +70,16 @@ Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page
 - [ ] Create 13 templates named Picker 01 through Picker 13 and assign the first 12 to Ivan. Give Ivan any earlier alphabetic templates too. Open his picker again. The first page offers Picker 13 without an extra click to get past the 12 assigned templates.
 - [ ] Keep Ivan's picker open with Picker 13 available. In the fake Google, suspend Ivan with `POST <fake>/_fake/users/ivan@acme.example/suspend`. In another tab, run **Scan now** for Google and wait for success. In the original tab choose Picker 13. The refusal explains that assigning it requires someone active in the directory. After refreshing, Ivan keeps his existing chips and their take-off buttons, with an explanation beside them of why he cannot receive another template. Picker 13 was never assigned.
 
+## Add or remove an app for one person
+
+Assign Everyone, with Google Workspace, Miro and Notion, to Ivan and to Lena Fischer.
+
+- [ ] On Ivan's page, the **×** at the end of the Notion row is named "Remove Notion for Ivan only". Choosing it strikes Notion through, shows **Removed by you** in **From** and offers **Undo**; **In the app** reads **Extra** while Ivan has an active Notion account, and **Not given** for an app he has no account in.
+- [ ] **+ Add app** lists the approved apps that none of Ivan's templates gives. Choosing Zoom adds a Zoom row with **Added by you**, **Missing** and **Undo**. With Linear connected, Linear opens its roles; choosing Admin adds it with the role Admin, and **Invite** stays offered.
+- [ ] Lena's page still lists Notion from Everyone, without Zoom, and Everyone's page lists the same apps as before.
+- [ ] **Undo** on Notion brings back Everyone in **From** and the row's earlier status. **Undo** on Zoom takes its row away.
+- [ ] Ana's page (suspended in Google) offers no **+ Add app**.
+
 ## No delete
 
 - [ ] Nothing on People or a person's page edits or removes a person.

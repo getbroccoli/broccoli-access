@@ -9,6 +9,7 @@ import { t } from "@/i18n";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 
+import { AddPersonAppMenu } from "./AddPersonAppMenu";
 import { PersonTemplates } from "./PersonTemplates";
 import { CurrentAccessTable } from "./CurrentAccessTable";
 
@@ -48,6 +49,11 @@ export function PersonPage() {
   // Some of the apps they still have access to can be disabled from here.
   const canDisableHere = person.appAccounts.some(
     ({ offeredChange }) => offeredChange === "SUSPEND",
+  );
+  const givenAppIds = new Set(
+    person.personApps.edges
+      .filter(({ node }) => node.templates.length || node.choice === "ADDED_FOR_PERSON")
+      .map(({ node }) => node.app.id),
   );
 
   return (
@@ -109,7 +115,12 @@ export function PersonPage() {
         </Button>
       )}
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold tracking-tight">{t("templates.apps.title")}</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold tracking-tight">{t("templates.apps.title")}</h2>
+          {person.status === "ACTIVE" && (
+            <AddPersonAppMenu employeeId={person.id} givenAppIds={givenAppIds} />
+          )}
+        </div>
         <CurrentAccessTable person={person} />
         {person.personApps.pageInfo.hasNextPage && (
           <Button variant="link" disabled={pageQuery.loading} onClick={() => more("personApps")}>

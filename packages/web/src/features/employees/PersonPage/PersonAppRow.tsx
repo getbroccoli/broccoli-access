@@ -1,3 +1,4 @@
+import { PersonAppChoiceButton } from "./PersonAppChoiceButton";
 import { PersonAppRole } from "./PersonAppRole";
 import type { PersonPageQuery } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
@@ -18,7 +19,7 @@ type Person = NonNullable<PersonPageQuery["employee"]>;
 type Props = {
   row: Person["personApps"]["edges"][number]["node"];
   account: Person["appAccounts"][number] | undefined;
-  employeeId: string;
+  person: Pick<Person, "id" | "firstName">;
   showEmail: boolean;
   first: boolean;
   span: number;
@@ -30,7 +31,7 @@ type Props = {
 export function PersonAppRow({
   row,
   account,
-  employeeId,
+  person,
   showEmail,
   first,
   span,
@@ -39,13 +40,14 @@ export function PersonAppRow({
 }: Props) {
   const retiredRole = row.role != null && !row.app.roles.some(({ key }) => key === row.role);
   const roleBlocked = row.roleConflict || retiredRole;
+  const removed = row.choice === "REMOVED_FOR_PERSON";
   return (
     <TableRow className={row.roleConflict ? "bg-amber-50/70" : undefined}>
       <TableCell className="h-12 pl-4">
         {first && (
           <span className="flex items-center gap-2.5 font-medium">
             <AppMark name={row.app.name} catalogKey={row.app.catalogKey} />
-            {row.app.name}
+            <span className={removed ? "line-through" : undefined}>{row.app.name}</span>
           </span>
         )}
         {showEmail && (
@@ -56,12 +58,9 @@ export function PersonAppRow({
         first && (
           <>
             <TableCell rowSpan={span}>
-              <PersonAppRole row={row} employeeId={employeeId} />
+              <PersonAppRole row={row} employeeId={person.id} />
             </TableCell>
-            <TableCell rowSpan={span}>
-              {row.templates.map((template) => template.name).join(", ") ||
-                t("people.person.noTemplate")}
-            </TableCell>
+            <TableCell rowSpan={span}>{sourceOf(row)}</TableCell>
           </>
         )
       ) : (
@@ -71,6 +70,9 @@ export function PersonAppRow({
         </>
       )}
       <TableCell>
+        {first && removed && !row.state && (
+          <StatusBadge tone="muted">{t("people.person.notGiven")}</StatusBadge>
+        )}
         {first && row.state === "MISSING" && (
           <StatusBadge tone="warning">{t("people.person.missing")}</StatusBadge>
         )}
@@ -97,24 +99,35 @@ export function PersonAppRow({
           <StatusBadge tone="muted">{t("apps.page.inApp.disabled")}</StatusBadge>
         )}
         {invite &&
-          (!row.state || (row.state !== "INVITED" && invite.latestInvite?.status === "FAILED")) && (
+          ((!row.state && !removed) ||
+            (row.state !== "INVITED" && invite.latestInvite?.status === "FAILED")) && (
             <InviteStatusCell appInvite={invite} roleBlocked={roleBlocked} />
           )}
       </TableCell>
-      <TableCell className="pr-4 text-right">
-        {account && <AccountChangeCell appUser={account} />}
-        {invite && (row.state !== "INVITED" || invite.latestInvite?.status === "RUNNING") && (
-          <InviteCell
-            appInvite={invite}
-            roleBlocked={roleBlocked}
-            expectedRole={
-              row.role
-                ? row.app.roles.find(({ key }) => key === row.role)?.name
-                : t("apps.change.appDefault")
-            }
-          />
-        )}
+      <TableCell className="pr-4">
+        <div className="flex items-center justify-end gap-2">
+          {account && <AccountChangeCell appUser={account} />}
+          {invite && (row.state !== "INVITED" || invite.latestInvite?.status === "RUNNING") && (
+            <InviteCell
+              appInvite={invite}
+              roleBlocked={roleBlocked}
+              expectedRole={
+                row.role
+                  ? row.app.roles.find(({ key }) => key === row.role)?.name
+                  : t("apps.change.appDefault")
+              }
+            />
+          )}
+          {first && <PersonAppChoiceButton row={row} person={person} />}
+        </div>
       </TableCell>
     </TableRow>
   );
+}
+
+/** Where the app comes from: the owner's own choice for this person, else their templates. */
+function sourceOf(row: Props["row"]) {
+  if (row.choice === "REMOVED_FOR_PERSON") return t("people.person.removedByYou");
+  if (row.choice === "ADDED_FOR_PERSON") return t("people.person.addedByYou");
+  return row.templates.map((template) => template.name).join(", ") || t("people.person.noTemplate");
 }
