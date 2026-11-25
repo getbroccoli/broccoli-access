@@ -37,7 +37,7 @@ export function LeftNav({ reveal = false }: Props) {
       className={cn(
         "shrink-0 md:h-full md:w-56 md:overflow-hidden",
         reveal &&
-          "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-500 md:transition-[width] md:duration-500 md:ease-[cubic-bezier(0.65,0,0.35,1)] md:starting:w-0 motion-reduce:transition-none",
+          "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-500 motion-safe:md:transition-[width] motion-safe:md:ease-[cubic-bezier(0.65,0,0.35,1)] motion-safe:md:starting:w-0",
       )}
     >
       <div

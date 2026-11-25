@@ -160,6 +160,7 @@ export const peopleEn = {
   "people.person.noTemplate": "No template",
   "people.person.missing": "Missing",
   "people.person.notConnected": "App not connected",
+  "people.person.openNotConnectedApp": "App not connected: open {app}",
   "people.person.extra": "Extra",
   "people.person.addApp": "+ Add app",
   "people.person.addApp.loading": "Loading apps…",

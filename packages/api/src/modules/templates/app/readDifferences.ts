@@ -89,6 +89,7 @@ function collectDifferences(
       const reason = extraAppReason(
         choices.get(appId),
         facts.templates.length > 0 && facts.listedApps.has(appId),
+        appId === facts.directoryAppId,
       );
       if (!reason) continue;
       const accountIds = (active.get(appId) ?? []).map(({ id }) => id);

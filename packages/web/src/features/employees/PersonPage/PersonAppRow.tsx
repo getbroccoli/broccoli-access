@@ -82,6 +82,7 @@ export function PersonAppRow({
           <Link
             to="/apps/$appId"
             params={{ appId: row.app.id }}
+            aria-label={t("people.person.openNotConnectedApp", { app: row.app.name })}
             className="rounded-full hover:opacity-80"
           >
             <StatusBadge tone="muted">{t("people.person.notConnected")}</StatusBadge>

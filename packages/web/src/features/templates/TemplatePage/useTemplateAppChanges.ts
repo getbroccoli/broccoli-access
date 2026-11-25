@@ -34,7 +34,7 @@ export function useTemplateAppChanges(templateId: string) {
         () => undefined,
         (error: unknown) =>
           void toast.error(
-            // Refused input: the app stopped being approved after the menu was read.
+            // Refused input: the app stopped being approved after the menu was read, or is the directory's.
             t(isRefusedInput(error) ? "templates.addAppUnavailable" : "templates.addAppFailed", {
               app: app.name,
             }),

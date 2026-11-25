@@ -32,14 +32,24 @@ export interface PersonAppFacts {
   listedApps: ReadonlySet<string>;
   /** The apps a connection reads, among those the person should have. */
   connectedApps: ReadonlySet<string>;
+  /** The directory's app, such as Google Workspace; null before it is connected. */
+  directoryAppId: string | null;
 }
 
 export function expectsApp(templateGivesIt: boolean, choice?: EmployeeAppChoice["choice"]) {
   return choice === "added" || (templateGivesIt && choice !== "removed");
 }
 
-/** Why unexpected active access belongs on the workspace board. */
-export function extraAppReason(choice: EmployeeAppChoice["choice"] | undefined, listed: boolean) {
+/**
+ * Why unexpected active access belongs on the workspace board; never for the directory's account,
+ * which every person keeps whatever their templates.
+ */
+export function extraAppReason(
+  choice: EmployeeAppChoice["choice"] | undefined,
+  listed: boolean,
+  isDirectory: boolean,
+) {
+  if (isDirectory) return null;
   if (choice === "to_review") return "review";
   if (!listed) return null;
   return choice === "removed" ? "removed" : "outside_templates";
@@ -70,11 +80,12 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
     const expected = expectsApp(templates.length > 0, choice?.choice);
     const invite = invites.get(appId);
     if (!expected && !account && !invite && !ownChoice) continue;
+    const isDirectory = appId === facts.directoryAppId;
+    const listed = facts.templates.length > 0 && facts.listedApps.has(appId);
     // A removal whose template is gone still says the owner did not want this app for them.
     const extra =
-      choice?.choice === "removed" ||
-      extraAppReason(choice?.choice, facts.templates.length > 0 && facts.listedApps.has(appId)) !==
-        null;
+      (!isDirectory && choice?.choice === "removed") ||
+      extraAppReason(choice?.choice, listed, isDirectory) !== null;
     const state = appState({
       expected,
       account,

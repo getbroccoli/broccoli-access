@@ -19,6 +19,7 @@ const NOTHING = {
   invites: [],
   listedApps: new Set<string>(),
   connectedApps: new Set([APP]),
+  directoryAppId: null,
 };
 const choice = (made: "added" | "removed", role: string | null = null) => ({
   employeeId: EMPLOYEE,
@@ -94,4 +95,17 @@ test("a suspended account found in an app without a connection is missing", () =
   });
 
   expect(rows).toMatchObject([{ appId: APP, state: "missing", accountStatus: "suspended" }]);
+});
+
+test("the directory's active account is never extra, even after the owner removed it for them", () => {
+  const rows = appsOfPerson({
+    ...NOTHING,
+    templates: [ENGINEER],
+    choices: [choice("removed")],
+    accounts: [{ appId: APP, status: "active" }],
+    listedApps: new Set([APP]),
+    directoryAppId: APP,
+  });
+
+  expect(rows).toMatchObject([{ appId: APP, state: "active" }]);
 });
