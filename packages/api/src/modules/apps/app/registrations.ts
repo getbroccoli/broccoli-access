@@ -35,6 +35,8 @@ declare module "../../../core/events" {
       cause: HistoryAppend["cause"];
       requestedBy?: string;
     };
+    /** The owner offboarded the employee: their Disables are queued in the same transaction. */
+    "apps.employeeOffboarded": { employeeId: string; requestedBy: string };
   }
 }
 

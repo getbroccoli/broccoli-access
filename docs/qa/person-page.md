@@ -81,6 +81,22 @@ A run of its own: start from [Setup](#setup), and also select Zoom before "Appro
 - [ ] Remove Notion for Ivan again, then take Everyone off him: Notion stays listed with **Removed by you**, **Extra** and **Undo**. **Undo** leaves it **Extra**, from **No template**.
 - [ ] Ana's page (suspended in Google) offers no **+ Add app**.
 
+## Offboard
+
+Connect Slack and Linear, assign a template to Chloé Martin, and set `GOOGLE` to the fake Google's address.
+
+- [ ] Chloé's page has "Offboard". It opens "Offboard Chloé Martin?" with her email, "Broccoli Access disables these now" listing Google Workspace with "Suspend" first, then Linear and Slack with "Disable", each ticked, and "You do these by hand" listing each app without a connection with "No connection".
+- [ ] While Settings › Connections shows that Google Workspace only reads users, the button reads "Continue to Google". After `curl -s -H 'content-type: application/json' -d '{"scope": "https://www.googleapis.com/auth/admin.directory.user"}' "$GOOGLE/_fake/consent/refuse-scope"`, Allow at Google comes back to the open dialog with "Google was not allowed to change users. Nobody was offboarded."; Activity has no new row and her template is still assigned.
+- [ ] "Continue to Google" again, then Allow, comes back to the dialog with "Offboard Chloé". Confirming closes it: each row shows its progress, then "Disabled" with "Enable"; the header shows "Suspended in Google" and "Offboarded today"; Templates is empty; a notice lists the apps that need the owner, each with its reason; and no row shows Missing or Extra.
+- [ ] `curl -s "$GOOGLE/_fake/state"` counts one more suspended person, and `curl -s "$FAKE/_fake/state"` shows chloe@acme.example `suspended` in `.slack` and `.linear`.
+- [ ] Activity lists her three changes, each "Disable" with "Offboarding" below.
+- [ ] For Felix Wagner, after `curl -s -H 'content-type: application/json' -d '{"email": "felix@acme.example"}' "$FAKE/_fake/linear/invitations"` and "Scan now" on Linear's page, the dialog lists Linear under "You do these by hand" with "Open invitation".
+- [ ] After `curl -s -H 'content-type: application/json' -d '{"connector": "slack", "call": "actions/run", "code": "not_allowed", "count": 1}' "$FAKE/_fake/failures"`, offboarding Felix suspends him in Google while Slack shows "Couldn’t disable"; the notice names Slack with "Couldn’t disable", and "Offboard" stays on his page.
+- [ ] For Isla Murray, untick Slack and confirm: Slack stays "Active" with "Disable", and Activity has no Slack change for her.
+- [ ] On a fresh stack, where Google Workspace again only reads users, untick Slack for Hugo Laurent, then "Continue to Google" and Allow: back in the dialog Slack is still unticked. Cancel, and open Offboard again: every app is ticked.
+- [ ] On a fresh stack, "Disable" on a Google Workspace row reads "Continue to Google"; after Allow the page says "Google now lets Broccoli Access create and change users. Allowing it changed no account: ask for your change again if you still want it.", and no account changed.
+- [ ] "Enable" on an offboarded person's Google Workspace row makes them "Active" again.
+
 ## No delete
 
 - [ ] Nothing on People or a person's page edits or removes a person.

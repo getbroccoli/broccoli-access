@@ -24,6 +24,9 @@ export function templatesModule(
           appIds.add(event.payload.appId);
           provenance = { cause: { kind: "FOUND_BY_SCAN", ref: event.payload.sourceId } };
         }
+        if (event.type === "apps.employeeOffboarded") {
+          await service.clearOffboarded(tx, event.payload);
+        }
         if (event.type === "apps.accountsChanged") {
           const { cause, requestedBy } = event.payload;
           provenance = { cause, requestedBy };

@@ -25,6 +25,12 @@ import type {
   AppUserService,
 } from "../app";
 import type { AccountChange } from "../domain";
+import {
+  offboardingMutations,
+  offboardingResolvers,
+  type OffboardingServices,
+  type ReadEmployees,
+} from "./offboardingResolvers";
 
 type AppResolverServices = AccountLinkService &
   Pick<
@@ -50,12 +56,14 @@ type AppResolverServices = AccountLinkService &
   >;
 
 export function createResolvers(
-  services: AppResolverServices,
+  services: AppResolverServices & OffboardingServices,
   people: RequestLoader<{ appAccounts: AppUser[]; appInvites: AppInvite[] }>,
+  readEmployees: ReadEmployees,
 ): Resolvers {
   const loaders = createLoaders(services);
   const appOf = ({ appId }: { appId: string }, _args: unknown, ctx: GraphqlContext) =>
     loaders.appsById(ctx).load(appId);
+  const offboarding = offboardingResolvers(services, loaders.appsById);
   const summary = (app: AccountWithoutPerson["app"] | AppSummary, context: GraphqlContext) =>
     "peopleCount" in app ? app : loaders.appsById(context).load(app.id);
   return {
@@ -85,7 +93,11 @@ export function createResolvers(
     Mutation: {
       apps: () => ({}),
     },
-    AppsMutations: appsMutations(services),
+    AppsMutations: {
+      ...appsMutations(services),
+      ...offboardingMutations(services, readEmployees),
+    },
+    OffboardingByHandWork: offboarding.OffboardingByHandWork,
     AccountWithoutPerson: accountWithoutPersonResolvers(loaders.changeStates),
     MarkedAccount: {
       kind: ({ kind }) => toEnum(kind),
@@ -135,6 +147,7 @@ export function createResolvers(
         name: await loaders.requesterNames(context).load(requestedBy),
       }),
       failure: ({ error }) => error && toEnum(error),
+      startedFrom: ({ startedFrom }) => toEnum(startedFrom),
     },
     App: {
       roles: (app, _args, context) => loaders.roles(context).load(app.id),
@@ -168,6 +181,7 @@ export function createResolvers(
         (await people(context).load(employee.id)).appAccounts,
       appInvites: async (employee, _args, context) =>
         (await people(context).load(employee.id)).appInvites,
+      ...offboarding.Employee,
     },
   };
 }

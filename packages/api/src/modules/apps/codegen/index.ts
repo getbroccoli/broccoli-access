@@ -7,5 +7,8 @@ export const codegenMappers = {
   AccountWithoutPerson: "../../modules/apps/app#AccountWithoutPerson as AccountWithoutPersonModel",
   AppUser: "../../modules/apps/app#AppUser as AppUserModel",
   AppInvite: "../../modules/apps/app#AppInvite as AppInviteModel",
+  EmployeeOffboarding: "../../modules/apps/app#EmployeeOffboarding as EmployeeOffboardingModel",
+  OffboardingByHandWork:
+    "../../modules/apps/domain#OffboardingByHandWork as OffboardingByHandWorkModel",
   AccountChange: "../../modules/apps/app#LatestAccountChange as AccountChangeModel",
 };

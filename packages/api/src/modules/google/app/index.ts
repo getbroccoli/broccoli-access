@@ -9,3 +9,7 @@ export {
   createIntegrationUserService,
   type IntegrationUserService,
 } from "./integrationUserService";
+export {
+  createUserWriteConsentService,
+  type UserWriteConsentService,
+} from "./userWriteConsentService";

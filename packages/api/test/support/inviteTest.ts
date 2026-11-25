@@ -58,14 +58,19 @@ async function scannedWorkspace(
     employeeDirectory(orm),
   );
   const { jobs, sent } = recordingJobQueue();
-  const service = accountChanges(orm, { connectorsUrl, jobs });
+  const service = accountChanges(orm, { connectorsUrl, googleUrl, jobs });
   const ivan = employee("ivan@acme.example");
   const input = { employeeId: ivan.id, appId: linear.appId };
   return {
     templates: templates(orm, { connectors: containerConnectors(connectorsUrl) }),
+    offboardingInput: async (employeeId: string) => {
+      const [plan] = await service.readOffboardings(owner, [employeeId]);
+      return { employeeId, appIds: plan!.accountsToDisable.map(({ appId }) => appId) };
+    },
     assignLinearRole: (role: string | null) =>
       seed.assignedTemplateApp({ ...input, role, assignedBy: google.ownerUserId }),
     linear,
+    google,
     owner,
     service,
     sent,

@@ -25,20 +25,22 @@ export function accountChanges(
   orm: Orm,
   {
     connectorsUrl,
+    googleUrl = "http://127.0.0.1:9",
     connectors: suppliedConnectors,
     jobs = recordingJobQueue().jobs,
     transact = testTransactor(orm),
   }: {
     connectors?: ConnectorRegistry;
     connectorsUrl?: string;
+    googleUrl?: string;
     jobs?: JobQueue;
     transact?: Transact;
   } = {},
 ) {
   const container = suppliedConnectors ?? containerConnectors(connectorsUrl);
   const google = createGoogleWorkspaceConnector({
-    openIdConfigurationUrl: "http://127.0.0.1:9/.well-known/openid-configuration",
-    adminApiUrl: "http://127.0.0.1:9",
+    openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
+    adminApiUrl: googleUrl,
   });
   const connectors = { list: async () => [google, ...(await container.list())] };
   return createAccountChangeService({

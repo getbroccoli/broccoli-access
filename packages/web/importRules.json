@@ -46,7 +46,9 @@
       "src/lib/useRefetchAfterScan",
       "src/lib/useRouteAction",
       "src/shell",
-      "src/components/ScanNowButton"
+      "src/components/ScanNowButton",
+      "src/lib/useGoogleUserWrites",
+      "src/components/GoogleUserWritesNotice"
     ],
     "src/features/auth": [
       "src/components/ui",
@@ -74,7 +76,11 @@
       "src/lib/usePollWhileScanning",
       "src/lib/useRefetchAfterScan",
       "src/shell",
-      "src/components/ScanNowButton"
+      "src/components/ScanNowButton",
+      "src/lib/useGoogleUserWrites",
+      "src/lib/dayAndTime",
+      "src/components/GoogleUserWritesNotice",
+      "src/lib/useRestoredFromBackCache"
     ],
     "src/features/templates": [
       "src/components/Avatar",
@@ -110,7 +116,8 @@
       "src/lib/useRefetchAfterContainerConnectorScans",
       "src/shell",
       "src/components/ScanNowButton",
-      "src/lib/googleScan"
+      "src/lib/googleScan",
+      "src/lib/useRestoredFromBackCache"
     ],
     "src/features/setup": [
       "src/__generated__",
@@ -168,7 +175,10 @@
       "src/i18n",
       "src/lib/class-names"
     ],
-    "src/lib/googleScan": ["src/__generated__"]
+    "src/lib/googleScan": ["src/__generated__"],
+    "src/lib/useGoogleUserWrites": ["src/__generated__", "src/lib/postJson"],
+    "src/components/GoogleUserWritesNotice": ["src/i18n", "src/lib/useGoogleUserWrites"],
+    "src/lib/useRestoredFromBackCache": []
   },
   "deepImports": ["src/components/ui", "src/__generated__"]
 }

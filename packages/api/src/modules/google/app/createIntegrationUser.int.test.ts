@@ -304,7 +304,7 @@ test("requires the owner's own Google app to start creation", async ({ orm, fake
 
   await expect(users.startCreation(OWNER, START)).rejects.toMatchObject({
     code: "CONFLICT",
-    message: "The integration user needs your own Google app.",
+    message: "Creating and changing Google users needs your own Google app.",
   });
 });
 

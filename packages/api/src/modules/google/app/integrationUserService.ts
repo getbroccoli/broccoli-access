@@ -7,26 +7,26 @@ import { createConnectorsContainerClient } from "../../../integrations/connector
 import { createGoogleClient, type GoogleClient } from "../../../integrations/google";
 import { integrationUserRepository } from "../db";
 import {
-  GOOGLE_USER_WRITE_SCOPE,
-  GOOGLE_WORKSPACE,
-  GOOGLE_WORKSPACE_SECRETS,
-  googleRedirectAddress,
-  type GoogleWorkspaceSettings,
   type IntegrationUser,
   type IntegrationUserSignIn,
-  parseGoogleWorkspaceSettings,
   parseIntegrationUserEmail,
 } from "../domain";
-import { openConsentState, randomConsentToken, sealConsentState } from "../helpers";
+import { openConsentState } from "../helpers";
 import { findIntegrationAccountEmail } from "./findIntegrationAccountEmail";
-import type { ConnectedApps, ScannedMembers } from "../ports";
-import { consentUrl } from "./consentUrl";
+import type { ScannedMembers } from "../ports";
 import type { GoogleConnectionDependencies } from "./googleConnectionService";
 import { createDirectoryUser, verifyWriteGrant, type WriteGrant } from "./integrationUserDirectory";
 import {
   createIntegrationUserSignInAttempts,
   encryptIntegrationUserSecrets,
 } from "./integrationUserSignIn";
+import {
+  type ConnectedGoogleApp,
+  googleAppChanged,
+  readOwnGoogleApp,
+  saveWriteGrant,
+  startWriteConsent,
+} from "./userWriteGrant";
 
 /**
  * The integration user: the Google Workspace user Broccoli Access creates for itself, once the
@@ -134,26 +134,12 @@ export function createIntegrationUserService(
         throw invalidInput([{ field: "email", code: parsed.problem }]);
       }
       await refuseSecondIntegrationUser(orm);
-      const nonce = randomConsentToken();
-      const browserToken = randomConsentToken();
-      const state = sealConsentState(
-        secretBox,
-        { flow: "create_integration_user", email: parsed.email, revision, nonce },
-        { browserToken, now },
-      );
-      const { authorizationEndpoint } = await google.discover();
-      const authorizationUrl = consentUrl(
-        authorizationEndpoint,
-        {
-          clientId: settings.clientId,
-          redirectUri: googleRedirectAddress(publicOrigin),
-          scopes: CREATION_SCOPES,
-          state,
-          nonce,
-        },
-        INCREMENTAL_OFFLINE_CONSENT,
-      );
-      return { authorizationUrl, browserToken };
+      return startWriteConsent({ google, secretBox }, { settings, publicOrigin, now }, (nonce) => ({
+        flow: "create_integration_user",
+        email: parsed.email,
+        revision,
+        nonce,
+      }));
     },
     async finishCreation(ctx, answer) {
       const createdBy = requireOwner(ctx);
@@ -205,33 +191,8 @@ export function createIntegrationUserService(
   };
 }
 
-/**
- * The one new scope, and `openid` so that Google's answer always says who consented, also when
- * another account than the connected admin does.
- */
-const CREATION_SCOPES = ["openid", GOOGLE_USER_WRITE_SCOPE];
-
-/**
- * Asks only for the scopes in the request and keeps the ones granted before in the new grant; a
- * consent asked now and offline gives the refresh token that holds them all.
- */
-const INCREMENTAL_OFFLINE_CONSENT = {
-  include_granted_scopes: "true",
-  access_type: "offline",
-  prompt: "consent",
-};
-
 /** 256 random bits, as 43 characters: beyond guessing and inside Google's 100. */
 const PASSWORD_BYTES = 32;
-
-/** The Google Workspace connection with its own Google app's secret, as one stored version. */
-interface ConnectedGoogleApp {
-  connectionId: string;
-  settings: GoogleWorkspaceSettings;
-  clientSecret: string;
-  /** The stored version read, which the save replaces or refuses. */
-  revision: string;
-}
 
 /** The owner's user id; refuses everyone else, the system included, with FORBIDDEN. */
 function requireOwner(ctx: SecurityContext): string {
@@ -271,35 +232,10 @@ async function createFromConsent(
   });
 }
 
-// shortcut: the Broccoli Google app's relay asks for its own fixed scopes, so only a connection
-// with the instance's own Google app can add the write scope; teach the relay the scope to lift this.
-/** The connection's own Google app; refuses with CONFLICT before it exists or with the Broccoli app. */
-async function readOwnGoogleApp(
-  connectedApps: ConnectedApps,
-  orm: Orm,
-): Promise<ConnectedGoogleApp> {
-  const connection = await connectedApps.readConnection(orm, GOOGLE_WORKSPACE);
-  const stored = connection && (await connectedApps.readConnectionWithSecrets(orm, connection.id));
-  if (!stored) {
-    throw new ApplicationError("CONFLICT", "Google Workspace is not connected.");
-  }
-  const settings = parseGoogleWorkspaceSettings(stored.connection.settings);
-  const { clientSecret } = GOOGLE_WORKSPACE_SECRETS.parse(stored.secrets);
-  if (settings.googleApp !== "own_google_app" || clientSecret === undefined) {
-    throw new ApplicationError("CONFLICT", "The integration user needs your own Google app.");
-  }
-  return { connectionId: stored.connection.id, settings, clientSecret, revision: stored.revision };
-}
-
 async function refuseSecondIntegrationUser(db: Orm | Tx): Promise<void> {
   if (await integrationUserRepository(db).find()) {
     throw integrationUserExists();
   }
-}
-
-/** The connection is no longer the version the consent started from, such as after a reconnect. */
-function googleAppChanged(): ApplicationError {
-  return new ApplicationError("CONFLICT", "The Google app changed during consent. Try again.");
 }
 
 function integrationUserExists(): ApplicationError {
@@ -315,7 +251,7 @@ async function saveIntegrationUser(
   { transact, secretBox, connectedApps, scans, logger }: IntegrationUserDependencies,
   ctx: SecurityContext,
   {
-    googleApp: { connectionId, settings, clientSecret, revision },
+    googleApp,
     grant,
     created: { password, ...created },
   }: {
@@ -326,22 +262,19 @@ async function saveIntegrationUser(
 ): Promise<void> {
   const encryptedSecrets = encryptIntegrationUserSecrets(secretBox, { password });
   const { googleUserId } = created;
+  const { connectionId } = googleApp;
   try {
     await transact(async (tx) => {
       const stored = await integrationUserRepository(tx).insert({ ...created, encryptedSecrets });
       if (!stored) {
         throw integrationUserExists();
       }
-      const saved = await connectedApps.changeConnection(ctx, tx, connectionId, {
-        settings: { ...settings, adminEmail: grant.adminEmail, grantedScopes: grant.scopes },
-        secrets: { clientSecret, refreshToken: grant.refreshToken },
-        replacingRevision: revision,
-      });
+      const saved = await saveWriteGrant(connectedApps, ctx, tx, googleApp, grant);
       if (!saved) {
         throw googleAppChanged();
       }
       // Its accounts in other apps are known by the email the directory's next scan reads.
-      await scans.scanConnection(ctx, tx, { connectionId, sourceName: settings.domain });
+      await scans.scanConnection(ctx, tx, { connectionId, sourceName: googleApp.settings.domain });
     });
   } catch (error) {
     logger.error(

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, max, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
@@ -57,6 +57,8 @@ export interface AccountChangeRepository {
     connectionIds: readonly string[],
     emails: readonly string[],
   ): Promise<AccountChange[]>;
+  /** When each employee's newest change started from their offboarding was asked; one never offboarded is left out. */
+  findLastOffboardings(employeeIds: readonly string[]): Promise<Map<string, Date>>;
   /** For each change of `changeIds`, how many running changes of its connection were asked before it. */
   countChangesAhead(changeIds: readonly string[]): Promise<Map<string, number>>;
   /** Up to `limit` changes after the one with sort values `after`, newest first. */
@@ -176,6 +178,19 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
           desc(accountChanges.id),
         );
       return rows.map(toChange);
+    },
+    findLastOffboardings: async (employeeIds) => {
+      const rows = await orm()
+        .select({ employeeId: accountChanges.employeeId, at: max(accountChanges.requestedAt) })
+        .from(accountChanges)
+        .where(
+          and(
+            eq(accountChanges.startedFrom, "offboarding"),
+            anyOf(accountChanges.employeeId, employeeIds),
+          ),
+        )
+        .groupBy(accountChanges.employeeId);
+      return new Map(rows.map(({ employeeId, at }) => [employeeId!, at!]));
     },
     countChangesAhead: async (changeIds) => {
       const ahead = alias(accountChanges, "ahead");

@@ -20,16 +20,18 @@ import {
   finishIntegrationUserCreation,
   startIntegrationUserCreation,
 } from "./integrationUserRoutes";
+import { finishUserWriteConsent, startUserWriteConsent } from "./userWriteRoutes";
 
 /**
  * Google's side of setup, sign-in and Settings, under `/api`: `POST /google/connect` starts the
  * admin's consent for the browser holding setup, `GET /google/sign-in` sends a visitor to sign in
- * with Google, `POST /google/change-app` starts the owner's consent for a new Google app, and
+ * with Google, `POST /google/change-app` starts the owner's consent for a new Google app,
+ * `POST /google/user-writes` the owner's consent to change the directory's users, and
  * `GET /google/callback` takes Google's answer to any of them, as its `state` says, and sends the
  * person on, or back with why it failed.
  */
 export function googleRouter(
-  services: Pick<GoogleRoutes, "connection" | "signIn" | "integrationUsers">,
+  services: Pick<GoogleRoutes, "connection" | "signIn" | "integrationUsers" | "userWrites">,
   http: ModuleHttp,
   logger: Logger,
 ): Router {
@@ -61,6 +63,9 @@ export function googleRouter(
       "/google/integration-user",
       express.json({ limit: MAX_BODY_BYTES }),
       (request, response) => startIntegrationUserCreation(routes, request, response),
+    )
+    .post("/google/user-writes", express.json({ limit: MAX_BODY_BYTES }), (request, response) =>
+      startUserWriteConsent(routes, request, response),
     )
     .get("/google/callback", async (request, response) => {
       const answer = parseAnswer(request.query);
@@ -107,6 +112,8 @@ function finisherOf(flow: string): (routes: GoogleRoutes, callback: Callback) =>
       return finishAppChange;
     case "create_integration_user" satisfies ConsentState["flow"]:
       return finishIntegrationUserCreation;
+    case "allow_user_writes" satisfies ConsentState["flow"]:
+      return finishUserWriteConsent;
     default:
       return finishConsent;
   }

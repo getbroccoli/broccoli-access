@@ -8,60 +8,25 @@ import {
   GOOGLE_SCOPES,
   stubGoogleRelay,
   expect,
-  test as baseTest,
+  googleConnectorTest as test,
   connectorContract,
-  type ConnectorContractCase,
   googleScanSetup,
-  storedAppConnections,
-  TEST_SECRET_BOX,
+  googleUserSuspended,
+  writableGoogleConnection,
   failFakeGoogle,
   createGoogleWorkspaceConnector,
-  createAppConnectionService,
   startCountingGoogleProxy,
 } from "#test/support";
 
+import type { Orm } from "../../../core/db";
 import { ConnectorError, type ImportedAccount } from "../../../core/connectors";
-
-const test = baseTest.extend<{ connectorCase: ConnectorContractCase }>({
-  connectorCase: async ({ orm, fakeGoogle }, use) => {
-    const { connectionId } = await googleScanSetup(orm, fakeGoogle.url);
-    const [connection] = await storedAppConnections(orm);
-    await use({
-      connector: createGoogleWorkspaceConnector({
-        openIdConfigurationUrl: `${fakeGoogle.url}/.well-known/openid-configuration`,
-        adminApiUrl: fakeGoogle.url,
-      }),
-      connection: {
-        settings: connection!.settings,
-        secrets: await createAppConnectionService({ secretBox: TEST_SECRET_BOX }).readSecrets(
-          orm,
-          connectionId,
-        ),
-      },
-      failAccounts: (error) =>
-        failFakeGoogle(fakeGoogle.url, {
-          endpoint: "directory.users.list",
-          error,
-          count: 1,
-        }),
-      revokeRefreshTokens: async () => {
-        const response = await fetch(`${fakeGoogle.url}/_fake/tokens/revoke`, { method: "POST" });
-        expect(response.status).toBe(204);
-      },
-      expireAccessTokens: async () => {
-        const response = await fetch(`${fakeGoogle.url}/_fake/tokens/expire`, { method: "POST" });
-        expect(response.status).toBe(204);
-      },
-    });
-  },
-});
 
 connectorContract(test, {
   description: {
     key: "google_workspace",
     version: 1,
     name: "Google Workspace",
-    capabilities: ["list_accounts"],
+    capabilities: ["list_accounts", "suspend", "reactivate"],
     runtimes: ["server"],
     findingKinds: { ownAppAccounts: "google_directory", otherAppAccounts: "google_sign_in" },
     isDirectory: true,
@@ -74,10 +39,63 @@ connectorContract(test, {
   connection: { domain: "acme.example", organizationName: "Acme" },
 });
 
-test("maps all 42 Google directory users to their own app's accounts", async ({
+test("suspends a directory user and restores them in Google Workspace", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { session, secrets } = await writableSession(orm, fakeGoogle.url);
+  const account = directoryAccount("chloe@acme.example");
+
+  expect(await session.runAction!("suspend", account)).toEqual({ status: "suspended" });
+  expect(await googleUserSuspended(fakeGoogle.url, secrets, account.sourceKey)).toBe(true);
+
+  expect(await session.runAction!("reactivate", account)).toEqual({ status: "active" });
+  expect(await googleUserSuspended(fakeGoogle.url, secrets, account.sourceKey)).toBe(false);
+});
+
+test("refuses to suspend its connection admin", async ({ orm, fakeGoogle }) => {
+  const { session, secrets } = await writableSession(orm, fakeGoogle.url);
+  const admin = directoryAccount("admin@acme.example");
+
+  const result = session.runAction!("suspend", { ...admin, email: admin.email.toUpperCase() });
+
+  await expect(result).rejects.toBeInstanceOf(ConnectorError);
+  await expect(result).rejects.toMatchObject({ code: "not_allowed" });
+  expect(await googleUserSuspended(fakeGoogle.url, secrets, admin.sourceKey)).toBe(false);
+});
+
+test("reports missing permission when the grant allows only directory reads", async ({
   connectorCase,
 }) => {
   const session = await connectorCase.connector.openSession(connectorCase.connection);
+  const result = session.runAction!("suspend", directoryAccount("chloe@acme.example"));
+
+  await expect(result).rejects.toBeInstanceOf(ConnectorError);
+  await expect(result).rejects.toMatchObject({ code: "permission_missing" });
+});
+
+test("reports a directory user missing for an unknown source key", async ({ orm, fakeGoogle }) => {
+  const { session } = await writableSession(orm, fakeGoogle.url);
+
+  const result = session.runAction!("suspend", {
+    ...directoryAccount("chloe@acme.example"),
+    sourceKey: "unknown-user",
+  });
+
+  await expect(result).rejects.toBeInstanceOf(ConnectorError);
+  await expect(result).rejects.toMatchObject({ code: "account_not_found" });
+});
+
+test("maps all 42 Google directory users to their own app's accounts", async ({
+  connectorCase,
+}) => {
+  const session = await connectorCase.connector.openSession({
+    ...connectorCase.connection,
+    settings: {
+      ...(connectorCase.connection.settings as Record<string, unknown>),
+      adminEmail: "ADMIN@acme.example",
+    },
+  });
 
   const accounts: ImportedAccount[] = [];
   let cursor: string | null = null;
@@ -119,7 +137,7 @@ test("maps all 42 Google directory users to their own app's accounts", async ({
         lastName: person.familyName,
         managerEmail: person.managerEmail,
         appName: "Google Workspace",
-        isConnectionUser: false,
+        isConnectionUser: person.email === "admin@acme.example",
         appExternalId: null,
         grantedAt: null,
         grantedBefore: null,
@@ -298,4 +316,16 @@ function relayConnector(googleUrl: string) {
     adminApiUrl: googleUrl,
     relayUrl: GOOGLE_RELAY_URL,
   });
+}
+
+async function writableSession(orm: Orm, url: string) {
+  const { owner } = await googleScanSetup(orm, url);
+  const connection = await writableGoogleConnection(orm, url, owner);
+  const session = await relayConnector(url).openSession(connection);
+  return { session, secrets: connection.secrets };
+}
+
+function directoryAccount(email: string) {
+  const person = ACME.people.find((person) => person.email === email)!;
+  return { sourceKey: person.id, email };
 }

@@ -28,6 +28,8 @@ import { type AppInvite, inviteEmployee, readAppInvites } from "./appInvite";
 import { loggingRefusal } from "./loggingRefusal";
 import { markChangeDoneByHand } from "./markChangeDoneByHand";
 import type { DirectoryConnectors } from "./directory";
+import { changeStatesOf } from "./changeStates";
+import { type EmployeeOffboarding, offboardEmployee, readOffboardings } from "./offboarding";
 import type { ReconnectReason } from "./connectionReconnects";
 import { failRunningChange, runAccountChange } from "./runAccountChange";
 
@@ -87,6 +89,24 @@ export interface AccountChangeService {
    * NOT_FOUND, and any other with CONFLICT.
    */
   markChangeDoneByHand: (ctx: SecurityContext, changeId: string) => Promise<LatestAccountChange>;
+  /**
+   * Offboard: in one transaction writes a running Disable, started from offboarding for the
+   * employee, for each of their active accounts that offers one in the apps the owner confirmed, the
+   * directory's first, queues each like a Disable, and publishes `apps.employeeOffboarded`, on
+   * which their templates and app choices are deleted. What it cannot disable stays the owner's
+   * work by hand and is never a change. Returns their offboarding as it is afterwards. Needs
+   * MANAGE_WORKSPACE and a signed-in user; refuses an unknown employee with NOT_FOUND.
+   */
+  offboardEmployee: (
+    ctx: SecurityContext,
+    input: { employeeId: string; appIds: readonly string[] },
+  ) => Promise<EmployeeOffboarding>;
+  /** What Offboard would do for each employee now, in the ids' order. Needs MANAGE_WORKSPACE. */
+  readOffboardings: (
+    ctx: SecurityContext,
+    employeeIds: readonly string[],
+    db?: Orm,
+  ) => Promise<EmployeeOffboarding[]>;
   /** What each of the app accounts offers and its latest change, by account id. Needs MANAGE_WORKSPACE. */
   readChangeStates: (
     ctx: SecurityContext,
@@ -219,31 +239,11 @@ export function createAccountChangeService(
     runChange: (ctx, changeId) => runAccountChange(run, ctx, changeId),
     failChange: (ctx, changeId) => failRunningChange(dependencies, ctx, changeId),
     markChangeDoneByHand: (ctx, changeId) => markChangeDoneByHand(dependencies, ctx, changeId),
+    offboardEmployee: (ctx, input) => offboardEmployee(dependencies, ctx, input),
+    readOffboardings: (ctx, employeeIds, db) =>
+      readOffboardings(dependencies, ctx, employeeIds, db),
     async readChangeStates(ctx, appAccountIds, db = orm) {
-      const facts = await readChangeFacts(dependencies, ctx, db, appAccountIds);
-      const running = [...facts.values()].flatMap(({ latest }) =>
-        latest?.status === "running" ? [latest.id] : [],
-      );
-      const ahead = running.length
-        ? await accountChangeRepository(db).countChangesAhead(running)
-        : new Map<string, number>();
-      return new Map(
-        Array.from(
-          facts,
-          ([id, { isConnectionUser, latest, offered, offersRemove, reconnectOffered }]) => {
-            return [
-              id,
-              {
-                isConnectionUser,
-                offeredChange: offered,
-                offersRemove,
-                offersReconnect: reconnectOffered,
-                latestChange: latest && withPlace(latest, ahead),
-              },
-            ];
-          },
-        ),
-      );
+      return changeStatesOf(db, await readChangeFacts(dependencies, ctx, db, appAccountIds));
     },
     async readConnectionStates(ctx, connectionIds) {
       ctx.require("MANAGE_WORKSPACE");
@@ -363,6 +363,8 @@ async function askForChange(
     role: null,
     requestedBy,
     requestedAt: new Date(),
+    startedFrom: "account",
+    employeeId: null,
   });
   // A concurrent ask of the same account committed first.
   if (!change) {

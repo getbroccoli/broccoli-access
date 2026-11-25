@@ -37,7 +37,11 @@ export async function runAccountChange(
     );
     return;
   }
-  const { error, calledServer, secretsUsed } = await runAction(dependencies, ctx, change);
+  const { error, calledServer, secretsUsed, reconnects } = await runAction(
+    dependencies,
+    ctx,
+    change,
+  );
   if (!error) {
     const finished = await finishSucceeded(dependencies, ctx, change);
     logger.info(
@@ -53,7 +57,7 @@ export async function runAccountChange(
     return;
   }
   const { finished, turnedToReconnect } = await transact((tx) =>
-    failChange(dependencies, ctx, tx, { change, error, calledServer, secretsUsed }),
+    failChange(dependencies, ctx, tx, { change, error, calledServer, secretsUsed, reconnects }),
   );
   logger.warn(
     {
@@ -82,9 +86,10 @@ async function failChange(
     error,
     calledServer,
     secretsUsed,
+    reconnects,
   }: ActionOutcome & { change: AccountChange; error: ConnectorErrorCode },
 ): Promise<{ finished: boolean; turnedToReconnect: boolean }> {
-  if (!reconnectCauseOf(error)) {
+  if (!reconnects || !reconnectCauseOf(error)) {
     return {
       finished: await finishFailed(tx, change.id, error, calledServer),
       turnedToReconnect: false,
@@ -119,6 +124,8 @@ interface ActionOutcome {
   calledServer: boolean;
   /** The secrets its call used; null when it made none. */
   secretsUsed: Record<string, unknown> | null;
+  /** Whether its connection turns to Reconnect on an error that needs it: never the directory's. */
+  reconnects: boolean;
 }
 
 async function runAction(
@@ -127,21 +134,25 @@ async function runAction(
   change: AccountChange,
 ): Promise<ActionOutcome> {
   const { orm, connections, connectors, wait, logger } = dependencies;
-  const connection = (await connections.readConnectionById(orm, change.connectionId))!;
+  // One stored version, so a connection changed meanwhile never pairs old settings with new secrets.
+  const { connection, secrets } = (await connections.readConnectionWithSecrets(
+    orm,
+    change.connectionId,
+  ))!;
   // A change asked just before its connection turned to Reconnect fails with that cause.
   if (connection.reconnectCause) {
-    return { error: connection.reconnectCause, calledServer: false, secretsUsed: null };
+    return { ...NOT_CALLED, error: connection.reconnectCause, reconnects: true };
   }
   const connector = (await connectors.list()).find(({ key }) => key === connection.connector);
   // A connector the container no longer lists, or one that no longer makes this change, cannot act now.
   if (!connector || !canMake(connector, change)) {
-    return { error: "app_unavailable", calledServer: false, secretsUsed: null };
+    return { ...NOT_CALLED, error: "app_unavailable", reconnects: false };
   }
+  const reconnects = !connector.isDirectory;
   if (change.action === "remove" && !(await canStillRemove(dependencies, change))) {
-    return { error: "not_allowed", calledServer: false, secretsUsed: null };
+    return { ...NOT_CALLED, error: "not_allowed", reconnects: false };
   }
   let calledServer = false;
-  const secrets = await connections.readSecrets(orm, change.connectionId);
   try {
     const session = await connector.openSession({ settings: connection.settings, secrets });
     const result = await withConnectorRetries(
@@ -160,20 +171,24 @@ async function runAction(
     );
     await saveConnectionUpdate(dependencies, ctx, change, {
       ...result.connection,
-      replacing: secrets!,
+      replacing: secrets,
     });
     return {
       error: result.readBack ? null : "unexpected_response",
       calledServer,
       secretsUsed: secrets,
+      reconnects,
     };
   } catch (error) {
     if (error instanceof ConnectorError) {
-      return { error: error.code, calledServer, secretsUsed: secrets };
+      return { error: error.code, calledServer, secretsUsed: secrets, reconnects };
     }
     throw error;
   }
 }
+
+/** An outcome decided before any call to the app. */
+const NOT_CALLED = { calledServer: false, secretsUsed: null } as const;
 
 /** Whether the connector makes the change: it supports the requested action on the server. */
 function canMake(connector: Connector, { action, role }: AccountChange): boolean {

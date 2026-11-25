@@ -8,6 +8,7 @@ import type { SecurityContext } from "../../../core/security";
 import { assignmentRepository } from "../db";
 import { appsOfPerson, type PersonApp, type Template } from "../domain";
 import type { EmployeeById, PersonAccess } from "../ports";
+import { clearOffboarded } from "./clearOffboarded";
 import { employeeTemplatesOf } from "./employeeTemplates";
 import { lockTemplate } from "./lockTemplate";
 import { clearInactiveReviews, reviewLostApps } from "./reviewLostApps";
@@ -19,6 +20,11 @@ export interface TemplateAssignmentService {
     tx: Tx,
     appIds: readonly string[],
     provenance: Pick<HistoryAppend, "cause" | "requestedBy">,
+  ) => Promise<void>;
+  /** Offboarding: deletes the person's assignments and app choices, inside its transaction. */
+  clearOffboarded: (
+    tx: Tx,
+    offboarded: { employeeId: string; requestedBy: string },
   ) => Promise<void>;
   assign: (ctx: SecurityContext, input: AssignmentInput) => Promise<Template>;
   takeOff: (ctx: SecurityContext, input: AssignmentInput) => Promise<Template>;
@@ -58,6 +64,7 @@ export function createTemplateAssignmentService(deps: Dependencies): TemplateAss
   return {
     clearInactiveReviews: (tx, appIds, provenance) =>
       clearInactiveReviews(tx, apps, appIds, provenance),
+    clearOffboarded: (tx, offboarded) => clearOffboarded(tx, apps, offboarded),
     assign: (ctx, input) => changeAssignment(deps, ctx, input, "assign"),
     takeOff: (ctx, input) => changeAssignment(deps, ctx, input, "takeOff"),
     readEmployeeTemplates(ctx, employeeIds, db = orm) {

@@ -39,6 +39,8 @@ test("stores Chloé's running Disable with her Linear source key and queues it b
     appId: linear.appId,
     email: chloe.email,
     connectionId: linear.connectionId,
+    startedFrom: "account",
+    employeeId: null,
     action: "suspend",
     role: null,
     sourceKey: ACME_LINEAR.members.find(({ email }) => email === chloe.email)!.sourceKey,

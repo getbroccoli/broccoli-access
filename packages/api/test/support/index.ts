@@ -30,6 +30,7 @@ export {
   googleConnection,
   googleSignIn,
   integrationUsers,
+  userWriteConsent,
   scans,
   apps,
   appUsers,
@@ -151,3 +152,8 @@ export {
   consentAnswer,
   failIntegrationUserSetup,
 } from "./integrationUserTest";
+export {
+  googleConnectorTest,
+  writableGoogleConnection,
+  googleUserSuspended,
+} from "./googleWorkspaceConnector";

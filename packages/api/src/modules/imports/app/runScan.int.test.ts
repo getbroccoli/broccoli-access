@@ -50,7 +50,7 @@ test("saves all 42 directory people with lowercase emails and their names", asyn
       },
       values: {
         displayName: null,
-        isConnectionUser: false,
+        isConnectionUser: person.email === "admin@acme.example",
         email: person.email.toLowerCase(),
         firstName: person.givenName,
         lastName: person.familyName,

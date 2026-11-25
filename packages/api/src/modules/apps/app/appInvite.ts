@@ -151,6 +151,8 @@ async function askForInvite(
     sourceKey: null,
     requestedBy,
     requestedAt: new Date(),
+    startedFrom: "account",
+    employeeId: null,
   });
   // A concurrent invite of the same email committed first.
   if (!change) {

@@ -278,7 +278,7 @@ test("counts earlier running changes on the connection and stops counting finish
   expect(after.get(ana)?.latestChange).toMatchObject({ id: second.id, changesAhead: 0 });
 });
 
-test("finds Linear among a changeable connection, a directory and an unconnected app", async ({
+test("finds Linear and the directory among changeable connections and an unconnected app", async ({
   orm,
   seed,
   fakeGoogle,
@@ -292,7 +292,7 @@ test("finds Linear among a changeable connection, a directory and an unconnected
 
   expect(
     await service.findAppsWithChangeableAccounts(OWNER, [google!.appId, linear.appId, slack.id]),
-  ).toEqual(new Set([linear.appId]));
+  ).toEqual(new Set([google!.appId, linear.appId]));
 });
 
 test.for(["readChangeStates", "findAppsWithChangeableAccounts"] as const)(

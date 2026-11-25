@@ -35,6 +35,7 @@ import {
 import {
   createGoogleConnectionService,
   createIntegrationUserService,
+  createUserWriteConsentService,
   createGoogleSignInService,
   createGoogleWorkspaceConnector,
   type GoogleConnectionService,
@@ -127,6 +128,16 @@ export function integrationUsers(
     // The scans read the integration user, so they are built when its creation queues one.
     scans: { scanConnection: (...scan) => scans(orm, { googleUrl, jobs }).scanConnection(...scan) },
     records: createImportRecordService(),
+    ...googleWriteDependencies(orm, googleUrl, logger),
+  });
+}
+
+export function userWriteConsent(orm: Orm, { googleUrl }: { googleUrl: string }) {
+  return createUserWriteConsentService(googleWriteDependencies(orm, googleUrl));
+}
+
+function googleWriteDependencies(orm: Orm, googleUrl: string, logger = createLogger("silent")) {
+  return {
     orm,
     transact: testTransactor(orm),
     secretBox: TEST_SECRET_BOX,
@@ -134,7 +145,7 @@ export function integrationUsers(
     openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
     adminApiUrl: googleUrl,
     connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
-  });
+  };
 }
 
 export function googleSignIn(
