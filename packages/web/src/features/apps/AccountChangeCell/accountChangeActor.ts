@@ -21,6 +21,6 @@ export function accountChangeActor({ name, containerConnection }: ActorApp): str
   if (sessionFrom === "EXTENSION") {
     return t("apps.change.actor.ownerSession", { app: name });
   }
-  const field = connectingFieldName(connector.connectionFields);
+  const field = connectingFieldName(connector.connectionFields.filter(({ secret }) => secret));
   return field ? t("apps.change.actor.credential", { field }) : null;
 }

@@ -48,6 +48,18 @@ describe("accountChangeActor", () => {
     expect(actor).toBeNull();
   });
 
+  it("returns no actor copy when the connection has only a non-secret field", () => {
+    const actor = accountChangeActor({
+      name: "Linear",
+      containerConnection: {
+        sessionFrom: null,
+        connector: { connectionFields: [{ label: "Workspace URL", secret: false }] },
+      },
+    });
+
+    expect(actor).toBeNull();
+  });
+
   it("returns no actor copy for an app without a container connection", () => {
     expect(accountChangeActor({ name: "Google Workspace", containerConnection: null })).toBeNull();
   });
