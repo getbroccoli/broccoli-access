@@ -9,6 +9,7 @@ import { assignmentRepository } from "../db";
 import { appsOfPerson, type PersonApp, type Template } from "../domain";
 import type { EmployeeById, PersonAccess } from "../ports";
 import { clearOffboarded } from "./clearOffboarded";
+import { employeeAppFactsOf } from "./employeeAppFactsOf";
 import { employeeTemplatesOf } from "./employeeTemplates";
 import { lockTemplate } from "./lockTemplate";
 import { clearInactiveReviews, reviewLostApps } from "./reviewLostApps";
@@ -44,6 +45,7 @@ export interface TemplateAssignmentService {
     shared?: {
       templates: Template[][];
       invites: Awaited<ReturnType<PersonAccess["readAppInvites"]>>;
+      appIds?: readonly string[];
     },
     db?: Orm | Tx,
   ) => Promise<PersonApp[][]>;
@@ -84,26 +86,8 @@ export function createTemplateAssignmentService(deps: Dependencies): TemplateAss
     },
     async readEmployeeApps(ctx, employeeIds, shared, db: Orm | Tx = orm) {
       ctx.require("MANAGE_WORKSPACE");
-      const repo = assignmentRepository(db);
-      const [templates, choices, accounts, invites] = await Promise.all([
-        shared?.templates ?? employeeTemplatesOf(db, employeeIds),
-        repo.choicesFor(employeeIds),
-        apps.findEmployeeAccounts(db, employeeIds),
-        shared?.invites ?? apps.readAppInvites(ctx, employeeIds),
-      ]);
-      const listedApps = await repo.listedApps(accounts.map((account) => account.appId));
-      const choicesByPerson = Map.groupBy(choices, (choice) => choice.employeeId);
-      const accountsByPerson = Map.groupBy(accounts, (account) => account.employeeId);
-      const invitesByPerson = Map.groupBy(invites, (invite) => invite.employeeId);
-      return employeeIds.map((id, index) =>
-        appsOfPerson({
-          templates: templates[index]!,
-          choices: choicesByPerson.get(id) ?? [],
-          accounts: accountsByPerson.get(id) ?? [],
-          invites: invitesByPerson.get(id) ?? [],
-          listedApps,
-        }),
-      );
+      const facts = await employeeAppFactsOf({ db, apps, ctx, employeeIds, ...shared });
+      return facts.map(appsOfPerson);
     },
   };
 }

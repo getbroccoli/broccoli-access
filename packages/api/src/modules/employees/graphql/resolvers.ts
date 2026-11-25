@@ -1,5 +1,7 @@
 import DataLoader from "dataloader";
+import type { GraphQLResolveInfo } from "graphql";
 
+import { ApplicationError } from "../../../core/applicationError";
 import {
   mutationPayload,
   perRequest,
@@ -47,6 +49,9 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
     AppUser: {
       employee: (user, _args, context) => employeesById(context).load(user.employeeId),
     },
+    AccessDifference: {
+      employee: ({ employeeId }, _args, context) => employeesById(context).load(employeeId),
+    },
     AppInvite: {
       employee: (invite, _args, context) => employeesById(context).load(invite.employeeId),
     },
@@ -65,11 +70,17 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
     Employee: {
       avatarUrl: ({ avatarFileId }) => avatarFileId && avatarUrl(avatarFileId),
       // shortcut: one query per employee; batch it when a list selects history.
-      history: (employee, { first, after }, context) =>
-        services.readEmployeeHistory(context.getActor(), employee.id, {
+      history: (employee, { first, after }, context, info) => {
+        if (insideAccessDifferences(info))
+          throw new ApplicationError(
+            "INVALID_INPUT",
+            "Read employee history from a person’s own query.",
+          );
+        return services.readEmployeeHistory(context.getActor(), employee.id, {
           first: first ?? undefined,
           after,
-        }),
+        });
+      },
       status: async ({ id }, _args, context) => {
         const { status } = await access(context).load(id);
         return status && toEnum(status);
@@ -80,6 +91,13 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
         (await access(context).load(id)).suspendedWithAccess,
     },
   };
+}
+
+/** The workspace board can contain many rows for one person. History is read on their own page. */
+function insideAccessDifferences(info: GraphQLResolveInfo) {
+  for (let path = info.path.prev; path; path = path.prev)
+    if (path.typename === "AccessDifference") return true;
+  return false;
 }
 
 function employeeLoaders(services: EmployeeReadService) {

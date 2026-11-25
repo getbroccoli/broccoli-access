@@ -9,6 +9,7 @@ import type {
   ProvisionService,
 } from "./app";
 import { createResolvers, type ReadEmployees } from "./graphql";
+export type { PersonPageScope } from "./ports";
 
 // Public values.
 export {
@@ -45,12 +46,13 @@ export function appsModule(
     AccountLinkService &
     ProvisionService,
   people: Parameters<typeof createResolvers>[1],
+  differencePeople: Parameters<typeof createResolvers>[2],
   readEmployees: ReadEmployees,
 ): ModuleManifest {
   return {
     name: "apps",
     typeDefs: readSdl(import.meta.url, "./graphql/schema.graphql"),
-    resolvers: createResolvers(services, people, readEmployees),
+    resolvers: createResolvers(services, people, differencePeople, readEmployees),
     jobs: {
       "apps.runAccountChange": {
         run: ({ changeId }) => services.runChange(SYSTEM, changeId),

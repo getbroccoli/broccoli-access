@@ -18,13 +18,11 @@ import type {
   AccountWithoutPerson,
   AccountLinkService,
   AccountChangeService,
-  AppInvite,
   AppService,
   AppSummary,
   AppUser,
   AppUserService,
   ProvisionService,
-  ProvisionStep,
 } from "../app";
 import type { AccountChange } from "../domain";
 import {
@@ -33,7 +31,12 @@ import {
   type OffboardingServices,
   type ReadEmployees,
 } from "./offboardingResolvers";
-import { provisionMutations, provisionStepResolvers } from "./provisionResolvers";
+import {
+  accessDifferenceResolvers,
+  type ProvisionRead,
+  provisionMutations,
+  provisionStepResolvers,
+} from "./provisionResolvers";
 
 type AppResolverServices = AccountLinkService &
   Pick<
@@ -49,6 +52,7 @@ type AppResolverServices = AccountLinkService &
     | "finishSetup"
     | "changeAccount"
     | "readChangeStates"
+    | "readRunningChangeIds"
     | "findAppsWithChangeableAccounts"
     | "readConnectionStates"
     | "listAccountChanges"
@@ -57,15 +61,13 @@ type AppResolverServices = AccountLinkService &
     | "markChangeDoneByHand"
     | "inviteEmployee"
     | "provisionEmployee"
+    | "provisionApp"
   >;
 
 export function createResolvers(
   services: AppResolverServices & OffboardingServices,
-  people: RequestLoader<{
-    appAccounts: AppUser[];
-    appInvites: AppInvite[];
-    provisionSteps: ProvisionStep[];
-  }>,
+  people: RequestLoader<ProvisionRead>,
+  differencePeople: Parameters<typeof accessDifferenceResolvers>[0],
   readEmployees: ReadEmployees,
 ): Resolvers {
   const loaders = createLoaders(services);
@@ -76,6 +78,8 @@ export function createResolvers(
     "peopleCount" in app ? app : loaders.appsById(context).load(app.id);
   return {
     Query: {
+      runningAccountChangeIds: (_parent, _args, ctx) =>
+        services.readRunningChangeIds(ctx.getActor()),
       accountsWithoutPerson: (_parent, { first, after }, context) =>
         services.listAccountsWithoutPerson(context.getActor(), {
           first: first ?? undefined,
@@ -130,6 +134,7 @@ export function createResolvers(
     AppInvite: { app: appOf },
     ProvisionStep: { app: appOf, ...provisionStepResolvers },
     PersonApp: { app: appOf },
+    ...accessDifferenceResolvers(differencePeople, loaders, services.readUsersOfApps),
     TemplateApp: { app: appOf },
     ContainerConnection: {
       app: async ({ id }, _args, context) =>
@@ -224,6 +229,7 @@ function appsMutations(services: AppResolverServices): Resolvers["AppsMutations"
         const change = await services.changeAccount(ctx, {
           appAccountId: input.id,
           retryOf: input.retryOf,
+          extraEmployeeId: input.extraEmployeeId,
           action: fromEnum(input.action),
         });
         // The answer shows the change as asked, even when it already ended on the server.

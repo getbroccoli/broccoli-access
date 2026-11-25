@@ -61,6 +61,38 @@ test("the owner disables Chloé in Linear and enables her again", async ({
   expect(await linearMemberStatus(fakeConnectors.url, chloe.employee.email)).toBe("active");
 }, 90_000);
 
+test("the owner disables an extra Linear account from Differences", async ({ env }) => {
+  const { browser, appId } = await connectedLinear(env);
+  const users = await browser.graphql(
+    `query ($id: ID!) {
+    app(id: $id) { users { id employee { id email } } }
+  }`,
+    { id: appId },
+  );
+  const body = (await users.json()) as {
+    data: { app: { users: { id: string; employee: { id: string; email: string } }[] } };
+  };
+  const chloe = body.data.app.users.find(
+    ({ employee }) => employee.email === "chloe@acme.example",
+  )!;
+  await env.seed.employeeAppChoice({ appId, employeeId: chloe.employee.id, choice: "to_review" });
+
+  const response = await browser.graphql(CHANGE_ACCOUNT, {
+    input: { id: chloe.id, action: "SUSPEND", extraEmployeeId: chloe.employee.id },
+  });
+
+  expect(await response.json()).toMatchObject({
+    data: {
+      apps: {
+        changeAccount: {
+          appUser: { id: chloe.id, latestChange: { action: "SUSPEND" } },
+          error: null,
+        },
+      },
+    },
+  });
+}, 90_000);
+
 test("shows one change ahead of Chloé while Ana's Disable runs, then finishes them in order", async ({
   env,
   fakeConnectors,

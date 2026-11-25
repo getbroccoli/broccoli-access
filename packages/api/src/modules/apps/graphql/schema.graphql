@@ -319,6 +319,8 @@ input AppUserChangeInput {
   action: AccountChangeAction!
   "For a Remove retry, the latest retryable failed Remove for this member and connection. A replacement member requires fresh confirmation."
   retryOf: ID
+  "When disabling from Differences, refuse if the account no longer belongs in Extra."
+  extraEmployeeId: ID
 }
 
 input AppInviteInput {
@@ -458,6 +460,8 @@ type AppsMutations {
   offboardEmployee(input: EmployeeOffboardInput!): EmployeeOffboardPayload!
   "Provisions an employee with the apps the owner confirmed: for each of those apps' provision steps offered now, queues the Invite or the Enable, started from Provision, or for an app without a connection writes an invite that fails at once with NO_CONNECTION, for the owner to make by hand. Asking again while those run or wait writes nothing more. Refused with a NotFoundError for an unknown employee, and a ConflictError while a confirmed missing app's templates disagree on its role or its invite role is no longer offered. Admins only."
   provisionEmployee(input: EmployeeProvisionInput!): EmployeeProvisionPayload!
+  "Provision one app for the people confirmed in Differences. Each person's access is rechecked."
+  provisionApp(input: AppProvisionInput!): AppProvisionPayload!
   "I did it by hand: the owner reports making a failed change in the app themselves; Broccoli Access calls no app. The change becomes DONE_BY_HAND and the status Broccoli Access records for the account takes the new value at once, with a history line unless it already had that status; the next scan checks it. A removal immediately deletes the local account unless another source still finds it, in which case it remains listed as outside the app. A failed invite becomes DONE_BY_HAND, which shows the employee Invited. Refused with a NotFoundError for an unknown change, and with a ConflictError unless the change failed and is the latest: its account's latest change, or for an invite, the latest invite of its connection and email, or in an app that still has no connection, of its app and person. Admins only."
   markAccountChangeDoneByHand(
     input: AccountChangeMarkDoneByHandInput!
@@ -502,6 +506,24 @@ type EmployeeProvisionPayload {
   error: EmployeeProvisionError
 }
 
+input AppProvisionInput {
+  appId: ID!
+  employeeIds: [ID!]!
+}
+
+type AppProvisionPayload {
+  "The work Provision requested."
+  changes: [ProvisionChange!]
+  refusedEmployeeIds: [ID!]
+  error: AppProvisionError
+}
+
+type ProvisionChange {
+  id: ID!
+}
+
+union AppProvisionError = InvalidInputError
+
 union EmployeeProvisionError = NotFoundError | ConflictError
 
 "The account with its change done by hand, or why it was refused; appUser is null for an unlinked or deleted account and for an invite."
@@ -535,12 +557,29 @@ type PersonApp {
   app: App!
 }
 
+type AccessDifference {
+  app: App!
+  "The accounts that hold extra access in this app."
+  activeAccounts: [AppUser!]!
+  "What Provision currently offers for this person and app."
+  provisionStep: ProvisionStep
+  roleNeedsAttention: Boolean!
+  latestProvisionChange: AccountChange
+}
+
+type TemplateDifferenceSummary {
+  "The missing app when every missing row is for the same app."
+  missingApp: App
+}
+
 type TemplateApp {
   "The app the template lists."
   app: App!
 }
 
 type Query {
+  "The ids of account changes still running. Admins only."
+  runningAccountChangeIds: [ID!]!
   "Eligible accounts without a person, by email. After an app’s first completed scan, its last scan must have returned the account. Owner only."
   accountsWithoutPerson(first: Int = 100, after: String): AccountWithoutPersonConnection!
   "How many accounts qualify for accountsWithoutPerson. Owner only."

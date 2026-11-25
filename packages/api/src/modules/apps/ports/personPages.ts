@@ -1,4 +1,4 @@
-import type { AccountAction } from "../../../core/connectors";
+import type { AccountAction, Connector } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import type { AccountChange } from "../domain";
@@ -11,7 +11,13 @@ export type ReadPersonPages = (
   ctx: SecurityContext,
   employeeIds: readonly string[],
   db: Orm | Tx,
+  scope?: PersonPageScope,
 ) => Promise<PersonPage[]>;
+
+export interface PersonPageScope {
+  appIds: readonly string[];
+  connectors: readonly Connector[];
+}
 
 /** The parts of one person's page Provision decides from. */
 export interface PersonPage {

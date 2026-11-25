@@ -46,6 +46,38 @@ test("the owner provisions Ivan and Linear holds one invitation with his templat
   expect((await readIvan(browser)).provisionSteps).toEqual([]);
 }, 90_000);
 
+test("the owner provisions a selected app for the people missing it", async ({ env }) => {
+  const { browser, appId, owner } = await connectedLinear(env);
+  const ivan = await readIvan(browser);
+  await env.seed.assignedTemplateApp({
+    employeeId: ivan.id,
+    appId,
+    role: null,
+    assignedBy: owner.id,
+  });
+
+  const response = await browser.graphql(
+    `mutation ($appId: ID!, $employeeIds: [ID!]!) {
+    apps { provisionApp(input: { appId: $appId, employeeIds: $employeeIds }) {
+      changes { id } refusedEmployeeIds error { __typename }
+    } }
+  }`,
+    { appId, employeeIds: [ivan.id] },
+  );
+
+  expect(await response.json()).toEqual({
+    data: {
+      apps: {
+        provisionApp: {
+          changes: [{ id: expect.any(String) as unknown }],
+          refusedEmployeeIds: [],
+          error: null,
+        },
+      },
+    },
+  });
+}, 90_000);
+
 test("refuses to provision without a session", async ({ env }) => {
   const response = await env.browser().graphql(PROVISION_EMPLOYEE, {
     input: { employeeId: "00000000-0000-4000-8000-000000000001", appIds: [] },

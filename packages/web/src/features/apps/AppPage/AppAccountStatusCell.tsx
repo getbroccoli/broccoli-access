@@ -11,13 +11,14 @@ import { AppAccountStatusBadge } from "./AppAccountStatusBadge";
 
 type Props = {
   appUser: FragmentType<AppAccountStatusCell_AppUserFragment>;
+  onlyIfExtra?: boolean;
 };
 
 /**
  * An account's status in its app, or "Couldn't disable" or "Couldn't enable" while its latest change
  * failed and its status is not yet what that change asked for.
  */
-export function AppAccountStatusCell({ appUser }: Props) {
+export function AppAccountStatusCell({ appUser, onlyIfExtra }: Props) {
   const fragment = useFragment({
     fragment: AppAccountStatusCell_AppUserFragmentDoc,
     fragmentName: "AppAccountStatusCell_appUser",
@@ -35,6 +36,7 @@ export function AppAccountStatusCell({ appUser }: Props) {
           id: user.id,
           offeredChange: user.offeredChange ?? null,
           offersRemove: user.offersRemove,
+          onlyIfExtra,
         }}
       />
     );

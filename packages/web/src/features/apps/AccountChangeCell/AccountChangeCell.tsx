@@ -22,6 +22,7 @@ import { useToastWhenChangeSucceeds } from "./useToastWhenChangeSucceeds";
 type Props = {
   /** The app account, whose row selects this cell's fragment. */
   appUser: FragmentType<AccountChangeCell_AppUserFragment>;
+  onlyIfExtra?: boolean;
 };
 
 /**
@@ -30,7 +31,7 @@ type Props = {
  * you" on the connection's own user, "No connection" where the app's connection cannot change
  * accounts, and Reconnect while the connection needs it.
  */
-export function AccountChangeCell({ appUser }: Props) {
+export function AccountChangeCell({ appUser, onlyIfExtra }: Props) {
   const [removing, setRemoving] = useState(false);
   const fragment = useFragment({
     fragment: AccountChangeCell_AppUserFragmentDoc,
@@ -42,7 +43,7 @@ export function AccountChangeCell({ appUser }: Props) {
   useToastWhenChangeSucceeds(user);
   const succeeded = user?.latestChange?.status === "SUCCEEDED" ? user.latestChange : null;
   const justNow = useJustNow(succeeded?.finishedAt ?? null);
-  if (!user) {
+  if (!user || (onlyIfExtra && user.status !== "ACTIVE")) {
     return null;
   }
   if (!user.app.canChangeAccounts || user.isConnectionUser) {
@@ -68,7 +69,10 @@ export function AccountChangeCell({ appUser }: Props) {
   if (change && !failedRemove && showsCouldntChange(user)) {
     return failedChangeOptions(user).tryAgain ? (
       <span className="flex justify-end">
-        <TryAgainButton target={changeTargetOf(user, change.action)} action={change.action} />
+        <TryAgainButton
+          target={changeTargetOf(user, change.action, onlyIfExtra)}
+          action={change.action}
+        />
       </span>
     ) : null;
   }
@@ -88,6 +92,7 @@ export function AccountChangeCell({ appUser }: Props) {
           accountEmail={user.email}
           row={user}
           action={user.offeredChange}
+          onlyIfExtra={onlyIfExtra}
         />
       )}
       {failedRemove && failedChangeOptions(user).tryAgain && (

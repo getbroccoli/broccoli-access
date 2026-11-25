@@ -8,8 +8,15 @@ type Template {
   apps: [TemplateApp!]!
   "How many people have it."
   peopleCount: Int!
+  "The differences of this template's current members; null when there are none."
+  differenceSummary: TemplateDifferenceSummary
   "The employees who have this template, in assignment order."
   people(first: Int, after: String): EmployeeConnection!
+}
+
+type TemplateDifferenceSummary {
+  missingCount: Int!
+  extraCount: Int!
 }
 
 "One app in one template."
@@ -187,6 +194,34 @@ type PersonAppUndoChoicePayload {
 }
 union PersonAppUndoChoiceError = InvalidInputError | NotFoundError
 
+input ExtraAppKeepInput {
+  employeeId: ID!
+  appId: ID!
+}
+
+"The person who should now have the app, or why Keep was refused."
+type ExtraAppKeepPayload {
+  employee: Employee
+  error: ExtraAppKeepError
+}
+union ExtraAppKeepError = InvalidInputError | NotFoundError | ConflictError
+
+"The differences between the workspace's expected and actual access, one per person and app."
+type AccessDifferences {
+  missingCount: Int!
+  extraCount: Int!
+  runningChangeIds: [ID!]!
+  missing: [AccessDifference!]!
+  extra: [AccessDifference!]!
+}
+
+"One person's missing or extra app."
+type AccessDifference {
+  employee: Employee!
+  "The source of this Extra difference, when the row is Extra."
+  reason: String
+}
+
 type TemplateSetAppRolePayload {
   template: Template
   error: TemplateSetAppRoleError
@@ -201,6 +236,8 @@ type TemplatePickRolePayload {
 union TemplatePickRoleError = InvalidInputError | NotFoundError | ConflictError
 
 type TemplatesMutations {
+  "Keep an extra app for this person. Owner only."
+  keepExtraApp(input: ExtraAppKeepInput!): ExtraAppKeepPayload!
   "Sets the invite role on an app already in this template. Admins only."
   setAppRole(input: TemplateSetAppRoleInput!): TemplateSetAppRolePayload!
   "Settles a role conflict for this person and app. Owner only."
@@ -268,6 +305,8 @@ union TemplateTakeOutAppError = NotFoundError
 
 # Each module declares its own root fields; the server merges them into one type.
 type Query {
+  "The workspace's missing and extra apps. Admins only."
+  accessDifferences: AccessDifferences!
   "One template; null when there is none. Admins only."
   template(id: ID!): Template
   "Templates by name, one page at a time. Admins only."

@@ -3,7 +3,7 @@ import { useQuery } from "@apollo/client/react";
 import { TemplatesPageDocument } from "@/__generated__/graphql";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AppTable } from "@/features/apps";
+import { AppTable, useRefreshDifferences } from "@/features/apps";
 import { t } from "@/i18n";
 import { PageHeader } from "@/shell";
 
@@ -20,6 +20,7 @@ export function TemplatesPage() {
     fetchPolicy: "cache-and-network",
   });
   const templates = data?.templates.edges.map(({ node }) => node);
+  useRefreshDifferences(data?.accessDifferences.runningChangeIds ?? [], refetch);
 
   return (
     <div className="flex flex-col">

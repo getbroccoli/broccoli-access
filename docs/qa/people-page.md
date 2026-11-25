@@ -30,6 +30,14 @@ A manual check of the People page against a development stack: everyone in Googl
 - [ ] With the API failing, the page shows "Couldn’t load people" and "Try again" reloads it once the API is back.
 - [ ] At 390 px wide the search field goes under the tabs and the table stays inside its frame.
 
+## Differences
+
+1. Use a fresh development database. Connect Linear with the fake key and wait for its scan. Assign an empty Engineering template to Ivan Petrov, Elif Demir and Chloé Martin.
+2. Add Linear to Engineering. The Templates page marks Engineering. In People → Differences, Linear shows two people under Missing. No account has changed yet.
+3. Open Provision beside Linear and check it lists Ivan and Elif. Confirm once. Read `invitations.linear` in the fake connectors' `GET /_fake/state` and check for exactly one pending invitation per person. The Missing count drops to zero and the template mark clears.
+4. Take Engineering off Chloé. Her active Linear account shows under Extra even though she has no template. Keep clears the row. Confirm her account stays active and her person page shows Linear as "Added by you" with no template assigned.
+5. Assign Engineering to David Okafor and take it off again. Disable his extra Linear account and check that his row clears once the fake suspends the account.
+
 ## Accounts without a person
 
 - [ ] Start from the setup above with Slack approved. Use the fake Google's unsuspend control for Ana, then scan Google Workspace. Connect Slack and Linear and let their scans finish. The tab shows four accounts. Ana’s private Slack address suggests Ana Ruiz. The other three show "Nobody".

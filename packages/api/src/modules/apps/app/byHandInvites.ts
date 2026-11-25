@@ -15,8 +15,14 @@ export async function readByHandInvites(
   db: Orm | Tx,
   employeeIds: readonly string[],
   connections: readonly AppConnection[],
+  appIds?: readonly string[],
+  expected?: readonly { employeeId: string; appId: string }[],
 ): Promise<AppInvite[]> {
-  const latest = await accountChangeRepository(db).findLatestInvitesWithoutConnection(employeeIds);
+  const latest = await accountChangeRepository(db).findLatestInvitesWithoutConnection(
+    employeeIds,
+    appIds,
+    expected,
+  );
   const connectedApps = new Set(connections.map(({ appId }) => appId));
   const waiting = latest.filter(({ appId }) => !connectedApps.has(appId));
   if (!waiting.length) {

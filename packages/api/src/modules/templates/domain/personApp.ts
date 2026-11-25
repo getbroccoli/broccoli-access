@@ -20,12 +20,23 @@ export interface EmployeeAppChoice {
   role: string | null;
 }
 
-interface PersonAppFacts {
+export interface PersonAppFacts {
   templates: readonly Template[];
   choices: readonly EmployeeAppChoice[];
   accounts: readonly { appId: string; status: AccountStatus }[];
   invites: readonly { appId: string; invitedAt: Date | null }[];
   listedApps: ReadonlySet<string>;
+}
+
+export function expectsApp(templateGivesIt: boolean, choice?: EmployeeAppChoice["choice"]) {
+  return choice === "added" || (templateGivesIt && choice !== "removed");
+}
+
+/** Why unexpected active access belongs on the workspace board. */
+export function extraAppReason(choice: EmployeeAppChoice["choice"] | undefined, listed: boolean) {
+  if (choice === "to_review") return "review";
+  if (!listed) return null;
+  return choice === "removed" ? "removed" : "outside_templates";
 }
 
 /** Combines assignments, choices and actual access once per app, including apps only offering Invite. */
@@ -58,14 +69,14 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
     const choice = choices.get(appId);
     const account = accounts.get(appId);
     const ownChoice = effectiveChoice(templates, choice, account);
-    const expected = ownChoice === "added" || (templates.length > 0 && ownChoice !== "removed");
+    const expected = expectsApp(templates.length > 0, choice?.choice);
     const invite = invites.get(appId);
     if (!expected && !account && !invite && !ownChoice) continue;
     // A removal whose template is gone still says the owner did not want this app for them.
     const extra =
-      choice?.choice === "to_review" ||
       choice?.choice === "removed" ||
-      (facts.templates.length > 0 && facts.listedApps.has(appId));
+      extraAppReason(choice?.choice, facts.templates.length > 0 && facts.listedApps.has(appId)) !==
+        null;
     const state = appState({ expected, account, invited: !!invite?.invitedAt, extra });
     rows.push({
       appId,

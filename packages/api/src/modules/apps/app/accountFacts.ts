@@ -3,6 +3,7 @@ import {
   canChangeAccounts,
   canRemoveAccounts,
   type AccountAction,
+  type Connector,
   type ConnectorRegistry,
 } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
@@ -32,12 +33,18 @@ export async function readChangeFacts(
   ctx: SecurityContext,
   db: Orm | Tx,
   ids: readonly string[],
+  connectors?: readonly Connector[],
 ) {
   ctx.require("MANAGE_WORKSPACE");
   const accounts = await appAccountRepository(db).findByIds(
     ids.flatMap((id) => parseUuid(id) ?? []),
   );
-  return readAccountFacts(dependencies, db, accounts);
+  return readAccountFacts(
+    dependencies,
+    db,
+    accounts,
+    connectors && changingConnectorsOf(connectors),
+  );
 }
 
 /** What decides each account's Disable or Enable, by account id, read in one go. */
@@ -157,7 +164,10 @@ const NO_CONNECTORS: ChangingConnectors = { status: new Set(), remove: new Set()
 export async function changingConnectors(
   connectors: ConnectorRegistry,
 ): Promise<ChangingConnectors> {
-  const listed = await connectors.list();
+  return changingConnectorsOf(await connectors.list());
+}
+
+function changingConnectorsOf(listed: readonly Connector[]): ChangingConnectors {
   return {
     status: new Set(listed.filter(canChangeAccounts).map(({ key }) => key)),
     remove: new Set(listed.filter(canRemoveAccounts).map(({ key }) => key)),

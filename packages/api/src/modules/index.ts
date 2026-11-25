@@ -31,8 +31,18 @@ import {
 } from "./google";
 import { createImportRecordService, createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
-import { createPersonPageReader, personPageLoader, readPersonPages } from "./personPageReader";
-import { readInviteRole, createTemplateService, templatesModule } from "./templates";
+import {
+  createPersonPageReader,
+  differencePageLoader,
+  personPageLoader,
+  readPersonPages,
+} from "./personPageReader";
+import {
+  readInviteRole,
+  createTemplateService,
+  templatesModule,
+  type TemplateService,
+} from "./templates";
 
 /** Settings that only some modules need, read from the environment by `main.ts`. */
 export interface ModuleSettings {
@@ -105,6 +115,8 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   const employees = createEmployeeReadService({ ...core, accounts: apps });
   const changeDependencies = {
     readInviteRole,
+    isExtraApp: (...args: Parameters<TemplateService["isExtraApp"]>) =>
+      templates.isExtraApp(...args),
     directoryConnectors,
     ...core,
     connectors,
@@ -121,15 +133,25 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   });
   const templates = createTemplateService({
     ...core,
-    apps: { ...apps, readAppRoles: changes.readAppRoles, readAppInvites: changes.readAppInvites },
+    apps: {
+      ...apps,
+      readAppRoles: changes.readAppRoles,
+      readAppInvites: changes.readAppInvites,
+      readRunningChangeIds: changes.readRunningChangeIds,
+      hasRunningDisable: changes.hasRunningDisable,
+    },
     employees,
   });
   const pageReads = { ...users, ...changes, ...templates };
   const provision = createProvisionService({
     ...changeDependencies,
-    readPersonPages: (ctx, ids, db) => readPersonPages(db, pageReads, ctx, ids),
+    readPersonPages: (ctx, ids, db, scope) => readPersonPages(db, pageReads, ctx, ids, scope),
   });
-  const people = personPageLoader(createPersonPageReader(core.orm, { ...pageReads, ...provision }));
+  const readPersonPagesInSnapshot = createPersonPageReader(core.orm, {
+    ...pageReads,
+    ...provision,
+  });
+  const people = personPageLoader(readPersonPagesInSnapshot);
   const manifests = [
     systemModule({
       ...core,
@@ -161,6 +183,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
         }),
       },
       people,
+      differencePageLoader(readPersonPagesInSnapshot, connectors.list),
       employees.readEmployees,
     ),
     extensionModule({ ...core, appSessions: containerConnections }),

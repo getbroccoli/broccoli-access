@@ -1,30 +1,16 @@
 import { ApplicationError } from "../../../core/applicationError";
-import {
-  canInvite,
-  type Connector,
-  listsInvitations,
-  offersInviteRole,
-} from "../../../core/connectors";
+import { type Connector, offersInviteRole } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
 import {
   type AppConnection,
-  type AppInvitation,
   accountChangeRepository,
   appAccountRepository,
   appConnectionRepository,
-  appInvitationRepository,
   appRepository,
 } from "../db";
-import {
-  type AccountChange,
-  type AppInviteState,
-  type ChangeStart,
-  FROM_ACCOUNT,
-  inviteStateOf,
-  startOfChange,
-} from "../domain";
+import { type AppInviteState, type ChangeStart, FROM_ACCOUNT, startOfChange } from "../domain";
 import {
   type AccountChangeDependencies,
   type LatestAccountChange,
@@ -32,7 +18,13 @@ import {
   withPlace,
 } from "./accountChangeService";
 import { readByHandInvites } from "./byHandInvites";
-import { findEmployeesInDirectory } from "./directory";
+import {
+  appInviteOf,
+  expectedInviteRows,
+  type InvitedEmployee,
+  inviteKey,
+  readInviteFacts,
+} from "./appInviteFacts";
 
 /**
  * An employee's row for an app they have no account in: Invite, its running invite, Invited, or
@@ -45,6 +37,12 @@ export interface AppInvite extends AppInviteState {
   appId: string;
   /** Its newest invite, with its place in its connection's queue while it runs; null before the first. */
   latestInvite: LatestAccountChange | null;
+}
+
+export interface AppInviteScope {
+  appIds?: readonly string[];
+  connectors?: readonly Connector[];
+  expected?: readonly { employeeId: string; appId: string }[];
 }
 
 /**
@@ -79,23 +77,39 @@ export async function readAppInvites(
   ctx: SecurityContext,
   employeeIds: readonly string[],
   db: Orm | Tx = dependencies.orm,
+  scope: AppInviteScope = {},
 ): Promise<AppInvite[]> {
   ctx.require("MANAGE_WORKSPACE");
+  const { expected } = scope;
+  if (expected?.length === 0) return [];
+  const appIds = scope.appIds ?? (expected && [...new Set(expected.map(({ appId }) => appId))]);
   const employees = await dependencies.employees.readEmployees(ctx, employeeIds, db);
+  const repo = appConnectionRepository(db);
   const [connectors, connections] = await Promise.all([
-    dependencies.connectors.list(),
-    appConnectionRepository(db).findAll(),
+    scope.connectors ?? dependencies.connectors.list(),
+    appIds ? repo.findByApps(appIds) : repo.findAll(),
   ]);
-  const facts = await readInviteFacts(dependencies, db, { employees, connections, connectors });
-  const connected = employees.flatMap((employee) =>
-    connections.flatMap((connection) => appInviteOf(employee, connection, facts) ?? []),
-  );
+  const facts = await readInviteFacts(dependencies, db, {
+    employees,
+    connections,
+    connectors,
+    expected,
+  });
+  const connected = expected
+    ? expectedInviteRows(expected, employees, connections, facts)
+    : employees.flatMap((employee) =>
+        connections.flatMap((connection) => appInviteOf(employee, connection, facts) ?? []),
+      );
   const byHand = await readByHandInvites(
     dependencies,
     db,
     employees.map(({ id }) => id),
     connections,
+    appIds,
+    expected,
   );
+  if (expected) return [...connected, ...byHand].filter(({ invitedAt }) => invitedAt !== null);
+  if (scope.connectors) return [...connected, ...byHand];
   const rows = await sortByAppName(db, employees, [...connected, ...byHand]);
   const running = rows.flatMap(({ latestInvite }) =>
     latestInvite?.status === "running" ? [latestInvite.id] : [],
@@ -108,12 +122,6 @@ export async function readAppInvites(
 }
 
 const NOT_OFFERED = "Invite is not offered for this employee in this app now.";
-
-/** An employee the caller may read, with the email an invite goes to. */
-interface InvitedEmployee {
-  id: string;
-  email: string;
-}
 
 export interface InviteRequest {
   ctx: SecurityContext;
@@ -178,14 +186,16 @@ export async function askForInvite(
     ),
   });
   // A concurrent invite of the same email committed first.
-  if (!change) {
-    throw new ApplicationError("CONFLICT", NOT_OFFERED);
-  }
+  if (!change) throw new ApplicationError("CONFLICT", NOT_OFFERED);
   await dependencies.jobs.send(tx, RUN_JOB, { changeId: change.id }, { group: connection.id });
   const latestInvites = new Map([[inviteKey(connection.id, employee.email), change]]);
   // A row with an invite always shows.
   const row = appInviteOf(employee, connection, { ...facts, latestInvites })!;
-  return { ...row, latestInvite: withPlace(change, await changes.countChangesAhead([change.id])) };
+  const ahead =
+    start.startedFrom === "provision"
+      ? new Map<string, number>()
+      : await changes.countChangesAhead([change.id]);
+  return { ...row, latestInvite: withPlace(change, ahead) };
 }
 
 /** The app's connection; refuses an unknown app with NOT_FOUND, and one without a connection with CONFLICT. */
@@ -201,129 +211,6 @@ async function findConnectionOfApp(tx: Tx, appId: string): Promise<AppConnection
   return connection;
 }
 
-/**
- * What the rows are decided from: who is active in the directory, the scans' members and pending
- * invitations, the latest invites.
- */
-interface StoredInviteFacts {
-  activeInDirectory: Set<string>;
-  /** When each connection's last scan finished, by connection id. */
-  scannedAt: Map<string, Date>;
-  /** The keys (`inviteKey`) of the members the connections' last scans saw. */
-  memberKeys: Set<string>;
-  /** The pending invitations the connections' last scans read, by key (`inviteKey`). */
-  invitations: Map<string, AppInvitation>;
-  /** By key (`inviteKey`). */
-  latestInvites: Map<string, AccountChange>;
-  invitingConnectors: Set<string>;
-  /** The keys of the connectors whose scans read the pending invitations. */
-  invitationListingConnectors: Set<string>;
-}
-
-async function readInviteFacts(
-  { members }: AccountChangeDependencies,
-  db: Orm | Tx,
-  {
-    employees,
-    connections,
-    connectors,
-  }: {
-    employees: readonly InvitedEmployee[];
-    connections: readonly AppConnection[];
-    connectors: readonly Connector[];
-  },
-): Promise<StoredInviteFacts> {
-  const connectionIds = connections.map(({ id }) => id);
-  const emails = employees.map(({ email }) => email);
-  const [active, lastScans, memberKeys, pending, latest] = await Promise.all([
-    findEmployeesInDirectory(db, connectors, {
-      status: "active",
-      among: employees.map(({ id }) => id),
-    }),
-    members.findLastScans(db),
-    readMemberKeys(db, members, employees, connections),
-    appInvitationRepository(db).findByEmails({ connectionIds, emails }),
-    accountChangeRepository(db).findLatestInvites(connectionIds, emails),
-  ]);
-  return {
-    activeInDirectory: new Set(active),
-    scannedAt: new Map(lastScans.map(({ connectionId, scannedAt }) => [connectionId, scannedAt])),
-    memberKeys,
-    invitations: new Map(
-      pending.map((invitation) => [
-        inviteKey(invitation.connectionId, invitation.email),
-        invitation,
-      ]),
-    ),
-    latestInvites: new Map(
-      latest.map((change) => [inviteKey(change.connectionId!, change.email), change]),
-    ),
-    invitingConnectors: new Set(connectors.filter(canInvite).map(({ key }) => key)),
-    invitationListingConnectors: new Set(connectors.filter(listsInvitations).map(({ key }) => key)),
-  };
-}
-
-/** Keys the scanned members by the employee's work email, including a member the owner linked. */
-async function readMemberKeys(
-  db: Orm | Tx,
-  members: AccountChangeDependencies["members"],
-  employees: readonly InvitedEmployee[],
-  connections: readonly AppConnection[],
-) {
-  const links = await appAccountRepository(db).findOwnerLinks(
-    employees.map(({ id }) => id),
-    connections.map(({ appId }) => appId),
-  );
-  const emails = [...new Set([...employees, ...links].map(({ email }) => email))];
-  const found = await members.findConnectionMembers(db, {
-    connectionIds: connections.map(({ id }) => id),
-    emails,
-  });
-  const memberKeys = new Set(
-    found.map(({ connectionId, email }) => inviteKey(connectionId, email)),
-  );
-  const connectionOfApp = new Map(connections.map(({ appId, id }) => [appId, id]));
-  const workEmails = new Map(employees.map(({ id, email }) => [id, email]));
-  const linkedKeys = links.flatMap((link) => {
-    const connectionId = connectionOfApp.get(link.appId);
-    return connectionId && memberKeys.has(inviteKey(connectionId, link.email))
-      ? [inviteKey(connectionId, workEmails.get(link.employeeId)!)]
-      : [];
-  });
-  return new Set([...memberKeys, ...linkedKeys]);
-}
-
-/** The employee's row for the connection's app, its latest invite not yet placed; null when none shows. */
-function appInviteOf(
-  employee: InvitedEmployee,
-  connection: AppConnection,
-  facts: StoredInviteFacts,
-): AppInvite | null {
-  const key = inviteKey(connection.id, employee.email);
-  const latestInvite = facts.latestInvites.get(key) ?? null;
-  const state = inviteStateOf({
-    activeInDirectory: facts.activeInDirectory.has(employee.id),
-    connection: {
-      status: connection.status,
-      invites: facts.invitingConnectors.has(connection.connector),
-      listsInvitations: facts.invitationListingConnectors.has(connection.connector),
-      scannedAt: facts.scannedAt.get(connection.id) ?? null,
-    },
-    hasMember: facts.memberKeys.has(key),
-    invitation: facts.invitations.get(key) ?? null,
-    latestInvite,
-  });
-  return (
-    state && {
-      id: `${employee.id}:${connection.appId}`,
-      employeeId: employee.id,
-      appId: connection.appId,
-      ...state,
-      latestInvite: latestInvite && { ...latestInvite, changesAhead: null },
-    }
-  );
-}
-
 async function sortByAppName(
   db: Orm | Tx,
   employees: readonly InvitedEmployee[],
@@ -337,8 +224,4 @@ async function sortByAppName(
       ranks.get(one.employeeId)! - ranks.get(other.employeeId)! ||
       names.get(one.appId)!.localeCompare(names.get(other.appId)!),
   );
-}
-
-function inviteKey(connectionId: string, email: string): string {
-  return `${connectionId} ${email}`;
 }

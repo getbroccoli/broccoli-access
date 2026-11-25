@@ -15,6 +15,7 @@ import {
 import { createPersonAppChoices, type PersonAppChoices } from "./personAppChoices";
 import { createTemplateRoles, type TemplateRoles } from "./templateRoles";
 import { lockTemplate } from "./lockTemplate";
+import { type AccessDifferences, readDifferences } from "./readDifferences";
 import { reviewLostApps } from "./reviewLostApps";
 
 const recordHistory = createRecordHistoryService();
@@ -32,6 +33,8 @@ export interface TemplateService
   ) => Promise<Connection<Template>>;
   /** The template; null for an unknown or malformed id. */
   readTemplate: (ctx: SecurityContext, templateId: string) => Promise<Template | null>;
+  /** Missing and extra apps and the templates assigned to the people with differences. */
+  readDifferences: (ctx: SecurityContext) => Promise<AccessDifferences>;
   /** Adds a template without apps; refuses a blank, too long or taken name as invalid `name`. */
   createTemplate: (ctx: SecurityContext, input: { name: string }) => Promise<Template>;
   /**
@@ -80,6 +83,7 @@ export function createTemplateService({
     ...createTemplateRoles({ transact, logger, apps, employees }),
     ...createPersonAppChoices({ transact, logger, apps, employees }),
     ...createTemplateAssignmentService({ orm, transact, logger, apps, employees }),
+    readDifferences: async (ctx) => readDifferences(orm, apps, ctx),
     async listTemplates(ctx, { assignableTo, ...pageArgs }) {
       ctx.require("MANAGE_WORKSPACE");
       if (assignableTo != null && !parseUuid(assignableTo))

@@ -16,6 +16,7 @@ import type { ConnectorErrorCode } from "../../../core/connectors";
 import type { KeysetQuery, KeysetRow } from "../../../core/pagination";
 import type { AccountChange } from "../domain";
 import { accountChanges, type StoredAttempt } from "./accountChangesTable";
+import { type InviteTarget, matchesInviteTargets } from "./appInvitationRepository";
 
 /** Account changes in Postgres, through the pool or inside a transaction. */
 export interface AccountChangeRepository {
@@ -31,6 +32,7 @@ export interface AccountChangeRepository {
   findById(id: string): Promise<AccountChange | null>;
   /** The changes with these ids; an unknown id is left out. */
   findByIds(ids: readonly string[]): Promise<AccountChange[]>;
+  runningIds(): Promise<string[]>;
   /** Like `findById`, locking the row until the transaction ends. */
   lockById(id: string): Promise<AccountChange | null>;
   /** Ends a running change with its outcome; a change no longer running stays as it is. */
@@ -65,6 +67,7 @@ export interface AccountChangeRepository {
   findLatestInvites(
     connectionIds: readonly string[],
     emails: readonly string[],
+    targets?: readonly InviteTarget[],
   ): Promise<AccountChange[]>;
   /** When each employee's newest change started from their offboarding was asked; one never offboarded is left out. */
   findLastOffboardings(employeeIds: readonly string[]): Promise<Map<string, Date>>;
@@ -72,6 +75,7 @@ export interface AccountChangeRepository {
   findLatestInvitesWithoutConnection(
     employeeIds: readonly string[],
     appIds?: readonly string[],
+    targets?: readonly { employeeId: string; appId: string }[],
   ): Promise<AccountChange[]>;
   /** For each change of `changeIds`, how many running changes of its connection were asked before it. */
   countChangesAhead(changeIds: readonly string[]): Promise<Map<string, number>>;
@@ -111,6 +115,14 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
     findById: async (id) => {
       const [row] = await orm().select().from(accountChanges).where(eq(accountChanges.id, id));
       return row ? toChange(row) : null;
+    },
+    async runningIds() {
+      const rows = await orm()
+        .select({ id: accountChanges.id })
+        .from(accountChanges)
+        .where(eq(accountChanges.status, "running"))
+        .orderBy(accountChanges.id);
+      return rows.map(({ id }) => id);
     },
     findByIds: async (ids) => {
       const rows = await orm().select().from(accountChanges).where(anyOf(accountChanges.id, ids));
@@ -188,7 +200,7 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         );
       return rows.map(toChange);
     },
-    findLatestInvites: async (connectionIds, emails) => {
+    findLatestInvites: async (connectionIds, emails, targets) => {
       const rows = await orm()
         .selectDistinctOn([accountChanges.connectionId, accountChanges.email])
         .from(accountChanges)
@@ -197,6 +209,8 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
             eq(accountChanges.action, "invite"),
             anyOf(accountChanges.connectionId, connectionIds),
             anyOf(accountChanges.email, emails),
+            targets &&
+              matchesInviteTargets(accountChanges.connectionId, accountChanges.email, targets),
           ),
         )
         .orderBy(
@@ -220,7 +234,7 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .groupBy(accountChanges.employeeId);
       return new Map(rows.map(({ employeeId, at }) => [employeeId!, at!]));
     },
-    findLatestInvitesWithoutConnection: async (employeeIds, appIds) => {
+    findLatestInvitesWithoutConnection: async (employeeIds, appIds, targets) => {
       const rows = await orm()
         .selectDistinctOn([accountChanges.employeeId, accountChanges.appId])
         .from(accountChanges)
@@ -230,6 +244,8 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
             isNull(accountChanges.connectionId),
             anyOf(accountChanges.employeeId, employeeIds),
             appIds && anyOf(accountChanges.appId, appIds),
+            targets &&
+              sql`(${accountChanges.employeeId},${accountChanges.appId}) in (select * from unnest(${sql.param(targets.map((target) => target.employeeId))}::uuid[],${sql.param(targets.map((target) => target.appId))}::uuid[]))`,
           ),
         )
         .orderBy(

@@ -1,9 +1,9 @@
-query PeoplePage($filter: EmployeeFilter, $showAccounts: Boolean! = false) {
+query PeoplePage($filter: EmployeeFilter, $skipPeople: Boolean! = false) {
   employeeCounts {
     all
     suspendedWithAccess
   }
-  employees(first: 10000, orderBy: { field: STATUS }, filter: $filter) @skip(if: $showAccounts) {
+  employees(first: 10000, orderBy: { field: STATUS }, filter: $filter) @skip(if: $skipPeople) {
     edges {
       node {
         id

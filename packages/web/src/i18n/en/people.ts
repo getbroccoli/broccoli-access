@@ -1,5 +1,33 @@
 /** English copy under `people.*`. */
 export const peopleEn = {
+  "people.tab.differences": "Differences",
+  "people.differences.loadFailed": "Couldn’t load differences.",
+  "people.differences.noMissing": "Nobody is missing an app.",
+  "people.differences.noExtra": "No extra accounts.",
+  "people.differences.peopleCount": "{count} people",
+  "people.differences.provisionTitle": "Provision {app}?",
+  "people.differences.provisionDescription": "Review how each person gets access.",
+  "people.differences.provisioning": "Provisioning…",
+  "people.differences.invites": "Send invitation",
+  "people.differences.fixRole": "Review their expected role",
+  "people.differences.byHand": "Invite by hand after confirming",
+  "people.differences.finishByHand":
+    "Send the invitation in the app and confirm on their person page",
+  "people.differences.provisionUnavailable": "Open their person page",
+  "people.differences.provisionFailed":
+    "Couldn’t provision everyone in {app}. Check the people still missing access.",
+  "people.differences.provisionRefused": "Couldn’t provision {count} people, including {name}.",
+  "people.differences.provisionRefusedOne": "Couldn’t provision {name}.",
+  "people.differences.disableRefused":
+    "Couldn’t disable the account. Refresh Differences and try again.",
+  "people.differences.why": "Why",
+  "people.differences.takenOutOfExpectedApps": "Taken out of their expected apps",
+  "people.differences.accessRemoved": "Removed for this person",
+  "people.differences.outsideTemplates": "Not in their templates",
+  "people.differences.keep": "Keep",
+  "people.differences.keepEffect": "Add this app to the person’s expected access.",
+  "people.differences.keepLabel": "Keep {app} for {name}",
+  "people.differences.keepFailed": "Couldn’t keep the app. Reload and try again.",
   "people.title": "People",
   "people.description": "Everyone in your Google Workspace.",
   "people.tabs": "Which people",

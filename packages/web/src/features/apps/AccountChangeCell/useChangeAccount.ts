@@ -17,7 +17,7 @@ import { forgetPersonApps } from "../cache";
  * employee and the app for Invite.
  */
 export type ChangeTarget = { name: string; app: string } & (
-  { accountId: string } | { employeeId: string; appId: string }
+  { accountId: string; extraEmployeeId?: string } | { employeeId: string; appId: string }
 );
 
 /**
@@ -27,14 +27,7 @@ export type ChangeTarget = { name: string; app: string } & (
  */
 export function useChangeAccount(
   refusedMessage: "apps.change.refused" | "people.accounts.changeRefused" = "apps.change.refused",
-): {
-  changeAccount: (
-    target: ChangeTarget,
-    action: AccountChangeAction,
-    retryOf?: string,
-  ) => Promise<boolean>;
-  loading: boolean;
-} {
+) {
   const cache = useCache();
   const [change, changing] = usePayloadMutation(ChangeAccountDocument, {
     refetch: ({ appUser }) => (appUser ? [] : [AppPageDocument, PersonPageDocument]),
@@ -48,7 +41,14 @@ export function useChangeAccount(
     try {
       if ("accountId" in target) {
         await change({
-          variables: { input: { id: target.accountId, action, retryOf } },
+          variables: {
+            input: {
+              id: target.accountId,
+              action,
+              retryOf,
+              extraEmployeeId: target.extraEmployeeId,
+            },
+          },
         });
       } else {
         await invite({
@@ -57,6 +57,10 @@ export function useChangeAccount(
       }
       return true;
     } catch {
+      if ("accountId" in target && target.extraEmployeeId) {
+        toast.error(t("people.differences.disableRefused"));
+        return false;
+      }
       const refused = "accountId" in target ? refusedMessage : "apps.change.inviteRefused";
       toast.error(
         t(retryOf ? "apps.change.retryRefused" : refused, { name: target.name, app: target.app }),
@@ -80,9 +84,14 @@ export function changeTargetOf(
     app: { id: string; name: string };
   },
   action: AccountChangeAction,
+  onlyIfExtra?: boolean,
 ): ChangeTarget {
   const named = { name: `${employee.firstName} ${employee.lastName}`, app: app.name };
   return action === "INVITE"
     ? { ...named, employeeId: employee.id, appId: app.id }
-    : { ...named, accountId: id };
+    : {
+        ...named,
+        accountId: id,
+        extraEmployeeId: action === "SUSPEND" && onlyIfExtra ? employee.id : undefined,
+      };
 }

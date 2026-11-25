@@ -3,8 +3,9 @@ import type { Tx } from "../../../core/db";
 import type { ModuleDependencies } from "../../../core/moduleManifest";
 import { createRecordHistoryService } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
+import { parseUuid } from "../../../utils";
 import { assignmentRepository, type EmployeeAppPair } from "../db";
-import type { EmployeeAppChoice } from "../domain";
+import { type EmployeeAppChoice, expectsApp, extraAppReason } from "../domain";
 import type { AppsById, EmployeeById, PersonAccess } from "../ports";
 import { reviewLostApps } from "./reviewLostApps";
 import { checkedAppId, checkedRole } from "./templateRoles";
@@ -23,6 +24,10 @@ export interface PersonAppChoices {
     ctx: SecurityContext,
     input: EmployeeAppPair & { role?: string | null },
   ) => Promise<string>;
+  /** Accepts a current extra account as an app for this person, with no account change. */
+  keepExtraApp: (ctx: SecurityContext, input: EmployeeAppPair) => Promise<string>;
+  /** Checks a pair while the caller holds its app's review lock. */
+  isExtraApp: (ctx: SecurityContext, pair: EmployeeAppPair, tx: Tx) => Promise<boolean>;
   /** Keeps an app their templates give from the person; refuses any other app with CONFLICT. */
   removePersonApp: (ctx: SecurityContext, input: EmployeeAppPair) => Promise<string>;
   /**
@@ -62,15 +67,16 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
           throw new ApplicationError("CONFLICT", "A template already gives this person the app.");
         if (choice?.choice === "added" && choice.role === role) return false;
         const before = REPLACED_BY_ADDING.has(choice?.choice) ? choice : undefined;
-        await assignmentRepository(tx).saveChoice({ ...pair, choice: "added", role });
-        await recordChoice(ctx, tx, pair, {
-          oldLabel: before && choiceLabel(appName, before),
-          newLabel: choiceLabel(appName, { choice: "added", role }),
-        });
+        await saveAddedChoice(ctx, tx, pair, { appName, role, before });
         return true;
       });
       if (changed) logger.info(pair, "App added for one employee");
       return pair.employeeId;
+    },
+    keepExtraApp: (ctx, input) => keepExtraApp(deps, ctx, input),
+    async isExtraApp(ctx, pair, tx) {
+      ctx.require("MANAGE_WORKSPACE");
+      return (await extraAccountIds(apps, tx, pair, await choiceFacts(tx, pair))).length > 0;
     },
     async removePersonApp(ctx, input) {
       const pair = await ownersPair(deps, ctx, input);
@@ -105,6 +111,51 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
   };
 }
 
+async function keepExtraApp(deps: Dependencies, ctx: SecurityContext, input: EmployeeAppPair) {
+  const { apps, transact, logger } = deps;
+  try {
+    const pair = await ownersPair(deps, ctx, input);
+    const changed = await transact(async (db) => {
+      const facts = await lockedFacts(deps, db, pair);
+      const { choice, appName } = facts;
+      if (choice?.choice === "added") return false;
+      const ids = await extraAccountIds(apps, db, pair, facts);
+      if (!ids.length)
+        throw new ApplicationError("CONFLICT", "This app is no longer extra for this person.");
+      if (await apps.hasRunningDisable(ctx, ids, db))
+        throw new ApplicationError("CONFLICT", "A Disable is still running for this app.");
+      await saveAddedChoice(ctx, db, pair, { appName, before: choice, role: null });
+      return true;
+    });
+    logger.info({ ...pair, changed }, "Extra app kept for one employee");
+    return pair.employeeId;
+  } catch (error) {
+    logger.info(
+      {
+        employeeId: parseUuid(input.employeeId),
+        appId: parseUuid(input.appId),
+        code: error instanceof ApplicationError ? error.code : "unexpected",
+      },
+      "Keep extra app failed",
+    );
+    throw error;
+  }
+}
+
+async function saveAddedChoice(
+  ctx: SecurityContext,
+  tx: Tx,
+  pair: EmployeeAppPair,
+  { appName, role, before }: { appName?: string; role: string | null; before?: EmployeeAppChoice },
+) {
+  const added = { ...pair, choice: "added", role } as const;
+  await assignmentRepository(tx).saveChoice(added);
+  await recordChoice(ctx, tx, pair, {
+    oldLabel: before && choiceLabel(appName, before),
+    newLabel: choiceLabel(appName, added),
+  });
+}
+
 /** The stored ids of the pair, once the caller is the owner and the employee exists. */
 async function ownersPair(
   { employees }: Dependencies,
@@ -123,10 +174,31 @@ async function ownersPair(
 async function lockedFacts({ apps, employees }: Dependencies, tx: Tx, pair: EmployeeAppPair) {
   await employees.holdForReference(tx, [pair.employeeId]);
   const [app] = await apps.lockAppsForReview(tx, [pair.appId]);
+  return { ...(await choiceFacts(tx, pair)), appName: app?.name };
+}
+
+async function choiceFacts(tx: Tx, pair: EmployeeAppPair) {
   const repo = assignmentRepository(tx);
   const sources = await repo.sources([pair]);
   const [choice] = await repo.choicesFor([pair.employeeId], [pair.appId]);
-  return { given: sources.length > 0, choice, appName: app?.name };
+  return { given: sources.length > 0, choice };
+}
+
+async function extraAccountIds(
+  apps: PersonAccess,
+  tx: Tx,
+  { employeeId, appId }: EmployeeAppPair,
+  { given, choice }: Awaited<ReturnType<typeof choiceFacts>>,
+) {
+  if (expectsApp(given, choice?.choice)) return [];
+  const repo = assignmentRepository(tx);
+  const listed =
+    choice?.choice !== "to_review" &&
+    (await repo.hasAssignment(employeeId)) &&
+    (await repo.listedApps([appId])).has(appId);
+  if (!extraAppReason(choice?.choice, listed)) return [];
+  const accounts = await apps.findEmployeeAccounts(tx, [employeeId], [appId]);
+  return accounts.flatMap(({ id, status }) => (status === "active" ? [id] : []));
 }
 
 function isOwnChoice(

@@ -28,34 +28,16 @@ export function createResolvers(
     personApps: Awaited<ReturnType<TemplateService["readEmployeeApps"]>>[number];
   }>,
 ): Resolvers {
-  const readRoster = async (
-    actor: SecurityContext,
-    id: string,
-    first: number,
-    after?: string | null,
-  ) => {
-    const page = await services.readTemplatePeople(actor, id, { first, after });
-    const people = await readEmployees(
-      actor,
-      page.edges.map((edge) => edge.node),
-    );
-    const byId = new Map(people.map((person) => [person.id, person]));
-    return {
-      ...page,
-      edges: page.edges.flatMap((edge) => {
-        const node = byId.get(edge.node);
-        return node ? [{ ...edge, node }] : [];
-      }),
-    };
-  };
   const changedEmployee = async (context: GraphqlContext, employeeId: string) => ({
     employee: (await readEmployees(context.getActor(), [employeeId]))[0] ?? null,
   });
+  const differences = differenceResolvers(services);
   const rosters = perRequest(() => ({
     remaining: 10000,
     cache: new Map<string, ReturnType<typeof readRoster>>(),
   }));
   return {
+    ...differences,
     Employee: {
       templates: async (employee, { first, after }, ctx) =>
         pageById(
@@ -73,6 +55,7 @@ export function createResolvers(
         ),
     },
     Template: {
+      ...differences.Template,
       async people(template, { first, after }, ctx, info) {
         const pages = rosters(ctx);
         const size = first ?? 100;
@@ -89,7 +72,11 @@ export function createResolvers(
         const key = JSON.stringify([template.id, size, after ?? null]);
         let page = pages.cache.get(key);
         if (!page) {
-          page = readRoster(ctx.getActor(), template.id, size, after);
+          page = readRoster(services, readEmployees, ctx.getActor(), {
+            id: template.id,
+            first: size,
+            after,
+          });
           pages.cache.set(key, page);
         }
         return page;
@@ -108,6 +95,7 @@ export function createResolvers(
       choice: ({ choice }) => choice && toEnum(`${choice}_for_person`),
     },
     Query: {
+      ...differences.Query,
       template: (_parent, { id }, context) => services.readTemplate(context.getActor(), id),
       templates: (_parent, { first, after, assignableTo }, context) =>
         services.listTemplates(context.getActor(), {
@@ -120,6 +108,12 @@ export function createResolvers(
       templates: () => ({}),
     },
     TemplatesMutations: {
+      keepExtraApp: (_parent, { input }, context) =>
+        mutationPayload<ResolversTypes["ExtraAppKeepPayload"]>(
+          async () =>
+            changedEmployee(context, await services.keepExtraApp(context.getActor(), input)),
+          ["CONFLICT", "INVALID_INPUT", "NOT_FOUND"],
+        ),
       setAppRole: (_parent, { input }, context) =>
         mutationPayload<ResolversTypes["TemplateSetAppRolePayload"]>(
           async () => ({
@@ -193,6 +187,47 @@ export function createResolvers(
           async () => ({ template: await services.takeOutApp(context.getActor(), input) }),
           ["NOT_FOUND"],
         ),
+    },
+  };
+}
+
+async function readRoster(
+  services: Pick<TemplateService, "readTemplatePeople">,
+  readEmployees: ReadTemplateEmployees,
+  actor: SecurityContext,
+  { id, first, after }: { id: string; first: number; after?: string | null },
+) {
+  const page = await services.readTemplatePeople(actor, id, { first, after });
+  const people = await readEmployees(
+    actor,
+    page.edges.map((edge) => edge.node),
+  );
+  const byId = new Map(people.map((person) => [person.id, person]));
+  return {
+    ...page,
+    edges: page.edges.flatMap((edge) => {
+      const node = byId.get(edge.node);
+      return node ? [{ ...edge, node }] : [];
+    }),
+  };
+}
+
+function differenceResolvers(
+  services: Pick<TemplateService, "readDifferences">,
+): Pick<Resolvers, "AccessDifferences" | "Query" | "Template"> {
+  const differences = perRequest((ctx) => services.readDifferences(ctx.getActor()));
+  return {
+    AccessDifferences: {
+      missingCount: ({ missing }) => missing.length,
+      extraCount: ({ extra }) =>
+        extra.reduce((count, { accountIds }) => count + accountIds.length, 0),
+    },
+    Template: {
+      differenceSummary: async ({ id }, _args, ctx) =>
+        (await differences(ctx)).templateSummaries.get(id) ?? null,
+    },
+    Query: {
+      accessDifferences: (_parent, _args, ctx) => differences(ctx),
     },
   };
 }
