@@ -170,7 +170,7 @@ async function recordAssignment(
   });
 }
 
-export async function requireActiveEmployee(
+async function requireActiveEmployee(
   tx: Tx,
   apps: PersonAccess,
   employees: EmployeeById,

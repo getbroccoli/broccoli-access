@@ -166,6 +166,45 @@ test("a removal and its undo each leave a history line on the employee", async (
   ]);
 });
 
+test("adding the app again with another role records the role change", async ({
+  workspace: { templates, owner, input },
+  orm,
+}) => {
+  await templates.addPersonApp(owner, { ...input, role: null });
+
+  await templates.addPersonApp(owner, { ...input, role: "admin" });
+
+  const history = await recordHistory.read(orm, "employee", input.employeeId, { first: 1 });
+  expect(history.edges[0]!.node.changes).toMatchObject([
+    {
+      field: "appChoice",
+      oldValue: input.appId,
+      oldLabel: "Linear — added",
+      newValue: input.appId,
+      newLabel: "Linear — added as admin",
+    },
+  ]);
+});
+
+test("undoing an added app marks Chloé's active account in it for review", async ({
+  workspace: { templates, owner, input, employee },
+  orm,
+}) => {
+  const chloe = { employeeId: employee("chloe@acme.example").id, appId: input.appId };
+  await templates.addPersonApp(owner, { ...chloe, role: null });
+
+  await templates.undoPersonAppChoice(owner, chloe);
+
+  expect(await storedEmployeeAppChoices(orm)).toEqual([
+    { ...chloe, choice: "to_review", role: null },
+  ]);
+  const [apps] = await templates.readEmployeeApps(owner, [chloe.employeeId]);
+  expect(apps!.find(({ appId }) => appId === input.appId)).toMatchObject({
+    choice: null,
+    state: "extra",
+  });
+});
+
 test.for(["addPersonApp", "removePersonApp", "undoPersonAppChoice"] as const)(
   "only the owner can call %s",
   async (operation, { workspace: { templates, input }, orm }) => {

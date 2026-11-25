@@ -6,7 +6,7 @@ import type { SecurityContext } from "../../../core/security";
 import { assignmentRepository, type EmployeeAppPair } from "../db";
 import type { EmployeeAppChoice } from "../domain";
 import type { AppsById, EmployeeById, PersonAccess } from "../ports";
-import { requireActiveEmployee } from "./templateAssignmentService";
+import { reviewLostApps } from "./reviewLostApps";
 import { checkedAppId, checkedRole } from "./templateRoles";
 
 /**
@@ -25,7 +25,10 @@ export interface PersonAppChoices {
   ) => Promise<string>;
   /** Keeps an app their templates give from the person; refuses any other app with CONFLICT. */
   removePersonApp: (ctx: SecurityContext, input: EmployeeAppPair) => Promise<string>;
-  /** Deletes the person's addition or removal of the app; without one, changes nothing. */
+  /**
+   * Deletes the person's addition or removal of the app; without one, changes nothing. An active
+   * account in an app that is then no longer theirs is marked for review.
+   */
   undoPersonAppChoice: (ctx: SecurityContext, input: EmployeeAppPair) => Promise<string>;
 }
 
@@ -46,12 +49,21 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
       const role = await checkedRole(ctx, apps, pair.appId, input.role ?? null);
       const changed = await transact(async (tx) => {
         const { given, choice, appName } = await lockedFacts(deps, tx, pair);
-        await requireActiveEmployee(tx, apps, employees, pair.employeeId);
+        if (!(await apps.activeInDirectory(tx, pair.employeeId)))
+          throw new ApplicationError(
+            "INVALID_INPUT",
+            "Only a person active in the directory can be given an app.",
+            [{ field: "employeeId", code: "invalid" }],
+          );
         if (given)
           throw new ApplicationError("CONFLICT", "A template already gives this person the app.");
-        if (choice?.choice === "added" && choice.role === role) return false;
+        const before = choice?.choice === "added" ? choice : undefined;
+        if (before?.role === role) return false;
         await assignmentRepository(tx).saveChoice({ ...pair, choice: "added", role });
-        await recordChoice(ctx, tx, pair, { newLabel: `${appName} — added` });
+        await recordChoice(ctx, tx, pair, {
+          oldLabel: before && choiceLabel(appName, before),
+          newLabel: choiceLabel(appName, { choice: "added", role }),
+        });
         return true;
       });
       if (changed) logger.info(pair, "App added for one employee");
@@ -65,7 +77,9 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
           throw new ApplicationError("CONFLICT", "No template gives this person the app.");
         if (choice?.choice === "removed") return false;
         await assignmentRepository(tx).saveChoice({ ...pair, choice: "removed", role: null });
-        await recordChoice(ctx, tx, pair, { newLabel: `${appName} — removed` });
+        await recordChoice(ctx, tx, pair, {
+          newLabel: choiceLabel(appName, { choice: "removed", role: null }),
+        });
         return true;
       });
       if (changed) logger.info(pair, "App removed for one employee");
@@ -77,7 +91,9 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
         const { choice, appName } = await lockedFacts(deps, tx, pair);
         if (!isOwnChoice(choice)) return false;
         await assignmentRepository(tx).clearChoices([pair], choice.choice);
-        await recordChoice(ctx, tx, pair, { oldLabel: `${appName} — ${choice.choice}` });
+        await recordChoice(ctx, tx, pair, { oldLabel: choiceLabel(appName, choice) });
+        // Without the addition, an active account in the app may be one that nothing gives.
+        await reviewLostApps(ctx, tx, apps, employees, [pair.employeeId], [pair.appId]);
         return true;
       });
       if (changed) logger.info(pair, "Employee app choice undone");
@@ -116,17 +132,26 @@ function isOwnChoice(
   return choice?.choice === "added" || choice?.choice === "removed";
 }
 
-/** A new label records a choice made; an old one, a choice undone. */
+function choiceLabel(
+  appName: string | undefined,
+  { choice, role }: Pick<EmployeeAppChoice, "choice" | "role">,
+) {
+  return `${appName} — ${choice}` + (role ? ` as ${role}` : "");
+}
+
+/** A new label records a choice made, an old one a choice undone, and both a changed choice. */
 async function recordChoice(
   ctx: SecurityContext,
   tx: Tx,
   { employeeId, appId }: EmployeeAppPair,
-  label: { newLabel: string } | { oldLabel: string },
+  { oldLabel, newLabel }: { oldLabel?: string; newLabel?: string },
 ) {
-  const change =
-    "newLabel" in label
-      ? { oldValue: null, newValue: appId, ...label }
-      : { oldValue: appId, newValue: null, ...label };
+  const change = {
+    oldValue: oldLabel ? appId : null,
+    oldLabel: oldLabel ?? null,
+    newValue: newLabel ? appId : null,
+    newLabel: newLabel ?? null,
+  };
   await history.append(ctx, tx, {
     recordType: "employee",
     operation: "UPDATED",

@@ -1,6 +1,6 @@
 import { usePersonPage } from "./usePersonPage";
 import { CaretLeft } from "@phosphor-icons/react";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useParams, useRouteContext } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/Avatar";
@@ -19,6 +19,7 @@ import { CurrentAccessTable } from "./CurrentAccessTable";
  */
 export function PersonPage() {
   const { employeeId } = useParams({ from: "/_authenticated/people_/$employeeId" });
+  const { me } = useRouteContext({ from: "/_authenticated" });
   // The route's loader has just read the page into the cache.
   const { pageQuery, more } = usePersonPage(employeeId);
   const person = pageQuery.data?.employee;
@@ -49,11 +50,6 @@ export function PersonPage() {
   // Some of the apps they still have access to can be disabled from here.
   const canDisableHere = person.appAccounts.some(
     ({ offeredChange }) => offeredChange === "SUSPEND",
-  );
-  const givenAppIds = new Set(
-    person.personApps.edges
-      .filter(({ node }) => node.templates.length || node.choice === "ADDED_FOR_PERSON")
-      .map(({ node }) => node.app.id),
   );
 
   return (
@@ -117,9 +113,7 @@ export function PersonPage() {
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-semibold tracking-tight">{t("templates.apps.title")}</h2>
-          {person.status === "ACTIVE" && (
-            <AddPersonAppMenu employeeId={person.id} givenAppIds={givenAppIds} />
-          )}
+          {me.isOwner && person.status === "ACTIVE" && <AddPersonAppMenu employeeId={person.id} />}
         </div>
         <CurrentAccessTable person={person} />
         {person.personApps.pageInfo.hasNextPage && (

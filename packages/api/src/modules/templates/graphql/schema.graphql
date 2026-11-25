@@ -89,7 +89,7 @@ type PersonApp {
   role: String
   "The owner's own choice for this person, while it changes what their templates give; null otherwise."
   choice: PersonAppChoice
-  "Expected access compared with the held account: active access is Active or Extra, a pending invitation is Invited, and an expected app without either is Missing, even for a disabled account. Other disabled accounts are Suspended. Null for invitation controls alone. Employee.appAccounts supplies the underlying account status and actions."
+  "Expected access compared with the held account: active access is Active or Extra, a pending invitation is Invited, and an expected app without either is Missing, even for a disabled account. Other disabled accounts are Suspended. Null for invitation controls alone, and for an app removed for this person that they have no account or pending invitation in. Employee.appAccounts supplies the underlying account status and actions."
   state: PersonAppState
 }
 

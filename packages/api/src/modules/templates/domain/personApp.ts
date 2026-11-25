@@ -61,8 +61,11 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
     const account = accounts.get(appId);
     const invite = invites.get(appId);
     if (!expected && !account && !invite && !ownChoice) continue;
+    // A removal whose template is gone still says the owner did not want this app for them.
     const extra =
-      choice?.choice === "to_review" || (facts.templates.length > 0 && facts.listedApps.has(appId));
+      choice?.choice === "to_review" ||
+      choice?.choice === "removed" ||
+      (facts.templates.length > 0 && facts.listedApps.has(appId));
     const state = appState({ expected, account, invited: !!invite?.invitedAt, extra });
     rows.push({
       appId,

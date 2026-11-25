@@ -72,11 +72,11 @@ Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page
 
 ## Add or remove an app for one person
 
-Assign Everyone, with Google Workspace, Miro and Notion, to Ivan and to Lena Fischer.
+A run of its own: start from [Setup](#setup), and also select Zoom before "Approve and finish". Create Everyone with Slack and Notion, and assign it to Ivan Petrov and to Lena Fischer, who are active in Google. Ivan has a Notion account and no Slack account.
 
-- [ ] On Ivan's page, the **×** at the end of the Notion row is named "Remove Notion for Ivan only". Choosing it strikes Notion through, shows **Removed by you** in **From** and offers **Undo**; **In the app** reads **Extra** while Ivan has an active Notion account, and **Not given** for an app he has no account in.
-- [ ] **+ Add app** lists the approved apps that none of Ivan's templates gives. Choosing Zoom adds a Zoom row with **Added by you**, **Missing** and **Undo**. With Linear connected, Linear opens its roles; choosing Admin adds it with the role Admin, and **Invite** stays offered.
-- [ ] Lena's page still lists Notion from Everyone, without Zoom, and Everyone's page lists the same apps as before.
+- [ ] On Ivan's page, the **×** at the end of the Notion row is named "Remove Notion for Ivan only". Choosing it strikes Notion through, shows **Removed by you** in **From** and offers **Undo**; **In the app** reads **Extra**, since Ivan has an active Notion account. The same on Slack, which he has no account in, reads **Not given**.
+- [ ] **+ Add app** lists the approved apps that none of Ivan's templates gives. Choosing Zoom adds a Zoom row with **Added by you**, **Missing** and **Undo**. With Linear connected as in [Connections settings](connections-settings.md#apps), Linear opens its roles; choosing Admin adds it with the role Admin, and **Invite** stays offered.
+- [ ] Lena's page still lists Notion and Slack from Everyone, without Zoom, and Everyone's page lists the same two apps.
 - [ ] **Undo** on Notion brings back Everyone in **From** and the row's earlier status. **Undo** on Zoom takes its row away.
 - [ ] Ana's page (suspended in Google) offers no **+ Add app**.
 

@@ -1,4 +1,5 @@
 import { X } from "@phosphor-icons/react";
+import { useRouteContext } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   PersonPageDocument,
@@ -16,8 +17,12 @@ type Props = {
   person: Pick<Person, "id" | "firstName">;
 };
 
-/** Undo on an app the owner added or removed for this person; else Remove on a template's app. */
+/**
+ * For the owner: Undo on an app they added or removed for this person; else Remove on a template's
+ * app.
+ */
 export function PersonAppChoiceButton({ row, person }: Props) {
+  const { me } = useRouteContext({ from: "/_authenticated" });
   const [remove, removing] = usePayloadMutation(RemovePersonAppDocument, {
     refetch: [PersonPageDocument],
   });
@@ -26,6 +31,7 @@ export function PersonAppChoiceButton({ row, person }: Props) {
   });
   const input = { variables: { input: { employeeId: person.id, appId: row.app.id } } };
   const failed = () => toast.error(t("people.person.appChoiceFailed", { app: row.app.name }));
+  if (!me.isOwner) return null;
   if (row.choice)
     return (
       <Button

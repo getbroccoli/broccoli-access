@@ -85,6 +85,7 @@ export const peopleEn = {
   "people.person.extra": "Extra",
   "people.person.addApp": "+ Add app",
   "people.person.addApp.loading": "Loading apps…",
+  "people.person.addApp.error": "Couldn’t load apps",
   "people.person.addApp.none": "No approved apps left to add.",
   "people.person.addApp.failed": "Couldn’t add {app}. Reload and try again.",
   "people.person.addedByYou": "Added by you",

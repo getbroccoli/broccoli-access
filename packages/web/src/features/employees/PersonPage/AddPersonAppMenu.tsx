@@ -11,14 +11,10 @@ import {
 import { t } from "@/i18n";
 import { AddPersonAppOptions } from "./AddPersonAppOptions";
 
-type Props = {
-  employeeId: string;
-  /** The apps the person's templates give or the owner already added, which the menu leaves out. */
-  givenAppIds: ReadonlySet<string>;
-};
+type Props = { employeeId: string };
 
 /** "Add app": gives this person alone an approved app, with a role where its connector lists any. */
-export function AddPersonAppMenu({ employeeId, givenAppIds }: Props) {
+export function AddPersonAppMenu({ employeeId }: Props) {
   const [open, setOpen] = useState(false);
   const [add, { loading }] = usePayloadMutation(AddPersonAppDocument, {
     refetch: [PersonPageDocument],
@@ -33,7 +29,7 @@ export function AddPersonAppMenu({ employeeId, givenAppIds }: Props) {
       <DropdownMenuContent align="end" className="max-h-80 w-60 overflow-y-auto">
         {open && (
           <AddPersonAppOptions
-            givenAppIds={givenAppIds}
+            employeeId={employeeId}
             onAdd={(app, role) =>
               void add({ variables: { input: { employeeId, appId: app.id, role } } }).catch(() =>
                 toast.error(t("people.person.addApp.failed", { app: app.name })),

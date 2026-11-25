@@ -44,6 +44,16 @@ test("an active account in a removed template app is extra", () => {
   expect(rows).toMatchObject([{ choice: "removed", state: "extra" }]);
 });
 
+test("an active account in a removed app stays extra once no template gives the app", () => {
+  const rows = appsOfPerson({
+    ...NOTHING,
+    choices: [choice("removed")],
+    accounts: [{ appId: APP, status: "active" }],
+  });
+
+  expect(rows).toMatchObject([{ choice: null, state: "extra", templates: [] }]);
+});
+
 test("a removal has no effect once no template gives the app", () => {
   const rows = appsOfPerson({ ...NOTHING, choices: [choice("removed")] });
 
