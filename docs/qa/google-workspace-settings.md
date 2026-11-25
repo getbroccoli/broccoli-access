@@ -16,7 +16,7 @@ Check the directory, scans, Change Google app and the integration user in Settin
 
 ## Scan now
 
-- [ ] A Google Workspace scan that fails (fake Google `POST /_fake/tokens/revoke`, then "Scan now") shows "Reconnect". Choose it to open Change Google app with the current app selected. After consent, Scan now clears the failure without a reload.
+- [ ] A Google Workspace scan that fails (fake Google `POST /_fake/tokens/revoke`, then "Scan now") shows "Reconnect". Choose it to open Change Google app with the current app selected. For your own app, re-enter its client ID and secret and choose "Connect as Google admin". After consent, Scan now clears the failure without a reload.
 
 - [ ] Suspend `elif@acme.example` in the fake Google (`POST <fake>/_fake/users/elif@acme.example/suspend`), then choose "Scan now": the line shows "Scanning…" and the button is disabled; when the scan ends, the line shows the new time without a reload, and People shows Elif suspended.
 - [ ] Double-clicking "Scan now" starts one scan only.
@@ -58,5 +58,5 @@ Start without an integration user (`pnpm dev --drop-db`, then setup again).
 
 - [ ] Switch own app → Broccoli app → own app. Connection ID, owner, people and approved apps stay; a cancelled or refused change leaves the old app working.
 - [ ] After each switch, Scan now excludes grants to both current and previous Google apps.
-- [ ] A revoked shared refresh token shows Reconnect. Choose "Reconnect" to open Change Google app, consent again, then check that Scan now succeeds.
+- [ ] Switch back to the Broccoli app for the next two checks. A revoked shared refresh token shows Reconnect. Choose "Reconnect" to open Change Google app, consent again, then check that Scan now succeeds.
 - [ ] A relay outage fails the scan and permits a retry; it does not show Reconnect.

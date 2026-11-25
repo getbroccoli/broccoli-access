@@ -72,7 +72,7 @@ export function ConnectWayStep({ connector, isSwitching, onChoose }: Props) {
       <>
         <ConnectHeader connector={connector} title={title} />
         <NoIntegrationUserChoice
-          exists={Boolean(integrationUser)}
+          signInStatus={integrationUser?.signInStatus}
           onOwnSession={isSwitching ? undefined : () => onChoose("ownSession")}
         />
         <DialogFooter className={FOOTER}>{cancel}</DialogFooter>

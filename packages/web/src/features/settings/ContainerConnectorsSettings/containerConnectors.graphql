@@ -1,16 +1,3 @@
-query GoogleWorkspaceScanStatus {
-  setup {
-    id
-    googleWorkspace {
-      id
-      scan {
-        id
-        status
-      }
-    }
-  }
-}
-
 query ContainerConnectorsSettings {
   containerConnectors {
     id

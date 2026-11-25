@@ -1,8 +1,9 @@
+import { NetworkStatus } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
 
 import {
   ContainerConnectorsSettingsDocument,
-  GoogleWorkspaceScanStatusDocument,
+  DirectoryScanDocument,
 } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
@@ -13,15 +14,16 @@ import { ChromeExtensionCard } from "./ChromeExtensionCard";
 import { ContainerConnectorCard } from "./ContainerConnectorCard";
 
 export function ContainerConnectorsSettings() {
-  // A scan started elsewhere, such as on the app's page, changes the connection outside this cache.
-  const query = useQuery(ContainerConnectorsSettingsDocument, { fetchPolicy: "cache-and-network" });
-  const connectors = query.data?.containerConnectors ?? [];
-  // A scan's results, such as its people count, commit with its end: read them once it ends.
-  useRefetchAfterContainerConnectorScans(query.refetch);
-  // The directory's scan can stop or restore the apps that sign in as the integration user.
-  const directoryScan = useQuery(GoogleWorkspaceScanStatusDocument, {
+  // Read the directory first so the cards can't miss a scan that just changed their connections.
+  const directoryScan = useQuery(DirectoryScanDocument, { fetchPolicy: "cache-and-network" });
+  const query = useQuery(ContainerConnectorsSettingsDocument, {
     fetchPolicy: "cache-and-network",
+    skip: directoryScan.networkStatus === NetworkStatus.loading,
+    // A scan-end refresh needs its own request even when the initial read is still in flight.
+    context: { queryDeduplication: false },
   });
+  const connectors = query.data?.containerConnectors ?? [];
+  useRefetchAfterContainerConnectorScans(query.refetch);
   const directoryScanning = directoryScan.data?.setup.googleWorkspace?.scan?.status === "SCANNING";
   usePollWhileScanning(directoryScanning, directoryScan, query.refetch);
 

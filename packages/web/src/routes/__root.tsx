@@ -11,6 +11,11 @@ export interface RouterContext {
 export const Route = createRootRouteWithContext<RouterContext>()({
   // Who is signed in and how far setup is, for the gates of every route below.
   beforeLoad: async ({ context, location }) => {
+    const pathname = location.pathname.replace(/\/$/, "");
+    const legacyPage = LEGACY_SETTINGS_PAGES.find(([from]) => from === pathname);
+    if (legacyPage) {
+      throw redirect({ to: legacyPage[1], search: location.search, replace: true });
+    }
     const { me, setup } = await readSession(context.apolloClient);
     // Another browser holds setup: this one sees only that, and only then.
     const heldElsewhere = setup.holder === "ANOTHER_DEVICE";
@@ -35,3 +40,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 const SETUP_IN_PROGRESS = "/setup/in-progress";
+
+const LEGACY_SETTINGS_PAGES = [
+  ["/settings/connections", "/settings/google-workspace"],
+  ["/settings/connections/google-app", "/settings/google-workspace/google-app"],
+] as const;
