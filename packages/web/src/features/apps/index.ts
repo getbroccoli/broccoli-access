@@ -26,5 +26,6 @@ export { ConnectContainerConnectorDialog } from "./ConnectContainerConnectorDial
 export { connectingFieldName } from "./connectingFieldName";
 export { connectsWithText } from "./connectsWithText";
 export { ReconnectButton } from "./ReconnectButton";
+export { SessionSourceBadge } from "./SessionSourceBadge";
 export { failsUntilLine, foundLine, reconnectCauseLine } from "./reconnectReason";
 export { useRefreshAfterChanges } from "./useRefreshAfterChanges";

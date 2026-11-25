@@ -37,13 +37,16 @@ export function ConnectionSummary({ connector, connection }: Props) {
 /** Which workspace is connected, with whose key or app session. */
 function summaryOf(
   connector: Props["connector"],
-  { connectionUserEmail: email }: Props["connection"],
+  { connectionUserEmail: email, sessionFrom }: Props["connection"],
   workspace: string,
 ): string {
   if (connector.connectionFields.some(({ kind }) => kind === "APP_SESSION")) {
     const app = connector.name;
-    return email
-      ? t("settings.apps.summaryAppSession", { workspace, app, email })
+    if (email) {
+      return t("settings.apps.summaryAppSession", { workspace, app, email });
+    }
+    return sessionFrom === "SERVER_SIGN_IN"
+      ? t("settings.apps.summaryIntegrationUserBeforeScan", { workspace, app })
       : t("settings.apps.summaryAppSessionBeforeScan", { workspace, app });
   }
   const field = connectingFieldName(connector.connectionFields);

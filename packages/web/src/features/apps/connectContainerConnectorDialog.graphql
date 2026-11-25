@@ -24,6 +24,7 @@ mutation ConnectContainerConnector($input: ContainerConnectorConnectInput!) {
           reconnectReason {
             cause
           }
+          sessionFrom
           connectionUserEmail
           noticeAcceptedAt
           scan {

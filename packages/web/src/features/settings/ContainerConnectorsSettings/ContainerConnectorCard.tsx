@@ -7,6 +7,7 @@ import {
   connectingFieldName,
   connectsWithText,
   ReconnectButton,
+  SessionSourceBadge,
 } from "@/features/apps";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
@@ -51,6 +52,7 @@ export function ContainerConnectorCard({ connector }: Props) {
             {connector.name}
           </h3>
           <ConnectorStatusBadge connection={connection} />
+          <SessionSourceBadge sessionFrom={connection?.sessionFrom} />
         </div>
         {connection && needsReconnect && (
           <ReconnectSummary connector={connector} connection={connection} />
@@ -60,51 +62,51 @@ export function ContainerConnectorCard({ connector }: Props) {
         )}
         {!connection && <p className="text-sm text-foreground/80">{howItConnects(connector)}</p>}
       </div>
-      {connection && (
-        <div className="flex shrink-0 flex-wrap items-start gap-2">
-          {!needsReconnect && (
-            <ScanNowButton
-              connectionId={connection.id}
-              isScanning={connection.scan?.status === "SCANNING"}
-              className="items-start pb-0"
-            />
-          )}
-          {/* One dialog in both states, so a status change during a scan keeps a key being typed. */}
-          {connectsWithText(connector) ? (
-            <ConnectContainerConnectorDialog
-              connector={connector}
-              trigger={
-                <Button
-                  type="button"
-                  variant={needsReconnect ? "default" : "outline"}
-                  size="lg"
-                  className="px-4"
-                >
-                  {t(needsReconnect ? "apps.reconnect.pasteNewKey" : "settings.apps.changeKey")}
-                </Button>
-              }
-            />
-          ) : (
-            needsReconnect && <ReconnectButton connector={connector} />
-          )}
-        </div>
-      )}
-      {!connection && (
-        <div className="shrink-0">
-          {connectsWithText(connector) ? (
-            <ConnectContainerConnectorDialog connector={connector} />
-          ) : (
-            <ConnectAppSessionDialog connector={connector} />
-          )}
-        </div>
-      )}
+      <div className="flex shrink-0 flex-wrap items-start gap-2">
+        {connection && !needsReconnect && (
+          <ScanNowButton
+            connectionId={connection.id}
+            isScanning={connection.scan?.status === "SCANNING"}
+            className="items-start pb-0"
+          />
+        )}
+        {connection && connectsWithText(connector) && (
+          /* One dialog in both states, so a status change during a scan keeps a key being typed. */
+          <ConnectContainerConnectorDialog
+            connector={connector}
+            trigger={
+              <Button
+                type="button"
+                variant={needsReconnect ? "default" : "outline"}
+                size="lg"
+                className="px-4"
+              >
+                {t(needsReconnect ? "apps.reconnect.pasteNewKey" : "settings.apps.changeKey")}
+              </Button>
+            }
+          />
+        )}
+        {!connection && connectsWithText(connector) && (
+          <ConnectContainerConnectorDialog connector={connector} />
+        )}
+        {needsReconnect && !connectsWithText(connector) && (
+          <ReconnectButton connector={connector} />
+        )}
+        {/* One dialog before and after connecting, so it shows its steps to the end; then it is Switch. */}
+        {!connectsWithText(connector) && <ConnectAppSessionDialog connector={connector} />}
+      </div>
     </article>
   );
 }
 
 function howItConnects(connector: ContainerConnector): string {
   if (!connectsWithText(connector)) {
-    return t("settings.apps.throughAppSession", { app: connector.name });
+    return t(
+      connector.signsInAsIntegrationUser
+        ? "settings.apps.throughIntegrationUser"
+        : "settings.apps.throughAppSession",
+      { app: connector.name },
+    );
   }
   const field = connectingFieldName(connector.connectionFields);
   return t("settings.apps.throughApi", { app: connector.name, field });

@@ -2,6 +2,7 @@ query ContainerConnectorsSettings {
   containerConnectors {
     id
     name
+    signsInAsIntegrationUser
     connectionFields {
       kind
       label
@@ -27,6 +28,7 @@ query ContainerConnectorsSettings {
           }
         }
       }
+      sessionFrom
       connectionUserEmail
       noticeAcceptedAt
       scan {

@@ -3,6 +3,69 @@ fragment ConnectAppSessionDialog_connector on ContainerConnector {
   name
   appDomain
   notice
+  signsInAsIntegrationUser
+  # Once connected, the dialog offers Switch for the owner's own session, and shows its scan.
+  connection {
+    id
+    sessionFrom
+    scan {
+      id
+      status
+    }
+  }
+}
+
+query ConnectWayIntegrationUser {
+  setup {
+    id
+    integrationUser {
+      id
+      email
+      signInStatus
+    }
+  }
+}
+
+# Returns what connecting or switching changes: the connection, whose session it uses and its scan.
+mutation ConnectWithIntegrationUser($input: ContainerConnectorConnectWithIntegrationUserInput!) {
+  connectors {
+    connectWithIntegrationUser(input: $input) {
+      containerConnector {
+        id
+        connection {
+          id
+          status
+          reconnectReason {
+            cause
+          }
+          sessionFrom
+          connectionUserEmail
+          noticeAcceptedAt
+          scan {
+            id
+            status
+            readAt
+            sourceName
+            people {
+              count
+            }
+          }
+        }
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+        ... on InvalidInputError {
+          fields {
+            field
+            code
+          }
+        }
+      }
+    }
+  }
 }
 
 query AppSessionHandOver($id: ID!) {

@@ -16,6 +16,7 @@ mutation ReconnectContainerConnector($input: ContainerConnectorReconnectInput!) 
         connection {
           id
           status
+          sessionFrom
           reconnectReason {
             cause
           }

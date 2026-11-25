@@ -12,6 +12,7 @@ import { ApproveAppButton } from "../ApproveAppButton";
 import { ConnectAppButton } from "../ConnectAppButton";
 import { ConnectedBadge } from "../ConnectedBadge";
 import { ReconnectBadge } from "../ReconnectBadge";
+import { SessionSourceBadge } from "../SessionSourceBadge";
 import { isConnected } from "../AppTable";
 import { useAppStatusChange } from "../useAppStatusChange";
 import { AppStatusBadge } from "./AppStatusBadge";
@@ -68,6 +69,7 @@ export function AppHeader({ app, onConnected }: Props) {
               <AppStatusBadge status={app.status} />
               {app.managingConnector && <CanDisableBadge />}
               {app.connected && !needsReconnect && <ConnectedBadge />}
+              <SessionSourceBadge sessionFrom={connection?.sessionFrom} />
               {needsReconnect && <ReconnectBadge />}
             </div>
             <AppSubtitle app={app} />
