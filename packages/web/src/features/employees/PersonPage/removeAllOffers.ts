@@ -1,19 +1,19 @@
 import type { AppAccountStatus } from "@/__generated__/graphql";
 
 /** An already suspended directory account can leave active access to remove before Offboard ran. */
-export function showRemoveAll({
-  offboardedAt,
-  directoryStatus,
-  accountsToRemove,
-}: {
-  offboardedAt: string | null;
-  directoryStatus?: AppAccountStatus;
-  accountsToRemove: readonly { status: AppAccountStatus }[];
-}): boolean {
+export function showRemoveAll(
+  offboardedAt: string | null,
+  person: {
+    directoryAccount?: { status: AppAccountStatus } | null;
+    offboarding: { accountsToRemove: readonly { status: AppAccountStatus }[] };
+  },
+): boolean {
+  const { accountsToRemove } = person.offboarding;
   if (!accountsToRemove.length) return false;
   return (
     offboardedAt !== null ||
-    (directoryStatus === "SUSPENDED" && activeAccountsToRemove(accountsToRemove).length > 0)
+    (person.directoryAccount?.status === "SUSPENDED" &&
+      activeAccountsToRemove(accountsToRemove).length > 0)
   );
 }
 

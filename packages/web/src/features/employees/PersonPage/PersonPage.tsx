@@ -192,11 +192,7 @@ export function PersonPage() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-semibold tracking-tight">{t("templates.apps.title")}</h2>
           {me.isOwner && person.status === "ACTIVE" && <AddPersonAppMenu employeeId={person.id} />}
-          {showRemoveAll({
-            offboardedAt,
-            directoryStatus: person.directoryAccount?.status,
-            accountsToRemove: person.offboarding.accountsToRemove,
-          }) && <RemoveAllDialog person={person} />}
+          {showRemoveAll(offboardedAt, person) && <RemoveAllDialog person={person} />}
         </div>
         <CurrentAccessTable person={person} />
         {person.personApps.pageInfo.hasNextPage && (
