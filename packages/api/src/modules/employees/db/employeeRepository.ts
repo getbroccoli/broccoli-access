@@ -30,6 +30,8 @@ import { employees } from "./employeesTable";
 export interface EmployeeRepository {
   /** Throws `EmailTakenError` when another employee has the email. */
   insert(newEmployee: EmployeeRow): Promise<Employee>;
+  /** Deletes the employee after the caller has checked whether they may be deleted. */
+  delete(id: string): Promise<void>;
   /** Inserts employees whose emails nobody has, as a sync found them. */
   insertMany(newEmployees: readonly NewEmployee[]): Promise<Employee[]>;
   /**
@@ -51,6 +53,8 @@ export interface EmployeeRepository {
     photo: StoredFile | null,
   ): Promise<string | null>;
   findById(id: string): Promise<Employee | null>;
+  lockById(id: string): Promise<Employee | null>;
+  findManagersWithReports(ids: readonly string[]): Promise<Set<string>>;
   /** The employee linked to this user, or null. */
   findByUserId(userId: string): Promise<Employee | null>;
   /** The employees among these ids that exist, sorted by name as the employee list sorts them. */
@@ -115,6 +119,26 @@ export function employeeRepository(db: Orm | Tx): EmployeeRepository {
         inserted.push(...(await orm().insert(employees).values(batch).returning()));
       }
       return inserted;
+    },
+
+    delete: async (id) => {
+      await orm().delete(employees).where(eq(employees.id, id));
+    },
+    lockById: async (id) => {
+      const [employee] = await orm()
+        .select()
+        .from(employees)
+        .where(eq(employees.id, id))
+        .for("update");
+      return employee ?? null;
+    },
+    findManagersWithReports: async (ids) => {
+      if (!ids.length) return new Set();
+      const rows = await orm()
+        .selectDistinct({ id: employees.managerId })
+        .from(employees)
+        .where(anyOf(employees.managerId, ids));
+      return new Set(rows.map(({ id }) => id!));
     },
 
     update: async (id, changes) => {

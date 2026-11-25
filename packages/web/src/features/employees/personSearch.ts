@@ -9,6 +9,7 @@ import { googleUserWritesOutcome } from "@/lib/useGoogleUserWrites";
  */
 export const personSearch = z.object({
   offboard: z.boolean().optional().catch(undefined),
+  provision: z.boolean().optional().catch(undefined),
   skip: z
     .string()
     .regex(/^[\w-]+$/)

@@ -11,7 +11,7 @@ import type {
 import type { TemplateService } from "./templates";
 
 type Reads = Pick<TemplateService, "readEmployeeTemplates" | "readEmployeeApps"> &
-  Pick<AccountChangeService, "readAppInvites" | "readChangeStates"> &
+  Pick<AccountChangeService, "readEmployeeInviteRows" | "readChangeStates"> &
   Pick<AppUserService, "readUsersOfEmployees">;
 
 /**
@@ -25,7 +25,7 @@ export function createPersonPageReader(
   return (ctx: SecurityContext, ids: readonly string[], scope?: PersonPageScope) =>
     readSnapshot(orm, async (db) => {
       const pages = await readPersonPages(db, reads, ctx, ids, scope);
-      const steps = await reads.readProvisionSteps(ctx, ids, pages, db);
+      const steps = await reads.readProvisionSteps(ctx, pages, db);
       return pages.map((page, index) => ({ ...page, provisionSteps: steps[index]! }));
     });
 }
@@ -40,7 +40,12 @@ export async function readPersonPages(
 ) {
   ctx.require("MANAGE_WORKSPACE");
   const templates = await reads.readEmployeeTemplates(ctx, ids, db);
-  const invites = await reads.readAppInvites(ctx, ids, db, scope);
+  const { rows: invites, activeInDirectory } = await reads.readEmployeeInviteRows(
+    ctx,
+    ids,
+    db,
+    scope,
+  );
   const accounts = await reads.readUsersOfEmployees(ctx, ids, db, scope?.appIds);
   const apps = await reads.readEmployeeApps(
     ctx,
@@ -60,6 +65,7 @@ export async function readPersonPages(
   );
   const invitesByPerson = Map.groupBy(invites, (invite) => invite.employeeId);
   return ids.map((id, index) => ({
+    activeInDirectory: activeInDirectory.has(id),
     templates: templates[index]!,
     personApps: apps[index]!,
     appAccounts: accountsByPerson.get(id) ?? [],

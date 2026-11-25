@@ -21,6 +21,7 @@ export interface PersonPageScope {
 
 /** The parts of one person's page Provision decides from. */
 export interface PersonPage {
+  activeInDirectory: boolean;
   /** Each of their apps: its state, `missing` among them, and whether its templates still disagree on its role. */
   personApps: readonly { appId: string; state: string | null; roleConflict: boolean }[];
   /** Their accounts, each with the change it offers now. */

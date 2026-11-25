@@ -3,11 +3,29 @@ import type { SecurityContext } from "../../../core/security";
 import type { Logger } from "../../../core/logger";
 import { parseUuid } from "../../../utils";
 import type { AccountChange } from "../domain";
+import type { PersonPage } from "../ports";
 import type { ProvisionService } from "./provisionService";
 
 export interface AppProvisionResult {
   changes: AccountChange[];
   refusedEmployeeIds: string[];
+}
+
+/** Differences reports a refusal for missing access with no offered or running change. */
+export function refuseUnavailableSelection(page: PersonPage, confirmed: PersonPage["personApps"]) {
+  if (confirmed.some(({ appId, state }) => state === "missing" && !hasRunningStep(page, appId))) {
+    throw new ApplicationError("CONFLICT", "This app cannot be provisioned for this person now.");
+  }
+}
+
+function hasRunningStep(page: PersonPage, appId: string) {
+  return (
+    page.appInvites.some((row) => row.appId === appId && row.latestInvite?.status === "running") ||
+    page.appAccounts.some((row) => {
+      const change = row.changeState?.latestChange;
+      return row.appId === appId && change?.action === "reactivate" && change.status === "running";
+    })
+  );
 }
 
 /** Keeps a person's refusal from preventing Provision for the others in the same request. */

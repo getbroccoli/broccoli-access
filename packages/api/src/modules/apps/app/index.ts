@@ -14,6 +14,7 @@ export {
 export { createAppAccountService, type AppAccountService } from "./appAccountService";
 export { createAppInvitationService, type AppInvitationService } from "./appInvitationService";
 export type { AppInvite } from "./appInvite";
+export { createAddPersonService, type AddPersonService } from "./addPersonService";
 export type { EmployeeOffboarding } from "./offboarding";
 export { createAppConnectionService, type AppConnectionService } from "./appConnectionService";
 export { createAppService, type AppService, type AppSummary } from "./appService";

@@ -3,7 +3,7 @@ import { AppMark } from "@/components/AppMark";
 import { t } from "@/i18n";
 import { dayAndTime } from "@/lib/dayAndTime";
 
-import type { AccountChangeRow } from "./accountChangeRow";
+import { type AccountChangeRow, createsDirectoryAccount } from "./accountChangeRow";
 import { ChangeOutcome } from "./ChangeOutcome";
 import { ChangePersonCell } from "./ChangePersonCell";
 
@@ -28,13 +28,19 @@ const APP: DataTableColumn<AccountChangeRow> = {
 const CHANGE: DataTableColumn<AccountChangeRow> = {
   id: "change",
   header: t("apps.activity.column.change"),
-  cell: ({ action, startedFrom }) => (
+  cell: (change) => (
     <span className="flex flex-col whitespace-nowrap">
-      <span>{t(ACTIONS[action])}</span>
-      {startedFrom === "OFFBOARDING" && (
+      <span>
+        {t(
+          createsDirectoryAccount(change)
+            ? "apps.activity.createDirectory"
+            : ACTIONS[change.action],
+        )}
+      </span>
+      {change.startedFrom === "OFFBOARDING" && (
         <span className="text-xs text-muted-foreground">{t("apps.activity.fromOffboarding")}</span>
       )}
-      {startedFrom === "PROVISION" && (
+      {change.startedFrom === "PROVISION" && (
         <span className="text-xs text-muted-foreground">{t("apps.activity.fromProvision")}</span>
       )}
     </span>

@@ -75,7 +75,12 @@ export { hostileText, storedTextSnapshot } from "./hostileText";
 export { storedTextProbe } from "./storedTextProbe";
 export { startFakeHttpServer } from "./fakeHttpServer";
 export { expectHistoryReplaysTo } from "./employeeHistory";
-export { registerGoogleRedirect, consentAtGoogle, refreshGoogleGrant } from "./googleConsent";
+export {
+  registerGoogleRedirect,
+  allowGoogleUserWrites,
+  consentAtGoogle,
+  refreshGoogleGrant,
+} from "./googleConsent";
 export {
   storedAppConnections,
   storedIntegrationUsers,
@@ -170,3 +175,9 @@ export {
   writableGoogleConnection,
   googleUserSuspended,
 } from "./googleWorkspaceConnector";
+export {
+  addPersonService,
+  NEW_PERSON,
+  createPersonAtGoogle,
+  directoryProvisionTest,
+} from "./addPerson";

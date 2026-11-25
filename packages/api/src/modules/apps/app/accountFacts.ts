@@ -4,7 +4,6 @@ import {
   canRemoveAccounts,
   type AccountAction,
   type Connector,
-  type ConnectorRegistry,
 } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import { parseUuid } from "../../../utils";
@@ -39,12 +38,7 @@ export async function readChangeFacts(
   const accounts = await appAccountRepository(db).findByIds(
     ids.flatMap((id) => parseUuid(id) ?? []),
   );
-  return readAccountFacts(
-    dependencies,
-    db,
-    accounts,
-    connectors && changingConnectorsOf(connectors),
-  );
+  return readAccountFacts(dependencies, db, accounts, connectors && changingConnectors(connectors));
 }
 
 /** What decides each account's Disable or Enable, by account id, read in one go. */
@@ -58,7 +52,9 @@ export async function readAccountFacts(
   // The connector list can take a network round trip. No member means no action.
   const capabilities =
     changing ??
-    (stored.members.length ? await changingConnectors(dependencies.connectors) : NO_CONNECTORS);
+    (stored.members.length
+      ? changingConnectors(await dependencies.connectors.list())
+      : NO_CONNECTORS);
   return gatherFacts(accounts, stored, capabilities);
 }
 
@@ -161,13 +157,7 @@ export interface ChangingConnectors {
 const NO_CONNECTORS: ChangingConnectors = { status: new Set(), remove: new Set() };
 
 /** Connector keys grouped by the changes they can make. */
-export async function changingConnectors(
-  connectors: ConnectorRegistry,
-): Promise<ChangingConnectors> {
-  return changingConnectorsOf(await connectors.list());
-}
-
-function changingConnectorsOf(listed: readonly Connector[]): ChangingConnectors {
+export function changingConnectors(listed: readonly Connector[]): ChangingConnectors {
   return {
     status: new Set(listed.filter(canChangeAccounts).map(({ key }) => key)),
     remove: new Set(listed.filter(canRemoveAccounts).map(({ key }) => key)),

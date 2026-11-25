@@ -4,7 +4,6 @@ import type { Orm, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
 import {
-  type AppConnection,
   accountChangeRepository,
   appAccountRepository,
   appConnectionRepository,
@@ -18,6 +17,7 @@ import {
   withPlace,
 } from "./accountChangeService";
 import { readByHandInvites } from "./byHandInvites";
+import type { DirectoryConnectors } from "./directory";
 import {
   appInviteOf,
   expectedInviteRows,
@@ -72,23 +72,27 @@ export async function inviteEmployee(
  * The employees' rows for the connected apps they have no account in, and for the apps without a
  * connection where an invite is theirs to make by hand, by employee, then app name.
  */
-export async function readAppInvites(
+export async function readEmployeeInviteRows(
   dependencies: AccountChangeDependencies,
   ctx: SecurityContext,
   employeeIds: readonly string[],
   db: Orm | Tx = dependencies.orm,
   scope: AppInviteScope = {},
-): Promise<AppInvite[]> {
+): Promise<{ rows: AppInvite[]; activeInDirectory: Set<string> }> {
   ctx.require("MANAGE_WORKSPACE");
   const { expected } = scope;
-  if (expected?.length === 0) return [];
+  if (expected?.length === 0) return { rows: [], activeInDirectory: new Set() };
   const appIds = scope.appIds ?? (expected && [...new Set(expected.map(({ appId }) => appId))]);
   const employees = await dependencies.employees.readEmployees(ctx, employeeIds, db);
   const repo = appConnectionRepository(db);
-  const [connectors, connections] = await Promise.all([
+  const [connectors, allConnections] = await Promise.all([
     scope.connectors ?? dependencies.connectors.list(),
     appIds ? repo.findByApps(appIds) : repo.findAll(),
   ]);
+  const directoryKeys = new Set(
+    dependencies.directoryConnectors.filter(({ isDirectory }) => isDirectory).map(({ key }) => key),
+  );
+  const connections = allConnections.filter(({ connector }) => !directoryKeys.has(connector));
   const facts = await readInviteFacts(dependencies, db, {
     employees,
     connections,
@@ -108,9 +112,21 @@ export async function readAppInvites(
     appIds,
     expected,
   );
-  if (expected) return [...connected, ...byHand].filter(({ invitedAt }) => invitedAt !== null);
-  if (scope.connectors) return [...connected, ...byHand];
-  const rows = await sortByAppName(db, employees, [...connected, ...byHand]);
+  const allRows = [...connected, ...byHand];
+  const rows = expected
+    ? allRows.filter(({ invitedAt }) => invitedAt !== null)
+    : scope.connectors
+      ? allRows
+      : await placeInvites(db, employees, allRows);
+  return { rows, activeInDirectory: facts.activeInDirectory };
+}
+
+async function placeInvites(
+  db: Orm | Tx,
+  employees: readonly InvitedEmployee[],
+  invites: AppInvite[],
+) {
+  const rows = await sortByAppName(db, employees, invites);
   const running = rows.flatMap(({ latestInvite }) =>
     latestInvite?.status === "running" ? [latestInvite.id] : [],
   );
@@ -151,7 +167,7 @@ export async function askForInvite(
   { ctx, employeeId, appId, requestedBy, connectors, start }: InviteRequest,
 ): Promise<AppInvite | null> {
   await appAccountRepository(tx).lockForSync();
-  const connection = await findConnectionOfApp(tx, appId);
+  const connection = await findInviteConnection(tx, appId, dependencies.directoryConnectors);
   if (!(await appRepository(tx).tryLockForReview(connection.appId))) return null;
   const id = parseUuid(employeeId);
   const [employee] = id ? await dependencies.employees.readEmployees(ctx, [id], tx) : [];
@@ -199,13 +215,16 @@ export async function askForInvite(
 }
 
 /** The app's connection; refuses an unknown app with NOT_FOUND, and one without a connection with CONFLICT. */
-async function findConnectionOfApp(tx: Tx, appId: string): Promise<AppConnection> {
+async function findInviteConnection(tx: Tx, appId: string, directory: DirectoryConnectors) {
   const app = parseUuid(appId) && (await appRepository(tx).findById(appId));
   if (!app) {
     throw new ApplicationError("NOT_FOUND", "No app has this id.");
   }
   const [connection] = await appConnectionRepository(tx).findByApps([app.id]);
-  if (!connection) {
+  if (
+    !connection ||
+    directory.some(({ key, isDirectory }) => isDirectory && key === connection.connector)
+  ) {
     throw new ApplicationError("CONFLICT", NOT_OFFERED);
   }
   return connection;

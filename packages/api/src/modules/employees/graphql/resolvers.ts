@@ -39,7 +39,7 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
       update: (_parent, { input }, context) =>
         mutationPayload<ResolversTypes["EmployeeUpdatePayload"]>(
           () => services.updateEmployee(context.getActor(), input),
-          ["INVALID_INPUT", "NOT_FOUND"],
+          ["INVALID_INPUT", "NOT_FOUND", "CONFLICT"],
         ),
     },
     AccountWithoutPerson: {

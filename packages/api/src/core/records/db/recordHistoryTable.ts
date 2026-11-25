@@ -1,3 +1,4 @@
+import { isNotNull } from "drizzle-orm";
 import { bigint, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { jsonb } from "../../db";
@@ -27,5 +28,8 @@ export const recordHistory = pgTable(
   (table) => [
     // Serves a record's newest-first history, which is also the keyset of its cursor.
     index("record_history_record_idx").on(table.recordType, table.recordId, table.id),
+    index("record_history_cause_idx")
+      .on(table.recordType, table.causeKind, table.operation, table.recordId, table.causeRef)
+      .where(isNotNull(table.causeRef)),
   ],
 );

@@ -100,7 +100,11 @@ export function PeoplePage() {
       {showDifferences ? (
         <PageHeader title={t("people.title")} />
       ) : (
-        <PeopleHeader connection={connection} loaded={directory.data !== undefined} />
+        <PeopleHeader
+          connection={connection}
+          loaded={directory.data !== undefined}
+          canAddPerson={me.isOwner}
+        />
       )}
       <div
         className={cn(

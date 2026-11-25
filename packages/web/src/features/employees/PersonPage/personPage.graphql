@@ -8,6 +8,12 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
     status
     suspendedWithAccess
     approvedAppNames
+    directoryProvision {
+      status
+      failure
+      canDelete
+      firstPasswordAvailable
+    }
     templates(first: 30, after: $templatesAfter) {
       pageInfo {
         hasNextPage
@@ -152,6 +158,68 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
       }
       ...InviteCell_appInvite
       ...InviteStatusCell_appInvite
+    }
+  }
+}
+
+query DirectoryProvisionStatus($id: ID!) {
+  employee(id: $id) {
+    id
+    directoryProvision {
+      status
+      failure
+      canDelete
+      firstPasswordAvailable
+    }
+  }
+}
+
+query DirectoryProvisionApps($id: ID!) {
+  employee(id: $id) {
+    id
+    personApps(first: 10000) {
+      edges {
+        node {
+          app {
+            id
+            name
+            catalogKey
+            connected
+            roles {
+              key
+              isDefault
+            }
+          }
+          roleConflict
+          roleSources {
+            role
+          }
+          state
+        }
+      }
+    }
+  }
+}
+
+mutation DeletePerson($employeeId: ID!) {
+  apps {
+    deletePerson(employeeId: $employeeId) {
+      deleted
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation TakeFirstPassword($employeeId: ID!) {
+  apps {
+    takeFirstPassword(employeeId: $employeeId) {
+      email
+      password
     }
   }
 }

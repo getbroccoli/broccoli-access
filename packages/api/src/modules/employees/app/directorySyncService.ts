@@ -3,6 +3,7 @@ import { createOwnerService } from "../../../core/instance";
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { type EmployeeRepository, employeeRepository } from "../db";
+import { findPeopleAwaitingDirectory } from "./peopleAwaitingDirectory";
 import {
   changesAvatar,
   directoryChanges,
@@ -54,6 +55,12 @@ export function createDirectorySyncService(): DirectorySyncService {
       const repository = employeeRepository(tx);
       const known = await repository.lockByEmails(emailsNamedBy(people));
       const knownEmails = new Set(known.map(({ email }) => email));
+      const listedEmails = new Set(people.map(({ email }) => email));
+      const firstDirectoryAccounts = await findPeopleAwaitingDirectory(
+        tx,
+        known.flatMap(({ email, id }) => (listedEmails.has(email) ? [id] : [])),
+        () => Promise.resolve(cause.ref),
+      );
       const created = await repository.insertMany(
         people
           .filter(({ email }) => !knownEmails.has(email))
@@ -66,7 +73,7 @@ export function createDirectorySyncService(): DirectorySyncService {
       };
       const saved = await saveDirectoryFields(repository, employees, people, links);
       const managerNames = await namesOfManagers(repository, employees, saved);
-      await recordChanges(ctx, tx, { created, saved, managerNames, cause });
+      await recordChanges(ctx, tx, { created, saved, managerNames, cause, firstDirectoryAccounts });
       return new Map(people.map(({ email }) => [email, links.idsByEmail.get(email)!]));
     },
     async findEmployeeIdsByEmail(ctx, db, emails) {
@@ -159,11 +166,13 @@ async function recordChanges(
     saved,
     managerNames,
     cause,
+    firstDirectoryAccounts,
   }: {
     created: readonly Employee[];
     saved: readonly EmployeeChange[];
     managerNames: { before: Map<string, string>; after: Map<string, string> };
     cause: HistoryAppend["cause"];
+    firstDirectoryAccounts: ReadonlySet<string>;
   },
 ): Promise<void> {
   const savedById = new Map(saved.map((change) => [change.after.id, change]));
@@ -182,18 +191,20 @@ async function recordChanges(
     },
     {
       operation: "UPDATED" as const,
-      records: saved
-        .filter(({ after }) => !createdIds.has(after.id))
-        .map(({ before, after }) => ({
-          recordId: after.id,
-          changes: directoryChanges(before, after, managerNames),
-        })),
+      records: [...new Set([...savedById.keys(), ...firstDirectoryAccounts])]
+        .filter((id) => !createdIds.has(id))
+        .map((recordId) => {
+          const change = savedById.get(recordId);
+          return {
+            recordId,
+            changes: change ? directoryChanges(change.before, change.after, managerNames) : [],
+          };
+        }),
     },
   ];
   for (const { operation, records } of lines) {
-    if (records.length > 0) {
+    if (records.length > 0)
       await recordHistory.append(ctx, tx, { recordType: "employee", operation, cause, records });
-    }
   }
 }
 

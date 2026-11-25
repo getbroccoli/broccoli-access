@@ -7,9 +7,10 @@ import type { ConnectorRegistry, SessionRenewals } from "../../src/core/connecto
 import type { Orm, Transact } from "../../src/core/db";
 import type { JobQueue } from "../../src/core/jobs";
 import { createSessionRenewals } from "../../src/modules/connectors";
-import { createAccountChangeService } from "../../src/modules/apps";
+import { createAccountChangeService, createAppConnectionService } from "../../src/modules/apps";
 import { readInviteRole, type TemplateService } from "../../src/modules/templates";
 import { createEmployeeReadService } from "../../src/modules/employees";
+import { directoryMatches } from "../../src/modules";
 import { createGoogleWorkspaceConnector } from "../../src/modules/google";
 import { createImportRecordService } from "../../src/modules/imports";
 import { connectLinear, containerDependencies, failLinearCall } from "./containerConnections";
@@ -54,15 +55,21 @@ export function accountChangeDependencies(
   const connectors = { list: async () => [google, ...(await container.list())] };
   const isExtraApp: TemplateService["isExtraApp"] = (ctx, pair, tx) =>
     templates(orm, { connectors: container, transact }).isExtraApp(ctx, pair, tx);
+  const members = createImportRecordService();
   return {
     isExtraApp,
     readInviteRole,
+    findPeopleAwaitingDirectory: directoryMatches(
+      createAppConnectionService({ secretBox: dependencies.secretBox }),
+      members,
+      google.key,
+    ),
     directoryConnectors: [google],
     ...dependencies,
     renewals: renewals ?? createSessionRenewals(dependencies),
     jobs,
     connectors,
-    members: createImportRecordService(),
+    members,
     employees: createEmployeeReadService({ orm, accounts: apps(orm) }),
   };
 }

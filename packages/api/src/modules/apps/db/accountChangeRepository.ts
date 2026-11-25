@@ -15,7 +15,7 @@ import {
 import type { ConnectorErrorCode } from "../../../core/connectors";
 import type { KeysetQuery, KeysetRow } from "../../../core/pagination";
 import type { AccountChange } from "../domain";
-import { accountChanges, type StoredAttempt } from "./accountChangesTable";
+import { accountChangeColumns, accountChanges, type StoredAttempt } from "./accountChangesTable";
 import { type InviteTarget, matchesInviteTargets } from "./appInvitationRepository";
 
 /** Account changes in Postgres, through the pool or inside a transaction. */
@@ -109,11 +109,14 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         // Waits for a concurrent ask of the same account or invite, then stores nothing if it
         // committed: both one-running indexes arbitrate.
         .onConflictDoNothing()
-        .returning();
+        .returning(accountChangeColumns);
       return stored ? toChange(stored) : null;
     },
     findById: async (id) => {
-      const [row] = await orm().select().from(accountChanges).where(eq(accountChanges.id, id));
+      const [row] = await orm()
+        .select(accountChangeColumns)
+        .from(accountChanges)
+        .where(eq(accountChanges.id, id));
       return row ? toChange(row) : null;
     },
     async runningIds() {
@@ -125,12 +128,15 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
       return rows.map(({ id }) => id);
     },
     findByIds: async (ids) => {
-      const rows = await orm().select().from(accountChanges).where(anyOf(accountChanges.id, ids));
+      const rows = await orm()
+        .select(accountChangeColumns)
+        .from(accountChanges)
+        .where(anyOf(accountChanges.id, ids));
       return rows.map(toChange);
     },
     lockById: async (id) => {
       const [row] = await orm()
-        .select()
+        .select(accountChangeColumns)
         .from(accountChanges)
         .where(eq(accountChanges.id, id))
         .for("update");
@@ -153,7 +159,7 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
           error: "no_connection",
           finishedAt: change.requestedAt,
         })
-        .returning();
+        .returning(accountChangeColumns);
       return toChange(stored!);
     },
     markDoneByHand: async (id) => {
@@ -161,7 +167,7 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .update(accountChanges)
         .set({ status: "done_by_hand" })
         .where(and(eq(accountChanges.id, id), eq(accountChanges.status, "failed")))
-        .returning();
+        .returning(accountChangeColumns);
       return toChange(row!);
     },
     failRunningOfConnection: async (connectionId, error, finishedAt) => {
@@ -190,7 +196,7 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
     },
     findLatestOfAccounts: async (appAccountIds) => {
       const rows = await orm()
-        .selectDistinctOn([accountChanges.appAccountId])
+        .selectDistinctOn([accountChanges.appAccountId], accountChangeColumns)
         .from(accountChanges)
         .where(anyOf(accountChanges.appAccountId, appAccountIds))
         .orderBy(
@@ -202,7 +208,7 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
     },
     findLatestInvites: async (connectionIds, emails, targets) => {
       const rows = await orm()
-        .selectDistinctOn([accountChanges.connectionId, accountChanges.email])
+        .selectDistinctOn([accountChanges.connectionId, accountChanges.email], accountChangeColumns)
         .from(accountChanges)
         .where(
           and(
@@ -236,7 +242,7 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
     },
     findLatestInvitesWithoutConnection: async (employeeIds, appIds, targets) => {
       const rows = await orm()
-        .selectDistinctOn([accountChanges.employeeId, accountChanges.appId])
+        .selectDistinctOn([accountChanges.employeeId, accountChanges.appId], accountChangeColumns)
         .from(accountChanges)
         .where(
           and(
@@ -281,7 +287,7 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
     },
     findPage: async ({ after, limit }) => {
       const rows = await orm()
-        .select()
+        .select(accountChangeColumns)
         .from(accountChanges)
         .where(after ? afterKeyset(PAGE_ORDER, after) : undefined)
         .orderBy(...orderByKeyset(PAGE_ORDER))
@@ -307,7 +313,9 @@ const PAGE_ORDER = keysetOrder(
   true,
 );
 
-function toChange(row: typeof accountChanges.$inferSelect): AccountChange {
+function toChange(
+  row: Omit<typeof accountChanges.$inferSelect, "encryptedFirstPassword">,
+): AccountChange {
   return {
     ...row,
     attempts: row.attempts.map((attempt) => ({ ...attempt, at: new Date(attempt.at) })),

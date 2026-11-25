@@ -23,7 +23,12 @@ import type { ConnectionMembers, EmployeesByName, IntegrationUser } from "../por
 import { changingConnectors, readChangeFacts } from "./accountFacts";
 import { createAppConnectionService } from "./appConnectionService";
 import { askForChange } from "./askForChange";
-import { type AppInvite, type AppInviteScope, inviteEmployee, readAppInvites } from "./appInvite";
+import {
+  type AppInvite,
+  type AppInviteScope,
+  inviteEmployee,
+  readEmployeeInviteRows,
+} from "./appInvite";
 import { loggingRefusal } from "./loggingRefusal";
 import { markChangeDoneByHand } from "./markChangeDoneByHand";
 import type { DirectoryConnectors } from "./directory";
@@ -87,6 +92,13 @@ export interface AccountChangeService {
   readRunningChangeIds: (ctx: SecurityContext, db?: Orm | Tx) => Promise<string[]>;
   /** Whether an account has a running Disable. Needs MANAGE_WORKSPACE. */
   hasRunningDisable: (ctx: SecurityContext, ids: readonly string[], tx: Tx) => Promise<boolean>;
+  /** Invite rows and the directory readiness used to decide their offers. */
+  readEmployeeInviteRows(
+    ctx: SecurityContext,
+    ids: readonly string[],
+    db: Orm | Tx,
+    scope?: AppInviteScope,
+  ): Promise<{ rows: AppInvite[]; activeInDirectory: Set<string> }>;
   /**
    * The run's job: makes the change through the connector, trying a rate-limited or unavailable
    * call again; saves a renewed connection first. When the member reads back with the new status,
@@ -228,6 +240,7 @@ export interface AccountChangeDependencies {
   ) => Promise<boolean>;
   members: ConnectionMembers;
   directoryConnectors: DirectoryConnectors;
+  findPeopleAwaitingDirectory(db: Orm | Tx, ids: readonly string[]): Promise<Set<string>>;
   /** The employees module, which owns their emails, which invites go to. */
   employees: EmployeesByName;
   /** Whose accounts never offer a change. */
@@ -259,7 +272,7 @@ export function createAccountChangeService(
         }
         const requestedBy = ctx.user.userId;
         // Read before the transaction: the container's list may take a while to answer.
-        const changing = await changingConnectors(dependencies.connectors);
+        const changing = changingConnectors(await dependencies.connectors.list());
         return dependencies.transact((tx) =>
           askForChange(dependencies, tx, {
             appAccountId,
@@ -280,8 +293,10 @@ export function createAccountChangeService(
       return change;
     },
     inviteEmployee: (ctx, input) => inviteEmployee(dependencies, ctx, input),
-    readAppInvites: (ctx, employeeIds, db, scope) =>
-      readAppInvites(dependencies, ctx, employeeIds, db, scope),
+    readAppInvites: async (ctx, ids, db, scope) =>
+      (await readEmployeeInviteRows(dependencies, ctx, ids, db, scope)).rows,
+    readEmployeeInviteRows: (ctx, ids, db, scope) =>
+      readEmployeeInviteRows(dependencies, ctx, ids, db, scope),
     async readRunningChangeIds(ctx, db = orm) {
       ctx.require("MANAGE_WORKSPACE");
       return accountChangeRepository(db).runningIds();
@@ -332,7 +347,7 @@ export function createAccountChangeService(
       ctx.require("MANAGE_WORKSPACE");
       const [connections, changing] = await Promise.all([
         appConnectionRepository(orm).findByApps(appIds),
-        changingConnectors(dependencies.connectors),
+        dependencies.connectors.list().then(changingConnectors),
       ]);
       return new Set(
         connections

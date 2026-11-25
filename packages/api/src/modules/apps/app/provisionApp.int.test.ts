@@ -1,4 +1,11 @@
-import { containerConnectors, expect, inviteTest as test, provisioning } from "#test/support";
+import {
+  addPersonService,
+  containerConnectors,
+  expect,
+  inviteTest as test,
+  NEW_PERSON,
+  provisioning,
+} from "#test/support";
 import { accountChanges } from "../db";
 
 test("provisions one app once per selected person and continues past a refused employee", async ({
@@ -50,6 +57,38 @@ test("provisions one app once per selected person and continues past a refused e
   for (const { id } of changes) {
     expect(sent).toContainEqual(expect.objectContaining({ payload: { changeId: id } }));
   }
+});
+
+test("Differences refuses a pending joiner who can still be provisioned from their person page", async ({
+  orm,
+  seed,
+  workspace: { owner, google, linear, provision, service, sent },
+}) => {
+  const appId = linear.appId;
+  const template = await seed.template({ appIds: [appId] });
+  const { id: employeeId } = await addPersonService(orm).addPerson(owner, {
+    ...NEW_PERSON,
+    templateIds: [template.id],
+  });
+
+  expect(await provision.provisionApp(owner, { appId, employeeIds: [employeeId] })).toEqual({
+    changes: [],
+    refusedEmployeeIds: [employeeId],
+  });
+  expect(sent).toEqual([]);
+  expect((await service.listAccountChanges(owner, {})).edges).toEqual([]);
+
+  const changes = await provision.provisionEmployee(owner, { employeeId, appIds: [appId] });
+  expect(changes).toMatchObject([
+    { employeeId, connectionId: google.connectionId, action: "invite", status: "running" },
+  ]);
+  expect(sent).toEqual([
+    {
+      name: "apps.runDirectoryProvision",
+      payload: { changeId: changes[0]!.id, appIds: [appId] },
+      options: { group: google.connectionId },
+    },
+  ]);
 });
 
 test("a failed enqueue rolls back just that person and returns the other committed invites", async ({

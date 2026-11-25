@@ -17,6 +17,7 @@ import type { SecurityContext } from "../../../core/security";
 import type {
   AccountWithoutPerson,
   AccountLinkService,
+  AddPersonService,
   AccountChangeService,
   AppService,
   AppSummary,
@@ -34,13 +35,16 @@ import {
 import {
   accessDifferenceResolvers,
   type ProvisionRead,
+  directoryProvisionResolver,
   provisionMutations,
   provisionStepResolvers,
 } from "./provisionResolvers";
 
 type AppResolverServices = AccountLinkService &
+  AddPersonService &
+  Pick<ProvisionService, "provisionEmployee" | "provisionApp" | "takeFirstPassword"> &
   Pick<
-    AppService & AppUserService & AccountChangeService & ProvisionService,
+    AppService & AppUserService & AccountChangeService,
     | "listApps"
     | "readApp"
     | "readApps"
@@ -60,8 +64,6 @@ type AppResolverServices = AccountLinkService &
     | "readRequesterNames"
     | "markChangeDoneByHand"
     | "inviteEmployee"
-    | "provisionEmployee"
-    | "provisionApp"
   >;
 
 export function createResolvers(
@@ -192,6 +194,7 @@ export function createResolvers(
       canChangeAccounts: (app, _args, context) => loaders.changeableApps(context).load(app.id),
     },
     Employee: {
+      directoryProvision: directoryProvisionResolver(services),
       appAccounts: async (employee, _args, context) =>
         (await people(context).load(employee.id)).appAccounts,
       appInvites: async (employee, _args, context) =>

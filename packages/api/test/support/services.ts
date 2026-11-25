@@ -63,7 +63,8 @@ export function employeeServices(
   orm: Orm,
   { transact = testTransactor(orm) }: { transact?: Transact } = {},
 ): EmployeeServices {
-  const dependencies = { orm, transact, logger: createLogger("silent") };
+  const { findPeopleAwaitingDirectory, logger } = accountChangeDependencies(orm, { transact });
+  const dependencies = { orm, transact, logger, findPeopleAwaitingDirectory };
   return {
     ...createEmployeeService(dependencies),
     ...createEmployeeReadService({ ...dependencies, accounts: apps(orm) }),

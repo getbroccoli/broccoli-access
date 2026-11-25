@@ -134,6 +134,13 @@
       "when": 1795603041162,
       "tag": "0018_reconnect_cause_blocked_by_check",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795609662582,
+      "tag": "0019_first_directory_password",
+      "breakpoints": true
     }
   ]
 }

@@ -61,7 +61,7 @@ async function scannedWorkspace(
   const connectors = containerConnectors(connectorsUrl);
   const service = accountChanges(orm, { connectors, googleUrl, jobs });
   const ivan = employee("ivan@acme.example");
-  const provision = provisioning(orm, { connectors, jobs });
+  const provision = provisioning(orm, { connectors, googleUrl, jobs });
   const pages = personPages(orm, { connectors });
   const input = { employeeId: ivan.id, appId: linear.appId };
   return {

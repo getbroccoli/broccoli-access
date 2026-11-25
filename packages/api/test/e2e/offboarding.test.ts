@@ -2,11 +2,10 @@ import { vi } from "vitest";
 
 import {
   ACCOUNT_CHANGE_POLL,
-  type Browser,
   type TestEnv,
+  allowGoogleUserWrites,
   connectedLinear,
   connectorTest as test,
-  consentAtGoogle,
   expect,
   finishSetupWithPreselectedApps,
 } from "#test/support";
@@ -118,7 +117,7 @@ test("Google consent returns the owner to their page and enables directory write
     data: { setup: { googleWorkspace: { canChangeUsers: false } } },
   });
 
-  const redirect = await allowWrites(browser, "/people?tab=active");
+  const redirect = await allowGoogleUserWrites(browser, "/people?tab=active");
 
   expect(redirect.headers.get("location")).toBe("/people?tab=active&googleUserWrites=allowed");
   expect(await (await browser.graphql(settings)).json()).toEqual({
@@ -149,7 +148,7 @@ async function offboardChloe(env: TestEnv) {
   const preview = (await before.json()) as {
     data: { employee: { offboarding: { accountsToDisable: { app: { id: string } }[] } } };
   };
-  await allowWrites(browser, `/people/${id}`);
+  await allowGoogleUserWrites(browser, `/people/${id}`);
 
   const response = await browser.graphql(
     `mutation ($input: EmployeeOffboardInput!) {
@@ -166,15 +165,4 @@ async function offboardChloe(env: TestEnv) {
     data: { apps: { offboardEmployee: { employee: { id }, error: null } } },
   });
   return { browser, id, email, preview };
-}
-
-async function allowWrites(browser: Browser, returnTo: string) {
-  const response = await browser.post("/api/google/user-writes", { returnTo });
-  expect(response.status).toBe(200);
-  expect(response.headers.getSetCookie().length).toBeGreaterThan(0);
-  const body = (await response.json()) as { authorizationUrl: string };
-  const callback = await consentAtGoogle(body.authorizationUrl);
-  const redirect = await browser.getManual(callback.href);
-  expect(redirect.status).toBe(302);
-  return redirect;
 }

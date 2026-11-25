@@ -1,4 +1,5 @@
 import type { HistoryAppend } from "../../../core/records";
+import type { DirectoryProvisionJob } from "./directoryProvision";
 
 // What this module adds to core's shared registries.
 
@@ -25,6 +26,8 @@ declare module "../../../core/jobs" {
   interface Jobs {
     /** Runs one account change through its connector, one per connection at a time. */
     "apps.runAccountChange": { changeId: string };
+    "apps.runDirectoryProvision": DirectoryProvisionJob;
+    "apps.expireFirstPasswords": Record<string, never>;
   }
 }
 

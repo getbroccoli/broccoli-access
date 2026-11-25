@@ -1,7 +1,9 @@
 import { usePersonPage } from "./usePersonPage";
 import { CaretLeft } from "@phosphor-icons/react";
 import { Link, useNavigate, useParams, useRouteContext, useSearch } from "@tanstack/react-router";
+import { useQuery } from "@apollo/client/react";
 
+import { DirectoryProvisionStatusDocument } from "@/__generated__/graphql";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/Avatar";
 import { GoogleUserWritesNotice } from "@/components/GoogleUserWritesNotice";
@@ -17,6 +19,8 @@ import { OffboardedNotice } from "./OffboardedNotice";
 import { RemoveAllDialog } from "./RemoveAllDialog";
 import { PersonTemplates } from "./PersonTemplates";
 import { CurrentAccessTable } from "./CurrentAccessTable";
+import { DirectoryProvisionPanel } from "./DirectoryProvisionPanel";
+import { FirstPasswordDialog } from "./FirstPasswordDialog";
 import { ProvisionBar } from "./ProvisionBar";
 
 /**
@@ -26,12 +30,18 @@ import { ProvisionBar } from "./ProvisionBar";
  */
 export function PersonPage() {
   const { employeeId } = useParams({ from: ROUTE });
-  const { offboard = false, skip, googleUserWrites } = useSearch({ from: ROUTE });
+  const {
+    offboard = false,
+    provision = false,
+    skip,
+    googleUserWrites,
+  } = useSearch({ from: ROUTE });
   const navigate = useNavigate({ from: "/people/$employeeId" });
   const { me } = useRouteContext({ from: "/_authenticated" });
   // The route's loader has just read the page into the cache.
   const { pageQuery, more } = usePersonPage(employeeId);
-  const person = pageQuery.data?.employee;
+  const latestPerson = pageQuery.data ? pageQuery.data.employee : pageQuery.previousData?.employee;
+  const person = latestPerson?.id === employeeId.toLowerCase() ? latestPerson : undefined;
   // A connected app's scan, such as one started from a failed change's dialog or its first one,
   // moves their rows: poll the scans only, then read the person once.
   useRefetchAfterContainerConnectorScans(pageQuery.refetch);
@@ -42,26 +52,32 @@ export function PersonPage() {
       person?.appInvites.some((invite) => invite.latestInvite?.status === "RUNNING")) ??
     false;
   usePollWhileScanning(isChanging, pageQuery);
-  useRefreshAfterChanges(isChanging, pageQuery.refetch);
-  // The route's loader found the person, so they are missing only while a reload replaces them.
-  if (pageQuery.error)
-    return (
-      <div role="alert">
-        <p>{t("people.person.refreshFailed")}</p>
-        <Button variant="outline" onClick={() => void pageQuery.refetch().catch(() => undefined)}>
-          {t("templates.retry")}
-        </Button>
-      </div>
-    );
-  if (!person) {
-    return null;
-  }
+  const creatingDirectory = person?.directoryProvision?.status === "RUNNING";
+  const directory = useQuery(DirectoryProvisionStatusDocument, {
+    variables: { id: employeeId },
+    skip: !creatingDirectory,
+  });
+  usePollWhileScanning(creatingDirectory, directory);
+  useRefreshAfterChanges(isChanging || creatingDirectory, pageQuery.refetch);
+  const refreshError = pageQuery.error && (
+    <div role="alert">
+      <p>{t("people.person.refreshFailed")}</p>
+      <Button variant="outline" onClick={() => void pageQuery.refetch().catch(() => undefined)}>
+        {t("templates.retry")}
+      </Button>
+    </div>
+  );
+  if (!person) return refreshError ?? null;
   const appCount = person.approvedAppNames.length;
   // Offboarding takes every template off; a template assigned again starts them anew.
   const offboardedAt = person.templates.edges.length ? null : person.offboarding.offboardedAt;
   const offboardedOn = offboardedAt ? dayAndTime(offboardedAt).day : null;
   // Once offboarded, Offboard comes back only when an account can be disabled again.
-  const canOffboard = !offboardedAt || person.offboarding.accountsToDisable.length > 0;
+  const awaitsDirectory =
+    person.directoryProvision &&
+    (!me.isOwner || !person.directoryAccount || person.directoryProvision.status !== "SUCCEEDED");
+  const canOffboard =
+    !awaitsDirectory && (!offboardedAt || person.offboarding.accountsToDisable.length > 0);
   // Some of the apps they still have access to can be disabled from here.
   const canDisableHere = person.appAccounts.some(
     ({ offeredChange }) => offeredChange === "SUSPEND",
@@ -69,6 +85,7 @@ export function PersonPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      {refreshError}
       <Link
         to="/people"
         className="flex w-fit items-center gap-1.5 text-sm text-foreground/80 transition-colors hover:text-foreground"
@@ -120,7 +137,7 @@ export function PersonPage() {
         )}
       </div>
       {/* Mounted while open, so each offboarding starts from every app ticked. */}
-      {offboard && (
+      {offboard && canOffboard && (
         <OffboardDialog
           person={person}
           googleUserWrites={googleUserWrites}
@@ -128,7 +145,24 @@ export function PersonPage() {
           onClose={() => void navigate({ search: {} })}
         />
       )}
-      {!offboard && googleUserWrites && <GoogleUserWritesNotice outcome={googleUserWrites} />}
+      {!offboard && googleUserWrites && !(provision && googleUserWrites === "allowed") && (
+        <GoogleUserWritesNotice outcome={googleUserWrites} />
+      )}
+      {me.isOwner && person.directoryProvision && (
+        <DirectoryProvisionPanel
+          key={`directory-provision-${person.id}`}
+          person={person}
+          confirmAfterConsent={provision && googleUserWrites === "allowed"}
+          refetch={pageQuery.refetch}
+        />
+      )}
+      {me.isOwner && (
+        <FirstPasswordDialog
+          key={`first-password-${person.id}`}
+          person={person}
+          onSaved={() => void pageQuery.refetch().catch(() => undefined)}
+        />
+      )}
       {offboardedAt && <OffboardedNotice person={person} />}
       {person.suspendedWithAccess && (
         <p

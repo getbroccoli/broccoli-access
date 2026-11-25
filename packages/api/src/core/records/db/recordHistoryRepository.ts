@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, not, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, lt, not, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { anyOf, type Orm, ormOf, type Tx } from "../../db";
@@ -26,6 +26,16 @@ export interface RecordHistoryRepository {
     recordIds: readonly string[],
     causeKind: CauseKind,
   ): Promise<HistoryLine[]>;
+  findRecordIdsWithCause(query: HistoryCauseQuery): Promise<Set<string>>;
+}
+
+export interface HistoryCauseQuery {
+  recordType: RecordType;
+  recordIds: readonly string[];
+  causeKind: CauseKind;
+  operation?: RecordOperation;
+  withReference?: boolean;
+  reference?: string;
 }
 
 export type NewHistoryLine = Omit<HistoryLine, "id" | "occurredAt">;
@@ -104,6 +114,26 @@ export function recordHistoryRepository(db: Orm | Tx): RecordHistoryRepository {
         )
         .orderBy(recordHistory.recordId, desc(recordHistory.id));
       return rows.map(toHistoryLine);
+    },
+    async findRecordIdsWithCause(query) {
+      const { recordType, recordIds, causeKind, operation, withReference, reference } = query;
+      const rows = await orm()
+        .selectDistinct({ id: recordHistory.recordId })
+        .from(recordHistory)
+        .where(
+          and(
+            eq(recordHistory.recordType, recordType),
+            anyOf(recordHistory.recordId, recordIds),
+            eq(recordHistory.causeKind, lowercase(causeKind)),
+            operation ? eq(recordHistory.operation, lowercase(operation)) : undefined,
+            reference !== undefined
+              ? eq(recordHistory.causeRef, reference)
+              : withReference
+                ? isNotNull(recordHistory.causeRef)
+                : undefined,
+          ),
+        );
+      return new Set(rows.map(({ id }) => id));
     },
   };
 }

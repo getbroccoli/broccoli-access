@@ -15,6 +15,7 @@ import {
 import { UnsuccessfulAnswerError } from "../../../utils";
 import {
   GOOGLE_WORKSPACE,
+  GOOGLE_USER_WRITE_SCOPE,
   GOOGLE_WORKSPACE_SECRETS,
   GOOGLE_WORKSPACE_SETTINGS,
   parseGoogleWorkspaceSettings,
@@ -37,7 +38,7 @@ export function createGoogleWorkspaceConnector(addresses: {
     key: GOOGLE_WORKSPACE,
     version: 1,
     name: APP_NAME,
-    capabilities: ["list_accounts", "suspend", "reactivate"],
+    capabilities: ["list_accounts", "suspend", "reactivate", "invite"],
     runtimes: ["server"],
     findingKinds: { ownAppAccounts: "google_directory", otherAppAccounts: "google_sign_in" },
     isDirectory: true,
@@ -49,9 +50,8 @@ export function createGoogleWorkspaceConnector(addresses: {
     settings: GOOGLE_WORKSPACE_SETTINGS,
     secrets: GOOGLE_WORKSPACE_SECRETS,
     async openSession(connection) {
-      const { clientId, previousClientIds, googleApp, adminEmail } = parseGoogleWorkspaceSettings(
-        connection.settings,
-      );
+      const { clientId, previousClientIds, googleApp, adminEmail, domain, grantedScopes } =
+        parseGoogleWorkspaceSettings(connection.settings);
       const accessToken =
         googleApp === "broccoli_google_app"
           ? await refreshShared(addresses.relayUrl, connection.secrets)
@@ -86,6 +86,25 @@ export function createGoogleWorkspaceConnector(addresses: {
           }),
         readPhoto: (userId) =>
           asConnectorError(directoryError, async () => google.readPhoto(accessToken, userId)),
+        createDirectoryAccount: ({ email, firstName, lastName, password }) =>
+          asConnectorError(
+            (status) => (status === 409 ? "not_allowed" : directoryError(status)),
+            async () => {
+              if (!grantedScopes.includes(GOOGLE_USER_WRITE_SCOPE))
+                throw new ConnectorError("permission_missing");
+              if (email.split("@").at(-1) !== domain.toLowerCase())
+                throw new ConnectorError("wrong_workspace");
+              const user = await google.createUser(accessToken, {
+                email,
+                givenName: firstName,
+                familyName: lastName,
+                password,
+                changePasswordAtNextLogin: true,
+              });
+              if (user.email !== email || user.suspended)
+                throw new ConnectorError("unexpected_response");
+            },
+          ),
         runAction: (action, { sourceKey, email }) =>
           asConnectorError(directoryError, async () => {
             // Also for a scan record older than its `isConnectionUser`: the connection would end.
@@ -97,9 +116,7 @@ export function createGoogleWorkspaceConnector(addresses: {
               sourceKey,
               action === "suspend",
             );
-            if (!user) {
-              throw new ConnectorError("account_not_found");
-            }
+            if (!user) throw new ConnectorError("account_not_found");
             return { status: user.suspended ? "suspended" : "active" };
           }),
       };

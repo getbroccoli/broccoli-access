@@ -1,8 +1,10 @@
 import { createMailSettingsService } from "../core/instance";
+import type { Orm, Tx } from "../core/db";
 import type { ModuleDependencies, Modules } from "../core/moduleManifest";
 import { recordsManifest } from "../core/records";
 import {
   appsModule,
+  createAddPersonService,
   createAccountLinkService,
   createAccountChangeService,
   createAppAccountService,
@@ -21,8 +23,10 @@ import {
 import {
   createDirectorySyncService,
   createEmployeeReadService,
+  createEmployeeService,
   employeeDirectory,
   employeesModule,
+  findPeopleAwaitingDirectory as findPendingPeople,
 } from "./employees";
 import { extensionModule } from "./extension";
 import {
@@ -77,6 +81,11 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   );
   const connectedApps = createAppConnectionService(core);
   const importRecords = createImportRecordService();
+  const findPeopleAwaitingDirectory = directoryMatches(
+    connectedApps,
+    importRecords,
+    directoryConnectors[0]!.key,
+  );
   // One service for Settings and the scans, which skip the integration user.
   const integrationUsers = createIntegrationUserService({
     ...core,
@@ -126,6 +135,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     isExtraApp: (...args: Parameters<TemplateService["isExtraApp"]>) =>
       templates.isExtraApp(...args),
     directoryConnectors,
+    findPeopleAwaitingDirectory,
     ...core,
     connectors,
     members: importRecords,
@@ -166,7 +176,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       ...core,
       mailSettings: createMailSettingsService({ ...core, publicUrl, resendApiUrl }),
     }),
-    employeesModule({ ...core, accounts: apps }),
+    employeesModule({ ...core, accounts: apps, findPeopleAwaitingDirectory }),
     googleModule({
       ...core,
       publicUrl,
@@ -184,6 +194,16 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
         ...users,
         ...changes,
         ...provision,
+        ...createAddPersonService({
+          ...core,
+          directoryConnectors,
+          employees: {
+            ...createEmployeeService({ ...core, findPeopleAwaitingDirectory }),
+            ...employees,
+            findPeopleAwaitingDirectory,
+          },
+          templates,
+        }),
         ...createAccountLinkService({
           ...core,
           connectors: directoryConnectors,
@@ -221,3 +241,16 @@ function createConnectors(
 }
 
 export { createPersonPageReader, personPageLoader, readPersonPages } from "./personPageReader";
+
+/** A directory finding refers to the directory connection's scan source, as all scan history does. */
+export function directoryMatches(
+  apps: Pick<ReturnType<typeof createAppConnectionService>, "readConnection">,
+  imports: Pick<ReturnType<typeof createImportRecordService>, "findSourceId">,
+  connector: string,
+) {
+  return (db: Orm | Tx, ids: readonly string[]) =>
+    findPendingPeople(db, ids, async (db) => {
+      const connection = await apps.readConnection(db, connector);
+      return connection && imports.findSourceId(db, connection.id);
+    });
+}

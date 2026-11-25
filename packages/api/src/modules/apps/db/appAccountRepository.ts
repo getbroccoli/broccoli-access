@@ -72,10 +72,10 @@ export interface AppAccountRepository {
   ): Promise<AppUserAccount[]>;
   /** How many employees hold an account in any app. */
   countEmployeesWithAccounts(): Promise<number>;
-  /** The employees whose account in the app has `status`; only those of `among` when given. */
+  /** The employees whose account matches the app and status when given; only those of `among` when given. */
   findEmployeeIdsWithStatus(
-    appId: string,
-    status: AccountStatus,
+    appId: string | null,
+    status: AccountStatus | null,
     among?: readonly string[],
   ): Promise<string[]>;
   /**
@@ -251,8 +251,8 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .from(appAccounts)
         .where(
           and(
-            eq(appAccounts.appId, appId),
-            eq(appAccounts.status, status),
+            appId === null ? undefined : eq(appAccounts.appId, appId),
+            status === null ? undefined : eq(appAccounts.status, status),
             among ? anyOf(appAccounts.employeeId, among) : isNotNull(appAccounts.employeeId),
           ),
         );

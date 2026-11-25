@@ -99,9 +99,10 @@ Connect Slack and Linear, assign a template to Chloé Martin, and set `GOOGLE` t
 - [ ] On an offboarded Chloé whose Slack and Linear accounts are disabled (Slack's "Scan now" after its member is suspended), "Remove all…" beside "Apps" opens "Remove Chloé Martin from these apps?" listing Linear and Slack with her email, never Google Workspace, and "This cannot be undone." One "Remove all" removes both after that one confirmation: the rows show "Removing from…", then leave the list; `curl -s "$FAKE/_fake/state"` has her in neither `.slack` nor `.linear`, Google Workspace is still "Disabled" with "Enable", and "Remove all…" is gone. Activity has two "Remove" changes with no "Offboarding" below.
 - [ ] A Remove that fails (the failures control on `actions/run`) reads "Couldn’t remove" on its row while the other app's account is removed.
 
-## No delete
+## Delete a person awaiting their Google account
 
-- [ ] Nothing on People or a person's page edits or removes a person.
+- [ ] On a fresh workspace with its own Google app and **Reads only** in Settings → Connections, start adding a person and cancel at Google's consent. The person's page offers Delete person. Cancel the deletion and check the person stays. Confirm it and check the person leaves People.
+- [ ] Open a person listed by Google Workspace. Their page offers Offboard and has no Delete person action.
 
 ## Not found
 

@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 
 import {
   accountChanges,
+  addPersonService,
+  NEW_PERSON,
   apps,
   EMPLOYEE,
   expect,
@@ -17,6 +19,33 @@ import {
   templates,
 } from "#test/support";
 import { appAccounts, accountChanges as changesTable } from "../db";
+
+test("offboarding a person awaiting their directory account leaves their templates assigned", async ({
+  orm,
+  seed,
+  workspace: { owner, linear },
+  fakeConnectors,
+  fakeGoogle,
+}) => {
+  const template = await seed.template({ appIds: [linear.appId] });
+  const { id: employeeId } = await addPersonService(orm).addPerson(owner, {
+    ...NEW_PERSON,
+    templateIds: [template.id],
+  });
+  const service = accountChanges(orm, {
+    connectorsUrl: fakeConnectors.url,
+    googleUrl: fakeGoogle.url,
+    transact: templateReviewTransactor(orm),
+  });
+
+  await expect(service.offboardEmployee(owner, { employeeId, appIds: [] })).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+
+  expect(await storedEmployeeTemplates(orm)).toMatchObject([
+    { employeeId, templateId: template.id },
+  ]);
+});
 
 test("queues the directory Disable first and each running change in its own connection's group", async ({
   workspace: { service, owner, employee, linear, google, sent },
