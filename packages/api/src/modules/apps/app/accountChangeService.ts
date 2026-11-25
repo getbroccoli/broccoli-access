@@ -132,7 +132,7 @@ export interface AccountChangeService {
   ) => Promise<EmployeeOffboarding>;
   /**
    * Remove all: in one transaction writes a running Remove, started from the account like a single
-   * Remove, for each of `accountIds` that is still among the employee's disabled accounts that offer one
+   * Remove, for each of `accountIds` that is still among the employee's accounts that offer one
    * (`accountsToRemove`), and queues each like a Remove. Never the directory account. Returns
    * their offboarding as it is afterwards. Needs MANAGE_WORKSPACE and a signed-in user; refuses an
    * unknown employee with NOT_FOUND.

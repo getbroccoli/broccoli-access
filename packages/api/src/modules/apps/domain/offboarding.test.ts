@@ -95,6 +95,7 @@ function account(appId: string) {
     status: "active",
     isDirectory: false,
     offeredChange: "suspend",
+    offersRemove: false,
     offersReconnect: false,
     isConnectionUser: false,
     runningChange: null,

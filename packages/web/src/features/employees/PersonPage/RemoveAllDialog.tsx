@@ -23,7 +23,7 @@ import { t } from "@/i18n";
 type Person = NonNullable<PersonPageQuery["employee"]>;
 
 /**
- * "Remove all…" on an offboarded person: one confirmation listing the disabled accounts it removes,
+ * "Remove all…" on an offboarded person: one confirmation listing the accounts it removes,
  * then a Remove for each, whose results show on their rows.
  */
 export function RemoveAllDialog({ person }: { person: Person }) {

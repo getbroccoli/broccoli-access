@@ -4,18 +4,61 @@ import {
   accountChanges,
   EMPLOYEE,
   expect,
+  googleScanSetup,
   listedLinearChloe,
   postFakeControl,
   scans,
+  scannedNotion,
   serveAccountList,
   serveManifest,
   containerConnectors,
   SYSTEM,
   offboardedTest as test,
+  writableGoogleConnection,
 } from "#test/support";
 import { eq } from "drizzle-orm";
 import type { Orm } from "../../../core/db";
 import { accountChanges as changesTable } from "../db";
+
+test("offboarding disables the directory account and leaves active Notion access for Remove all", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const google = await googleScanSetup(orm, fakeGoogle.url);
+  await google.scans.runScan(SYSTEM, google.sourceId);
+  await writableGoogleConnection(orm, fakeGoogle.url, google.owner);
+  const { changes, chloe } = await scannedNotion(orm, ["invite", "remove"], fakeGoogle.url);
+  const employeeId = chloe.employeeId!;
+  const [plan] = await changes.readOffboardings(google.owner, [employeeId]);
+  const directory = plan!.directoryAccount!;
+  expect(plan!.accountsToDisable.map(({ id }) => id)).toEqual([directory.id]);
+  expect.soft(plan!.byHandWork.map(({ appId }) => appId)).not.toContain(chloe.appId);
+
+  await changes.offboardEmployee(google.owner, {
+    employeeId,
+    appIds: plan!.accountsToDisable.map(({ appId }) => appId),
+  });
+  const { edges } = await changes.listAccountChanges(google.owner, {});
+  expect(edges).toMatchObject([{ node: { action: "suspend", appAccountId: directory.id } }]);
+  await changes.runChange(SYSTEM, edges[0]!.node.id);
+  const [offboarded] = await changes.readOffboardings(google.owner, [employeeId]);
+  expect(offboarded!.directoryAccount?.status).toBe("suspended");
+  expect(offboarded!.accountsToRemove).toMatchObject([{ id: chloe.id, status: "active" }]);
+
+  await changes.removeEmployeeAccounts(google.owner, {
+    employeeId,
+    accountIds: offboarded!.accountsToRemove.map(({ id }) => id),
+  });
+  const removes = await removeChanges(orm);
+  expect(removes).toMatchObject([{ appAccountId: chloe.id, status: "running" }]);
+  await changes.runChange(SYSTEM, removes[0]!.id);
+
+  expect(await changes.readAccountChange(google.owner, removes[0]!.id)).toMatchObject({
+    status: "succeeded",
+  });
+  const [after] = await changes.readOffboardings(google.owner, [employeeId]);
+  expect(after!.accountsToRemove).toEqual([]);
+});
 
 test("lists the person's disabled app accounts by app name and leaves out the suspended directory account", async ({
   workspace: { service, owner, linear },

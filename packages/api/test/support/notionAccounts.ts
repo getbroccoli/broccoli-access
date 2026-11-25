@@ -22,7 +22,11 @@ export async function testNotion(actions: readonly NotionAction[]) {
   return notion;
 }
 
-export async function scannedNotion(orm: Orm, actions: readonly NotionAction[]) {
+export async function scannedNotion(
+  orm: Orm,
+  actions: readonly NotionAction[],
+  googleUrl?: string,
+) {
   const { url } = await testNotion(actions);
   const { service, scans } = containerConnections(orm, url);
   const { connection } = await service.connect(OWNER, NOTION_INPUT);
@@ -37,5 +41,5 @@ export async function scannedNotion(orm: Orm, actions: readonly NotionAction[]) 
   const own = accounts.find(
     ({ appId, email }) => appId === chloe.appId && email === "david@acme.example",
   )!;
-  return { changes: accountChanges(orm, { connectorsUrl: url }), chloe, own };
+  return { changes: accountChanges(orm, { connectorsUrl: url, googleUrl }), chloe, own };
 }
