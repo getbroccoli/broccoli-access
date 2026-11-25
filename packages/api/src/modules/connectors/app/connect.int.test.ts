@@ -49,7 +49,7 @@ test("connects the approved catalog app, protects its key and queues its first s
   ]);
   const appId = state.apps[0]!.id;
   expect(state.connections).toMatchObject([
-    { id: connectionId, appId, connector: "linear", status: "connected" },
+    { id: connectionId, appId, connector: "linear", status: "connected", sessionFrom: null },
   ]);
   const { encryptedSecrets, settings } = state.connections[0]!;
   expect(settings).toEqual(ACME_LINEAR.settings);

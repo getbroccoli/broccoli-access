@@ -1,13 +1,12 @@
 import { useState } from "react";
 
 import type { ConnectAppSessionDialog_ConnectorFragment } from "@/__generated__/graphql";
-import { AppMark } from "@/components/AppMark";
 import { Button } from "@/components/ui/button";
-import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { t } from "@/i18n";
 import { useChromeExtension } from "@/lib/useChromeExtension";
 
 import { ConfirmStep } from "./ConfirmStep";
+import { ConnectHeader } from "./ConnectHeader";
 import { ExtensionStep } from "./ExtensionStep";
 import { NoticeStep } from "./NoticeStep";
 import { PairStep } from "./PairStep";
@@ -53,14 +52,7 @@ export function ConnectAppSessionSteps({ connector, connection, onConnected }: P
   }
   return (
     <>
-      <DialogHeader className="gap-3">
-        <div className="flex items-center gap-3 pr-8">
-          <AppMark name={app} catalogKey={connector.id} className="size-9 rounded-lg text-base" />
-          <DialogTitle className="text-xl font-semibold">
-            {t("settings.apps.connect", { app })}
-          </DialogTitle>
-        </div>
-      </DialogHeader>
+      <ConnectHeader connector={connector} title={t("settings.apps.connect", { app })} />
       <StepList hasNotice={connector.notice !== null} current={step} />
       {step === null && extension.loadFailed && (
         <div role="alert" className="flex flex-col items-start gap-2">

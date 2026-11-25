@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 
 import { ApplicationError } from "../../../core/applicationError";
-import type { ConnectorErrorCode } from "../../../core/connectors";
+import type { AppSessionSource, ConnectorErrorCode } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import type { FieldChange } from "../../../core/records";
 import { createRecordHistoryService } from "../../../core/records";
@@ -20,6 +20,7 @@ import {
   holdsSecrets,
   readReconnectReasons,
   reconnect,
+  type Reconnection,
   type ReconnectReason,
   turnToReconnect,
 } from "./connectionReconnects";
@@ -31,8 +32,8 @@ export interface AppConnectionService {
   /**
    * Approves the connector's app (the app with the connector's key as catalog key, else its name,
    * else a new one) and saves its connection with `secrets` encrypted under the connection's id,
-   * and the caller as who accepted the connector's notice at `noticeAcceptedAt`, joining `tx`;
-   * appends the history of both. Connects and scan saves run one at a time. Admins only; refuses
+   * the caller as who accepted the connector's notice at `noticeAcceptedAt`, and who made its app
+   * session, joining `tx`; appends the history of both. Connects and scan saves run one at a time. Admins only; refuses
    * with CONFLICT a connector already connected, or an app another connector reads.
    */
   connectApp: (
@@ -46,6 +47,8 @@ export interface AppConnectionService {
       secrets: Record<string, unknown>;
       /** Set exactly for a connector with a notice, which a signed-in user accepted. */
       noticeAcceptedAt?: Date;
+      /** Set exactly for secrets that hold an app session. */
+      sessionFrom?: AppSessionSource;
     },
   ) => Promise<{ appId: string; connectionId: string }>;
   /**
@@ -85,16 +88,12 @@ export interface AppConnectionService {
     },
   ) => Promise<boolean>;
   /**
-   * Replaces the connection's secrets and sets it `connected` without a cause, joining `tx`;
-   * appends an `EDITED_DIRECTLY` line when its status changed, never with a secret. Admins only;
-   * refuses an unknown connection with NOT_FOUND.
+   * Replaces the connection's secrets, with who made their app session, and sets it `connected`
+   * without a cause, joining `tx`; appends an `EDITED_DIRECTLY` line when its status changed, and
+   * one when who made its session did, never with a secret. Admins only; refuses an unknown
+   * connection with NOT_FOUND.
    */
-  reconnect: (
-    ctx: SecurityContext,
-    tx: Tx,
-    connectionId: string,
-    secrets: Record<string, unknown>,
-  ) => Promise<void>;
+  reconnect: (ctx: SecurityContext, tx: Tx, reconnection: Reconnection) => Promise<void>;
   /**
    * Why each of the connections in `reconnect` needs it, by connection id; a connected one is left
    * out. Trusted read: no `ctx`.
@@ -141,7 +140,9 @@ export function createAppConnectionService({
   secretBox: SecretBox;
 }): AppConnectionService {
   return {
-    async connectApp(ctx, tx, { connector, app: appFields, settings, secrets, noticeAcceptedAt }) {
+    async connectApp(ctx, tx, connection) {
+      const { connector, app: appFields, settings, secrets, noticeAcceptedAt } = connection;
+      const { sessionFrom } = connection;
       ctx.require("MANAGE_WORKSPACE");
       const noticeAccepted = noticeAcceptedAt && { at: noticeAcceptedAt, by: signedInUserOf(ctx) };
       // The lock scans take before they add apps, so a connect and a scan never both add one.
@@ -162,14 +163,13 @@ export function createAppConnectionService({
         settings,
         encryptedSecrets,
         noticeAccepted,
+        sessionFrom,
       });
       await recordHistory.append(ctx, tx, {
         recordType: "app_connection",
         operation: "CREATED",
         cause: { kind: "EDITED_DIRECTLY" },
-        records: [
-          { recordId: id, changes: connectionChanges(connector, app, settings, noticeAcceptedAt) },
-        ],
+        records: [{ recordId: id, changes: connectionChanges(app, connection) }],
       });
       return { appId: app.id, connectionId: id };
     },
@@ -216,8 +216,7 @@ export function createAppConnectionService({
       return true;
     },
     turnToReconnect: (ctx, tx, failure) => turnToReconnect(secretBox, ctx, tx, failure),
-    reconnect: (ctx, tx, connectionId, secrets) =>
-      reconnect(secretBox, ctx, tx, { connectionId, secrets }),
+    reconnect: (ctx, tx, reconnection) => reconnect(secretBox, ctx, tx, reconnection),
     readReconnectReasons: (db, connectionIds) => readReconnectReasons(db, connectionIds),
     readConnection: (db, connector) => appConnectionRepository(db).findByConnector(connector),
     readConnections: (db) => appConnectionRepository(db).findAll(),
@@ -297,10 +296,18 @@ async function appendAppHistory(
 
 /** A new connection's fields; its secrets never reach history. */
 function connectionChanges(
-  connector: string,
   app: App,
-  settings: Record<string, unknown>,
-  noticeAcceptedAt: Date | undefined,
+  {
+    connector,
+    settings,
+    noticeAcceptedAt,
+    sessionFrom,
+  }: {
+    connector: string;
+    settings: Record<string, unknown>;
+    noticeAcceptedAt?: Date;
+    sessionFrom?: AppSessionSource;
+  },
 ): FieldChange[] {
   return [
     { field: "connector", oldValue: null, newValue: connector },
@@ -309,6 +316,7 @@ function connectionChanges(
     ...(noticeAcceptedAt
       ? [{ field: "noticeAcceptedAt", oldValue: null, newValue: noticeAcceptedAt.toISOString() }]
       : []),
+    ...(sessionFrom ? [{ field: "sessionFrom", oldValue: null, newValue: sessionFrom }] : []),
   ];
 }
 

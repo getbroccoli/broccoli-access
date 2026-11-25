@@ -1,13 +1,17 @@
 import { APP_SESSION, type AppSession } from "@broccoli-access/connector-contract";
 import { z } from "zod";
 
-import type { ConnectionDetails } from "../../../core/connectors";
+import {
+  APP_SESSION_SOURCES,
+  type AppSessionSource,
+  type ConnectionDetails,
+} from "../../../core/connectors";
 import type { SecretBox } from "../../../core/secrets";
 
 /**
- * App sessions the extension handed over, each tested and sealed with the instance's key for the
- * user and connector, waiting for that user to connect within five minutes. Nothing reaches
- * Postgres before they connect.
+ * App sessions the extension handed over, or the integration user's sign-in made, each sealed with
+ * the instance's key for the user and connector, waiting for that user to confirm their workspace
+ * and connect within five minutes. Nothing reaches Postgres before they connect.
  */
 export interface AppSessionHandOvers {
   /**
@@ -20,6 +24,8 @@ export interface AppSessionHandOvers {
     connector: string;
     appSession: AppSession;
     details: ConnectionDetails;
+    /** Who made the session; the extension unless given. */
+    sessionFrom?: AppSessionSource;
   }): boolean;
   /** The user's hand-over `requestId` while unexpired; null otherwise. */
   read(userId: string, requestId: string): AppSessionHandOver | null;
@@ -35,6 +41,7 @@ export interface HandedOverSession {
   appSession: AppSession;
   settings: Record<string, unknown>;
   workspace: ConfirmedWorkspace;
+  sessionFrom: AppSessionSource;
 }
 
 /** The workspace the owner saw before connecting. */
@@ -64,7 +71,7 @@ export function createAppSessionHandOvers({
   // shortcut: hand-overs live in this process's memory, so a restart, or a second API process, loses them and the owner hands over again; keep them in Postgres when that matters.
   const kept = new Map<string, KeptHandOver>();
   return {
-    keep({ userId, requestId, connector, appSession, details }) {
+    keep({ userId, requestId, connector, appSession, details, sessionFrom = "extension" }) {
       forgetExpired(kept, now());
       const expiresAt = now().getTime() + HAND_OVER_LIFETIME_MS;
       const { organizationName, domain } = details;
@@ -75,6 +82,7 @@ export function createAppSessionHandOvers({
         appSession,
         settings,
         workspace: { organizationName, domain },
+        sessionFrom,
         expiresAt,
       };
       const encrypted = secretBox.encrypt(JSON.stringify(sealed), ASSOCIATED_DATA);
@@ -96,9 +104,11 @@ export function createAppSessionHandOvers({
         opened.userId === userId &&
         opened.connector === connector &&
         opened.expiresAt > now().getTime();
-      return isOwnAndFresh
-        ? { appSession: opened.appSession, settings: opened.settings, workspace: opened.workspace }
-        : null;
+      if (!isOwnAndFresh) {
+        return null;
+      }
+      const { appSession, settings, workspace, sessionFrom } = opened;
+      return { appSession, settings, workspace, sessionFrom };
     },
   };
 }
@@ -121,6 +131,7 @@ const SEALED_APP_SESSION = z.object({
   appSession: APP_SESSION,
   settings: z.record(z.string(), z.unknown()),
   workspace: z.object({ organizationName: z.string(), domain: z.string().nullable() }),
+  sessionFrom: z.enum(APP_SESSION_SOURCES),
   expiresAt: z.number(),
 });
 

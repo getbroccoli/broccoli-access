@@ -1,3 +1,4 @@
+import type { AppSessionSource } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 
@@ -5,8 +6,8 @@ import type { SecurityContext } from "../../../core/security";
 export interface ConnectedApps {
   /**
    * Approves the connector's app and saves its connection with the secrets encrypted, and the
-   * caller as who accepted its notice at `noticeAcceptedAt`, joining `tx`; refuses a connector
-   * already connected with CONFLICT.
+   * caller as who accepted its notice at `noticeAcceptedAt`, joining `tx`; `sessionFrom` says who
+   * made the app session in `secrets`. Refuses a connector already connected with CONFLICT.
    */
   connectApp(
     ctx: SecurityContext,
@@ -17,14 +18,21 @@ export interface ConnectedApps {
       settings: Record<string, unknown>;
       secrets: Record<string, unknown>;
       noticeAcceptedAt?: Date;
+      sessionFrom?: AppSessionSource;
     },
   ): Promise<{ appId: string; connectionId: string }>;
-  /** Replaces the connection's secrets and sets it connected, joining `tx`, with its history. */
+  /**
+   * Replaces the connection's secrets and sets it connected, joining `tx`, with its history;
+   * `sessionFrom` says who made the app session in `secrets`, and left out keeps what is stored.
+   */
   reconnect(
     ctx: SecurityContext,
     tx: Tx,
-    connectionId: string,
-    secrets: Record<string, unknown>,
+    reconnection: {
+      connectionId: string;
+      secrets: Record<string, unknown>;
+      sessionFrom?: AppSessionSource;
+    },
   ): Promise<void>;
   /** The catalog apps among `catalogKeys` that have no app yet, whatever its status. */
   readCatalogAppsWithoutApp(
@@ -39,6 +47,7 @@ export interface ConnectedApps {
       appId: string;
       settings: Record<string, unknown>;
       noticeAcceptedAt: Date | null;
+      sessionFrom: AppSessionSource | null;
     }[]
   >;
 }

@@ -1,5 +1,6 @@
 import DataLoader from "dataloader";
 
+import { signsInAsIntegrationUser } from "../../../core/connectors";
 import {
   mutationPayload,
   perRequest,
@@ -54,6 +55,13 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
           }),
           ["INVALID_INPUT", "NOT_FOUND", "UNAVAILABLE"],
         ),
+      connectWithIntegrationUser: (_parent, { input }, context) =>
+        mutationPayload<
+          ResolversTypes["ContainerConnectorConnectWithIntegrationUserPayload"]
+        >(async () => {
+          const signedIn = await connections.connectWithIntegrationUser(context.getActor(), input);
+          return { containerConnector: signedIn, appSessionHandOver: signedIn.handOver };
+        }, ["INVALID_INPUT", "NOT_FOUND", "CONFLICT", "UNAVAILABLE"]),
     },
     ContainerConnector: {
       id: ({ connector }) => connector.key,
@@ -61,11 +69,13 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
       appDomain: ({ connector }) => connector.appDomain,
       findingKind: ({ connector }) => connector.findingKinds.ownAppAccounts,
       notice: ({ connector }) => connector.notice,
+      signsInAsIntegrationUser: ({ connector }) => signsInAsIntegrationUser(connector),
       connectionFields: ({ connector }) =>
         connector.connectionFields.map((field) => ({ ...field, kind: toEnum(field.kind) })),
       connection: ({ connection }) => connection,
     },
     ContainerConnection: {
+      sessionFrom: ({ sessionFrom }) => sessionFrom && toEnum(sessionFrom),
       connector: (connection) => ({ connector: connection.connector, connection }),
     },
     AppSessionHandOver: {

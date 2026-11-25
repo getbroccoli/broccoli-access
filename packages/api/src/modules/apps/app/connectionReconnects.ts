@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 
 import { ApplicationError } from "../../../core/applicationError";
-import type { ConnectorErrorCode } from "../../../core/connectors";
+import type { AppSessionSource, ConnectorErrorCode } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecretBox } from "../../../core/secrets";
@@ -54,12 +54,12 @@ export async function turnToReconnect(
   return true;
 }
 
-/** Replaces the connection's secrets and sets it connected, with a history line when its status changed. */
+/** Replaces the connection's secrets and sets it connected, as `AppConnectionService.reconnect` says. */
 export async function reconnect(
   secretBox: SecretBox,
   ctx: SecurityContext,
   tx: Tx,
-  { connectionId, secrets }: { connectionId: string; secrets: Record<string, unknown> },
+  { connectionId, secrets, sessionFrom }: Reconnection,
 ): Promise<void> {
   ctx.require("MANAGE_WORKSPACE");
   const connections = appConnectionRepository(tx);
@@ -69,10 +69,31 @@ export async function reconnect(
   }
   const encryptedSecrets = secretBox.encrypt(JSON.stringify(secrets), connectionId);
   const after = { status: "connected", reconnectCause: null } as const;
-  await connections.update(connectionId, { encryptedSecrets, ...after });
+  await connections.update(connectionId, { encryptedSecrets, ...after, sessionFrom });
   if (old.status !== after.status) {
     await appendStatusHistory(ctx, tx, { kind: "EDITED_DIRECTLY" }, old, after);
   }
+  if (sessionFrom && sessionFrom !== old.sessionFrom) {
+    await recordHistory.append(ctx, tx, {
+      recordType: "app_connection",
+      operation: "UPDATED",
+      cause: { kind: "EDITED_DIRECTLY" },
+      records: [
+        {
+          recordId: connectionId,
+          changes: [{ field: "sessionFrom", oldValue: old.sessionFrom, newValue: sessionFrom }],
+        },
+      ],
+    });
+  }
+}
+
+/** New secrets for a connection, and who made their app session when they hold one. */
+export interface Reconnection {
+  connectionId: string;
+  secrets: Record<string, unknown>;
+  /** Left out for secrets without an app session, which keeps what is stored. */
+  sessionFrom?: AppSessionSource;
 }
 
 /** Why each of the connections in `reconnect` needs it, by connection id. */

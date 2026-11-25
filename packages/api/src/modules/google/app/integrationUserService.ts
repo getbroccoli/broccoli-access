@@ -17,8 +17,10 @@ import type { ScannedMembers } from "../ports";
 import type { GoogleConnectionDependencies } from "./googleConnectionService";
 import { createDirectoryUser, verifyWriteGrant, type WriteGrant } from "./integrationUserDirectory";
 import {
+  type AppSignIn,
   createIntegrationUserSignInAttempts,
   encryptIntegrationUserSecrets,
+  signInToApp,
 } from "./integrationUserSignIn";
 import {
   type ConnectedGoogleApp,
@@ -64,6 +66,11 @@ export interface IntegrationUserService {
    * integration user exists.
    */
   startSignIn: (ctx: SecurityContext) => Promise<void>;
+  /**
+   * Signs in to the app of the container's `connector` as the integration user and answers the
+   * connection with its new session, or why not. Its secrets go to the container only. Admins only.
+   */
+  signInToApp: (ctx: SecurityContext, connector: string) => Promise<AppSignIn>;
   /** The integration user as Settings shows it, its id the directory's; null before it exists. Owner only. */
   readIntegrationUser: (
     ctx: SecurityContext,
@@ -115,12 +122,13 @@ export function createIntegrationUserService(
 ): IntegrationUserService {
   const { orm, secretBox, connectedApps } = dependencies;
   const google = createGoogleClient(dependencies);
-  const signIn = createIntegrationUserSignInAttempts({
+  const signInDependencies = {
     ...dependencies,
     connectorsContainer: dependencies.connectorsUrl
       ? createConnectorsContainerClient(dependencies.connectorsUrl)
       : null,
-  });
+  };
+  const signIn = createIntegrationUserSignInAttempts(signInDependencies);
   // shortcut: one creation at a time in this process, so two answers at once never create two
   // users in Google; that holds while the API runs as one process. Reserve the row in Postgres
   // before calling Google if it ever runs as more.
@@ -177,6 +185,10 @@ export function createIntegrationUserService(
         throw new ApplicationError("CONFLICT", "The integration user does not exist.");
       }
       signIn.start();
+    },
+    signInToApp(ctx, connector) {
+      ctx.require("MANAGE_WORKSPACE");
+      return signInToApp(signInDependencies, connector);
     },
     async readIntegrationUser(ctx) {
       ctx.require("MANAGE_WORKSPACE");

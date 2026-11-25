@@ -107,6 +107,8 @@ export const settingsEn = {
   "settings.apps.throughApi": "Through {app}’s API, with a {field} made by a {app} admin.",
   "settings.apps.throughAppSession":
     "{app} has no API for this on your plan, so Broccoli Access makes the calls {app}’s own admin pages make, with your {app} session. The Chrome extension hands it over.",
+  "settings.apps.throughIntegrationUser":
+    "{app} has no API for this on your plan, so Broccoli Access makes the calls {app}’s own admin pages make, with a {app} session: the integration user’s, or your own.",
   "settings.apps.connect": "Connect {app}",
   "settings.apps.summary": "The {workspace} workspace, connected with a {field} of {email}.",
   "settings.apps.summaryBeforeScan": "The {workspace} workspace, connected with a {field}.",
@@ -114,7 +116,62 @@ export const settingsEn = {
     "The {workspace} workspace, connected with the {app} session of {email}.",
   "settings.apps.summaryAppSessionBeforeScan":
     "The {workspace} workspace, connected with your {app} session.",
+  "settings.apps.summaryIntegrationUser":
+    "The {workspace} workspace, connected with the integration user’s {app} session.",
   "settings.apps.noticeAccepted": "You accepted {app}’s notice on {day}.",
+  "settings.apps.actsAsIntegrationUser": "Acts as the integration user",
+  "settings.apps.usesOwnSession": "Uses your own session",
+  "settings.connectWay.integrationUser": "Integration user",
+  "settings.connectWay.recommended": "Recommended",
+  "settings.connectWay.invite": "In {app}, invite {email} as an admin. Then press Connect.",
+  "settings.connectWay.inviteToSwitch":
+    "In the connected {app} workspace, invite {email} as an admin. Then press Switch.",
+  "settings.connectWay.useOwnSession": "Use my own session",
+  "settings.connectWay.ownSession": "My own session",
+  "settings.connectWay.needsExtension": "Needs the Chrome extension.",
+  "settings.connectWay.none": "You have none yet. Create it once, for all apps.",
+  "settings.connectWay.create": "Create integration user",
+  "settings.connectWay.notSetUp":
+    "Its sign-in to Google isn’t set up yet. Finish it under Connections.",
+  "settings.connectWay.openConnections": "Open Connections",
+  "settings.connectWay.continue": "Continue",
+  "settings.connectWay.switch": "Switch",
+  "settings.connectWay.switchTitle": "Switch {app} to the integration user",
+  "settings.connectWay.loadFailed": "Couldn’t load the integration user. Close this and try again.",
+  "settings.integrationUserConnect.failedStep": "Failed",
+  "settings.integrationUserConnect.membersNotRead":
+    "{app} is connected, but its members couldn’t be read. Close this and look at {app} under Connections.",
+  "settings.integrationUserConnect.scanRunning":
+    "{app} is being scanned. Try again when the scan ends.",
+  "settings.integrationUserConnect.title": "Connecting {app}",
+  "settings.integrationUserConnect.switchTitle": "Switching {app} to the integration user",
+  "settings.integrationUserConnect.canCloseSwitch":
+    "You can close this. {app} shows “Acts as the integration user” when it is done.",
+  "settings.integrationUserConnect.switched": "{app} now acts as the integration user.",
+  "settings.integrationUserConnect.stepInvitation": "Accept the invitation",
+  "settings.integrationUserConnect.stepSignIn": "Sign in to {app}",
+  "settings.integrationUserConnect.stepMembers": "Read the members",
+  "settings.integrationUserConnect.done": "Done",
+  "settings.integrationUserConnect.working": "Working",
+  "settings.integrationUserConnect.next": "Next",
+  "settings.integrationUserConnect.canClose":
+    "You can close this. {app} shows as connected when it is done.",
+  "settings.integrationUserConnect.connected": "{app} is connected.",
+  "settings.integrationUserConnect.close": "Close",
+  "settings.integrationUserConnect.tryAgain": "Try again",
+  "settings.integrationUserConnect.notInvited":
+    "The integration user has no invitation in {app}. Invite it as an admin in {app}, then try again.",
+  "settings.integrationUserConnect.notAdmin":
+    "The integration user isn’t an admin in {app}. Make it an admin in {app}, then try again.",
+  "settings.integrationUserConnect.blockedByCheck":
+    "Google or {app} showed a check, which Broccoli Access never gets around. Try again later.",
+  "settings.integrationUserConnect.authenticationFailed":
+    "Google refused the integration user’s sign-in. Check the integration user under Connections, then try again.",
+  "settings.integrationUserConnect.otherWorkspace":
+    "The integration user signed in to another {app} workspace than the connected one, so the connection stays as it was. Make it an admin in the connected workspace, then try again.",
+  "settings.integrationUserConnect.notSetUp":
+    "The integration user’s sign-in to Google isn’t set up yet. Finish it under Connections, then try again.",
+  "settings.integrationUserConnect.failed": "Couldn’t sign in to {app}. Try again.",
   "settings.appSession.stepExtension": "Extension",
   "settings.appSession.stepPair": "Pair",
   "settings.appSession.stepNotice": "Notice",
@@ -154,6 +211,10 @@ export const settingsEn = {
     "Couldn’t check whether the extension handed over your session. Connect {app} again.",
   "settings.appSession.confirmTitle": "Connect the {workspace} workspace?",
   "settings.appSession.confirmBody": "Your {app} session in this Chrome opens this workspace.",
+  "settings.appSession.confirmBodyIntegrationUser":
+    "The integration user signed in to this {app} workspace. Nothing is connected until you confirm it.",
+  "settings.appSession.notThisWorkspaceIntegrationUser":
+    "Not this workspace? Cancel, take the integration user out of it in {app}, invite it to the right one, then Connect {app} again.",
   "settings.appSession.approvesNow": "Broccoli Access approves {app} and reads its members now.",
   "settings.appSession.readsDaily":
     "Each day it reads them again, which also keeps the session fresh.",

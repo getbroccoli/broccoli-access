@@ -5,6 +5,9 @@ import {
   ACTION_RUN_ANSWER,
   type ActionRunAnswer,
   type ActionRunRequest,
+  CONNECTION_SIGN_IN_ANSWER,
+  type ConnectionSignInAnswer,
+  type ConnectionSignInRequest,
   CONNECTION_TEST_ANSWER,
   type ConnectionTestAnswer,
   type ConnectionTestRequest,
@@ -31,15 +34,19 @@ export interface ConnectorsContainerClient {
   setUpIntegrationUser(
     request: IntegrationUserSetupRequest,
   ): Promise<ContainerAnswer<IntegrationUserSetupAnswer>>;
+  /** Signs in to the connector's app as the integration user in the container's browser, and answers its connection. */
+  signInToApp(
+    request: ConnectionSignInRequest,
+  ): Promise<ContainerAnswer<ConnectionSignInAnswer, ConnectorErrorCode>>;
 }
 
 /**
  * A call's answer, or the connector error it stands for: the container failing is
  * `app_unavailable`, an answer nobody understands `unexpected_response`.
  */
-export type ContainerAnswer<T> = { answer: T } | { error: CallErrorCode };
+export type ContainerAnswer<T, Code = CallErrorCode> = { answer: T } | { error: Code };
 
-/** The errors these calls give; `not_invited` comes only from signing in as the integration user. */
+/** The errors every call gives; `not_invited` comes only from signing in to an app as the integration user. */
 type CallErrorCode = Exclude<ConnectorErrorCode, "not_invited">;
 
 export function createConnectorsContainerClient(url: string): ConnectorsContainerClient {
@@ -55,15 +62,23 @@ export function createConnectorsContainerClient(url: string): ConnectorsContaine
       return manifest.connectors;
     },
     testConnection: (request) =>
-      call(urlUnder(url, "v1/connections/test"), request, CONNECTION_TEST_ANSWER),
+      callWithoutSignIn(urlUnder(url, "v1/connections/test"), request, CONNECTION_TEST_ANSWER),
     listAccounts: (request) =>
-      call(urlUnder(url, "v1/accounts/list"), request, ACCOUNTS_LIST_ANSWER),
-    runAction: (request) => call(urlUnder(url, "v1/actions/run"), request, ACTION_RUN_ANSWER),
+      callWithoutSignIn(urlUnder(url, "v1/accounts/list"), request, ACCOUNTS_LIST_ANSWER),
+    runAction: (request) =>
+      callWithoutSignIn(urlUnder(url, "v1/actions/run"), request, ACTION_RUN_ANSWER),
     setUpIntegrationUser: (request) =>
-      call(
+      callWithoutSignIn(
         urlUnder(url, "v1/integration-user/setup"),
         request,
         INTEGRATION_USER_SETUP_ANSWER,
+        SIGN_IN_TIMEOUT_MS,
+      ),
+    signInToApp: (request) =>
+      call(
+        urlUnder(url, "v1/connections/sign-in"),
+        request,
+        CONNECTION_SIGN_IN_ANSWER,
         SIGN_IN_TIMEOUT_MS,
       ),
   };
@@ -84,12 +99,22 @@ const MAX_ANSWER_BYTES = 16 * 1024 * 1024;
 /** Read leniently: a code a newer container adds is still an error, read as `unexpected_response`. */
 const ERROR_ANSWER = z.object({ error: z.object({ code: z.string() }) });
 
+/** A call that signs in to no app, so `not_invited` from it is an answer nobody understands. */
+async function callWithoutSignIn<T>(
+  ...request: Parameters<typeof call<T>>
+): Promise<ContainerAnswer<T>> {
+  const answer = await call(...request);
+  return "error" in answer && answer.error === "not_invited"
+    ? { error: "unexpected_response" }
+    : (answer as ContainerAnswer<T>);
+}
+
 async function call<T>(
   url: URL,
   request: unknown,
   schema: z.ZodType<T>,
   timeoutMs = CALL_TIMEOUT_MS,
-): Promise<ContainerAnswer<T>> {
+): Promise<ContainerAnswer<T, ConnectorErrorCode>> {
   const bytes = await postJson(url, request, timeoutMs);
   if (bytes === null) {
     return { error: "app_unavailable" };
@@ -133,8 +158,8 @@ function parsedJson(bytes: Buffer): unknown {
   }
 }
 
-function knownErrorCode(code: string): CallErrorCode {
-  return code !== "not_invited" && (CONNECTOR_ERROR_CODES as readonly string[]).includes(code)
-    ? (code as CallErrorCode)
+function knownErrorCode(code: string): ConnectorErrorCode {
+  return (CONNECTOR_ERROR_CODES as readonly string[]).includes(code)
+    ? (code as ConnectorErrorCode)
     : "unexpected_response";
 }

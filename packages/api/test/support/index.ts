@@ -20,7 +20,13 @@ export {
   type TestRun,
 } from "./testDatabases";
 export { TEST_OWNER, TestEnv, type SignedInOwner, type TestEnvOptions } from "./testEnv";
-export { TestSeed } from "./testSeed";
+export { INTEGRATION_USER_PASSWORD, TestSeed } from "./testSeed";
+export {
+  connectAsIntegrationUser,
+  INTEGRATION_USER_EMAIL,
+  inviteIntegrationUserToFakeSlack,
+  readyIntegrationUser,
+} from "./integrationUserConnect";
 export { TEST_SECRET_BOX } from "./testSecretBox";
 export { storedFileIds } from "./storedFileIds";
 export {

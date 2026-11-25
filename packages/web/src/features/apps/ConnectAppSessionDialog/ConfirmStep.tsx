@@ -11,13 +11,22 @@ type Props = {
   connector: Pick<AppSessionConnector, "id" | "name">;
   handOver: NonNullable<AppSessionHandOverQuery["appSessionHandOver"]>;
   connection: ReturnType<typeof useConnectAppSession>;
-  /** Back to signing in, such as to switch workspaces in the app. */
+  /** Whether the integration user's sign-in made the session, not the owner's hand-over. */
+  isIntegrationUser?: boolean;
+  /** Back to signing in, such as to switch workspaces in the app; Cancel for the integration user. */
   onBack: () => void;
   onConnected: () => void;
 };
 
 /** Step 5: the workspace the handed-over session opens, which the owner confirms to connect. */
-export function ConfirmStep({ connector, handOver, connection, onBack, onConnected }: Props) {
+export function ConfirmStep({
+  connector,
+  handOver,
+  connection,
+  isIntegrationUser = false,
+  onBack,
+  onConnected,
+}: Props) {
   const [connect, { loading, error, payloadError }] = connection;
   const app = connector.name;
   const workspace = handOver.organizationName;
@@ -42,7 +51,12 @@ export function ConfirmStep({ connector, handOver, connection, onBack, onConnect
           </DialogTitle>
         </div>
         <DialogDescription className="text-sm text-foreground/80">
-          {t("settings.appSession.confirmBody", { app })}
+          {t(
+            isIntegrationUser
+              ? "settings.appSession.confirmBodyIntegrationUser"
+              : "settings.appSession.confirmBody",
+            { app },
+          )}
         </DialogDescription>
       </DialogHeader>
       <div className="flex items-center gap-4 rounded-xl border-2 border-foreground px-4 py-3.5">
@@ -64,7 +78,12 @@ export function ConfirmStep({ connector, handOver, connection, onBack, onConnect
         <li>{t("settings.appSession.readsDaily")}</li>
       </ul>
       <p className="text-[13px] text-muted-foreground">
-        {t("settings.appSession.notThisWorkspace", { app })}
+        {t(
+          isIntegrationUser
+            ? "settings.appSession.notThisWorkspaceIntegrationUser"
+            : "settings.appSession.notThisWorkspace",
+          { app },
+        )}
       </p>
       {failure && (
         <p role="alert" className="text-sm text-destructive">
@@ -73,7 +92,7 @@ export function ConfirmStep({ connector, handOver, connection, onBack, onConnect
       )}
       <DialogFooter className="m-0 flex-row justify-end gap-2 border-0 bg-transparent p-0">
         <Button type="button" variant="outline" size="lg" disabled={loading} onClick={onBack}>
-          {t("settings.appSession.back")}
+          {t(isIntegrationUser ? "settings.apps.dialog.cancel" : "settings.appSession.back")}
         </Button>
         <Button type="button" size="lg" disabled={loading} onClick={confirm}>
           {loading

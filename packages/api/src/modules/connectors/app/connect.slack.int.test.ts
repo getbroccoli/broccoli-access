@@ -56,6 +56,7 @@ test("connects Slack with the handed-over session, records the notice and queues
       id: connectionId,
       appId: apps[0]!.id,
       connector: "slack",
+      sessionFrom: "extension",
       noticeAcceptedAt: now,
       noticeAcceptedBy: owner.userId,
     },

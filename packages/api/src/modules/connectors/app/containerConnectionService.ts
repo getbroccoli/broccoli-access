@@ -1,18 +1,15 @@
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
-import { canChangeAccounts, type ConnectionDetails } from "../../../core/connectors";
+import { type AppSessionSource, canChangeAccounts } from "../../../core/connectors";
 import type { Orm, Transact } from "../../../core/db";
 import type { Logger } from "../../../core/logger";
 import type { SecretBox } from "../../../core/secrets";
 import type { SecurityContext } from "../../../core/security";
-import { adminUrlOf, parseAppSession } from "../domain";
-import type { ConnectedApps, Scans } from "../ports";
+import { parseAppSession } from "../domain";
+import type { ConnectedApps, IntegrationUserSignIn, Scans } from "../ports";
 import { type AppSessionHandOver, createAppSessionHandOvers } from "./appSessionHandOvers";
-import {
-  type Connection,
-  connectionOf,
-  isOtherWorkspace,
-  refuseOtherWorkspace,
-} from "./connectionOf";
+import { connectionOf, isOtherWorkspace, refuseOtherWorkspace } from "./connectionOf";
+import { connectWithIntegrationUser } from "./connectWithIntegrationUser";
+import { replaceSecrets, saveConnection, summaryOf } from "./saveConnection";
 import { testedConnection } from "./testedConnection";
 import {
   appSessionFieldOf,
@@ -64,6 +61,23 @@ export interface ContainerConnectionService {
       appSession?: string | null;
     },
   ) => Promise<ConnectorWithConnection>;
+  /**
+   * Signs in to a container connector's app as the integration user. For a connector not connected
+   * yet it stores nothing: the session waits sealed as `handOver`, for five minutes, until the
+   * owner confirms the workspace it reached with `connect`. On a connected connector it switches:
+   * the new session, which must open the connection's workspace, replaces the stored one, and its
+   * scan is queued. Needs MANAGE_WORKSPACE. Refuses an unknown connector with NOT_FOUND, one that
+   * cannot sign in with CONFLICT, a first sign-in without the notice accepted with INVALID_INPUT,
+   * a sign-in the owner can put right with INVALID_INPUT on `integrationUser` and its code
+   * (`not_invited`, `permission_missing`, `blocked_by_check`, `authentication_failed`,
+   * `wrong_workspace`, `not_set_up`, or `scan_running` for a switch while the connection's scan
+   * runs), and any other failing sign-in, after trying a rate-limited or unavailable one again,
+   * with UNAVAILABLE; a refusal changes nothing.
+   */
+  connectWithIntegrationUser: (
+    ctx: SecurityContext,
+    input: { connector: string; noticeAccepted?: boolean },
+  ) => Promise<IntegrationUserConnection>;
   /**
    * What the extension collects for the connector's app session field. Trusted: the extension's
    * token was checked. Refuses an unknown connector with NOT_FOUND, and one without an app session
@@ -118,6 +132,12 @@ export interface ConnectorWithConnection {
   connection: ContainerConnection | null;
 }
 
+/** What signing in as the integration user gave: the switched connection, or the session to confirm. */
+export interface IntegrationUserConnection extends ConnectorWithConnection {
+  /** The workspace a first sign-in reached, sealed with its session; null after a switch. */
+  handOver: AppSessionHandOver | null;
+}
+
 /** A connection through the connectors container, as Settings and its app's page show it. */
 export interface ContainerConnection {
   id: string;
@@ -125,6 +145,8 @@ export interface ContainerConnection {
   adminUrl: string | null;
   /** When the owner accepted the connector's notice; null for a connector without one. */
   noticeAcceptedAt: Date | null;
+  /** Who made its app session; null for a connection without one. */
+  sessionFrom: AppSessionSource | null;
   /** The connector it connects through. */
   connector: ContainerConnector;
 }
@@ -154,6 +176,7 @@ export interface ContainerConnectionDependencies {
   containerConnectors: ContainerConnectors;
   connectedApps: ConnectedApps;
   scans: Scans;
+  integrationUser: IntegrationUserSignIn;
   secretBox: SecretBox;
   /** Waits between attempts of the connection test; tests pass one that does not wait. */
   wait?: (ms: number) => Promise<void>;
@@ -193,6 +216,7 @@ export function createContainerConnectionService(
         connection,
         details,
         noticeAcceptedAt,
+        sessionFrom: connection.sessionFrom,
       });
     },
     async reconnect(ctx, input) {
@@ -208,22 +232,11 @@ export function createContainerConnectionService(
       const details = await testedConnection(dependencies, connector, connection);
       refuseOtherWorkspace({ connector, connection, details, stored }, logger);
       const secrets = details.connection?.secrets ?? connection.secrets;
-      const { sourceId } = await dependencies.transact(async (tx) => {
-        // The source first, then the connection, as a failing scan locks them, so they never deadlock.
-        // The source exists since the first scan, which named it.
-        const scan = await dependencies.scans.scanConnection(ctx, tx, {
-          connectionId: stored.id,
-          sourceName: connector.name,
-        });
-        await connectedApps.reconnect(ctx, tx, stored.id, secrets);
-        return scan;
-      });
-      logger.info(
-        { connector: connector.key, connectionId: stored.id, sourceId },
-        "App reconnected through the connectors container; a scan is queued or running",
-      );
-      return { connector, connection: summaryOf(connector, stored) };
+      const { sessionFrom } = connection;
+      return replaceSecrets(dependencies, ctx, { connector, stored, secrets, sessionFrom });
     },
+    connectWithIntegrationUser: (ctx, input) =>
+      connectWithIntegrationUser(dependencies, handOvers, ctx, input),
     async describeAppSession(key) {
       const { connector, field } = await findAppSessionConnector(containerConnectors, key);
       const { domains, storageKeys } = field;
@@ -317,57 +330,4 @@ async function connectorsWithConnections({
     const connection = connections.find((candidate) => candidate.connector === connector.key);
     return { connector, connection: connection ? summaryOf(connector, connection) : null };
   });
-}
-
-/** Writes the connection, its approved app and its first scan together, then logs the outcome. */
-async function saveConnection(
-  { transact, connectedApps, scans, logger }: ContainerConnectionDependencies,
-  ctx: SecurityContext,
-  {
-    connector,
-    connection,
-    details,
-    noticeAcceptedAt,
-  }: {
-    connector: ContainerConnector;
-    connection: Connection;
-    details: ConnectionDetails;
-    noticeAcceptedAt: Date | undefined;
-  },
-): Promise<ConnectorWithConnection> {
-  const settings = { ...connection.settings, ...details.connection?.settings };
-  const saved = await transact(async (tx) => {
-    const { appId, connectionId } = await connectedApps.connectApp(ctx, tx, {
-      connector: connector.key,
-      app: { name: connector.name, domain: connector.appDomain },
-      settings,
-      secrets: details.connection?.secrets ?? connection.secrets,
-      noticeAcceptedAt,
-    });
-    const scan = { connectionId, sourceName: details.organizationName };
-    const { sourceId } = await scans.scanConnection(ctx, tx, scan);
-    return { appId, connectionId, sourceId };
-  });
-  logger.info(
-    { connector: connector.key, ...saved },
-    "App connected through the connectors container; its scan is queued",
-  );
-  const summary = summaryOf(connector, {
-    id: saved.connectionId,
-    settings,
-    noticeAcceptedAt: noticeAcceptedAt ?? null,
-  });
-  return { connector, connection: summary };
-}
-
-function summaryOf(
-  connector: ContainerConnector,
-  connection: { id: string; settings: Record<string, unknown>; noticeAcceptedAt: Date | null },
-): ContainerConnection {
-  return {
-    id: connection.id,
-    adminUrl: adminUrlOf(connector.adminUrl, connection.settings),
-    noticeAcceptedAt: connection.noticeAcceptedAt,
-    connector,
-  };
 }

@@ -11,6 +11,8 @@ type ContainerConnector {
   connectionFields: [ConnectionField!]!
   "Shown before the first connection, which the owner accepts; null for an API connector."
   notice: String
+  "Whether Broccoli Access can sign in to its app as the integration user, so Connect offers that beside the owner's own session."
+  signsInAsIntegrationUser: Boolean!
   "Its connection; null until connected."
   connection: ContainerConnection
 }
@@ -40,11 +42,21 @@ type ContainerConnection {
   adminUrl: String
   "When the owner accepted the connector's notice; null for a connector without one."
   noticeAcceptedAt: DateTime
+  "Who made its app session; null for a connection without one, such as one with an API key."
+  sessionFrom: AppSessionSource
   "The connector it connects through."
   connector: ContainerConnector!
 }
 
-"An app session the paired extension handed over, tested with the app, waiting for the owner to connect within five minutes."
+"Who made a connection's app session."
+enum AppSessionSource {
+  "The owner's own session, which the extension handed over."
+  EXTENSION
+  "The integration user's session, which Broccoli Access made by signing in as it: the connection acts as the integration user."
+  SERVER_SIGN_IN
+}
+
+"An app session the paired extension handed over, or the integration user's sign-in made, waiting for the owner to confirm its workspace and connect within five minutes."
 type AppSessionHandOver {
   "The id the page gave the hand-over."
   id: ID!
@@ -80,7 +92,7 @@ input ContainerConnectorConnectInput {
   connector: ID!
   "A value for each of its text connection fields."
   values: [ConnectionFieldValue!]! = []
-  "For a connector with an app session field: the `appSession` of its `AppSessionHandOver`."
+  "For a connector with an app session field: the `appSession` of its `AppSessionHandOver`, from the extension or from `connectWithIntegrationUser`."
   appSession: String
   "Whether the owner accepted the connector's notice; a connector with a notice needs it."
   noticeAccepted: Boolean! = false
@@ -120,11 +132,37 @@ type ContainerConnectorReconnectPayload {
 
 union ContainerConnectorReconnectError = InvalidInputError | NotFoundError | UnavailableError
 
+input ContainerConnectorConnectWithIntegrationUserInput {
+  "The key of a connector that signs in as the integration user, such as `slack`."
+  connector: ID!
+  "Whether the owner accepted the connector's notice; its first connection needs it."
+  noticeAccepted: Boolean! = false
+}
+
+"What signing in as the integration user gave, or why it was refused."
+type ContainerConnectorConnectWithIntegrationUserPayload {
+  "For a connector not connected yet: the workspace the sign-in reached with its sealed session, which the owner confirms within five minutes through `connectors.connect` and its `appSession`; null after a switch."
+  appSessionHandOver: AppSessionHandOver
+  "The connector; its connection is null until the owner confirms a first connection."
+  containerConnector: ContainerConnector
+  error: ContainerConnectorConnectWithIntegrationUserError
+}
+
+union ContainerConnectorConnectWithIntegrationUserError =
+  | InvalidInputError
+  | NotFoundError
+  | ConflictError
+  | UnavailableError
+
 type ConnectorsMutations {
   "Connects a container connector with typed values, or with the app session its extension handed over: tests them with the app, then saves the connection, approves its app and queues its first scan. Refused as invalid `noticeAccepted` without the connector's notice accepted, as invalid `values.<key>` for a missing or unknown value, as invalid `appSession` for a missing, changed, expired or another's session, and as invalid `values` or `appSession` with the error's code when the app refuses them; with a NotFoundError for a connector the container lacks, a ConflictError for one already connected, and an UnavailableError when the test fails otherwise. Admins only."
   connect(input: ContainerConnectorConnectInput!): ContainerConnectorConnectPayload!
   "Replaces the credentials of a container connector's connection, whether it is connected or needs reconnecting, with new typed values or the app session a new hand-over gave: tests them with the app, which must reach the connection's workspace, then saves them, sets it connected and queues its scan. Refused with an InvalidInputError: on `values.<key>` or `appSession` as `connect` refuses them; on `values` (typed values) or `appSession` (a hand-over) with the app's error code when the app refuses them, or with `wrong_workspace` when they reach another workspace than the connection's. Refused with a NotFoundError for a connector the container lacks or one not connected, and an UnavailableError when the test fails otherwise. Admins only."
   reconnect(input: ContainerConnectorReconnectInput!): ContainerConnectorReconnectPayload!
+  "Signs in to a container connector's app as the integration user, which the owner invited there as an admin. For a connector not connected yet, nothing is stored: the payload's `appSessionHandOver` names the workspace the sign-in reached, and `connect` with its `appSession` connects it. On a connected connector it switches the connection to that session, which must open the same workspace, and queues its scan. Refused as invalid `noticeAccepted` for a first sign-in without the notice accepted, and as invalid `integrationUser` with a code the owner can act on: `not_invited`, `permission_missing`, `blocked_by_check`, `authentication_failed`, `wrong_workspace`, `scan_running` for a switch while the connection's scan runs, or `not_set_up` until the integration user signs in to Google with two steps. Refused with a NotFoundError for a connector the container lacks, a ConflictError for one that cannot sign in as the integration user, and an UnavailableError when signing in fails otherwise. Admins only."
+  connectWithIntegrationUser(
+    input: ContainerConnectorConnectWithIntegrationUserInput!
+  ): ContainerConnectorConnectWithIntegrationUserPayload!
 }
 
 type Query {

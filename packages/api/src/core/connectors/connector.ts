@@ -178,13 +178,21 @@ export interface AccountPhoto {
   mimeType: string;
 }
 
+/**
+ * Who made a connection's app session: `extension`, the owner's own, handed over; or
+ * `server_sign_in`, the integration user's, made by signing in as it.
+ */
+export const APP_SESSION_SOURCES = ["extension", "server_sign_in"] as const;
+
+export type AppSessionSource = (typeof APP_SESSION_SOURCES)[number];
+
 /** The version of `AccountValues` the import records store. */
 export const ACCOUNT_VALUES_VERSION = 3;
 
 /**
  * Why a connector failed; it never passes on the app's raw answer. The connectors container's own
  * codes, such as `wrong_workspace`, come from the connector contract, except `not_invited`: only
- * signing in as the integration user gives it, which the core does not do yet.
+ * signing in as the integration user gives it, which is no connector session's call.
  */
 export const CONNECTOR_ERROR_CODES = [
   "authentication_failed",
@@ -243,6 +251,13 @@ export function canInvite({
 /** Null asks for the default, even on a connector that does not list roles. */
 export function offersInviteRole(roles: Connector["roles"], role: string | null): boolean {
   return role === null || !!roles?.some(({ key }) => key === role);
+}
+
+/** Whether Broccoli Access can sign in to its app as the integration user: it lists `sign_in`. */
+export function signsInAsIntegrationUser({
+  capabilities,
+}: Pick<Connector, "capabilities">): boolean {
+  return capabilities.includes("sign_in");
 }
 
 /** Whether its scans read the app's pending invitations: it lists `list_invitations`. */
