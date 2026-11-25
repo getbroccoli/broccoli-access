@@ -127,6 +127,7 @@ export {
   ownerHandOver,
   containerConnectors,
   failLinearCall,
+  scanAfterFirstPage,
   serveAccountList,
   serveManifest,
   serveConnectorRoutes,
@@ -181,4 +182,4 @@ export {
   createPersonAtGoogle,
   directoryProvisionTest,
 } from "./addPerson";
-export { scannedNotion, testNotion, NOTION_INPUT } from "./notionAccounts";
+export { instantNotionInvite, scannedNotion, testNotion, NOTION_INPUT } from "./notionAccounts";

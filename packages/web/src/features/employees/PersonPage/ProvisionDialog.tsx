@@ -45,8 +45,6 @@ export function ProvisionDialog({ person, steps, disabled }: Props) {
     refetch: [PersonPageDocument],
   });
   const name = `${person.firstName} ${person.lastName}`;
-  // Only an app Broccoli Access invites to sends an invitation email.
-  const invited = steps.filter(({ action }) => action === "INVITE").length;
   const confirm = () => {
     setOpen(false);
     const appIds = steps.map(({ row }) => row.app.id);
@@ -90,17 +88,12 @@ export function ProvisionDialog({ person, steps, disabled }: Props) {
             );
           })}
         </ul>
-        {invited > 0 && (
+        {steps.some(({ action }) => action === "INVITE") && (
           <p className="text-sm text-foreground/80">
-            {t(
-              invited === steps.length
-                ? "people.provision.appsInvite"
-                : "people.provision.someAppsInvite",
-              { firstName: person.firstName },
-            )}
+            {t("people.provision.appsInvite", { firstName: person.firstName })}
           </p>
         )}
-        {invited < steps.length && steps.some(({ action }) => action === "GIVE_BY_HAND") && (
+        {steps.some(({ action }) => action === "GIVE_BY_HAND") && (
           <p className="text-sm text-foreground/80">
             {t("people.provision.byHandIsYours", { firstName: person.firstName })}
           </p>

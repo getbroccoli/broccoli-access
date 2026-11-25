@@ -33,11 +33,16 @@ export interface ImportSourceRepository {
   markScanning(id: string): Promise<void>;
   /** Makes the source's records exactly `accounts`. */
   replaceRecords(id: string, accounts: readonly ImportedAccount[]): Promise<void>;
+  /** Saves one member, replacing the record with the same source key. */
+  upsertMember(id: string, account: ImportedAccount): Promise<void>;
   removeMember(member: { connectionId: string; sourceKey: string; email: string }): Promise<void>;
   /** The accounts the source's last saved scan found. */
   findRecords(id: string): Promise<Pick<ImportedAccount, "sourceKey" | "raw">[]>;
-  /** The email of the member with this stable source key, or null if absent from the scan. */
-  findMemberEmail(connectionId: string, sourceKey: string): Promise<string | null>;
+  /** The connection's source and the email it holds for this member key, if present. */
+  findSourceAndMemberEmail(
+    connectionId: string,
+    sourceKey: string,
+  ): Promise<{ sourceId: string; email: string | null } | null>;
   /**
    * The source's account of the member whose key or session the connection uses; null without
    * one, as a version 1 record, which predates the flag, reads.
@@ -93,17 +98,20 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
     },
     replaceRecords: async (id, accounts) => {
       await orm().delete(importRecords).where(eq(importRecords.sourceId, id));
-      const rows = accounts.map(({ sourceKey, raw, values }) => ({
-        sourceId: id,
-        type: "app_account" as const,
-        typeVersion: ACCOUNT_VALUES_VERSION,
-        sourceKey,
-        raw,
-        values,
-      }));
+      const rows = accounts.map((account) => memberRecord(id, account));
       for (const batch of insertBatches(rows)) {
         await orm().insert(importRecords).values(batch);
       }
+    },
+    upsertMember: async (id, account) => {
+      const row = memberRecord(id, account);
+      await orm()
+        .insert(importRecords)
+        .values(row)
+        .onConflictDoUpdate({
+          target: [importRecords.sourceId, importRecords.type, importRecords.sourceKey],
+          set: { raw: row.raw, values: row.values, typeVersion: row.typeVersion },
+        });
     },
     removeMember: async ({ connectionId, sourceKey, email }) => {
       const source = orm()
@@ -128,15 +136,23 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
         })
         .from(importRecords)
         .where(eq(importRecords.sourceId, id)),
-    findMemberEmail: async (connectionId, sourceKey) => {
+    findSourceAndMemberEmail: async (connectionId, sourceKey) => {
       const [record] = await orm()
-        .select({ email: sql<string>`${importRecords.values} ->> 'email'` })
-        .from(importRecords)
-        .innerJoin(importSources, eq(importSources.id, importRecords.sourceId))
-        .where(
-          and(eq(importSources.connectionId, connectionId), eq(importRecords.sourceKey, sourceKey)),
-        );
-      return record?.email ?? null;
+        .select({
+          sourceId: importSources.id,
+          email: sql<string | null>`${importRecords.values} ->> 'email'`,
+        })
+        .from(importSources)
+        .leftJoin(
+          importRecords,
+          and(
+            eq(importSources.id, importRecords.sourceId),
+            eq(importRecords.sourceKey, sourceKey),
+            eq(importRecords.type, "app_account"),
+          ),
+        )
+        .where(eq(importSources.connectionId, connectionId));
+      return record ?? null;
     },
     findConnectionUserEmail: async (connectionId) => {
       const [record] = await orm()
@@ -211,6 +227,19 @@ async function findSource(
   { lock }: { lock: boolean },
 ): Promise<ImportSource | null> {
   const query = orm.select().from(importSources).where(where);
-  const [source] = await (lock ? query.for("update") : query);
+  // A scan locks its source before the account sync lock. The member insert takes a key-share
+  // lock on that unchanged source id while it holds the account sync lock.
+  const [source] = await (lock ? query.for("no key update") : query);
   return source ?? null;
+}
+
+function memberRecord(sourceId: string, { sourceKey, raw, values }: ImportedAccount) {
+  return {
+    sourceId,
+    type: "app_account" as const,
+    typeVersion: ACCOUNT_VALUES_VERSION,
+    sourceKey,
+    raw,
+    values,
+  };
 }

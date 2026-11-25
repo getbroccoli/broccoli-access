@@ -12,17 +12,12 @@ import {
   RenewedSessionRefusedError,
   withConnectorRetries,
 } from "../../../core/connectors";
-import type { Tx } from "../../../core/db";
-import { createSetupStepService } from "../../../core/instance";
 import type { SecurityContext } from "../../../core/security";
-import { importSourceRepository } from "../db";
 import type { ScanCounts, ScanProgress } from "../domain";
 import { readChangedPhotos } from "./readChangedPhotos";
 import type { ScannedApps } from "../ports";
 import type { ScanDependencies } from "./scanService";
-import { type ScanFindings, syncAccounts } from "./syncAccounts";
-
-const setupSteps = createSetupStepService();
+import { saveScan } from "./saveScan";
 
 /** How a scan ended without saving: its connector error, and what turning to Reconnect needs. */
 export interface ScanFailure {
@@ -63,11 +58,14 @@ export async function scanSource(
       throw new ConnectorError("app_unavailable");
     }
     const target = { sourceId, connection, connector, used, revision };
-    const saved = await readRenewing(ctx, dependencies, target, progressBySource);
-    if (!saved) {
+    const rosterChanged = await readRenewing(ctx, dependencies, target, progressBySource);
+    if (rosterChanged) {
       if (restarted)
         throw new ApplicationError("CONFLICT", "The roster changed on both scan attempts.");
-      dependencies.logger.info({ sourceId }, "Restarting scan after an overlapping removal");
+      dependencies.logger.info(
+        { sourceId, connectionId },
+        "Restarting scan after an overlapping membership change",
+      );
       return scanSource(ctx, dependencies, { sourceId, connectionId }, progressBySource, true);
     }
     return null;
@@ -144,9 +142,9 @@ async function readAndSave(
   const { sourceId, connection, connector } = scanned;
   const renewing = { connectionId: connection.id, used };
   const readStartedAt = new Date();
-  const savedCount = connector.isDirectory
+  const rosterRevision = connector.isDirectory
     ? null
-    : (await importSourceRepository(dependencies.orm).countRecords(sourceId)).accounts;
+    : await dependencies.apps.readRosterRevision(dependencies.orm, connection.id);
   const retrying = <T>(call: () => Promise<T>) => withRetries(dependencies, sourceId, call);
   const session = await retrying(() =>
     connector.openSession({ settings: connection.settings, secrets: used.secrets }),
@@ -167,81 +165,14 @@ async function readAndSave(
   });
   const outcome = await saveScan(ctx, dependencies, {
     ...scanned,
-    savedCount,
+    rosterRevision,
     readStartedAt,
     invitations,
     ...read,
   });
-  if (!outcome) return false;
+  if (!outcome) return true;
   logScan(dependencies, sourceId, found, { accounts, invitations, photos: read.photos }, outcome);
-  return true;
-}
-
-/**
- * Replaces the source's records with what the scan found, syncs them and moves setup on, in one
- * transaction; saves nothing when the scan is no longer queued.
- */
-async function saveScan(
-  ctx: SecurityContext,
-  dependencies: ScanDependencies,
-  findings: ScanFindings & {
-    revision: string;
-    savedCount: number | null;
-  },
-): Promise<{ saved: boolean; finishedSetupScan: boolean; accountsSetToService: number } | null> {
-  const { sourceId, accounts, savedCount } = findings;
-  return dependencies.transact(async (tx) => {
-    const sources = importSourceRepository(tx);
-    const source = await sources.lockById(sourceId);
-    if (source?.status !== "scanning") {
-      return { saved: false, finishedSetupScan: false, accountsSetToService: 0 };
-    }
-    // Before the directory locks any employee, so two saves wait for each other, never deadlock.
-    await dependencies.apps.holdAccountSyncs(ctx, tx);
-    if (
-      findings.connector.isDirectory &&
-      !(await dependencies.apps.holdConnectionRevision(
-        tx,
-        findings.connection.id,
-        findings.revision,
-      ))
-    ) {
-      // The job retries from a fresh connection; stale findings must never reach app history.
-      throw new ApplicationError("CONFLICT", "The directory connection changed during the scan.");
-    }
-    // Only Remove can delete this source's records between scan saves.
-    // shortcut: an unsettled remote removal can still shift a page; the next scan reconciles it.
-    if (savedCount !== null && savedCount !== (await sources.countRecords(sourceId)).accounts)
-      return null;
-    await sources.replaceRecords(sourceId, accounts);
-    if (findings.connector.isDirectory) {
-      await followIntegrationUser(ctx, tx, dependencies, { sourceId, accounts });
-    }
-    const { accountsSetToService } = await syncAccounts(ctx, tx, findings, dependencies);
-    await sources.markScanned(sourceId, new Date());
-    if (!source.readAt)
-      tx.publish("imports.appScanned", { appId: findings.connection.appId, sourceId });
-    // Setup waits for the directory's people; another app's scan never ends its scan step.
-    const finishedSetupScan =
-      findings.connector.isDirectory && (await setupSteps.finishScanStep(ctx, tx));
-    return { saved: true, finishedSetupScan, accountsSetToService };
-  });
-}
-
-/** Lets the connections made by the integration user's sign-in follow its status in the directory. */
-async function followIntegrationUser(
-  ctx: SecurityContext,
-  tx: Tx,
-  { integrationUser, apps }: ScanDependencies,
-  { sourceId, accounts }: { sourceId: string; accounts: readonly ImportedAccount[] },
-): Promise<void> {
-  const googleId = await integrationUser.readGoogleUserId(ctx, tx);
-  const member = accounts.find(({ sourceKey }) => sourceKey === googleId);
-  // Until the directory lists the integration user, nothing is known of it.
-  if (member) {
-    const suspended = member.values.status === "suspended";
-    await apps.syncIntegrationUserStops(ctx, tx, { suspended, ref: sourceId });
-  }
+  return false;
 }
 
 /** Every page's accounts, and the pending invitations any page carries. */
@@ -265,10 +196,6 @@ async function readAllPages(
       seenCursors.add(cursor);
     }
   } while (cursor !== null);
-  // Each account is one record; a key seen twice is an answer the connector got wrong.
-  if (new Set(accounts.map(({ sourceKey }) => sourceKey)).size !== accounts.length) {
-    throw new ConnectorError("unexpected_response");
-  }
   return { accounts, invitations };
 }
 

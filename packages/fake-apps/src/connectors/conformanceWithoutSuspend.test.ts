@@ -9,6 +9,7 @@ const scenarios: {
   actions: NotionAction[];
   ownMember: string | null;
   onlySuspendedMember?: boolean;
+  instantInvite?: boolean;
   observeUnlistedRuntimeActions?: boolean;
 }[] = [
   { name: "list only", actions: [], ownMember: null },
@@ -29,11 +30,20 @@ const scenarios: {
     ownMember: null,
     observeUnlistedRuntimeActions: true,
   },
+  {
+    name: "invite adds an active member at once",
+    actions: ["invite"],
+    ownMember: null,
+    instantInvite: true,
+  },
   { name: "remove only", actions: ["remove"], ownMember: null },
 ];
 
 for (const scenario of scenarios) {
-  const options = { onlySuspendedMember: scenario.onlySuspendedMember };
+  const options = {
+    onlySuspendedMember: scenario.onlySuspendedMember,
+    instantInvite: scenario.instantInvite,
+  };
   const unlistedRuntimeActions = new Set<ActionRunRequest["action"]>();
   const first = await startNotionConnector(scenario.actions, scenario.ownMember, {
     ...options,

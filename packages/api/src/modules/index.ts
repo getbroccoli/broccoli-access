@@ -107,6 +107,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     connectors: directoryConnectors,
     members: importRecords,
   });
+  const directorySync = createDirectorySyncService();
   // One scan service for the job, the page and the connect flows, which share its progress.
   const scans = createScanService({
     ...core,
@@ -117,7 +118,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       ...createAppInvitationService(),
       ...apps,
     },
-    directory: createDirectorySyncService(),
+    directory: directorySync,
     integrationUser: integrationUsers,
     renewals,
   });
@@ -132,6 +133,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   const employees = createEmployeeReadService({ ...core, accounts: apps });
   const changeDependencies = {
     readInviteRole,
+    findEmployeeIdsByEmail: directorySync.findEmployeeIdsByEmail,
     isExtraApp: (...args: Parameters<TemplateService["isExtraApp"]>) =>
       templates.isExtraApp(...args),
     directoryConnectors,

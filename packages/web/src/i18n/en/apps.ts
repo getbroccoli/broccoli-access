@@ -128,7 +128,7 @@ export const appsEn = {
   "apps.change.enableEffect":
     "This account becomes active in this workspace again. You can disable it again later.",
   "apps.change.inviteEffect":
-    "{app} sends {firstName} an invitation to join this workspace, unless they already have one or have joined. Their account shows here once {app} is scanned after they join.",
+    "{app} can add {firstName} to this workspace at once or send an invitation email. If they already have access or a pending invitation, {app} keeps it. After they accept an invitation, their account shows here once {app} is scanned.",
   "apps.change.cancel": "Cancel",
   "apps.change.continueToGoogle": "Continue to Google",
   "apps.change.googleAsks":

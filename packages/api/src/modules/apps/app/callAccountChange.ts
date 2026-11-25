@@ -2,9 +2,11 @@ import {
   type ConnectionUpdate,
   type Connector,
   callWithRenewal,
+  ConnectorAnswerLostError,
   ConnectorError,
   type ConnectorErrorCode,
   type ConnectorSession,
+  type ImportedAccount,
   RenewalError,
   RenewedSessionRefusedError,
   withConnectorRetries,
@@ -23,6 +25,13 @@ export interface ActionOutcome {
   reconnects: boolean;
   /** Whether the error is what signing in again answered, which turns Reconnect with a check too. */
   afterRenewal?: boolean;
+  /** The member an invite added, with the finding kind its connection uses. */
+  invitedMember?: InvitedMember;
+}
+
+export interface InvitedMember {
+  account: ImportedAccount;
+  findingKind: string;
 }
 
 /** An outcome decided before any call to the app. */
@@ -49,7 +58,7 @@ export async function callChange(
     );
     return { ...NOT_CALLED, secretsUsed: secrets, error: "authentication_failed", reconnects };
   }
-  const progress = { calledServer: false, inUse: secrets };
+  const progress = { calledServer: false, inviteAnswerLost: false, inUse: secrets };
   try {
     const result = await callWithRenewal(() => callOnce(dependencies, change, call, progress), {
       renewals,
@@ -69,6 +78,10 @@ export async function callChange(
       calledServer: progress.calledServer,
       secretsUsed: progress.inUse,
       reconnects,
+      invitedMember: result.account && {
+        account: result.account,
+        findingKind: call.connector.findingKinds.ownAppAccounts,
+      },
     };
   } catch (error) {
     if (error instanceof ConnectorError) {
@@ -93,21 +106,32 @@ interface ChangeCall {
   reconnects: boolean;
 }
 
+interface CallProgress {
+  calledServer: boolean;
+  inviteAnswerLost: boolean;
+  inUse: Record<string, unknown>;
+}
+
 /** One attempt with the secrets in use, trying a rate-limited or unavailable call again. */
 async function callOnce(
   { wait, logger }: RunDependencies,
   change: RunnableChange,
   { connector, connection }: ChangeCall,
-  progress: { calledServer: boolean; inUse: Record<string, unknown> },
+  progress: CallProgress,
 ) {
   const session = await connector.openSession({
     settings: connection.settings,
     secrets: progress.inUse,
   });
   return withConnectorRetries(
-    () => {
+    async () => {
       progress.calledServer = true;
-      return makeChange(session, change);
+      try {
+        return await makeChange(session, change, progress.inviteAnswerLost);
+      } catch (error) {
+        if (error instanceof ConnectorAnswerLostError) progress.inviteAnswerLost = true;
+        throw error;
+      }
     },
     {
       wait,
@@ -128,9 +152,21 @@ async function callOnce(
 async function makeChange(
   session: ConnectorSession,
   change: RunnableChange,
-): Promise<{ readBack: boolean; connection?: ConnectionUpdate }> {
+  inviteAnswerLost: boolean,
+): Promise<{ readBack: boolean; connection?: ConnectionUpdate; account?: ImportedAccount }> {
   if (change.action === "invite") {
-    return { ...(await session.invite!(change.email, change.role ?? undefined)), readBack: true };
+    const { connection, account, changed } = await session.invite!(
+      change.email,
+      change.role ?? undefined,
+    );
+    // shortcut: a crash before commit leaves reconciliation to the next scan, record dispatched
+    // attempts if recovery must be immediate.
+    return {
+      connection,
+      readBack: true,
+      account:
+        (changed || inviteAnswerLost) && account?.values.status === "active" ? account : undefined,
+    };
   }
   // A change to an existing account always copies the member's source key.
   const account = { sourceKey: change.sourceKey!, email: change.email };

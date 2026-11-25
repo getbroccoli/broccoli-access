@@ -1,5 +1,14 @@
 import { getTableColumns, isNotNull, sql } from "drizzle-orm";
-import { check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  type AnyPgColumn,
+  check,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 import { user } from "../../../core/auth";
 import { jsonb } from "../../../core/db";
@@ -12,6 +21,12 @@ import {
 import { appAccounts } from "./appAccountsTable";
 import { appConnections } from "./appConnectionsTable";
 import { apps } from "./appsTable";
+
+/** Completed changes that can alter a connection's saved roster. */
+export const COMPLETED_ROSTER_CHANGE = sql`
+  ((action = 'invite' and status = 'succeeded' and source_key is not null)
+  or (action = 'remove' and status in ('succeeded', 'done_by_hand')))
+`;
 
 /** One Disable, Enable or Remove of one app account, or one Invite of an employee to an app, from the owner's click to its result. */
 export const accountChanges = pgTable(
@@ -33,7 +48,7 @@ export const accountChanges = pgTable(
     /** Null for a change in an app without a connection. */
     connectionId: uuid("connection_id").references(() => appConnections.id),
     action: text("action", { enum: ["suspend", "reactivate", "invite", "remove"] }).notNull(),
-    /** The member's id in the app, copied from the connection's import record; null for an invite. */
+    /** The member's id in the app; null for an invite unless it added a member. */
     sourceKey: text("source_key"),
     status: text("status", { enum: ACCOUNT_CHANGE_STATUSES }).notNull(),
     /** Each runtime tried, in order, as `{ runtime, error, at }`. */
@@ -61,6 +76,7 @@ export const accountChanges = pgTable(
       .where(sql`${table.status} = 'running' and ${table.action} = 'invite'`),
     index("account_changes_app_account").on(table.appAccountId, table.requestedAt),
     index("account_changes_employee").on(table.employeeId).where(isNotNull(table.employeeId)),
+    index("account_changes_roster_revision").on(table.connectionId).where(COMPLETED_ROSTER_CHANGE),
     index("account_changes_first_password_expiry")
       .on(table.finishedAt)
       .where(sql`${table.encryptedFirstPassword} is not null`),
@@ -94,14 +110,7 @@ export const accountChanges = pgTable(
       "account_changes_error",
       sql`${table.error} in ('authentication_failed', 'permission_missing', 'rate_limited', 'app_unavailable', 'unexpected_response', 'blocked_by_check', 'account_not_found', 'wrong_workspace', 'not_allowed', 'owner_browser_lost', 'no_connection')`,
     ),
-    check(
-      "account_changes_error_when_failed",
-      sql`(${table.status} in ('failed', 'done_by_hand')) = (${table.error} is not null)`,
-    ),
-    check(
-      "account_changes_finished_when_not_running",
-      sql`(${table.status} = 'running') = (${table.finishedAt} is null)`,
-    ),
+    ...outcomeChecks(table),
   ],
 );
 
@@ -111,3 +120,20 @@ export const { encryptedFirstPassword: firstPasswordColumn, ...accountChangeColu
 
 /** An attempt as JSON stores it, its moment as an ISO date-time. */
 export type StoredAttempt = Omit<AccountChangeAttempt, "at"> & { at: string };
+
+function outcomeChecks({
+  status,
+  error,
+  finishedAt,
+}: Record<"status" | "error" | "finishedAt", AnyPgColumn>) {
+  return [
+    check(
+      "account_changes_error_when_failed",
+      sql`(${status} in ('failed', 'done_by_hand')) = (${error} is not null)`,
+    ),
+    check(
+      "account_changes_finished_when_not_running",
+      sql`(${status} = 'running') = (${finishedAt} is null)`,
+    ),
+  ];
+}

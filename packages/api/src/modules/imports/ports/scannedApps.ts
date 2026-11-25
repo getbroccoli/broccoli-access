@@ -31,6 +31,8 @@ export interface ScannedApps {
   holdConnectionRevision(tx: Tx, connectionId: string, revision: string): Promise<boolean>;
   /** Holds off other account syncs and connects until `tx` ends; a scan's save takes it first. */
   holdAccountSyncs(ctx: SecurityContext, tx: Tx): Promise<void>;
+  /** The count of committed roster changes through this connection. */
+  readRosterRevision(db: Orm | Tx, connectionId: string): Promise<number>;
   /**
    * Replaces the settings or secrets `update` carries, joining `tx`; new settings add history.
    * Saves nothing once the stored secrets are no longer `replacing`; returns whether it saved.

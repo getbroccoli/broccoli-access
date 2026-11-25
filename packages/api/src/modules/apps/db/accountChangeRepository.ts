@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, isNull, lt, max, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull, lt, max, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
@@ -41,6 +41,7 @@ export interface AccountChangeRepository {
     outcome: Pick<AccountChange, "attempts" | "error"> & {
       status: "succeeded" | "failed";
       finishedAt: Date;
+      sourceKey?: string;
     },
     expectedStatus?: AccountChange["status"],
   ): Promise<void>;
@@ -59,8 +60,6 @@ export interface AccountChangeRepository {
     error: ConnectorErrorCode,
     finishedAt: Date,
   ): Promise<void>;
-  /** Those of the accounts whose change is running, or succeeded at or after `since`. */
-  findAccountsChangedSince(appAccountIds: readonly string[], since: Date): Promise<string[]>;
   /** Each account's newest change; an account without one is left out. */
   findLatestOfAccounts(appAccountIds: readonly string[]): Promise<AccountChange[]>;
   /** The newest invite of each of the connections and emails; one never invited is left out. */
@@ -142,10 +141,10 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .for("update");
       return row ? toChange(row) : null;
     },
-    finish: async (id, { status, attempts, error, finishedAt }, expectedStatus = "running") => {
+    finish: async (id, { attempts, ...outcome }, expectedStatus = "running") => {
       await orm()
         .update(accountChanges)
-        .set({ status, attempts: attempts.map(storedAttempt), error, finishedAt })
+        .set({ ...outcome, attempts: attempts.map(storedAttempt) })
         .where(and(eq(accountChanges.id, id), eq(accountChanges.status, expectedStatus)));
     },
     insertWithoutConnection: async (change) => {
@@ -177,22 +176,6 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .where(
           and(eq(accountChanges.connectionId, connectionId), eq(accountChanges.status, "running")),
         );
-    },
-    findAccountsChangedSince: async (appAccountIds, since) => {
-      const rows = await orm()
-        .selectDistinct({ appAccountId: accountChanges.appAccountId })
-        .from(accountChanges)
-        .where(
-          and(
-            anyOf(accountChanges.appAccountId, appAccountIds),
-            anyOf(accountChanges.action, ["suspend", "reactivate"]),
-            or(
-              eq(accountChanges.status, "running"),
-              and(eq(accountChanges.status, "succeeded"), gte(accountChanges.finishedAt, since)),
-            ),
-          ),
-        );
-      return rows.map(({ appAccountId }) => appAccountId!);
     },
     findLatestOfAccounts: async (appAccountIds) => {
       const rows = await orm()

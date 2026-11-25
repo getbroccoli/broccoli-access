@@ -132,6 +132,9 @@ export interface ActionResult {
 export interface InviteResult {
   /** Renewed settings or secrets, saved before the result is used. */
   connection?: ConnectionUpdate;
+  /** The email's member, when the connector read it back. */
+  account?: ImportedAccount;
+  changed: boolean;
 }
 
 /** New settings or secrets an answer carries; each object it carries replaces the stored one. */
@@ -221,6 +224,13 @@ export class ConnectorError extends Error {
   constructor(readonly code: ConnectorErrorCode) {
     super(`The connector failed: ${code}`);
     this.name = "ConnectorError";
+  }
+}
+
+/** The container gave no usable HTTP reply, so the app may have acted. */
+export class ConnectorAnswerLostError extends ConnectorError {
+  constructor() {
+    super("app_unavailable");
   }
 }
 

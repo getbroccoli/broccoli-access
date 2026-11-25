@@ -23,7 +23,7 @@ export interface AccountChange {
   /** Null for a change in an app without a connection, which fails at once and is made by hand. */
   connectionId: string | null;
   action: AccountChangeAction;
-  /** The member's id in the app, copied from the connection's record when the owner asked; null for an invite. */
+  /** The member's id in the app; null for an invite unless it added a member. */
   sourceKey: string | null;
   status: AccountChangeStatus;
   /** Each runtime tried, in order; `error` is null for the one that worked. */

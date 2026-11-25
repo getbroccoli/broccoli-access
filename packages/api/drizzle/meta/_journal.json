@@ -141,6 +141,13 @@
       "when": 1795609662582,
       "tag": "0019_first_directory_password",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795614955172,
+      "tag": "0020_account_changes_roster_revision",
+      "breakpoints": true
     }
   ]
 }

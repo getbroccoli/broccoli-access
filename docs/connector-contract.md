@@ -208,7 +208,7 @@ Makes one change to one member, then reads the member again.
 }
 ```
 
-- **`invite`'s answer:** `changed`, and either `invitation`, the pending invitation read after the call as `{ "email", "invitedAt", "expiresAt" }`, or `account`, when the email already has a member. An email that already has a member or a pending invitation succeeds with `changed: false`, and no second invitation is sent.
+- **`invite`'s answer:** `changed`, and either `invitation`, the pending invitation read after the call as `{ "email", "invitedAt", "expiresAt" }`, or `account`, read back after the call, when the email already has a member or the app adds the person as a member at once. An email that already has a member or a pending invitation succeeds with `changed: false`, and no second invitation is sent.
 - **`remove`'s answer:** `{ "changed": true, "removed": true }`, with no `account`. A member who is already gone succeeds with `changed: false`. The connection's own member is answered with `not_allowed`.
 - **Rules:**
   - Before changing anything, the connector checks that the connection still reaches the same workspace and finds exactly one member with this `sourceKey` and email. For `invite`, it checks the workspace only. For `remove`, no member with this `sourceKey` and email means already gone; more than one is `account_not_found`.

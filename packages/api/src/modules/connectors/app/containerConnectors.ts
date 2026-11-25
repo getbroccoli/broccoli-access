@@ -5,6 +5,7 @@ import {
   type ConnectionField,
   type ConnectionUpdate,
   type Connector,
+  ConnectorAnswerLostError,
   ConnectorError,
   type ConnectorSession,
   type ImportedAccount,
@@ -261,13 +262,22 @@ function containerSession(
       if ((answer.invitation ?? answer.account?.values)?.email !== email) {
         throw new ConnectorError("unexpected_response");
       }
-      return { connection: answer.connection };
+      const { account, changed } = answer;
+      if (changed && account && account.values.status !== "active") {
+        throw new ConnectorError("unexpected_response");
+      }
+      return {
+        connection: answer.connection,
+        changed,
+        account: account && importedAccount({ ...account, raw: {} }, name),
+      };
     },
   };
 }
 
 function answerOf<T>(answer: ContainerAnswer<T>): T {
   if ("error" in answer) {
+    if (answer.answerLost) throw new ConnectorAnswerLostError();
     throw new ConnectorError(answer.error);
   }
   return answer.answer;

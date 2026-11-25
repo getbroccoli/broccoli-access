@@ -1,6 +1,8 @@
 import { applyAccountSync } from "./appAccountService";
 import { otherAppFindingKinds } from "./inAppFacts";
 import type { AccountChangeDependencies } from "./accountChangeService";
+import type { InvitedMember } from "./callAccountChange";
+import type { RunnableChange } from "./runAccountChange";
 import type { Tx } from "../../../core/db";
 import type { HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
@@ -9,6 +11,7 @@ import {
   type AccountChange,
   type AccountSyncPlan,
   keepAccountFindings,
+  planAccountSync,
   statusAfter,
 } from "../domain";
 
@@ -51,4 +54,47 @@ export async function applyAccountChange(
     plan.updated.push({ before, after: { ...before, status } });
   }
   await applyAccountSync(ctx, tx, plan, line);
+}
+
+/** Saves the invite's read-back through the same account and history path as a scan. */
+export async function applyInvitedMember(
+  { members, findEmployeeIdsByEmail, integrationUser }: AccountChangeDependencies,
+  ctx: SecurityContext,
+  tx: Tx,
+  change: RunnableChange,
+  { account, findingKind }: InvitedMember,
+): Promise<void> {
+  const { appId, connectionId, email } = change;
+  const saved = await members.addInvitedMember(tx, connectionId, account);
+  if (!saved) return;
+  const { previousEmail } = saved;
+  const affectedEmails = previousEmail ? [email, previousEmail] : [email];
+  const remaining = previousEmail
+    ? await members.findConnectionMembers(tx, {
+        connectionIds: [connectionId],
+        emails: [previousEmail],
+      })
+    : [];
+  const known = await appAccountRepository(tx).findByAppAndEmails(appId, affectedEmails);
+  const employeeIds = await findEmployeeIdsByEmail(ctx, tx, affectedEmails);
+  const integrationEmail = await integrationUser.findIntegrationAccountEmail(tx);
+  const plan = planAccountSync(known, {
+    findingKind,
+    found: [account.values, ...remaining].map(({ email, status }) => ({
+      appId,
+      email,
+      status,
+      employeeId: employeeIds.get(email) ?? null,
+      isIntegrationUser: email === integrationEmail,
+      grantedAt: null,
+      grantedBefore: null,
+    })),
+    now: new Date(),
+    statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
+  });
+  await applyAccountSync(ctx, tx, plan, {
+    cause: { kind: "CHANGED_IN_APP", ref: change.id },
+    requestedBy: change.requestedBy,
+  });
 }

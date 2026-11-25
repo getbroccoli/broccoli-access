@@ -103,8 +103,8 @@ export interface AccountChangeService {
    * The run's job: makes the change through the connector, trying a rate-limited or unavailable
    * call again; saves a renewed connection first. When the member reads back with the new status,
    * the change succeeds and sets the account's status with a history line by the user who asked;
-   * an invite succeeds when the invitation, or the email's member, reads back. Otherwise it fails
-   * with the error. Skips a change no longer running. System only.
+   * an invite succeeds when the invitation, or the email's member, reads back, and saves a member
+   * it added at once. Otherwise it fails with the error. Skips a change no longer running. System only.
    */
   runChange: (ctx: SecurityContext, changeId: string) => Promise<void>;
   /** The job's attempts are used up: a running change fails with `app_unavailable`. System only. */
@@ -243,6 +243,11 @@ export interface AccountChangeDependencies {
   findPeopleAwaitingDirectory(db: Orm | Tx, ids: readonly string[]): Promise<Set<string>>;
   /** The employees module, which owns their emails, which invites go to. */
   employees: EmployeesByName;
+  findEmployeeIdsByEmail: (
+    ctx: SecurityContext,
+    db: Tx,
+    emails: readonly string[],
+  ) => Promise<Map<string, string>>;
   /** Whose accounts never offer a change. */
   integrationUser: IntegrationUser;
   /** Signs in again for a connection made by the integration user's sign-in. */

@@ -41,7 +41,7 @@ interface StoredInviteFacts {
   activeInDirectory: Set<string>;
   /** When each connection's last scan finished, by connection id. */
   scannedAt: Map<string, Date>;
-  /** The keys (`inviteKey`) of the members the connections' last scans saw. */
+  /** The keys (`inviteKey`) of members read by a scan or added by an invite. */
   memberKeys: Set<string>;
   /** The pending invitations the connections' last scans read, by key (`inviteKey`). */
   invitations: Map<string, AppInvitation>;
@@ -116,7 +116,7 @@ function invitationTargets(
   });
 }
 
-/** Keys the scanned members by the employee's work email, including a member the owner linked. */
+/** Keys the connection's members by work email, including a member the owner linked. */
 async function readMemberKeys(
   db: Orm | Tx,
   members: AccountChangeDependencies["members"],

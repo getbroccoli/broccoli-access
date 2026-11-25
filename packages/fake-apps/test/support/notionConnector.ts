@@ -24,15 +24,19 @@ export async function startNotionConnector(
     host = "127.0.0.1",
     port = 0,
     onlySuspendedMember = false,
+    instantInvite = false,
+    replaceMemberOnInvite,
+    suspendedMemberEmail,
     onUnlistedRuntimeAction,
   }: {
     host?: string;
     port?: number;
     onlySuspendedMember?: boolean;
+    suspendedMemberEmail?: string;
     onUnlistedRuntimeAction?: (action: ActionRunRequest["action"]) => void;
-  } = {},
+  } & InviteOptions = {},
 ) {
-  const seed = notionMembers(ownMember, onlySuspendedMember);
+  const seed = notionMembers(ownMember, onlySuspendedMember, suspendedMemberEmail);
   let members = [...seed];
   const invitations = new Set<string>();
   let nextError: ConnectorErrorCode | undefined;
@@ -72,7 +76,10 @@ export async function startNotionConnector(
     const call = ACTION_RUN_REQUEST.safeParse(request.body);
     if (!call.success || !actions.some((action) => action === call.data.action))
       return response.sendStatus(400);
-    response.json(takeError(call.data.action) ?? changeMember(call.data, members, invitations));
+    response.json(
+      takeError(call.data.action) ??
+        changeMember(call.data, members, invitations, { instantInvite, replaceMemberOnInvite }),
+    );
   });
   const server = app.listen(port, host);
   await once(server, "listening");
@@ -129,9 +136,13 @@ function description(actions: readonly NotionAction[]): ConnectorDescription {
   };
 }
 
-function notionMembers(ownMember: string | null, onlySuspendedMember: boolean): ListedAccount[] {
+function notionMembers(
+  ownMember: string | null,
+  onlySuspendedMember: boolean,
+  suspendedMemberEmail: string | undefined,
+): ListedAccount[] {
   const names = onlySuspendedMember ? ["chloe"] : ["chloe", "david", "ana"];
-  return names.map((name) => {
+  const members = names.map((name): ListedAccount => {
     const person = ACME.people.find(({ email }) => email === `${name}@acme.example`)!;
     return {
       sourceKey: `notion-${person.id}`,
@@ -144,13 +155,43 @@ function notionMembers(ownMember: string | null, onlySuspendedMember: boolean): 
       },
     };
   });
+  const shared = members.find(({ values }) => values.email === suspendedMemberEmail);
+  if (shared) {
+    members.push({
+      ...shared,
+      sourceKey: `${shared.sourceKey}-suspended`,
+      values: { ...shared.values, status: "suspended", isConnectionUser: false },
+    });
+  }
+  return members;
 }
 
-function changeMember(call: ActionRunRequest, members: ListedAccount[], invitations: Set<string>) {
+type InviteOptions = {
+  instantInvite?: boolean;
+  replaceMemberOnInvite?: string;
+};
+
+function changeMember(
+  call: ActionRunRequest,
+  members: ListedAccount[],
+  invitations: Set<string>,
+  { instantInvite, replaceMemberOnInvite }: InviteOptions,
+) {
   const { email } = call.account;
   const member = members.find(({ values }) => values.email === email);
   if (call.action === "invite") {
     if (member) return { changed: false, account: member };
+    if (instantInvite) {
+      const replaced = members.findIndex(({ values }) => values.email === replaceMemberOnInvite);
+      const account: ListedAccount = {
+        sourceKey: members[replaced]?.sourceKey ?? `notion-${email}`,
+        raw: {},
+        values: { email, displayName: email, status: "active", isConnectionUser: false },
+      };
+      if (replaced < 0) members.push(account);
+      else members[replaced] = account;
+      return { changed: true, account };
+    }
     const changed = !invitations.has(email);
     invitations.add(email);
     return { changed, invitation: { email, invitedAt: null, expiresAt: null } };
@@ -166,6 +207,7 @@ if (import.meta.main) {
   const notion = await startNotionConnector(undefined, undefined, {
     host: process.env.NOTION_TEST_HOST,
     port: Number(process.env.NOTION_TEST_PORT ?? 0),
+    instantInvite: process.env.NOTION_TEST_INSTANT_INVITE === "1",
   });
   process.stdout.write(
     `CONNECTORS_URL=${notion.url}\nNotion API key: ${NOTION_CONNECTION.secrets.apiKey}\n`,
