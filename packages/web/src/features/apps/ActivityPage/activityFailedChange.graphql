@@ -1,0 +1,46 @@
+# The failed change with its person's rows, read when the owner opens it, for Try again.
+query ActivityFailedChange($id: ID!) {
+  accountChange(id: $id) {
+    id
+    action
+    email
+    ...CouldntChangeDialog_accountChange
+    employee {
+      id
+      appAccounts {
+        id
+        email
+        app {
+          id
+        }
+        offeredChange
+        offersRemove
+        latestChange {
+          id
+        }
+      }
+      directoryAccount {
+        id
+        email
+        app {
+          id
+        }
+        offeredChange
+        offersRemove
+        latestChange {
+          id
+        }
+      }
+      appInvites {
+        id
+        app {
+          id
+        }
+        offered
+        latestInvite {
+          id
+        }
+      }
+    }
+  }
+}

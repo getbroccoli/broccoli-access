@@ -30,6 +30,7 @@ import { integrationUserOf } from "../reconnectReason";
 import { ReconnectButton } from "../ReconnectButton";
 import { couldntChangeHint, couldntChangeReason, failedChangeOptions } from "./couldntChange";
 import { couldntChangeChipClassName, couldntChangeCopy } from "./couldntChangeCopy";
+import { ChangeAttempts } from "./ChangeAttempts";
 import { DoneByHandDialog } from "./DoneByHandDialog";
 import { type ChangeTarget, changeTargetOf, useChangeAccount } from "./useChangeAccount";
 
@@ -37,9 +38,8 @@ type Props = {
   /** A failed account change. */
   change: FragmentType<CouldntChangeDialog_AccountChangeFragment>;
   /**
-   * The row whose latest change it is, which Try again and I did it by hand act on: the account, or
-   * the employee's invite row, offering INVITE while Invite is offered; absent where the change is
-   * history, as on Activity, which shows only why.
+   * The row Try again and I did it by hand act on: the account, or the employee's invite row,
+   * offering INVITE while Invite is offered; absent where no row is known, which shows only why.
    */
   row?: {
     id: string;
@@ -146,6 +146,7 @@ export function CouldntChangeDialog({
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
             {reason}
           </p>
+          <ChangeAttempts attempts={change.attempts} />
           {row && (
             <p className="text-sm text-muted-foreground">
               {couldntChangeHint(change.failure, change.action, options, {
@@ -223,7 +224,7 @@ export function CouldntChangeDialog({
   );
 }
 
-/** History offers no action: Try again and I did it by hand act on an account's latest change. */
+/** Without a row there is nothing to act on. */
 const NO_OPTIONS = { tryAgain: false, byHand: false, scanNow: false, reconnect: false };
 
 type FailedChange = CouldntChangeDialog_AccountChangeFragment;

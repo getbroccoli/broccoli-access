@@ -28,7 +28,10 @@ test("the owner sees why Ana's Linear Disable failed and marks it done by hand",
             suspendedWithAccessCount
             users {
               id status employee { status }
-              latestChange { id status failure requestedAt requestedBy { id name } }
+              latestChange {
+                id status failure requestedAt requestedBy { id name }
+                attempts { at runtime failure }
+              }
             }
           }
         }`,
@@ -51,6 +54,13 @@ test("the owner sees why Ana's Linear Disable failed and marks it done by hand",
                 failure: "UNEXPECTED_RESPONSE",
                 requestedAt: expect.any(String) as unknown,
                 requestedBy: { id: owner.id, name: "Mia Novak" },
+                attempts: [
+                  {
+                    at: expect.any(String) as unknown,
+                    runtime: "SERVER",
+                    failure: "UNEXPECTED_RESPONSE",
+                  },
+                ],
               },
             },
           ]) as unknown,

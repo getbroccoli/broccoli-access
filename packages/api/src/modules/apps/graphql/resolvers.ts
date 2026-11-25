@@ -165,6 +165,12 @@ export function createResolvers(
       }),
       failure: ({ error }) => error && toEnum(error),
       startedFrom: ({ startedFrom }) => toEnum(startedFrom),
+      attempts: ({ attempts }) =>
+        attempts.map(({ at, runtime, error }) => ({
+          at,
+          runtime: toEnum(runtime),
+          failure: error && toEnum(error),
+        })),
     },
     App: {
       roles: (app, _args, context) => loaders.roles(context).load(app.id),
