@@ -64,7 +64,12 @@ export function IntegrationUserConnectStep({ connector, signIn, isScanning, onTr
         </p>
       ) : (
         <p className="text-[13px] text-muted-foreground">
-          {t("settings.integrationUserConnect.canClose", { app })}
+          {t(
+            steps.every(({ status }) => status === "done")
+              ? "settings.integrationUserConnect.connected"
+              : "settings.integrationUserConnect.canClose",
+            { app },
+          )}
         </p>
       )}
       <DialogFooter className="m-0 flex-row justify-end gap-2 border-0 bg-transparent p-0">

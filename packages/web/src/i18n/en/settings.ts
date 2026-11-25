@@ -145,6 +145,7 @@ export const settingsEn = {
   "settings.integrationUserConnect.next": "Next",
   "settings.integrationUserConnect.canClose":
     "You can close this. {app} shows as connected when it is done.",
+  "settings.integrationUserConnect.connected": "{app} is connected.",
   "settings.integrationUserConnect.close": "Close",
   "settings.integrationUserConnect.tryAgain": "Try again",
   "settings.integrationUserConnect.notInvited":
