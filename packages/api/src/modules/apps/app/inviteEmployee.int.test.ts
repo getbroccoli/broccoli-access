@@ -1,12 +1,17 @@
 import {
   accountLinks,
+  containerConnectors,
   expect,
   expectBlockedBy,
   holdBeforeCommit,
+  instantNotionInvite,
   inviteTest as test,
   linearInvitations,
+  personPages,
   postFakeControl,
   SYSTEM,
+  templates,
+  test as integrationTest,
 } from "#test/support";
 import { ormOf } from "../../../core/db";
 import { accountChanges } from "../db";
@@ -104,6 +109,47 @@ test("running Ivan's invite sends one Linear invitation and shows him Invited, d
   ]);
   expect(rows[0]!.invitedAt).toEqual(rows[0]!.latestInvite!.finishedAt);
 });
+
+integrationTest(
+  "an instant invite gives Ivan access before the next scan and keeps the same account afterwards",
+  async ({ fakeGoogle, orm, seed }) => {
+    const { owner, ivan, input, changes, scans, sourceId, connectionId, url } =
+      await instantNotionInvite(orm, fakeGoogle.url);
+    const options = { connectors: containerConnectors(url) };
+    const readPage = personPages(orm, options);
+    const differences = templates(orm, options);
+    await seed.assignedTemplateApp({ ...input, role: null, assignedBy: owner.user!.userId });
+    expect((await differences.readDifferences(owner)).missing).toEqual([input]);
+    expect(await readPage(owner, [ivan.id])).toMatchObject([
+      { appAccounts: [], provisionSteps: [{ appId: input.appId, action: "invite" }] },
+    ]);
+    const { latestInvite } = await changes.inviteEmployee(owner, input);
+
+    await changes.runChange(SYSTEM, latestInvite!.id);
+
+    expect(await changes.readAccountChange(owner, latestInvite!.id)).toMatchObject({
+      status: "succeeded",
+    });
+    const [page] = await readPage(owner, [ivan.id]);
+    expect.soft(page).toMatchObject({
+      appAccounts: [{ ...input, email: ivan.email, status: "active", inApp: true }],
+      appInvites: [],
+      provisionSteps: [],
+    });
+    expect.soft(page!.personApps.find(({ appId }) => appId === input.appId)).toMatchObject({
+      state: "active",
+    });
+    expect((await differences.readDifferences(owner)).missing).toEqual([]);
+    const accountIds = page!.appAccounts.map(({ id }) => id);
+
+    await scans.scanNow(owner, connectionId);
+    await scans.runScan(SYSTEM, sourceId);
+
+    expect(await scans.readScan(owner, connectionId)).toMatchObject({ status: "scanned" });
+    const [scanned] = await readPage(owner, [ivan.id]);
+    expect(scanned!.appAccounts.map(({ id }) => id)).toEqual(accountIds);
+  },
+);
 
 test("refuses a second Invite while the first runs and Linear receives one invitation", async ({
   workspace,

@@ -1,10 +1,10 @@
+import type { ImportedAccount } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
 
-/**
- * What the apps module reads from the imports module: the members connections' scans saw, and when
- * each connection last finished a scan.
- */
+/** The members read from each connection, and when each connection last finished a scan. */
 export interface ConnectionMembers {
+  /** Stores a member added by Invite unless a scan already saved its source key. Joins `tx`. */
+  addInvitedMember(tx: Tx, connectionId: string, account: ImportedAccount): Promise<boolean>;
   /** Forgets only the member removed from this connection. Joins the account change transaction. */
   removeMember(
     tx: Tx,
@@ -12,8 +12,7 @@ export interface ConnectionMembers {
   ): Promise<void>;
 
   /**
-   * The members with one of `emails` that the last saved scan of one of `connectionIds` saw. Trusted
-   * read: no `ctx`.
+   * The members read from one of `connectionIds` with one of `emails`. Trusted read: no `ctx`.
    */
   findConnectionMembers(
     db: Orm | Tx,
@@ -26,7 +25,7 @@ export interface ConnectionMembers {
   findLastScans(db: Orm | Tx): Promise<{ connectionId: string; scannedAt: Date }[]>;
 }
 
-/** A member of a connected app as its connection's last scan saw it. */
+/** A member read from a connected app. */
 export interface ConnectionMember {
   status: "active" | "suspended";
   displayName: string | null;

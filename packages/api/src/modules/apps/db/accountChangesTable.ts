@@ -33,7 +33,7 @@ export const accountChanges = pgTable(
     /** Null for a change in an app without a connection. */
     connectionId: uuid("connection_id").references(() => appConnections.id),
     action: text("action", { enum: ["suspend", "reactivate", "invite", "remove"] }).notNull(),
-    /** The member's id in the app, copied from the connection's import record; null for an invite. */
+    /** The member's id in the app; null for an invite unless it added a member. */
     sourceKey: text("source_key"),
     status: text("status", { enum: ACCOUNT_CHANGE_STATUSES }).notNull(),
     /** Each runtime tried, in order, as `{ runtime, error, at }`. */

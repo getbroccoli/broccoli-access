@@ -49,7 +49,11 @@ export interface EmployeeReadService {
     accountIds: readonly string[],
   ) => Promise<Map<string, Employee>>;
   /** The employees with these lowercased emails the caller may read; an email nobody has is left out. */
-  readEmployeesByEmails: (ctx: SecurityContext, emails: readonly string[]) => Promise<Employee[]>;
+  readEmployeesByEmails: (
+    ctx: SecurityContext,
+    emails: readonly string[],
+    db?: Orm | Tx,
+  ) => Promise<Employee[]>;
   /** The signed-in user's own employee; null for a user without one, such as the owner. */
   readMyEmployee: (ctx: SecurityContext) => Promise<Employee | null>;
   /**
@@ -110,8 +114,8 @@ export function createEmployeeReadService({
         }),
       );
     },
-    readEmployeesByEmails: async (ctx, emails) =>
-      readableOf(ctx, await employees.findByEmails(emails)),
+    readEmployeesByEmails: async (ctx, emails, db = orm) =>
+      readableOf(ctx, await employeeRepository(db).findByEmails(emails)),
     async readMyEmployee(ctx) {
       const employeeId = ctx.user?.employeeId;
       return employeeId ? employees.findById(employeeId) : null;

@@ -32,7 +32,10 @@ it("shows no row for an employee not active in the directory who was never invit
 
 it("offers no Invite while an invite runs", () => {
   expect(
-    inviteStateOf({ ...activeEmployee, latestInvite: { status: "running", finishedAt: null } }),
+    inviteStateOf({
+      ...activeEmployee,
+      latestInvite: { status: "running", finishedAt: null, sourceKey: null },
+    }),
   ).toEqual({
     offered: false,
     offersReconnect: false,
@@ -57,7 +60,11 @@ it.for(["succeeded", "done_by_hand"] as const)(
   "keeps a %s invite from before the last scan when the connector does not list invitations",
   (status) => {
     expect(
-      inviteStateOf({ ...activeEmployee, invitation, latestInvite: { status, finishedAt } }),
+      inviteStateOf({
+        ...activeEmployee,
+        invitation,
+        latestInvite: { status, finishedAt, sourceKey: null },
+      }),
     ).toEqual({
       offered: false,
       offersReconnect: false,
@@ -66,9 +73,21 @@ it.for(["succeeded", "done_by_hand"] as const)(
   },
 );
 
+it("offers Invite again when the member created by an invite is no longer listed", () => {
+  const row = inviteStateOf({
+    ...activeEmployee,
+    latestInvite: { status: "succeeded", finishedAt, sourceKey: "notion-member" },
+  });
+
+  expect(row).toMatchObject({ offered: true, invitedAt: null });
+});
+
 it("offers Invite again after a failed invite", () => {
   expect(
-    inviteStateOf({ ...activeEmployee, latestInvite: { status: "failed", finishedAt } }),
+    inviteStateOf({
+      ...activeEmployee,
+      latestInvite: { status: "failed", finishedAt, sourceKey: null },
+    }),
   ).toEqual({
     offered: true,
     offersReconnect: false,
@@ -81,7 +100,7 @@ it("keeps the failed invite row without offering Invite to an employee not activ
     inviteStateOf({
       ...activeEmployee,
       activeInDirectory: false,
-      latestInvite: { status: "failed", finishedAt },
+      latestInvite: { status: "failed", finishedAt, sourceKey: null },
     }),
   ).toEqual({ offered: false, offersReconnect: false, invitedAt: null });
 });
@@ -90,7 +109,7 @@ it("dates Invited by the app's invitation even when the latest invite failed", (
   const row = inviteStateOf({
     ...listsInvitations,
     invitation,
-    latestInvite: { status: "failed", finishedAt },
+    latestInvite: { status: "failed", finishedAt, sourceKey: null },
   });
 
   expect(row).toMatchObject({ offered: false, invitedAt: invitation.invitedAt });
@@ -127,7 +146,7 @@ it.for(["succeeded", "done_by_hand"] as const)(
     const afterScan = new Date("2026-11-25T10:00:00Z");
     const row = inviteStateOf({
       ...listsInvitations,
-      latestInvite: { status, finishedAt: afterScan },
+      latestInvite: { status, finishedAt: afterScan, sourceKey: null },
     });
 
     expect(row).toMatchObject({ offered: false, invitedAt: afterScan });
@@ -137,7 +156,10 @@ it.for(["succeeded", "done_by_hand"] as const)(
 it.for(["succeeded", "done_by_hand"] as const)(
   "offers Invite again when a scan after a %s invite finds no invitation",
   (status) => {
-    const row = inviteStateOf({ ...listsInvitations, latestInvite: { status, finishedAt } });
+    const row = inviteStateOf({
+      ...listsInvitations,
+      latestInvite: { status, finishedAt, sourceKey: null },
+    });
 
     expect(row).toMatchObject({ offered: true, invitedAt: null });
   },

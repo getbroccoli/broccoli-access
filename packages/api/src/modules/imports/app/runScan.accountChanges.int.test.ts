@@ -4,15 +4,18 @@ import type { Orm } from "../../../core/db";
 
 import {
   accountChanges,
+  appUsers,
   OWNER,
   ownerHandOver,
   postFakeControl,
   storedImportSources,
   containerConnectors,
   expect,
+  instantNotionInvite,
   linearMemberStatus,
   storedImportRecords,
   listedLinearChloe,
+  scanAfterFirstPage,
   scannedLinear,
   scans,
   serveAccountList,
@@ -22,6 +25,33 @@ import {
   test,
   type TestSeed,
 } from "#test/support";
+
+test("reads a fresh roster when Notion adds a member after the scan fetched its first page", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { owner, ivan, input, changes, connectionId, sourceId, url } = await instantNotionInvite(
+    orm,
+    fakeGoogle.url,
+  );
+  const { latestInvite } = await changes.inviteEmployee(owner, input);
+  let rosterReads = 0;
+  const scan = await scanAfterFirstPage(
+    orm,
+    url,
+    () => changes.runChange(SYSTEM, latestInvite!.id),
+    () => rosterReads++,
+  );
+  await scan.scanNow(owner, connectionId);
+
+  await scan.runScan(SYSTEM, sourceId);
+
+  expect(await scan.readScan(owner, connectionId)).toMatchObject({ status: "scanned" });
+  expect.soft(rosterReads).toBe(2);
+  expect(await appUsers(orm).readUsersOfEmployees(owner, [ivan.id])).toMatchObject([
+    { ...input, email: ivan.email, status: "active", inApp: true },
+  ]);
+});
 
 test("keeps Chloé suspended when a scan saves the active status it read before Disable finished", async ({
   orm,
@@ -283,24 +313,6 @@ test("leaves Chloé's suspension and its history line to the owner's running Dis
     },
   ]);
 });
-
-/** Changes the workspace after the connector has read the first page. Later pages and fresh scans read live membership. */
-async function scanAfterFirstPage(orm: Orm, url: string, change: () => Promise<void>) {
-  let first = true;
-  const server = await serveAccountList(url, async (request, response, next) => {
-    if (!first) return next();
-    first = false;
-    const page = await fetch(`${url}/v1/accounts/list`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(request.body),
-    });
-    const snapshot = await page.text();
-    await change();
-    response.status(page.status).type("json").send(snapshot);
-  });
-  return scans(orm, { connectors: containerConnectors(server.url) });
-}
 
 async function scannedSlack(orm: Orm, seed: TestSeed, fakeConnectors: RunningFakeConnectors) {
   const owner = OWNER;

@@ -1,7 +1,12 @@
 import type { Orm, Tx } from "../../../core/db";
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
-import { accountChangeRepository, appAccountRepository, appConnectionRepository } from "../db";
+import {
+  appAccountRepository,
+  appConnectionRepository,
+  findAccountsChangedSince,
+  hasInstantInviteSince,
+} from "../db";
 import {
   type AppAccount,
   type AccountSyncPlan,
@@ -42,6 +47,8 @@ export interface AppAccountService {
    * System only.
    */
   holdAccountSyncs: (ctx: SecurityContext, tx: Tx) => Promise<void>;
+  /** Whether an invite through the connection saved a member since `since`. Trusted read. */
+  hasInstantInviteSince: (db: Orm | Tx, connectionId: string, since: Date) => Promise<boolean>;
   /** How many people have an account in the app, and how many of those are suspended. Trusted read: no `ctx`. */
   countAccounts: (db: Orm | Tx, appId: string) => Promise<{ people: number; suspended: number }>;
   /** How many apps hold an account `findingKind` saw in its last scan. Trusted read: no `ctx`. */
@@ -60,7 +67,8 @@ export function createAppAccountService(): AppAccountService {
       const otherConnections = (await appConnectionRepository(tx).findByApps(appIds)).filter(
         ({ id }) => id !== connectionId,
       );
-      const changed = await accountChangeRepository(tx).findAccountsChangedSince(
+      const changed = await findAccountsChangedSince(
+        tx,
         known.map(({ id }) => id),
         readStartedAt,
       );
@@ -78,6 +86,7 @@ export function createAppAccountService(): AppAccountService {
       ctx.requireSystem();
       await appAccountRepository(tx).lockForSync();
     },
+    hasInstantInviteSince,
     countAccounts: (db, appId) => appAccountRepository(db).countPeople(appId),
     countAppsFoundVia: (db, findingKind) => appAccountRepository(db).countAppsFoundVia(findingKind),
   };

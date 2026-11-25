@@ -13,12 +13,12 @@ export interface AppInviteFacts {
     /** When its last scan finished; null before the first. */
     scannedAt: Date | null;
   };
-  /** Whether the connection's last scan returned a member with the employee's email. */
+  /** Whether a scan or invite returned a member with the employee's email. */
   hasMember: boolean;
   /** The pending invitation of the employee's email that the connection's last scan read; null without one. */
   invitation: { invitedAt: Date | null; firstSeenAt: Date } | null;
   /** The latest invite of the employee's email through the connection; null before the first. */
-  latestInvite: Pick<AccountChange, "status" | "finishedAt"> | null;
+  latestInvite: Pick<AccountChange, "status" | "finishedAt" | "sourceKey"> | null;
 }
 
 /** What an employee's row shows for an app they have no account in. */
@@ -87,7 +87,7 @@ export function byHandInviteStateOf(
  */
 function invitedAtOf({ connection, invitation, latestInvite }: AppInviteFacts): Date | null {
   const done = latestInvite?.status === "succeeded" || latestInvite?.status === "done_by_hand";
-  const doneAt = done ? latestInvite.finishedAt : null;
+  const doneAt = done && !latestInvite.sourceKey ? latestInvite.finishedAt : null;
   if (connection.listsInvitations === false) {
     return doneAt;
   }

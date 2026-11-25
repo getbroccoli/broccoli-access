@@ -24,13 +24,15 @@ export async function startNotionConnector(
     host = "127.0.0.1",
     port = 0,
     onlySuspendedMember = false,
+    instantInvite = false,
+    existingMemberInvite,
     onUnlistedRuntimeAction,
   }: {
     host?: string;
     port?: number;
     onlySuspendedMember?: boolean;
     onUnlistedRuntimeAction?: (action: ActionRunRequest["action"]) => void;
-  } = {},
+  } & InviteOptions = {},
 ) {
   const seed = notionMembers(ownMember, onlySuspendedMember);
   let members = [...seed];
@@ -72,7 +74,10 @@ export async function startNotionConnector(
     const call = ACTION_RUN_REQUEST.safeParse(request.body);
     if (!call.success || !actions.some((action) => action === call.data.action))
       return response.sendStatus(400);
-    response.json(takeError(call.data.action) ?? changeMember(call.data, members, invitations));
+    response.json(
+      takeError(call.data.action) ??
+        changeMember(call.data, members, invitations, { instantInvite, existingMemberInvite }),
+    );
   });
   const server = app.listen(port, host);
   await once(server, "listening");
@@ -146,11 +151,30 @@ function notionMembers(ownMember: string | null, onlySuspendedMember: boolean): 
   });
 }
 
-function changeMember(call: ActionRunRequest, members: ListedAccount[], invitations: Set<string>) {
+type InviteOptions = {
+  instantInvite?: boolean;
+  existingMemberInvite?: (account: ListedAccount) => { changed: boolean; account: ListedAccount };
+};
+
+function changeMember(
+  call: ActionRunRequest,
+  members: ListedAccount[],
+  invitations: Set<string>,
+  { instantInvite, existingMemberInvite }: InviteOptions,
+) {
   const { email } = call.account;
   const member = members.find(({ values }) => values.email === email);
   if (call.action === "invite") {
-    if (member) return { changed: false, account: member };
+    if (member) return existingMemberInvite?.(member) ?? { changed: false, account: member };
+    if (instantInvite) {
+      const account: ListedAccount = {
+        sourceKey: `notion-${email}`,
+        raw: {},
+        values: { email, displayName: email, status: "active", isConnectionUser: false },
+      };
+      members.push(account);
+      return { changed: true, account };
+    }
     const changed = !invitations.has(email);
     invitations.add(email);
     return { changed, invitation: { email, invitedAt: null, expiresAt: null } };
@@ -166,6 +190,7 @@ if (import.meta.main) {
   const notion = await startNotionConnector(undefined, undefined, {
     host: process.env.NOTION_TEST_HOST,
     port: Number(process.env.NOTION_TEST_PORT ?? 0),
+    instantInvite: process.env.NOTION_TEST_INSTANT_INVITE === "1",
   });
   process.stdout.write(
     `CONNECTORS_URL=${notion.url}\nNotion API key: ${NOTION_CONNECTION.secrets.apiKey}\n`,

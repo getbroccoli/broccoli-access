@@ -261,7 +261,14 @@ function containerSession(
       if ((answer.invitation ?? answer.account?.values)?.email !== email) {
         throw new ConnectorError("unexpected_response");
       }
-      return { connection: answer.connection };
+      const account = answer.changed ? answer.account : undefined;
+      if (account && account.values.status !== "active") {
+        throw new ConnectorError("unexpected_response");
+      }
+      return {
+        connection: answer.connection,
+        account: account && importedAccount({ ...account, raw: {} }, name),
+      };
     },
   };
 }

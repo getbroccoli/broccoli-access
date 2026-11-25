@@ -45,7 +45,6 @@ export function ProvisionDialog({ person, steps, disabled }: Props) {
     refetch: [PersonPageDocument],
   });
   const name = `${person.firstName} ${person.lastName}`;
-  // Only an app Broccoli Access invites to sends an invitation email.
   const invited = steps.filter(({ action }) => action === "INVITE").length;
   const confirm = () => {
     setOpen(false);

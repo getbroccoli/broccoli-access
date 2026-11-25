@@ -33,6 +33,8 @@ export interface ImportSourceRepository {
   markScanning(id: string): Promise<void>;
   /** Makes the source's records exactly `accounts`. */
   replaceRecords(id: string, accounts: readonly ImportedAccount[]): Promise<void>;
+  /** Stores one member without overwriting a record that a scan saved. */
+  insertMember(id: string, account: ImportedAccount): Promise<boolean>;
   removeMember(member: { connectionId: string; sourceKey: string; email: string }): Promise<void>;
   /** The accounts the source's last saved scan found. */
   findRecords(id: string): Promise<Pick<ImportedAccount, "sourceKey" | "raw">[]>;
@@ -93,17 +95,20 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
     },
     replaceRecords: async (id, accounts) => {
       await orm().delete(importRecords).where(eq(importRecords.sourceId, id));
-      const rows = accounts.map(({ sourceKey, raw, values }) => ({
-        sourceId: id,
-        type: "app_account" as const,
-        typeVersion: ACCOUNT_VALUES_VERSION,
-        sourceKey,
-        raw,
-        values,
-      }));
+      const rows = accounts.map((account) => memberRecord(id, account));
       for (const batch of insertBatches(rows)) {
         await orm().insert(importRecords).values(batch);
       }
+    },
+    insertMember: async (id, account) => {
+      const [saved] = await orm()
+        .insert(importRecords)
+        .values(memberRecord(id, account))
+        .onConflictDoNothing({
+          target: [importRecords.sourceId, importRecords.type, importRecords.sourceKey],
+        })
+        .returning({ id: importRecords.id });
+      return saved !== undefined;
     },
     removeMember: async ({ connectionId, sourceKey, email }) => {
       const source = orm()
@@ -211,6 +216,19 @@ async function findSource(
   { lock }: { lock: boolean },
 ): Promise<ImportSource | null> {
   const query = orm.select().from(importSources).where(where);
-  const [source] = await (lock ? query.for("update") : query);
+  // A scan locks its source before the account sync lock. The member insert takes a key-share
+  // lock on that unchanged source id while it holds the account sync lock.
+  const [source] = await (lock ? query.for("no key update") : query);
   return source ?? null;
+}
+
+function memberRecord(sourceId: string, { sourceKey, raw, values }: ImportedAccount) {
+  return {
+    sourceId,
+    type: "app_account" as const,
+    typeVersion: ACCOUNT_VALUES_VERSION,
+    sourceKey,
+    raw,
+    values,
+  };
 }

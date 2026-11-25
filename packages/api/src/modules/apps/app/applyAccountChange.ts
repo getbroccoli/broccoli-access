@@ -1,6 +1,8 @@
 import { applyAccountSync } from "./appAccountService";
 import { otherAppFindingKinds } from "./inAppFacts";
 import type { AccountChangeDependencies } from "./accountChangeService";
+import type { InvitedMember } from "./callAccountChange";
+import type { RunnableChange } from "./runAccountChange";
 import type { Tx } from "../../../core/db";
 import type { HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
@@ -9,6 +11,7 @@ import {
   type AccountChange,
   type AccountSyncPlan,
   keepAccountFindings,
+  planAccountSync,
   statusAfter,
 } from "../domain";
 
@@ -51,4 +54,40 @@ export async function applyAccountChange(
     plan.updated.push({ before, after: { ...before, status } });
   }
   await applyAccountSync(ctx, tx, plan, line);
+}
+
+/** Saves the invite's read-back through the same account and history path as a scan. */
+export async function applyInvitedMember(
+  { members, employees, integrationUser }: AccountChangeDependencies,
+  ctx: SecurityContext,
+  tx: Tx,
+  change: RunnableChange,
+  { account, findingKind }: InvitedMember,
+): Promise<void> {
+  if (!(await members.addInvitedMember(tx, change.connectionId, account))) return;
+  const { appId, email } = change;
+  const known = await appAccountRepository(tx).findByAppAndEmail(appId, email);
+  const [employee] = await employees.readEmployeesByEmails(ctx, [email], tx);
+  const integrationEmail = await integrationUser.findIntegrationAccountEmail(tx);
+  const plan = planAccountSync(known, {
+    findingKind,
+    found: [
+      {
+        appId,
+        email,
+        employeeId: employee?.id ?? null,
+        status: account.values.status,
+        isIntegrationUser: email === integrationEmail,
+        grantedAt: null,
+        grantedBefore: null,
+      },
+    ],
+    now: new Date(),
+    statusKeptIn: new Set(),
+    statusKeptFor: new Set(),
+  });
+  await applyAccountSync(ctx, tx, plan, {
+    cause: { kind: "CHANGED_IN_APP", ref: change.id },
+    requestedBy: change.requestedBy,
+  });
 }

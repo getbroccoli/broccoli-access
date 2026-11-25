@@ -27,9 +27,8 @@ import {
  * one that lists no `roles` skips the check of a role.
  */
 export function describeInviteConformance(url: string, fixture: ConnectorFixture): void {
-  it("sends one invitation when invite repeats, and reports the invitation read afterwards", async ({
-    skip,
-  }) => checkRepeatedInvite(url, fixture, await inviteeOf(url, fixture, skip)));
+  it("reads back the same invitation or member when invite repeats", async ({ skip }) =>
+    checkRepeatedInvite(url, fixture, await inviteeOf(url, fixture, skip)));
   it("lists the invitation that invite just sent, once even after a retry", async ({ skip }) => {
     const invitee = await inviteeOf(url, fixture, skip);
     if (!(await capabilitiesOf(url, fixture.connector)).includes("list_invitations"))
@@ -70,6 +69,11 @@ async function checkRepeatedInvite(
   const second = await invite(flow, invitee);
 
   expect([first.changed, second.changed]).toEqual([true, false]);
+  if (first.account) {
+    expect(first.account.values).toMatchObject({ email: invitee.email, status: "active" });
+    expect(second.account?.sourceKey).toBe(first.account.sourceKey);
+    return;
+  }
   expect(invitationReadBack(first).email).toBe(invitee.email);
   // The retry reads back the invitation the first call sent.
   expect(invitationReadBack(second)).toEqual(invitationReadBack(first));

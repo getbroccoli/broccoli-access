@@ -120,6 +120,30 @@ export function serveAccountList(fakeUrl: string, list: RequestHandler) {
   return serveConnectorRoutes(fakeUrl, app);
 }
 
+/** Changes the workspace after the connector reads its first page. Any later read gets the live roster. */
+export async function scanAfterFirstPage(
+  orm: Orm,
+  url: string,
+  change: () => Promise<void>,
+  onPage?: () => void,
+) {
+  let first = true;
+  const server = await serveAccountList(url, async (request, response, next) => {
+    onPage?.();
+    if (!first) return next();
+    first = false;
+    const page = await fetch(`${url}/v1/accounts/list`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request.body),
+    });
+    const snapshot = await page.text();
+    await change();
+    response.status(page.status).type("json").send(snapshot);
+  });
+  return scans(orm, { connectors: containerConnectors(server.url) });
+}
+
 /** Forwards calls the test routes did not handle to the real fake container. */
 export async function serveConnectorRoutes(fakeUrl: string, app: express.Express) {
   app.use(express.json(), async (request, response) => {

@@ -171,8 +171,8 @@ const ACTION_ANSWER = z.object({
 const NOTHING = z.undefined().optional();
 
 /**
- * Whether anything changed, and what the connector read again after the call: the member; for an
- * invite of an email without one, the pending invitation; for a remove, that the member is gone.
+ * Whether anything changed, and what the connector read again after the call: the member, the
+ * pending invitation, or for a remove, that the member is gone.
  * Never two of them.
  */
 export const ACTION_RUN_ANSWER = z.union([

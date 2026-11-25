@@ -5,6 +5,7 @@ import {
   ConnectorError,
   type ConnectorErrorCode,
   type ConnectorSession,
+  type ImportedAccount,
   RenewalError,
   RenewedSessionRefusedError,
   withConnectorRetries,
@@ -23,6 +24,13 @@ export interface ActionOutcome {
   reconnects: boolean;
   /** Whether the error is what signing in again answered, which turns Reconnect with a check too. */
   afterRenewal?: boolean;
+  /** The member an invite added, with the finding kind its connection uses. */
+  invitedMember?: InvitedMember;
+}
+
+export interface InvitedMember {
+  account: ImportedAccount;
+  findingKind: string;
 }
 
 /** An outcome decided before any call to the app. */
@@ -69,6 +77,10 @@ export async function callChange(
       calledServer: progress.calledServer,
       secretsUsed: progress.inUse,
       reconnects,
+      invitedMember: result.account && {
+        account: result.account,
+        findingKind: call.connector.findingKinds.ownAppAccounts,
+      },
     };
   } catch (error) {
     if (error instanceof ConnectorError) {
@@ -128,7 +140,7 @@ async function callOnce(
 async function makeChange(
   session: ConnectorSession,
   change: RunnableChange,
-): Promise<{ readBack: boolean; connection?: ConnectionUpdate }> {
+): Promise<{ readBack: boolean; connection?: ConnectionUpdate; account?: ImportedAccount }> {
   if (change.action === "invite") {
     return { ...(await session.invite!(change.email, change.role ?? undefined)), readBack: true };
   }

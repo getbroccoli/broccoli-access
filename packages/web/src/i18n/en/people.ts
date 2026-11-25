@@ -225,9 +225,10 @@ export const peopleEn = {
   "people.provision.enable": "Enable",
   "people.provision.byBroccoli": "Broccoli Access",
   "people.provision.byHand": "By hand",
-  "people.provision.appsInvite": "Each app sends {firstName} its own invitation email.",
+  "people.provision.appsInvite":
+    "Each app gives {firstName} access at once or sends an invitation. This page shows the result for each app.",
   "people.provision.someAppsInvite":
-    "Each app Broccoli Access invites {firstName} to sends its own invitation email.",
+    "For each invite Broccoli Access makes, the app gives {firstName} access at once or sends an invitation. This page shows the result.",
   "people.provision.confirm": "Provision {count} apps",
   "people.provision.confirmOne": "Provision 1 app",
   "people.provision.failed": "Couldn’t provision {name}. Reload the page and try again.",

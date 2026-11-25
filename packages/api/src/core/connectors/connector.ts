@@ -132,6 +132,8 @@ export interface ActionResult {
 export interface InviteResult {
   /** Renewed settings or secrets, saved before the result is used. */
   connection?: ConnectionUpdate;
+  /** The member, when the invite added one at once. */
+  account?: ImportedAccount;
 }
 
 /** New settings or secrets an answer carries; each object it carries replaces the stored one. */

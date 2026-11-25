@@ -12,8 +12,13 @@ import { accountChangeRepository, appAccountRepository, appConnectionRepository 
 import { type AccountChange, reconnectCauseOf } from "../domain";
 import type { AccountChangeDependencies } from "./accountChangeService";
 import type { AppConnectionService } from "./appConnectionService";
-import { applyAccountChange } from "./applyAccountChange";
-import { type ActionOutcome, callChange, NOT_CALLED } from "./callAccountChange";
+import { applyAccountChange, applyInvitedMember } from "./applyAccountChange";
+import {
+  type ActionOutcome,
+  callChange,
+  type InvitedMember,
+  NOT_CALLED,
+} from "./callAccountChange";
 
 /** What a run needs: the service's dependencies and its connection service. */
 export type RunDependencies = AccountChangeDependencies & { connections: AppConnectionService };
@@ -37,13 +42,10 @@ export async function runAccountChange(
     );
     return;
   }
-  const { error, calledServer, secretsUsed, reconnects, afterRenewal } = await runAction(
-    dependencies,
-    ctx,
-    change,
-  );
+  const { error, calledServer, secretsUsed, reconnects, afterRenewal, invitedMember } =
+    await runAction(dependencies, ctx, change);
   if (!error) {
-    await succeed(dependencies, ctx, change);
+    await succeed(dependencies, ctx, change, invitedMember);
     return;
   }
   const { finished, turnedToReconnect } = await transact((tx) =>
@@ -74,8 +76,9 @@ async function succeed(
   dependencies: RunDependencies,
   ctx: SecurityContext,
   change: RunnableChange,
+  invitedMember: InvitedMember | undefined,
 ): Promise<void> {
-  const finished = await finishSucceeded(dependencies, ctx, change);
+  const finished = await finishSucceeded(dependencies, ctx, change, invitedMember);
   dependencies.logger.info(
     {
       changeId: change.id,
@@ -206,12 +209,12 @@ async function finishFailed(
 async function finishSucceeded(
   dependencies: RunDependencies,
   ctx: SecurityContext,
-  change: AccountChange,
+  change: RunnableChange,
+  invitedMember: InvitedMember | undefined,
 ): Promise<boolean> {
   return dependencies.transact(async (tx) => {
-    // The lock scans take first: a scan deleting the account also locks this change. An invite,
-    // or a change whose account a scan deleted, has no account to wait for.
-    if (change.appAccountId || change.action === "remove") {
+    // Scans can lock changes while removing accounts, so take the same locks in order.
+    if (change.appAccountId || change.action === "remove" || invitedMember) {
       await appAccountRepository(tx).lockForSync();
     }
     const changes = accountChangeRepository(tx);
@@ -234,9 +237,14 @@ async function finishSucceeded(
         attempts: [{ runtime: "server", error: null, at: now }],
         error: null,
         finishedAt: now,
+        sourceKey: invitedMember?.account.sourceKey,
       },
       stored.status,
     );
+    if (invitedMember) {
+      await applyInvitedMember(dependencies, ctx, tx, change, invitedMember);
+      return true;
+    }
     await applyAccountChange(dependencies, ctx, tx, change, {
       cause: {
         kind: change.action === "remove" ? "REMOVED_IN_APP" : "CHANGED_IN_APP",
