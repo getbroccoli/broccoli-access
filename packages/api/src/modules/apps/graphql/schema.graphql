@@ -344,7 +344,6 @@ input EmployeeProvisionInput {
   employeeId: ID!
   "The apps of the provision steps the owner confirmed; an app without a step now gets nothing."
   appIds: [ID!]!
-  appIds: [ID!]!
 }
 
 input EmployeeRemoveAccountsInput {
