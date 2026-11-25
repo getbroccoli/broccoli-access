@@ -27,7 +27,7 @@ import {
 
 import type { Orm } from "../../../core/db";
 
-test("offers Disable or Enable only for another member in the last Linear scan", async ({
+test("offers Remove alongside Enable only for a disabled member in the last Linear scan", async ({
   orm,
   fakeGoogle,
   fakeConnectors,
@@ -45,17 +45,31 @@ test("offers Disable or Enable only for another member in the last Linear scan",
     {
       isConnectionUser: false,
       offeredChange: "suspend",
+      offersRemove: false,
       offersReconnect: false,
       latestChange: null,
     },
     {
       isConnectionUser: false,
       offeredChange: "reactivate",
+      offersRemove: true,
       offersReconnect: false,
       latestChange: null,
     },
-    { isConnectionUser: true, offeredChange: null, offersReconnect: false, latestChange: null },
-    { isConnectionUser: false, offeredChange: null, offersReconnect: false, latestChange: null },
+    {
+      isConnectionUser: true,
+      offeredChange: null,
+      offersRemove: false,
+      offersReconnect: false,
+      latestChange: null,
+    },
+    {
+      isConnectionUser: false,
+      offeredChange: null,
+      offersRemove: false,
+      offersReconnect: false,
+      latestChange: null,
+    },
   ]);
 });
 
@@ -131,13 +145,17 @@ test("offers Reconnect instead of Disable to a Linear member but not to the conn
 }) => {
   const linear = await scannedLinear(orm, fakeConnectors.url);
   await seed.connectionNeedsReconnect(linear.connectionId);
-  const member = linear.account("chloe@acme.example").id;
+  const member = linear.account("hannah@acme.example").id;
   const admin = linear.account("admin@acme.example").id;
   const service = accountChanges(orm, { connectorsUrl: fakeConnectors.url });
 
   const states = await service.readChangeStates(OWNER, [member, admin]);
 
-  expect(states.get(member)).toMatchObject({ offeredChange: null, offersReconnect: true });
+  expect(states.get(member)).toMatchObject({
+    offeredChange: null,
+    offersRemove: false,
+    offersReconnect: true,
+  });
   expect(states.get(admin)).toMatchObject({ offeredChange: null, offersReconnect: false });
 });
 
@@ -181,6 +199,7 @@ test("refuses Disable when Linear lists only the owner's browser runtime", async
 test.for([
   { status: "active", action: "suspend" },
   { status: "suspended", action: "reactivate" },
+  { status: "suspended", action: "remove" },
 ] as const)(
   "refuses $action when two Linear members share one email",
   async ({ status, action }, { orm, seed, fakeConnectors }) => {
@@ -198,7 +217,7 @@ test.for([
 
     const states = await service.readChangeStates(owner, [appAccountId]);
 
-    expect(states.get(appAccountId)?.offeredChange).toBeNull();
+    expect(states.get(appAccountId)).toMatchObject({ offeredChange: null, offersRemove: false });
     await expect(service.changeAccount(owner, { appAccountId, action })).rejects.toMatchObject({
       code: "CONFLICT",
     });

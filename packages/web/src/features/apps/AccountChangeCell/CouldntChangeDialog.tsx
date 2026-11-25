@@ -39,7 +39,12 @@ type Props = {
    * the employee's invite row, offering INVITE while Invite is offered; absent where the change is
    * history, as on Activity, which shows only why.
    */
-  row?: { id: string; roleConflict?: boolean; offeredChange: AccountChangeAction | null };
+  row?: {
+    id: string;
+    roleConflict?: boolean;
+    offeredChange?: AccountChangeAction | null;
+    offersRemove?: boolean;
+  };
   /**
    * Called once Try again was asked or the change was marked done by hand, by a row of an account
    * without an employee, which the answers do not carry.
@@ -78,9 +83,7 @@ export function CouldntChangeDialog({
   const name = employee ? `${employee.firstName} ${employee.lastName}` : change.email;
   const firstName = employee?.firstName ?? change.email;
   const workspace = connection?.scan?.sourceName ?? app.name;
-  const options = row
-    ? failedChangeOptions({ offeredChange: row.offeredChange, latestChange: change, app })
-    : NO_OPTIONS;
+  const options = row ? failedChangeOptions({ ...row, latestChange: change, app }) : NO_OPTIONS;
   const copy = COPY[change.action];
   const reason = couldntChangeReason(change.failure, {
     action: change.action,
@@ -95,7 +98,11 @@ export function CouldntChangeDialog({
   });
   const tryAgain = (target: ChangeTarget) => {
     setShown(null);
-    void changeAccount(target, change.action).then(onChanged);
+    void changeAccount(
+      target,
+      change.action,
+      change.action === "REMOVE" ? change.id : undefined,
+    ).then(onChanged);
   };
   const target = row && rowTarget(row.id, change);
   const scan = (connectionId: string) => {
@@ -222,6 +229,7 @@ const COPY = {
     chip: "apps.couldnt.enable",
     title: "apps.couldnt.enableTitle",
   },
+  REMOVE: { chip: "apps.couldnt.remove", title: "apps.couldnt.removeTitle" },
   INVITE: {
     chip: "apps.couldnt.invite",
     title: "apps.couldnt.inviteTitle",

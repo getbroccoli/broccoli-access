@@ -28,7 +28,11 @@ export function useToastWhenChangeSucceeds(user: AccountChangeCell_AppUserFragme
       };
       toast.success(
         t(
-          change.action === "SUSPEND" ? "apps.change.disabledToast" : "apps.change.enabledToast",
+          change.action === "REMOVE"
+            ? "apps.change.removedToast"
+            : change.action === "SUSPEND"
+              ? "apps.change.disabledToast"
+              : "apps.change.enabledToast",
           params,
         ),
         // The row's outcome, apart from the answers to clicks at the top.

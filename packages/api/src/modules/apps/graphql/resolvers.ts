@@ -1,5 +1,6 @@
 import { accountLinkMutations } from "./accountLinkMutations";
 import { accountWithoutPersonResolvers } from "./accountWithoutPersonResolvers";
+import { createChangeLoaders } from "./createChangeLoaders";
 import DataLoader from "dataloader";
 
 import { invalidInput } from "../../../core/applicationError";
@@ -17,8 +18,6 @@ import type {
   AccountWithoutPerson,
   AccountLinkService,
   AccountChangeService,
-  AccountChangeState,
-  ConnectionState,
   AppInvite,
   AppService,
   AppSummary,
@@ -73,7 +72,7 @@ export function createResolvers(
       app: (_parent, { id }, context) => services.readApp(context.getActor(), id),
       apps: (_parent, { status, first, after }, context) =>
         services.listApps(context.getActor(), {
-          status: STATUSES[status],
+          status: fromEnum(status),
           first: first ?? undefined,
           after,
         }),
@@ -86,7 +85,7 @@ export function createResolvers(
     Mutation: {
       apps: () => ({}),
     },
-    AppsMutations: appsMutations(services, loaders),
+    AppsMutations: appsMutations(services),
     AccountWithoutPerson: accountWithoutPersonResolvers(loaders.changeStates),
     MarkedAccount: {
       kind: ({ kind }) => toEnum(kind),
@@ -100,6 +99,8 @@ export function createResolvers(
         const { offeredChange } = await loaders.actions(user, context);
         return offeredChange && toEnum(offeredChange);
       },
+      offersRemove: async (user, _args, context) =>
+        (await loaders.actions(user, context)).offersRemove,
       offersReconnect: async (user, _args, context) =>
         (await loaders.actions(user, context)).offersReconnect,
       latestChange: async (user, _args, context) =>
@@ -172,10 +173,7 @@ export function createResolvers(
 }
 
 /** The module's mutations: approving and ignoring apps, finishing setup, and account changes. */
-function appsMutations(
-  services: AppResolverServices,
-  loaders: ReturnType<typeof createLoaders>,
-): Resolvers["AppsMutations"] {
+function appsMutations(services: AppResolverServices): Resolvers["AppsMutations"] {
   return {
     ...accountLinkMutations(services),
     approve: (_parent, { input }, context) =>
@@ -199,16 +197,19 @@ function appsMutations(
         const ctx = context.getActor();
         const change = await services.changeAccount(ctx, {
           appAccountId: input.id,
-          action: ACTIONS[input.action],
+          retryOf: input.retryOf,
+          action: fromEnum(input.action),
         });
         // The answer shows the change as asked, even when it already ended on the server.
-        loaders.changeStates(context).prime(change.appAccountId!, {
+        const user = await appUserOf(services, ctx, change);
+        const changeState = {
           isConnectionUser: false,
           offeredChange: null,
+          offersRemove: false,
           offersReconnect: false,
           latestChange: change,
-        });
-        return { appUser: await appUserOf(services, ctx, change) };
+        };
+        return { appUser: user && { ...user, changeState } };
       }, ["NOT_FOUND", "CONFLICT"]),
     markAccountChangeDoneByHand: (_parent, { input }, context) =>
       mutationPayload<ResolversTypes["AccountChangeMarkDoneByHandPayload"]>(async () => {
@@ -224,11 +225,10 @@ function appsMutations(
   };
 }
 
-const STATUSES = { DISCOVERED: "discovered", APPROVED: "approved", IGNORED: "ignored" } as const;
+function fromEnum<T extends string>(value: T): Lowercase<T> {
+  return value.toLowerCase() as Lowercase<T>;
+}
 
-const ACTIONS = { SUSPEND: "suspend", REACTIVATE: "reactivate", INVITE: "invite" } as const;
-
-/** The change's account as its app's users list it; null for an invite, or once it belongs to no employee. */
 async function appUserOf(
   services: AppResolverServices,
   ctx: SecurityContext,
@@ -272,44 +272,5 @@ function createLoaders(services: AppResolverServices) {
     ...changes,
     actions: (user: AppUser, ctx: Parameters<typeof changes.changeStates>[0]) =>
       user.changeState ?? changes.changeStates(ctx).load(user.id),
-  };
-}
-
-/** The batches of Disable and Enable: the accounts' states, who asked, and the apps that offer them. */
-function createChangeLoaders(services: AppResolverServices) {
-  return {
-    changeStates: perRequest(
-      (context) =>
-        new DataLoader<string, AccountChangeState>(async (accountIds) => {
-          const states = await services.readChangeStates(context.getActor(), accountIds);
-          return accountIds.map((id) => states.get(id) ?? new Error("No app account has this id."));
-        }),
-    ),
-    requesterNames: perRequest(
-      (context) =>
-        new DataLoader<string, string>(async (userIds) => {
-          const names = await services.readRequesterNames(context.getActor(), userIds);
-          return userIds.map((id) => names.get(id) ?? new Error("No user has this id."));
-        }),
-    ),
-    connectionStates: perRequest(
-      (context) =>
-        new DataLoader<string, ConnectionState>(async (connectionIds) => {
-          const states = await services.readConnectionStates(context.getActor(), connectionIds);
-          return connectionIds.map(
-            (id) => states.get(id) ?? new Error("No app connection has this id."),
-          );
-        }),
-    ),
-    changeableApps: perRequest(
-      (context) =>
-        new DataLoader<string, boolean>(async (appIds) => {
-          const changeable = await services.findAppsWithChangeableAccounts(
-            context.getActor(),
-            appIds,
-          );
-          return appIds.map((appId) => changeable.has(appId));
-        }),
-    ),
   };
 }

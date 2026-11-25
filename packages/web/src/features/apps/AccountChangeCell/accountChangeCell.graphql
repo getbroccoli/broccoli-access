@@ -4,6 +4,7 @@ fragment AccountChangeCell_appUser on AppUser {
   status
   isConnectionUser
   offeredChange
+  offersRemove
   offersReconnect
   latestChange {
     id
@@ -26,6 +27,7 @@ fragment AccountChangeCell_appUser on AppUser {
     catalogKey
     canChangeAccounts
     containerConnection {
+      adminUrl
       id
       scan {
         id

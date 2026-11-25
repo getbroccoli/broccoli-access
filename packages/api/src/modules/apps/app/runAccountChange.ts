@@ -2,6 +2,7 @@ import {
   canChangeAccounts,
   canInvite,
   offersInviteRole,
+  canRemoveAccounts,
   type ConnectionUpdate,
   type Connector,
   ConnectorError,
@@ -9,13 +10,13 @@ import {
   type ConnectorSession,
   withConnectorRetries,
 } from "../../../core/connectors";
-import type { Transact, Tx } from "../../../core/db";
+import type { Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { accountChangeRepository, appAccountRepository, appConnectionRepository } from "../db";
 import { type AccountChange, reconnectCauseOf, statusAfter } from "../domain";
 import type { AccountChangeDependencies } from "./accountChangeService";
 import type { AppConnectionService } from "./appConnectionService";
-import { setAccountStatus } from "./setAccountStatus";
+import { applyAccountChange } from "./applyAccountChange";
 
 /** What a run needs: the service's dependencies and its connection service. */
 type RunDependencies = AccountChangeDependencies & { connections: AppConnectionService };
@@ -38,7 +39,7 @@ export async function runAccountChange(
   }
   const { error, calledServer, secretsUsed } = await runAction(dependencies, ctx, change);
   if (!error) {
-    const finished = await finishSucceeded(transact, ctx, change);
+    const finished = await finishSucceeded(dependencies, ctx, change);
     logger.info(
       {
         changeId,
@@ -136,6 +137,9 @@ async function runAction(
   if (!connector || !canMake(connector, change)) {
     return { error: "app_unavailable", calledServer: false, secretsUsed: null };
   }
+  if (change.action === "remove" && !(await canStillRemove(dependencies, change))) {
+    return { error: "not_allowed", calledServer: false, secretsUsed: null };
+  }
   let calledServer = false;
   const secrets = await connections.readSecrets(orm, change.connectionId);
   try {
@@ -171,8 +175,9 @@ async function runAction(
   }
 }
 
-/** Whether the connector makes the change: it disables and enables accounts, or invites. */
+/** Whether the connector makes the change: it supports the requested action on the server. */
 function canMake(connector: Connector, { action, role }: AccountChange): boolean {
+  if (action === "remove") return canRemoveAccounts(connector);
   if (action !== "invite") return canChangeAccounts(connector);
   return canInvite(connector) && offersInviteRole(connector.roles, role);
 }
@@ -189,8 +194,9 @@ async function makeChange(
   if (change.action === "invite") {
     return { ...(await session.invite!(change.email, change.role ?? undefined)), readBack: true };
   }
-  // A Disable or Enable always copies the member's source key.
+  // A change to an existing account always copies the member's source key.
   const account = { sourceKey: change.sourceKey!, email: change.email };
+  if (change.action === "remove") return { ...(await session.remove!(account)), readBack: true };
   const { status, connection } = await session.runAction!(change.action, account);
   return { readBack: status === statusAfter(change.action), connection };
 }
@@ -245,31 +251,66 @@ async function finishFailed(
  * asked; false when another outcome came first.
  */
 async function finishSucceeded(
-  transact: Transact,
+  dependencies: RunDependencies,
   ctx: SecurityContext,
   change: AccountChange,
 ): Promise<boolean> {
-  return transact(async (tx) => {
+  return dependencies.transact(async (tx) => {
     // The lock scans take first: a scan deleting the account also locks this change. An invite,
     // or a change whose account a scan deleted, has no account to wait for.
-    if (change.appAccountId) {
+    if (change.appAccountId || change.action === "remove") {
       await appAccountRepository(tx).lockForSync();
     }
     const changes = accountChangeRepository(tx);
-    if ((await changes.lockById(change.id))?.status !== "running") {
+    const stored = await changes.lockById(change.id);
+    // A concurrent Reconnect fails queued changes, including this already-dispatched removal.
+    const failedDuringCall =
+      stored?.status === "failed" &&
+      change.action === "remove" &&
+      stored.attempts.length === 0 &&
+      stored.error &&
+      reconnectCauseOf(stored.error);
+    if (!stored || (stored.status !== "running" && !failedDuringCall)) {
       return false;
     }
     const now = new Date();
-    await changes.finish(change.id, {
-      status: "succeeded",
-      attempts: [{ runtime: "server", error: null, at: now }],
-      error: null,
-      finishedAt: now,
-    });
-    await setAccountStatus(ctx, tx, change, {
-      cause: { kind: "CHANGED_IN_APP", ref: change.id },
+    await changes.finish(
+      change.id,
+      {
+        status: "succeeded",
+        attempts: [{ runtime: "server", error: null, at: now }],
+        error: null,
+        finishedAt: now,
+      },
+      stored.status,
+    );
+    await applyAccountChange(dependencies, ctx, tx, change, {
+      cause: {
+        kind: change.action === "remove" ? "REMOVED_IN_APP" : "CHANGED_IN_APP",
+        ref: change.id,
+      },
       requestedBy: change.requestedBy,
     });
     return true;
   });
+}
+
+async function canStillRemove(
+  { members, orm }: RunDependencies,
+  change: AccountChange,
+): Promise<boolean> {
+  const matches = await members.findConnectionMembers(orm, {
+    connectionIds: [change.connectionId],
+    emails: [change.email],
+  });
+  const target = matches.find((member) => member.sourceKey === change.sourceKey);
+  // An absent original member is an idempotent removal; the connector checks its key and email.
+  if (!target) return true;
+  // A Disable made here disables the account before a scan saves the member as suspended; a scan
+  // that sees the member active makes the account active again.
+  const [account] = await appAccountRepository(orm).findByIds(
+    change.appAccountId ? [change.appAccountId] : [],
+  );
+  const suspended = target.status === "suspended" || account?.status === "suspended";
+  return matches.length === 1 && suspended && !target.isConnectionUser;
 }

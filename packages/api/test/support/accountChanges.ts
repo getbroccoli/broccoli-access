@@ -43,6 +43,7 @@ export function accountChanges(
   const connectors = { list: async () => [google, ...(await container.list())] };
   return createAccountChangeService({
     readInviteRole,
+    directoryConnectors: [google],
     orm,
     transact,
     jobs,

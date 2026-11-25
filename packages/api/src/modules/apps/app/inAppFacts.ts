@@ -19,6 +19,10 @@ export async function findInAppFacts(
     // Only the core's connectors find accounts in other apps; a container connector finds its own.
     // shortcut: trusts that a connector keeps its finding kind, since a renamed kind stays on accounts
     // a Google sign-in keeps; read the scan's own records instead if kinds ever get renamed.
-    otherAppKinds: connectors.flatMap(({ findingKinds }) => findingKinds.otherAppAccounts ?? []),
+    otherAppKinds: otherAppFindingKinds(connectors),
   };
+}
+
+export function otherAppFindingKinds(connectors: DirectoryConnectors): string[] {
+  return connectors.flatMap(({ findingKinds }) => findingKinds.otherAppAccounts ?? []);
 }

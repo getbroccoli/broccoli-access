@@ -97,16 +97,22 @@ export function planAccountSync(
       continue;
     }
     const foundVia = before.foundVia.filter((kind) => kind !== findingKind);
-    if (foundVia.length === 0) {
-      plan.deleted.push(before);
-    } else {
-      plan.updated.push({ before, after: { ...before, foundVia } });
-    }
+    keepAccountFindings(plan, before, foundVia);
   }
   plan.updated = plan.updated.filter(
     ({ before, after }) => accountChanges(before, after).length > 0,
   );
   return plan;
+}
+
+/** Keeps the account while another source still sees it. */
+export function keepAccountFindings(
+  plan: AccountSyncPlan,
+  before: AppAccount,
+  foundVia: string[],
+): void {
+  if (foundVia.length) plan.updated.push({ before, after: { ...before, foundVia } });
+  else plan.deleted.push(before);
 }
 
 /** The fields history keeps of an account, from `before` to `after`; null for none. */

@@ -67,7 +67,8 @@ function removeAnswer(
   member: SeedMember | undefined,
 ): ActionAnswer {
   if (member === undefined) return { changed: false, removed: true };
-  if (member.sourceKey === actor.sourceKey) return errorAnswer("not_allowed");
+  if (member.status !== "suspended" || member.sourceKey === actor.sourceKey)
+    return errorAnswer("not_allowed");
   members.splice(members.indexOf(member), 1);
   return { changed: true, removed: true };
 }

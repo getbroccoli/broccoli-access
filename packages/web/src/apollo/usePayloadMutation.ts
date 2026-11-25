@@ -28,7 +28,7 @@ export function usePayloadMutation<Data, Variables extends OperationVariables>(
   options?: {
     update?: MutationUpdaterFunction<Data, Variables, ApolloCache>;
     /** Active queries to refetch after a success; the run and `loading` end once they are back. */
-    refetch?: DocumentNode[];
+    refetch?: DocumentNode[] | ((payload: PayloadOf<Data>) => DocumentNode[]);
   },
 ) {
   const client = useApolloClient();
@@ -59,10 +59,12 @@ export function usePayloadMutation<Data, Variables extends OperationVariables>(
         }
         throw new PayloadFailure(failure);
       }
-      if (refetch) {
+      const documents =
+        typeof refetch === "function" ? refetch(payload as PayloadOf<Data>) : refetch;
+      if (documents?.length) {
         setRefetching(true);
         // The mutation succeeded; a failed refetch shows as its own query's error.
-        await client.refetchQueries({ include: refetch }).catch(() => undefined);
+        await client.refetchQueries({ include: documents }).catch(() => undefined);
         setRefetching(false);
       }
       return payload as PayloadOf<Data>;

@@ -38,5 +38,6 @@ function progressText(app: string, { action, changesAhead }: Props["change"]): s
 const RUNNING = {
   SUSPEND: "apps.change.disabling",
   REACTIVATE: "apps.change.enabling",
+  REMOVE: "apps.change.removing",
   INVITE: "apps.change.inviting",
 } as const;

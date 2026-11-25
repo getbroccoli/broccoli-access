@@ -3,6 +3,8 @@ import { toast } from "sonner";
 import {
   type AccountChangeAction,
   ChangeAccountDocument,
+  AppPageDocument,
+  PersonPageDocument,
   InviteEmployeeDocument,
 } from "@/__generated__/graphql";
 import { useCache, usePayloadMutation } from "@/apollo";
@@ -26,16 +28,28 @@ export type ChangeTarget = { name: string; app: string } & (
 export function useChangeAccount(
   refusedMessage: "apps.change.refused" | "people.accounts.changeRefused" = "apps.change.refused",
 ): {
-  changeAccount: (target: ChangeTarget, action: AccountChangeAction) => Promise<boolean>;
+  changeAccount: (
+    target: ChangeTarget,
+    action: AccountChangeAction,
+    retryOf?: string,
+  ) => Promise<boolean>;
   loading: boolean;
 } {
   const cache = useCache();
-  const [change, changing] = usePayloadMutation(ChangeAccountDocument);
+  const [change, changing] = usePayloadMutation(ChangeAccountDocument, {
+    refetch: ({ appUser }) => (appUser ? [] : [AppPageDocument, PersonPageDocument]),
+  });
   const [invite, inviting] = usePayloadMutation(InviteEmployeeDocument);
-  const changeAccount = async (target: ChangeTarget, action: AccountChangeAction) => {
+  const changeAccount = async (
+    target: ChangeTarget,
+    action: AccountChangeAction,
+    retryOf?: string,
+  ) => {
     try {
       if ("accountId" in target) {
-        await change({ variables: { input: { id: target.accountId, action } } });
+        await change({
+          variables: { input: { id: target.accountId, action, retryOf } },
+        });
       } else {
         await invite({
           variables: { input: { employeeId: target.employeeId, appId: target.appId } },
@@ -44,7 +58,9 @@ export function useChangeAccount(
       return true;
     } catch {
       const refused = "accountId" in target ? refusedMessage : "apps.change.inviteRefused";
-      toast.error(t(refused, { name: target.name, app: target.app }));
+      toast.error(
+        t(retryOf ? "apps.change.retryRefused" : refused, { name: target.name, app: target.app }),
+      );
       if (!("accountId" in target)) forgetPersonApps(cache, target.employeeId);
       return false;
     }

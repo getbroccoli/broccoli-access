@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 import type { AccountValues, ImportedAccount } from "../../../core/connectors";
 import { jsonb } from "../../../core/db";
@@ -34,6 +34,7 @@ export const importRecords = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("import_records_source_email").on(table.sourceId, sql`(${table.values} ->> 'email')`),
     unique("import_records_source_record").on(table.sourceId, table.type, table.sourceKey),
     check("import_records_type", sql`${table.type} in ('app_account')`),
   ],

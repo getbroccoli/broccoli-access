@@ -30,6 +30,7 @@ mutation ReconnectContainerConnector($input: ContainerConnectorReconnectInput!) 
             users {
               id
               offeredChange
+              offersRemove
               offersReconnect
             }
           }

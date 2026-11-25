@@ -5,7 +5,7 @@ import { parseUuid } from "../../../utils";
 import { accountChangeRepository, appAccountRepository } from "../db";
 import type { AccountChange } from "../domain";
 import type { AccountChangeDependencies, LatestAccountChange } from "./accountChangeService";
-import { setAccountStatus } from "./setAccountStatus";
+import { applyAccountChange } from "./applyAccountChange";
 
 /**
  * "I did it by hand": the failed change, its account's latest, becomes `done_by_hand`, and the
@@ -13,7 +13,7 @@ import { setAccountStatus } from "./setAccountStatus";
  * failed invite, its connection's and email's latest, becomes `done_by_hand` alone.
  */
 export async function markChangeDoneByHand(
-  { transact, logger }: AccountChangeDependencies,
+  dependencies: AccountChangeDependencies,
   ctx: SecurityContext,
   changeId: string,
 ): Promise<LatestAccountChange> {
@@ -25,13 +25,15 @@ export async function markChangeDoneByHand(
   if (!id) {
     throw new ApplicationError("NOT_FOUND", NOT_FOUND);
   }
-  const done = await transact(async (tx) => {
+  const done = await dependencies.transact(async (tx) => {
     const change = await lockLatestFailure(tx, id);
     const marked = await accountChangeRepository(tx).markDoneByHand(change.id);
-    await setAccountStatus(ctx, tx, marked, { cause: { kind: "DONE_BY_HAND", ref: marked.id } });
+    await applyAccountChange(dependencies, ctx, tx, marked, {
+      cause: { kind: "DONE_BY_HAND", ref: marked.id },
+    });
     return marked;
   });
-  logger.info(
+  dependencies.logger.info(
     {
       changeId: done.id,
       appAccountId: done.appAccountId,

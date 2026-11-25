@@ -3,6 +3,7 @@ export {
   ChangeProgress,
   CouldntChangeDialog,
   InviteCell,
+  RemoveAccountDialog,
   showsCouldntChange,
   useChangeAccount,
 } from "./AccountChangeCell";

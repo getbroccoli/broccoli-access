@@ -1,6 +1,6 @@
 import { and, eq, isNull, ne, type SQL, sql } from "drizzle-orm";
 import { anyOf } from "../../../core/db";
-import type { InAppFacts } from "../domain";
+import type { AppAccount, InAppFacts } from "../domain";
 import { appAccounts } from "./appAccountsTable";
 
 import { apps } from "./appsTable";
@@ -29,4 +29,14 @@ export function unlinkedAccounts(facts: InAppFacts, group: "personal" | "marked"
     isNull(appAccounts.employeeId),
     isAccess(facts),
   );
+}
+
+/** What the app list and an app's page read of a user's account. */
+export interface AppUserAccount extends Pick<
+  AppAccount,
+  "id" | "appId" | "email" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
+> {
+  employeeId: string;
+  /** Whether it is in its app; null where its app's connection has not finished a scan (see `inApp`). */
+  inApp: boolean | null;
 }

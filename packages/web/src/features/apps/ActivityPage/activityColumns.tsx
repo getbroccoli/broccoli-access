@@ -62,5 +62,6 @@ export const ACTIVITY_COLUMNS = [PERSON, APP, CHANGE, ASKED, OUTCOME];
 const ACTIONS = {
   SUSPEND: "apps.change.disable",
   REACTIVATE: "apps.change.enable",
+  REMOVE: "apps.change.remove",
   INVITE: "apps.change.invite",
 } as const;

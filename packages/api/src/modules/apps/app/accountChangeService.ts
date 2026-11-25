@@ -16,30 +16,37 @@ import {
 } from "../db";
 import type { AccountChange, AccountChangeAction } from "../domain";
 import type { ConnectionMembers, EmployeesByName, IntegrationUser } from "../ports";
-import { changingConnectors, readAccountFacts, readChangeFacts } from "./accountFacts";
+import {
+  type ChangingConnectors,
+  changingConnectors,
+  ensureSameRetry,
+  readAccountFacts,
+  readChangeFacts,
+} from "./accountFacts";
 import { createAppConnectionService } from "./appConnectionService";
 import { type AppInvite, inviteEmployee, readAppInvites } from "./appInvite";
 import { loggingRefusal } from "./loggingRefusal";
 import { markChangeDoneByHand } from "./markChangeDoneByHand";
+import type { DirectoryConnectors } from "./directory";
 import type { ReconnectReason } from "./connectionReconnects";
 import { failRunningChange, runAccountChange } from "./runAccountChange";
 
 /**
- * Disable and Enable of app accounts, and Invite of employees to apps they have no account in:
+ * Disable, Enable and Remove of app accounts, and Invite of employees to apps they have no account in:
  * asked by the owner, run as a job, read by the account and invite rows and Activity.
  */
 export interface AccountChangeService {
   /**
-   * Asks for a Disable (`suspend`) or Enable (`reactivate`) of the app account: in one transaction
+   * Asks for a Disable, Enable or Remove of the app account: in one transaction
    * writes the change `running`, with the account's app and email and the connection's source key
    * copied, and queues its run, one per connection at a time; returns it with its place in the
    * queue. Needs MANAGE_WORKSPACE and a signed-in user; refuses an unknown account with NOT_FOUND,
-   * and an action the account does not offer now (`offeredChange`), which Invite never is, with
+   * and an action the account does not offer now, which Invite never is, with
    * CONFLICT.
    */
   changeAccount: (
     ctx: SecurityContext,
-    input: { appAccountId: string; action: AccountChangeAction },
+    input: { appAccountId: string; action: AccountChangeAction; retryOf?: string | null },
   ) => Promise<LatestAccountChange>;
   /**
    * Asks for an Invite of the employee to the app: in one transaction writes the invite `running`,
@@ -133,6 +140,8 @@ export interface AccountChangeState {
   isConnectionUser: boolean;
   /** Disable or Enable when offered now; null otherwise. */
   offeredChange: AccountAction | null;
+  /** Whether this disabled account also offers Remove. */
+  offersRemove: boolean;
   /** Whether Reconnect shows instead of Disable or Enable, while its app's connection needs it. */
   offersReconnect: boolean;
   /** Its newest change; null before the first. */
@@ -164,6 +173,7 @@ export interface AccountChangeDependencies {
   /** Template sources and personal choices at the time of the invite. */
   readInviteRole: (tx: Tx, employeeId: string, appId: string) => Promise<string | null>;
   members: ConnectionMembers;
+  directoryConnectors: DirectoryConnectors;
   /** The employees module, which owns their emails, which invites go to. */
   employees: EmployeesByName;
   /** Whose accounts never offer a change. */
@@ -181,7 +191,7 @@ export function createAccountChangeService(
     connections: createAppConnectionService({ secretBox: dependencies.secretBox }),
   };
   return {
-    async changeAccount(ctx, { appAccountId, action }) {
+    async changeAccount(ctx, { appAccountId, action, retryOf }) {
       const refusal = {
         message: "Account change refused",
         ids: { appAccountId: parseUuid(appAccountId), action },
@@ -195,7 +205,7 @@ export function createAccountChangeService(
         // Read before the transaction: the container's list may take a while to answer.
         const changing = await changingConnectors(dependencies.connectors);
         return dependencies.transact((tx) =>
-          askForChange(dependencies, tx, { appAccountId, action, requestedBy, changing }),
+          askForChange(dependencies, tx, { appAccountId, action, retryOf, requestedBy, changing }),
         );
       });
       logger.info(
@@ -218,17 +228,21 @@ export function createAccountChangeService(
         ? await accountChangeRepository(db).countChangesAhead(running)
         : new Map<string, number>();
       return new Map(
-        Array.from(facts, ([id, { isConnectionUser, latest, offered, reconnectOffered }]) => {
-          return [
-            id,
-            {
-              isConnectionUser,
-              offeredChange: offered,
-              offersReconnect: reconnectOffered,
-              latestChange: latest && withPlace(latest, ahead),
-            },
-          ];
-        }),
+        Array.from(
+          facts,
+          ([id, { isConnectionUser, latest, offered, offersRemove, reconnectOffered }]) => {
+            return [
+              id,
+              {
+                isConnectionUser,
+                offeredChange: offered,
+                offersRemove,
+                offersReconnect: reconnectOffered,
+                latestChange: latest && withPlace(latest, ahead),
+              },
+            ];
+          },
+        ),
       );
     },
     async readConnectionStates(ctx, connectionIds) {
@@ -262,7 +276,11 @@ export function createAccountChangeService(
         changingConnectors(dependencies.connectors),
       ]);
       return new Set(
-        connections.filter(({ connector }) => changing.has(connector)).map(({ appId }) => appId),
+        connections
+          .filter(
+            ({ connector }) => changing.status.has(connector) || changing.remove.has(connector),
+          )
+          .map(({ appId }) => appId),
       );
     },
     async readAccountChange(ctx, id) {
@@ -310,11 +328,13 @@ async function askForChange(
     action,
     requestedBy,
     changing,
+    retryOf,
   }: {
     appAccountId: string;
     action: AccountChangeAction;
     requestedBy: string;
-    changing: Set<string>;
+    changing: ChangingConnectors;
+    retryOf?: string | null;
   },
 ): Promise<LatestAccountChange> {
   const id = parseUuid(appAccountId);
@@ -324,8 +344,12 @@ async function askForChange(
     throw new ApplicationError("NOT_FOUND", "No app account has this id.");
   }
   const facts = await readAccountFacts(dependencies, tx, [account], changing);
-  const { offered, connection, member } = facts.get(account.id)!;
-  if (offered !== action || !connection || !member) {
+  const { offered, offersRemove, connection, member } = facts.get(account.id)!;
+  if (retryOf != null) ensureSameRetry(facts.get(account.id)!, action, retryOf);
+  // shortcut: a first confirmation follows a replacement suspended member at the same email;
+  // bind the opened dialog to the upstream key if memberships start changing during confirmation.
+  const allowed = action === "remove" ? offersRemove : offered === action;
+  if (!allowed || !connection || !member) {
     throw new ApplicationError("CONFLICT", NOT_OFFERED);
   }
   const changes = accountChangeRepository(tx);

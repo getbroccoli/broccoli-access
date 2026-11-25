@@ -14,7 +14,7 @@ import {
   type Tx,
 } from "../../../core/db";
 import type { AppAccount, AppStatus, InAppFacts } from "../domain";
-import { inApp, isAccess, unlinkedAccounts } from "./inApp";
+import { type AppUserAccount, inApp, isAccess, unlinkedAccounts } from "./inApp";
 import { appAccounts } from "./appAccountsTable";
 import { appConnections } from "./appConnectionsTable";
 import type { App } from "./appRepository";
@@ -95,16 +95,6 @@ export type UnlinkedAccount = Pick<AppAccount, "id" | "email" | "status" | "kind
 export const UNLINKED_SORT_VALUES: Record<"EMAIL", z.ZodType<unknown[]>> = {
   EMAIL: z.tuple([z.string(), z.uuid()]),
 };
-
-/** What the app list and an app's page read of a user's account. */
-export interface AppUserAccount extends Pick<
-  AppAccount,
-  "id" | "appId" | "email" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
-> {
-  employeeId: string;
-  /** Whether it is in its app; null where its app's connection has not finished a scan (see `inApp`). */
-  inApp: boolean | null;
-}
 
 /** An employee's account with its app's name and status, as People and a person's page read it. */
 export interface EmployeeAppAccount extends Pick<

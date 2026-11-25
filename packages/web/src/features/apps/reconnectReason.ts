@@ -70,5 +70,6 @@ export function foundLine({
 const FOUND_BY = {
   SUSPEND: "apps.reconnect.foundByDisable",
   REACTIVATE: "apps.reconnect.foundByEnable",
+  REMOVE: "apps.reconnect.foundByRemove",
   INVITE: "apps.reconnect.foundByInvite",
 } as const;

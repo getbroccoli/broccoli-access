@@ -1,5 +1,7 @@
+import { ApplicationError } from "../../../core/applicationError";
 import {
   canChangeAccounts,
+  canRemoveAccounts,
   type AccountAction,
   type ConnectorRegistry,
 } from "../../../core/connectors";
@@ -14,10 +16,12 @@ import {
 } from "../db";
 import {
   type AccountChange,
+  type AccountChangeAction,
   type AppAccount,
   isAutomaticService,
   offeredChange,
   offersReconnect,
+  offersRemove,
 } from "../domain";
 import type { ConnectionMember } from "../ports";
 import type { AccountChangeDependencies } from "./accountChangeService";
@@ -41,13 +45,13 @@ export async function readAccountFacts(
   dependencies: AccountChangeDependencies,
   db: Orm | Tx,
   accounts: readonly AppAccount[],
-  changing?: Set<string>,
+  changing?: ChangingConnectors,
 ): Promise<Map<string, AccountFacts>> {
   const stored = await readFacts(dependencies, db, accounts);
   // The connector list can take a network round trip. No member means no action.
   const capabilities =
     changing ??
-    (stored.members.length ? await changingConnectors(dependencies.connectors) : new Set<string>());
+    (stored.members.length ? await changingConnectors(dependencies.connectors) : NO_CONNECTORS);
   return gatherFacts(accounts, stored, capabilities);
 }
 
@@ -86,6 +90,7 @@ export interface AccountFacts {
   member: ConnectionMember | null;
   latest: AccountChange | null;
   offered: AccountAction | null;
+  offersRemove: boolean;
   /** Whether Reconnect shows instead of Disable or Enable. */
   reconnectOffered: boolean;
 }
@@ -93,7 +98,7 @@ export interface AccountFacts {
 function gatherFacts(
   accounts: readonly AppAccount[],
   { connections, members, latest, integrationEmail }: StoredFacts,
-  changing: Set<string>,
+  changing: ChangingConnectors,
 ): Map<string, AccountFacts> {
   const connectionByApp = new Map(connections.map((connection) => [connection.appId, connection]));
   const membersByKey = Map.groupBy(
@@ -117,7 +122,10 @@ function gatherFacts(
         status: account.status,
         connection: connection && {
           status: connection.status,
-          changesAccounts: changing.has(connection.connector),
+          changesAccounts: changing.status.has(connection.connector),
+          removesAccounts:
+            changing.remove.has(connection.connector) &&
+            (member?.status === "suspended" || disabledHere(change, member)),
         },
         record: member && !isIntegrationUsers ? { isConnectionUser } : null,
         changeRunning: change?.status === "running",
@@ -128,7 +136,8 @@ function gatherFacts(
           connection,
           isConnectionUser,
           member,
-          latest: change,
+          latest: latestForMember(change, member),
+          offersRemove: offersRemove(offerFacts),
           offered: offeredChange(offerFacts),
           reconnectOffered: offersReconnect(offerFacts),
         },
@@ -137,8 +146,65 @@ function gatherFacts(
   );
 }
 
-/** The keys of the connectors that list `suspend` and `reactivate`. */
-export async function changingConnectors(connectors: ConnectorRegistry): Promise<Set<string>> {
+export interface ChangingConnectors {
+  status: Set<string>;
+  remove: Set<string>;
+}
+
+const NO_CONNECTORS: ChangingConnectors = { status: new Set(), remove: new Set() };
+
+/** Connector keys grouped by the changes they can make. */
+export async function changingConnectors(
+  connectors: ConnectorRegistry,
+): Promise<ChangingConnectors> {
   const listed = await connectors.list();
-  return new Set(listed.filter((connector) => canChangeAccounts(connector)).map(({ key }) => key));
+  return {
+    status: new Set(listed.filter(canChangeAccounts).map(({ key }) => key)),
+    remove: new Set(listed.filter(canRemoveAccounts).map(({ key }) => key)),
+  };
+}
+
+/** A Disable the connector verified for this member, which no scan has saved as suspended yet. */
+function disabledHere(change: AccountChange | null, member: ConnectionMember | null): boolean {
+  return (
+    change?.action === "suspend" &&
+    change.status === "succeeded" &&
+    change.sourceKey === member?.sourceKey
+  );
+}
+
+function latestForMember(
+  change: AccountChange | null,
+  member: ConnectionMember | null,
+): AccountChange | null {
+  if (
+    change?.status === "failed" &&
+    change.action === "remove" &&
+    member &&
+    member.sourceKey !== change.sourceKey
+  )
+    return null;
+  return change;
+}
+
+/** Refuses a retry of a failed Remove once the account's facts no longer match that change. */
+export function ensureSameRetry(
+  { latest, member, connection }: AccountFacts,
+  action: AccountChangeAction,
+  retryOf: string,
+): void {
+  if (
+    action !== "remove" ||
+    latest?.id !== retryOf ||
+    latest.action !== action ||
+    latest.status !== "failed" ||
+    latest.error === "not_allowed" ||
+    member?.sourceKey !== latest.sourceKey ||
+    connection?.id !== latest.connectionId
+  ) {
+    throw new ApplicationError(
+      "CONFLICT",
+      "This removal can no longer be retried. Check the current member and confirm a new removal.",
+    );
+  }
 }

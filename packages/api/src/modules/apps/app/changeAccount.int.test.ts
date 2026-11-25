@@ -111,6 +111,7 @@ test("returns one change ahead when another account is already queued on the con
 test.for([
   { reason: "the member who owns the connection", email: "admin@acme.example", action: "suspend" },
   { reason: "Invite on an existing account", email: "chloe@acme.example", action: "invite" },
+  { reason: "Remove on an active account", email: "chloe@acme.example", action: "remove" },
   { reason: "Enable on an active account", email: "chloe@acme.example", action: "reactivate" },
 ] as const)(
   "refuses $reason without storing or queuing a change",
@@ -187,47 +188,53 @@ test("refuses an employee without storing or queuing a change", async ({ orm, fa
   );
 });
 
-test("two concurrent requests for one account store and queue only the first change", async ({
-  orm,
-  seed,
-  transact,
-  fakeConnectors,
-}) => {
-  const linear = await scannedLinear(orm, fakeConnectors.url);
-  const owner = await seed.owner();
-  const held = holdBeforeCommit(transact);
-  const { jobs, sent } = recordingJobQueue();
-  const service = accountChanges(orm, {
-    connectorsUrl: fakeConnectors.url,
-    jobs,
-    transact: held.transact,
-  });
-  const input = {
-    appAccountId: linear.account("chloe@acme.example").id,
-    action: "suspend",
-  } as const;
-  const first = service.changeAccount(owner, input);
-  const pid = await Promise.race([
-    held.ready,
-    first.then(() => {
-      throw new Error("First change was not held");
-    }),
-  ]);
-  const results = Promise.allSettled([first, service.changeAccount(owner, input)]);
-  try {
-    await expectBlockedBy(orm, pid);
-  } finally {
-    held.release();
-    await results;
-  }
+test.for([
+  { email: "chloe@acme.example", action: "suspend" },
+  { email: "hannah@acme.example", action: "remove" },
+] as const)(
+  "two concurrent $action requests store and queue only the first change",
+  async ({ email, action }, { orm, seed, transact, fakeConnectors }) => {
+    const linear = await scannedLinear(orm, fakeConnectors.url);
+    const owner = await seed.owner();
+    const held = holdBeforeCommit(transact);
+    const { jobs, sent } = recordingJobQueue();
+    const service = accountChanges(orm, {
+      connectorsUrl: fakeConnectors.url,
+      jobs,
+      transact: held.transact,
+    });
+    const input = {
+      appAccountId: linear.account(email).id,
+      action,
+    } as const;
+    const first = service.changeAccount(owner, input);
+    const pid = await Promise.race([
+      held.ready,
+      first.then(() => {
+        throw new Error("First change was not held");
+      }),
+    ]);
+    const results = Promise.allSettled([first, service.changeAccount(owner, input)]);
+    try {
+      await expectBlockedBy(orm, pid);
+    } finally {
+      held.release();
+      await results;
+    }
 
-  expect(await results).toMatchObject([
-    { status: "fulfilled" },
-    { status: "rejected", reason: NOT_OFFERED },
-  ]);
-  expect(await storedChangeIds(orm)).toEqual([{ id: (await first).id }]);
-  expect(sent).toHaveLength(1);
-});
+    expect(await results).toMatchObject([
+      { status: "fulfilled" },
+      { status: "rejected", reason: NOT_OFFERED },
+    ]);
+    expect(await storedChangeIds(orm)).toEqual([{ id: (await first).id }]);
+    expect(sent).toHaveLength(1);
+    const states = await service.readChangeStates(owner, [input.appAccountId]);
+    expect(states.get(input.appAccountId)).toMatchObject({
+      offeredChange: null,
+      offersRemove: false,
+    });
+  },
+);
 
 test("a second Disable waits for the first to finish and refuses the suspended account", async ({
   orm,

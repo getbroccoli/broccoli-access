@@ -23,6 +23,7 @@ export function showsCouldntChange({
   if (latestChange?.status !== "FAILED") {
     return false;
   }
+  if (latestChange.action === "REMOVE") return true;
   return status !== (latestChange.action === "SUSPEND" ? "SUSPENDED" : "ACTIVE");
 }
 
@@ -47,7 +48,9 @@ export function couldntChangeReason(
   const reconnect = toReconnect
     ? ` ${t(credential === "APP_SESSION" ? "apps.couldnt.reconnectSession" : "apps.couldnt.reconnectKey", { app })}`
     : "";
-  return `${reasonOf(failure, about)}${reconnect} ${t("apps.couldnt.nothingChanged", { app })}`;
+  // A refusal changed nothing; any other failed Remove may have removed the member unseen.
+  const unconfirmed = about.action === "REMOVE" && failure !== "NOT_ALLOWED";
+  return `${reasonOf(failure, about)}${reconnect} ${t(unconfirmed ? "apps.couldnt.unconfirmedRemoval" : "apps.couldnt.nothingChanged", { app })}`;
 }
 
 /**
@@ -60,13 +63,17 @@ export function couldntChangeReason(
  */
 export function failedChangeOptions({
   offeredChange,
+  offersRemove,
   latestChange,
   app,
 }: FailedChangeFacts): FailedChangeOptions {
   if (!latestChange?.failure || !latestChange.finishedAt) {
     return { tryAgain: false, byHand: false, scanNow: false, reconnect: false };
   }
-  const offered = offeredChange === latestChange.action;
+  const offered =
+    latestChange.action === "REMOVE"
+      ? offersRemove === true
+      : offeredChange === latestChange.action;
   if (latestChange.failure === "NOT_ALLOWED") {
     return { tryAgain: false, byHand: true, scanNow: false, reconnect: false };
   }
@@ -94,6 +101,8 @@ export function couldntChangeHint(
   { firstName, app, roleConflict }: { firstName: string; app: string; roleConflict?: boolean },
 ): string {
   if (failure === "NOT_ALLOWED") {
+    // Broccoli Access itself refuses a Remove whose member a scan saw active again.
+    if (action === "REMOVE") return t("apps.couldnt.hintRemoveRefused", { firstName, app });
     return t("apps.couldnt.hintByHandOnly", { app });
   }
   if (failure === "ACCOUNT_NOT_FOUND") {
@@ -143,10 +152,20 @@ const INVITE_HINTS = {
   reconnect: "apps.couldnt.hintInviteAfterReconnect",
 } as const;
 
-const HINTS = { SUSPEND: DISABLE_HINTS, REACTIVATE: ENABLE_HINTS, INVITE: INVITE_HINTS } as const;
+const HINTS = {
+  REMOVE: {
+    tryAgain: "apps.couldnt.hintRemove",
+    byHand: "apps.couldnt.hintRemoveByHand",
+    reconnect: "apps.couldnt.hintRemoveAfterReconnect",
+  },
+  SUSPEND: DISABLE_HINTS,
+  REACTIVATE: ENABLE_HINTS,
+  INVITE: INVITE_HINTS,
+} as const;
 
 /** The parts of an app account its failed change's options are decided from. */
 type FailedChangeFacts = {
+  offersRemove?: boolean;
   offeredChange?: AccountChangeAction | null;
   latestChange?: {
     action: AccountChangeAction;
@@ -164,12 +183,12 @@ type FailedChangeFacts = {
 function reasonOf(
   failure: AccountChangeFailure,
   {
+    action,
     app,
     workspace,
     person,
     connectionUserEmail,
     credential,
-    action,
     historical,
   }: Parameters<typeof couldntChangeReason>[1],
 ): string {
@@ -200,7 +219,9 @@ function reasonOf(
     case "ACCOUNT_NOT_FOUND":
       return t("apps.couldnt.accountNotFound", { app, name: person.name, email: person.email });
     case "NOT_ALLOWED":
-      return t("apps.couldnt.notAllowed", { app });
+      return t(action === "REMOVE" ? "apps.couldnt.removeNotAllowed" : "apps.couldnt.notAllowed", {
+        app,
+      });
     case "OWNER_BROWSER_LOST":
       return t("apps.couldnt.browserLost", { app });
   }

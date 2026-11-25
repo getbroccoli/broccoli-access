@@ -4,6 +4,7 @@ import {
   type AccountChangeAction,
   MarkAccountChangeDoneByHandDocument,
   PersonPageDocument,
+  AppPageDocument,
 } from "@/__generated__/graphql";
 import { useCache, usePayloadMutation } from "@/apollo";
 import {
@@ -39,7 +40,8 @@ type Props = {
 export function DoneByHandDialog({ open, onClose, onDone, change, person, app }: Props) {
   const cache = useCache();
   const [markDoneByHand, { loading }] = usePayloadMutation(MarkAccountChangeDoneByHandDocument, {
-    refetch: [PersonPageDocument],
+    refetch:
+      change.action === "REMOVE" ? [PersonPageDocument, AppPageDocument] : [PersonPageDocument],
   });
   const copy = COPY[change.action];
   const confirm = async () => {
@@ -93,6 +95,11 @@ const COPY = {
   REACTIVATE: {
     title: "apps.byHand.enableTitle",
     effect: "apps.byHand.enableEffect",
+    refused: "apps.byHand.refused",
+  },
+  REMOVE: {
+    title: "apps.byHand.removeTitle",
+    effect: "apps.byHand.removeEffect",
     refused: "apps.byHand.refused",
   },
   INVITE: {

@@ -12,6 +12,8 @@ declare module "../../../core/records" {
   interface CauseKinds {
     /** An account change succeeded; its ref is the account change's id. */
     CHANGED_IN_APP: true;
+    /** A member was removed in its app; the ref is the account change. */
+    REMOVED_IN_APP: true;
     /** The owner made a failed account change in the app themselves; its ref is the account change's id. */
     DONE_BY_HAND: true;
     /** A connection turned to Reconnect; its ref is the scan's import source or the account change. */

@@ -31,7 +31,11 @@ export function AppAccountStatusCell({ appUser }: Props) {
     return (
       <CouldntChangeDialog
         change={user.latestChange}
-        row={{ id: user.id, offeredChange: user.offeredChange ?? null }}
+        row={{
+          id: user.id,
+          offeredChange: user.offeredChange ?? null,
+          offersRemove: user.offersRemove,
+        }}
       />
     );
   }
