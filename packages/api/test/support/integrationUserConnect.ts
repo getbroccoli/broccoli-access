@@ -20,6 +20,11 @@ export async function readyIntegrationUser(
   fake: RunningFakeConnectors,
   now?: () => Date,
 ) {
+  await seedReadyIntegrationUser(seed);
+  return containerConnections(orm, fake.url, undefined, now);
+}
+
+export async function seedReadyIntegrationUser(seed: TestSeed) {
   const owner = OWNER.user!;
   await seed.user({ id: owner.userId, email: owner.email });
   await seed.integrationUser({
@@ -28,7 +33,6 @@ export async function readyIntegrationUser(
     createdBy: owner.userId,
     totpSecret: INTEGRATION_USER_TOTP_SECRET,
   });
-  return containerConnections(orm, fake.url, undefined, now);
 }
 
 /** Signs in as the integration user and confirms the Slack workspace it reached. */

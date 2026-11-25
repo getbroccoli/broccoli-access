@@ -2,17 +2,18 @@ import type { ConnectorCall, ConnectorErrorCode } from "@broccoli-access/connect
 import type { RunningFakeConnectors } from "@broccoli-access/fake-apps";
 import express from "express";
 
+import type { SecurityContext } from "../../src/core/security";
 import type { Orm } from "../../src/core/db";
 import { createAppConnectionService } from "../../src/modules/apps";
 import { importSourceRepository } from "../../src/modules/imports/db";
 import { storedIntegrationUsers } from "./storedGoogleConnection";
 import { accountChanges } from "./accountChanges";
-import { ownerHandOver, serveConnectorRoutes } from "./containerConnections";
+import { containerConnections, ownerHandOver, serveConnectorRoutes } from "./containerConnections";
 import {
   connectAsIntegrationUser,
   INTEGRATION_USER_EMAIL,
   inviteIntegrationUserToFakeSlack,
-  readyIntegrationUser,
+  seedReadyIntegrationUser,
 } from "./integrationUserConnect";
 import { postFakeControl } from "./reconnect";
 import { storedAppAccounts, storedImportSources } from "./storedScan";
@@ -27,6 +28,16 @@ export async function slackSession(
   fake: RunningFakeConnectors,
   sessionFrom: "server_sign_in" | "extension" = "server_sign_in",
 ) {
+  await seedReadyIntegrationUser(seed);
+  return slackSessionForOwner(orm, fake, OWNER, sessionFrom);
+}
+
+export async function slackSessionForOwner(
+  orm: Orm,
+  fake: RunningFakeConnectors,
+  owner: SecurityContext,
+  sessionFrom: "server_sign_in" | "extension" = "server_sign_in",
+) {
   const calls: string[] = [];
   const app = express();
   const routes: express.Router = express.Router();
@@ -35,31 +46,27 @@ export async function slackSession(
     next();
   }, routes);
   const server = await serveConnectorRoutes(fake.url, app);
-  const { service, scans, renewals } = await readyIntegrationUser(orm, seed, {
-    ...fake,
-    url: server.url,
-  });
+  const { service, scans, renewals } = containerConnections(orm, server.url);
   await inviteIntegrationUserToFakeSlack(fake, "admin");
-  if (sessionFrom === "server_sign_in") {
-    await connectAsIntegrationUser(service);
-  } else {
-    const owner = await ownerHandOver(orm, fake);
-    await owner.service.connect(OWNER, {
-      connector: "slack",
-      noticeAccepted: true,
-      appSession: owner.handOver.appSession,
-    });
-  }
-  const [source] = await storedImportSources(orm);
-  const { connectionId, id: sourceId } = source!;
+  const connected =
+    sessionFrom === "server_sign_in"
+      ? await connectAsIntegrationUser(service, owner)
+      : await connectOwnerSession();
+  const { id: connectionId } = connected.connection!;
+  const sourceId = (await storedImportSources(orm)).find(
+    (row) => row.connectionId === connectionId,
+  )!.id;
   const connections = createAppConnectionService({ secretBox: TEST_SECRET_BOX });
   const changes = accountChanges(orm, { connectorsUrl: server.url, renewals });
+  const readConnection = () => connections.readConnectionById(orm, connectionId);
   calls.length = 0;
   return {
     calls,
     routes,
     scans,
     changes,
+    renewals,
+    readConnection,
     connectionId,
     sourceId,
     secrets: () => connections.readSecrets(orm, connectionId),
@@ -68,18 +75,30 @@ export async function slackSession(
       postFakeControl(fake.url, "failures", { connector: "slack", call, code, count }),
     async queueDisable() {
       await scans.runScan(SYSTEM, sourceId);
-      const ana = (await storedAppAccounts(orm)).find(({ email }) => email === "ana@acme.example")!;
-      const change = await changes.changeAccount(OWNER, {
+      const { appId } = (await readConnection())!;
+      const ana = (await storedAppAccounts(orm)).find(
+        (account) => account.appId === appId && account.email === "ana@acme.example",
+      )!;
+      const change = await changes.changeAccount(owner, {
         appAccountId: ana.id,
         action: "suspend",
       });
       return {
         run: () => changes.runChange(SYSTEM, change.id),
         latest: async () =>
-          (await changes.readChangeStates(OWNER, [ana.id])).get(ana.id)?.latestChange,
+          (await changes.readChangeStates(owner, [ana.id])).get(ana.id)?.latestChange,
       };
     },
   };
+
+  async function connectOwnerSession() {
+    const handOver = await ownerHandOver(orm, fake, undefined, owner);
+    return handOver.service.connect(owner, {
+      connector: "slack",
+      noticeAccepted: true,
+      appSession: handOver.handOver.appSession,
+    });
+  }
 }
 
 export async function suspendIntegrationUserInDirectory(

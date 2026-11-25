@@ -118,6 +118,18 @@ With Slack and Linear connected as above, and `FAKE` set to the fake connectors'
 - [ ] A Google Workspace scan that fails (fake Google `POST /_fake/tokens/revoke`, then "Scan now") shows "Reconnect" and offers consent through Change Google app. The current app is selected; after consent, Scan now clears the failure without a reload.
 - [ ] At 390 px wide, a card in Reconnect wraps its button under the text without horizontal scrolling.
 
+## Reconnect as the integration user
+
+With Slack connected as the integration user (see above), `FAKE` set to the fake connectors' address and `GOOGLE` to the fake Google's.
+
+- [ ] After `curl -s -X POST "$FAKE/_fake/slack/sessions/expire"`, Slack's "Scan now" ends with "Connected" and no "Reconnect": the scan signs in again by itself and the card still reads "Acts as the integration user".
+- [ ] After the same expiry and `curl -s -X POST -H 'content-type: application/json' -d '{"connector":"slack","call":"connections/sign-in","code":"blocked_by_check","count":1}' "$FAKE/_fake/failures"`, "Scan now" turns the card amber with "Reconnect", "A check, such as a CAPTCHA, stopped Broccoli Access from signing in to Slack as the integration user. Only a person can pass it. Found by a scan today at HH:MM." and "Changes in Slack fail until the integration user signs in again.", never "Your Slack session expired".
+- [ ] The same with the code `permission_missing` reads "The integration user is no longer an admin in Slack. If it is not a member, invite it as an admin."
+- [ ] The card's button reads "Sign in again as the integration user", never "Reconnect" with a hand-over window; pressing it brings back "Connected" and "Acts as the integration user", not the owner's session.
+- [ ] After `curl -s -X POST "$GOOGLE/_fake/users/broccoli@acme.example/suspend"` and "Scan now" on Google Workspace, without a Slack scan, Slack's card reads "Reconnect" with "Slack stopped: the integration user is suspended in Google. Found by a scan today at HH:MM." and "Restore the integration user in Google, then sign in again."; a reload keeps it, and the fake's Slack records no call.
+- [ ] After `.../unsuspend` and "Scan now" on Google Workspace, the card is "Connected" again, and its "Scan now" works.
+- [ ] A Slack connected with your own session keeps the old "Reconnect" above after the expiry, and the suspension changes nothing in it.
+
 ## Shared Google app
 
 - [ ] Switch own app → Broccoli app → own app. Connection ID, owner, people and approved apps stay; a cancelled or refused change leaves the old app working.

@@ -12,6 +12,7 @@ import {
   RenewedSessionRefusedError,
   withConnectorRetries,
 } from "../../../core/connectors";
+import type { Tx } from "../../../core/db";
 import { createSetupStepService } from "../../../core/instance";
 import type { SecurityContext } from "../../../core/security";
 import { importSourceRepository } from "../db";
@@ -213,6 +214,9 @@ async function saveScan(
     if (savedCount !== null && savedCount !== (await sources.countRecords(sourceId)).accounts)
       return null;
     await sources.replaceRecords(sourceId, accounts);
+    if (findings.connector.isDirectory) {
+      await followIntegrationUser(ctx, tx, dependencies, { sourceId, accounts });
+    }
     const { accountsSetToService } = await syncAccounts(ctx, tx, findings, dependencies);
     await sources.markScanned(sourceId, new Date());
     if (!source.readAt)
@@ -222,6 +226,22 @@ async function saveScan(
       findings.connector.isDirectory && (await setupSteps.finishScanStep(ctx, tx));
     return { saved: true, finishedSetupScan, accountsSetToService };
   });
+}
+
+/** Lets the connections made by the integration user's sign-in follow its status in the directory. */
+async function followIntegrationUser(
+  ctx: SecurityContext,
+  tx: Tx,
+  { integrationUser, apps }: ScanDependencies,
+  { sourceId, accounts }: { sourceId: string; accounts: readonly ImportedAccount[] },
+): Promise<void> {
+  const googleId = await integrationUser.readGoogleUserId(ctx, tx);
+  const member = accounts.find(({ sourceKey }) => sourceKey === googleId);
+  // Until the directory lists the integration user, nothing is known of it.
+  if (member) {
+    const suspended = member.values.status === "suspended";
+    await apps.syncIntegrationUserStops(ctx, tx, { suspended, ref: sourceId });
+  }
 }
 
 /** Every page's accounts, and the pending invitations any page carries. */
