@@ -1,11 +1,20 @@
 #!/bin/sh
-# Starts this checkout's development stack, its fake Google and fake connectors on free host
-# ports unless HOST_WEB_PORT, HOST_FAKE_GOOGLE_PORT or HOST_FAKE_CONNECTORS_PORT is set, prints
-# their URLs and follows new logs.
+# Starts this checkout's source with hot reload. By default it uses fake apps on free ports;
+# --real uses real Google and connectors on port 8081. HOST_WEB_PORT overrides either.
 # Successful startup is quiet; failures print their output. Any exit removes the containers;
 # the database volume stays unless --drop-db removes it before the start.
 set -eu
 cd "$(dirname "$0")/../.."
+
+real=false
+drop_db=false
+for option in "$@"; do
+  case "$option" in
+    --real) real=true ;;
+    --drop-db) drop_db=true ;;
+    *) echo "Usage: pnpm dev [--real] [--drop-db]" >&2; exit 2 ;;
+  esac
+done
 
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)
@@ -15,8 +24,11 @@ export HOST_UID HOST_GID BROCCOLI_ACCESS_CHECKOUT
 
 # Worktrees share a folder name; Compose must not share their containers or database.
 project="broccoli-access-dev-$(node -p "require('node:crypto').createHash('sha256').update(process.cwd()).digest('hex').slice(0, 12)")"
+# Never connect the fake workspace's stored credentials or accounts to real apps.
+if [ "$real" = true ]; then project="$project-real"; fi
 
 compose() {
+  if [ "$real" = true ]; then set -- -f packages/scripts/docker-compose.real.yml "$@"; fi
   docker compose --project-name "$project" -f docker-compose.yml -f packages/scripts/docker-compose.dev.yml "$@"
 }
 
@@ -40,25 +52,20 @@ free_ports=$(node -e '
 ')
 HOST_WEB_PORT=$(printf '%s\n' "$environment" | sed -n 's/^HOST_WEB_PORT=//p')
 HOST_FAKE_GOOGLE_PORT=$(printf '%s\n' "$environment" | sed -n 's/^HOST_FAKE_GOOGLE_PORT=//p')
+# A stable real-mode origin keeps saved Google callbacks valid across restarts.
+if [ "$real" = true ] && [ -z "$HOST_WEB_PORT" ]; then HOST_WEB_PORT=8081; fi
 if [ "${HOST_WEB_PORT:-0}" = 0 ]; then HOST_WEB_PORT=${free_ports% *}; fi
 if [ "${HOST_FAKE_GOOGLE_PORT:-0}" = 0 ]; then HOST_FAKE_GOOGLE_PORT=${free_ports#* }; fi
 export HOST_WEB_PORT HOST_FAKE_GOOGLE_PORT
 
-case "${1:-}" in
-  '') ;;
-  --drop-db)
-    # Only this checkout's database volume: `down --volumes` would also take other profiles'
-    # volumes, or another checkout's when project names collide.
-    database=$(docker volume ls --quiet --filter "label=org.getbroccoli.access.checkout=$PWD" \
-      --filter label=com.docker.compose.volume=dev-postgres-data)
-    quiet compose down
-    if [ -n "$database" ]; then quiet docker volume rm $database; fi
-    ;;
-  *)
-    echo "Usage: pnpm dev [--drop-db]" >&2
-    exit 2
-    ;;
-esac
+if [ "$drop_db" = true ]; then
+  # Only this checkout and mode's database volume; keep secrets and the other mode's data.
+  database=$(docker volume ls --quiet --filter "label=org.getbroccoli.access.checkout=$PWD" \
+    --filter "label=com.docker.compose.project=$project" \
+    --filter label=com.docker.compose.volume=dev-postgres-data)
+  quiet compose down
+  if [ -n "$database" ]; then quiet docker volume rm $database; fi
+fi
 
 # The containers run on the checkout's node_modules.
 quiet pnpm install --frozen-lockfile
@@ -72,23 +79,28 @@ trap 'quiet compose down' EXIT
 # signals into an exit; HUP comes from a closed terminal.
 trap 'exit 0' HUP INT TERM
 
-quiet compose up --detach --wait
-quiet compose exec -T api node_modules/.bin/tsx src/configureDevelopmentMail.ts "http://localhost:$HOST_WEB_PORT"
+# Reuse cached images; update them explicitly when needed.
+quiet compose up --detach --wait --pull missing
+if [ "$real" = false ]; then
+  quiet compose exec -T api node_modules/.bin/tsx src/configureDevelopmentMail.ts "http://localhost:$HOST_WEB_PORT"
+fi
 green='' cyan='' reset=''
 if [ -t 1 ]; then
   green='\033[1;32m'
   cyan='\033[1;36m'
   reset='\033[0m'
 fi
-mailpit=$(compose port mailpit 8025)
-fake_connectors=$(compose port fake-connectors 4000)
 printf '\n%b🥦🥦🥦  Broccoli Access is ready!%b    ➜  %bhttp://localhost:%s%b\n' \
   "$green" "$reset" "$cyan" "$HOST_WEB_PORT" "$reset"
-printf '%b📬  Email it sends (Mailpit)%b  ➜  %bhttp://localhost:%s%b\n' \
-  "$green" "$reset" "$cyan" "${mailpit##*:}" "$reset"
-printf '%b🔑  Fake Google (Acme)%b        ➜  %bhttp://localhost:%s%b\n' \
-  "$green" "$reset" "$cyan" "$HOST_FAKE_GOOGLE_PORT" "$reset"
-# Chrome sends *.localhost to this machine; the Slack cookie stays off the app's own localhost.
-printf '%b🔌  Fake connectors (Acme)%b    ➜  %bhttp://slack.localhost:%s/slack/signin%b\n\n' \
-  "$green" "$reset" "$cyan" "${fake_connectors##*:}" "$reset"
+if [ "$real" = false ]; then
+  mailpit=$(compose port mailpit 8025)
+  fake_connectors=$(compose port fake-connectors 4000)
+  printf '%b📬  Email it sends (Mailpit)%b  ➜  %bhttp://localhost:%s%b\n' \
+    "$green" "$reset" "$cyan" "${mailpit##*:}" "$reset"
+  printf '%b🔑  Fake Google (Acme)%b        ➜  %bhttp://localhost:%s%b\n' \
+    "$green" "$reset" "$cyan" "$HOST_FAKE_GOOGLE_PORT" "$reset"
+  # Chrome sends *.localhost to this machine; the Slack cookie stays off the app's own localhost.
+  printf '%b🔌  Fake connectors (Acme)%b    ➜  %bhttp://slack.localhost:%s/slack/signin%b\n\n' \
+    "$green" "$reset" "$cyan" "${fake_connectors##*:}" "$reset"
+fi
 compose logs --follow --tail 0

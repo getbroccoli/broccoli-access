@@ -16,6 +16,7 @@
   "prettier": "@broccoli-access/config/prettier",
   "scripts": {
     "dev": "sh packages/scripts/dev.sh",
+    "real": "sh packages/scripts/dev.sh --real",
     "dev:prune": "node packages/scripts/prune.mjs",
     "build": "turbo run build",
     "lint": "turbo run lint",

@@ -38,6 +38,17 @@ Open http://localhost:8080.
 
 [Self-hosted setup guide](docs/guides/setup-guide.md)
 
+## Run from source
+
+Use `pnpm real` for hot reload with real Google and app connectors at
+http://localhost:8081. Docker is required; cached images are reused. Set
+`HOST_WEB_PORT` to choose another port. This mode keeps its own database and
+secrets, separate from fake development and the installed Compose stack. Configure
+email in Settings as with self-hosting.
+
+Use `pnpm dev` for the fake Google and demo apps instead. Ctrl-C stops either mode
+and keeps its data. Add `--drop-db` to reset only the selected mode's database.
+
 ## Licence
 
 Copyright (C) 2026 Minari Limited.
