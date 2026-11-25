@@ -141,6 +141,7 @@ export {
   linearUsers,
 } from "./linearAccountChanges";
 export { inviteTest, linearInvitations } from "./inviteTest";
+export { offboardedTest } from "./offboardedTest";
 export {
   GOOGLE_RELAY_URL,
   RELAY_HANDLE,

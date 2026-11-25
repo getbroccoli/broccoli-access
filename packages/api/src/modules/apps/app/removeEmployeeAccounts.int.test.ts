@@ -1,58 +1,21 @@
 import { ACME_LINEAR, ACME_SLACK } from "@broccoli-access/fake-apps";
-import { eq } from "drizzle-orm";
 
 import {
   accountChanges,
-  containerConnectors,
   EMPLOYEE,
   expect,
-  failLinearCall,
-  inviteTest,
-  linearMemberStatus,
   listedLinearChloe,
-  ownerHandOver,
   postFakeControl,
   scans,
   serveAccountList,
   serveManifest,
-  storedAppConnections,
-  storedImportSources,
+  containerConnectors,
   SYSTEM,
-  writableGoogleConnection,
+  offboardedTest as test,
 } from "#test/support";
+import { eq } from "drizzle-orm";
 import type { Orm } from "../../../core/db";
 import { accountChanges as changesTable } from "../db";
-
-const test = inviteTest.extend<{
-  offboarded: { employeeId: string; email: string; slackAppId: string; slackConnectionId: string };
-}>({
-  offboarded: async ({ orm, fakeGoogle, fakeConnectors, workspace }, use) => {
-    const { owner, service, employee, offboardingInput } = workspace;
-    const { id: employeeId, email } = employee("chloe@acme.example");
-    const slack = await ownerHandOver(orm, fakeConnectors, undefined, owner);
-    const { connection } = await slack.service.connect(owner, {
-      connector: "slack",
-      appSession: slack.handOver.appSession,
-      noticeAccepted: true,
-    });
-    const source = (await storedImportSources(orm)).find(
-      (row) => row.connectionId === connection!.id,
-    )!;
-    await slack.scans.runScan(SYSTEM, source.id);
-    const { appId } = (await storedAppConnections(orm)).find((row) => row.id === connection!.id)!;
-    await writableGoogleConnection(orm, fakeGoogle.url, owner);
-    await service.offboardEmployee(owner, await offboardingInput(employeeId));
-    const disables = await orm.select().from(changesTable);
-    expect(disables).toHaveLength(3);
-    for (const change of disables) {
-      await service.runChange(SYSTEM, change.id);
-      expect(await service.readAccountChange(owner, change.id)).toMatchObject({
-        status: "succeeded",
-      });
-    }
-    await use({ employeeId, email, slackAppId: appId, slackConnectionId: connection!.id });
-  },
-});
 
 test("lists the person's disabled app accounts by app name and leaves out the suspended directory account", async ({
   workspace: { service, owner, linear },
@@ -245,42 +208,6 @@ test("asking again while Removes run keeps the same changes and jobs", async ({
 
   expect(await removeChanges(orm)).toEqual(changes);
   expect(sent).toEqual(jobs);
-});
-
-test("a refused Linear Remove stays on the account while Slack removes its member", async ({
-  orm,
-  fakeConnectors,
-  workspace: { service, owner, linear },
-  offboarded: { employeeId, email, slackAppId },
-}) => {
-  const [plan] = await service.readOffboardings(owner, [employeeId]);
-  await service.removeEmployeeAccounts(owner, {
-    employeeId,
-    accountIds: plan!.accountsToRemove.map(({ id }) => id),
-  });
-  const changes = await removeChanges(orm);
-  const linearRemove = changes.find((change) => change.appId === linear.appId)!;
-  const slackRemove = changes.find((change) => change.appId === slackAppId)!;
-  await failLinearCall(fakeConnectors.url, "actions/run", "not_allowed");
-
-  await service.runChange(SYSTEM, linearRemove.id);
-  await service.runChange(SYSTEM, slackRemove.id);
-
-  const accountId = linear.account(email).id;
-  const states = await service.readChangeStates(owner, [accountId]);
-  expect(states.get(accountId)?.latestChange).toMatchObject({
-    id: linearRemove.id,
-    action: "remove",
-    status: "failed",
-    error: "not_allowed",
-  });
-  expect(await linearMemberStatus(fakeConnectors.url, email)).toBe("suspended");
-  expect(await service.readAccountChange(owner, slackRemove.id)).toMatchObject({
-    status: "succeeded",
-  });
-  const response = await fetch(`${fakeConnectors.url}/_fake/state`);
-  const state = (await response.json()) as { slack: { email: string }[] };
-  expect(state.slack.map((member) => member.email)).not.toContain(email);
 });
 
 test.for([

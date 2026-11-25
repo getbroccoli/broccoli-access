@@ -3,10 +3,46 @@ import {
   expect,
   failLinearCall,
   postFakeControl,
+  recordingJobQueue,
   scannedLinear,
   SYSTEM,
   test,
 } from "#test/support";
+
+test("offers and queues a retry of a failed Remove before a scan sees the Disable", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const owner = await seed.owner();
+  const linear = await scannedLinear(orm, fakeConnectors.url);
+  const appAccountId = linear.account("chloe@acme.example").id;
+  const { jobs, sent } = recordingJobQueue();
+  const service = accountChanges(orm, { connectorsUrl: fakeConnectors.url, jobs });
+  const disable = await service.changeAccount(owner, { appAccountId, action: "suspend" });
+  await service.runChange(SYSTEM, disable.id);
+  const input = { appAccountId, action: "remove" } as const;
+  const failed = await service.changeAccount(owner, input);
+  await failLinearCall(fakeConnectors.url, "actions/run", "unexpected_response");
+  await service.runChange(SYSTEM, failed.id);
+
+  const states = await service.readChangeStates(owner, [appAccountId]);
+  expect(states.get(appAccountId)?.latestChange).toMatchObject({
+    id: failed.id,
+    status: "failed",
+    error: "unexpected_response",
+  });
+  expect.soft(states.get(appAccountId)?.offersRemove).toBe(true);
+  const retry = await service.changeAccount(owner, { ...input, retryOf: failed.id });
+
+  expect(retry.id).not.toBe(failed.id);
+  expect(retry).toMatchObject({ ...input, status: "running" });
+  expect(sent).toContainEqual({
+    name: "apps.runAccountChange",
+    payload: { changeId: retry.id },
+    options: { group: linear.connectionId },
+  });
+});
 
 test.for(["same member", "replacement"] as const)(
   "retrying Remove checks the original member key (%s)",
