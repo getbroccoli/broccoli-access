@@ -92,6 +92,7 @@ export function CouldntChangeDialog({
   const copy = COPY[change.action];
   const reason = couldntChangeReason(change.failure, {
     action: change.action,
+    canDisableAccounts: connection?.connector.canDisableAccounts,
     app: app.name,
     workspace,
     person: { name, email: change.email },

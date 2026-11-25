@@ -39,6 +39,7 @@ export function couldntChangeReason(
   about: {
     action?: AccountChangeAction;
     historical?: boolean;
+    canDisableAccounts?: boolean;
     app: string;
     workspace: string;
     person: { name: string; email: string };
@@ -249,19 +250,17 @@ type RemovalApp = {
 
 function reasonOf(
   failure: AccountChangeFailure,
-  {
-    action,
-    app,
-    workspace,
-    person,
-    connectionUserEmail,
-    credential,
-    historical,
-    integrationUser,
-  }: Parameters<typeof couldntChangeReason>[1],
+  about: Parameters<typeof couldntChangeReason>[1],
 ): string {
-  const withSession = credential === "APP_SESSION";
-  const causeAbout = { app, withSession, email: connectionUserEmail, workspace, integrationUser };
+  const { action, app, canDisableAccounts, credential, historical, person } = about;
+  const { connectionUserEmail: email, integrationUser, workspace } = about;
+  const causeAbout = {
+    app,
+    withSession: credential === "APP_SESSION",
+    email,
+    workspace,
+    integrationUser,
+  };
   switch (failure) {
     case "UNEXPECTED_RESPONSE":
       return t("apps.couldnt.unexpectedResponse", { app });
@@ -285,9 +284,13 @@ function reasonOf(
     case "ACCOUNT_NOT_FOUND":
       return t("apps.couldnt.accountNotFound", { app, name: person.name, email: person.email });
     case "NOT_ALLOWED":
-      return t(action === "REMOVE" ? "apps.couldnt.removeNotAllowed" : "apps.couldnt.notAllowed", {
-        app,
-      });
+      if (action === "REMOVE")
+        return t(
+          canDisableAccounts && !historical
+            ? "apps.couldnt.removeNeedsDisabled"
+            : "apps.couldnt.removeNotAllowed",
+        );
+      return t("apps.couldnt.notAllowed", { app });
     case "OWNER_BROWSER_LOST":
       return t("apps.couldnt.browserLost", { app });
     case "NO_CONNECTION":

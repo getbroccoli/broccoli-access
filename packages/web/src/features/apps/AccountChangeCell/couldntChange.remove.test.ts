@@ -122,20 +122,22 @@ it("explains that a failed Remove may already have removed the member", () => {
   expect(reason).not.toContain("Nothing changed");
 });
 
-it.for([false, true])("explains a refused Remove (historical: %s)", (historical) => {
-  const reason = couldntChangeReason("NOT_ALLOWED", {
-    app: "Linear",
-    workspace: "Acme",
-    person: { name: "Hannah Weber", email: "hannah@acme.example" },
-    connectionUserEmail: null,
-    credential: "TEXT",
-    toReconnect: false,
-    action: "REMOVE",
-    historical,
-  });
+it.for([false, true])(
+  "explains a refused Remove when the connector cannot disable accounts (historical: %s)",
+  (historical) => {
+    const about = { ...refusedLinearRemoval, canDisableAccounts: false, historical };
 
-  expect(reason).toBe(
-    "The removal was refused. Check the member’s access and your permissions in Linear. Nothing changed in Linear.",
+    expect(couldntChangeReason("NOT_ALLOWED", about)).toBe(
+      "The removal was refused. Nothing changed in Linear.",
+    );
+  },
+);
+
+it("explains the disabled-member requirement on a refused Remove row when the connector can disable accounts", () => {
+  const about = { ...refusedLinearRemoval, canDisableAccounts: true, historical: false };
+
+  expect(couldntChangeReason("NOT_ALLOWED", about)).toBe(
+    "Only a disabled member can be removed. Nothing changed in Linear.",
   );
 });
 
@@ -162,3 +164,13 @@ it("asks the owner to check the account after a refused Remove when the connecto
 
   expect(hint).toBe("Scan Linear or remove Ana by hand.");
 });
+
+const refusedLinearRemoval = {
+  app: "Linear",
+  workspace: "Acme",
+  person: { name: "Hannah Weber", email: "hannah@acme.example" },
+  connectionUserEmail: null,
+  credential: "TEXT",
+  toReconnect: false,
+  action: "REMOVE",
+} as const;
