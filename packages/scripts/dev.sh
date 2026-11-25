@@ -62,6 +62,8 @@ esac
 
 # The containers run on the checkout's node_modules.
 quiet pnpm install --frozen-lockfile
+# A reused checkout can skip postinstall and keep GraphQL generated for another commit.
+quiet pnpm codegen
 # The web app's dev server zips this build for owners to download.
 quiet pnpm --filter @broccoli-access/extension build
 
