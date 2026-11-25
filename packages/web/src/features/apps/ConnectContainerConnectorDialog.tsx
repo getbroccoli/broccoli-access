@@ -69,6 +69,9 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
   }
   const app = connector.name;
   const isNewKey = connector.connection !== null;
+  const connectDescription = connector.canDisableAccounts
+    ? "apps.connect.description"
+    : "apps.connect.readDescription";
   const { loading, error, payloadError, reset } = isNewKey ? reconnecting : connecting;
   const changeOpen = (next: boolean) => {
     // Closed only once the check ends, so a pending connect never runs behind another try.
@@ -124,12 +127,7 @@ export function ConnectContainerConnectorDialog({ connector: from, trigger, onCo
             </DialogTitle>
           </div>
           <DialogDescription className="text-sm text-foreground/80">
-            {t(
-              isNewKey
-                ? "settings.apps.dialog.newKeyDescription"
-                : "settings.apps.dialog.description",
-              { app },
-            )}
+            {t(isNewKey ? "settings.apps.dialog.newKeyDescription" : connectDescription, { app })}
           </DialogDescription>
         </DialogHeader>
         <form id={`connect-${connector.id}`} onSubmit={submit} className="flex flex-col gap-5">

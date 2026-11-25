@@ -6,6 +6,19 @@ it("parses the documented manifest", () => {
   expect(CONNECTOR_MANIFEST.parse(manifest)).toEqual(manifest);
 });
 
+it.for(["suspend", "reactivate"])("rejects %s without its paired capability", (capability) => {
+  const connector = { ...manifest.connectors[0], capabilities: ["list_accounts", capability] };
+
+  const result = CONNECTOR_MANIFEST.safeParse({ connectors: [connector] });
+
+  expect(result.error?.issues).toContainEqual(
+    expect.objectContaining({
+      path: ["connectors", 0, "capabilities"],
+      message: "suspend and reactivate must be listed together",
+    }),
+  );
+});
+
 it("leaves out a capability v1 does not list", () => {
   const extended = structuredClone(manifest);
   extended.connectors[0]!.capabilities.push("delete_accounts");

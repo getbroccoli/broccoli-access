@@ -160,7 +160,7 @@ async function runAction(
     return { ...NOT_CALLED, error: "app_unavailable", reconnects: false };
   }
   const reconnects = !connector.isDirectory;
-  if (change.action === "remove" && !(await canStillRemove(dependencies, change))) {
+  if (change.action === "remove" && !(await canStillRemove(dependencies, change, connector))) {
     return { ...NOT_CALLED, error: "not_allowed", reconnects: false };
   }
   return callChange(dependencies, ctx, change, { connector, connection, secrets, reconnects });
@@ -251,6 +251,7 @@ async function finishSucceeded(
 async function canStillRemove(
   { members, orm }: RunDependencies,
   change: RunnableChange,
+  connector: Connector,
 ): Promise<boolean> {
   const matches = await members.findConnectionMembers(orm, {
     connectionIds: [change.connectionId],
@@ -259,11 +260,12 @@ async function canStillRemove(
   const target = matches.find((member) => member.sourceKey === change.sourceKey);
   // An absent original member is an idempotent removal; the connector checks its key and email.
   if (!target) return true;
+  if (matches.length !== 1 || target.isConnectionUser) return false;
+  if (!canChangeAccounts(connector) || target.status === "suspended") return true;
   // A Disable made here disables the account before a scan saves the member as suspended; a scan
   // that sees the member active makes the account active again.
   const [account] = await appAccountRepository(orm).findByIds(
     change.appAccountId ? [change.appAccountId] : [],
   );
-  const suspended = target.status === "suspended" || account?.status === "suspended";
-  return matches.length === 1 && suspended && !target.isConnectionUser;
+  return account?.status === "suspended";
 }

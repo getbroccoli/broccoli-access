@@ -32,6 +32,7 @@ fragment CouldntChangeDialog_accountChange on AccountChange {
       }
       connector {
         id
+        canDisableAccounts
         connectionFields {
           kind
           secret

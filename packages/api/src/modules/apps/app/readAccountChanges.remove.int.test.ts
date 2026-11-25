@@ -4,10 +4,43 @@ import {
   failedDisable,
   listedLinearChloe,
   scannedLinear,
+  scannedNotion,
+  OWNER,
   serveAccountList,
   serveManifest,
   test,
 } from "#test/support";
+
+test("offers Remove alone for an active Notion member and no change for its connection member", async ({
+  orm,
+}) => {
+  const { changes, chloe, own } = await scannedNotion(orm, ["invite", "remove"]);
+
+  const states = await changes.readChangeStates(OWNER, [chloe.id, own.id]);
+
+  expect(states.get(chloe.id)).toMatchObject({ offeredChange: null, offersRemove: true });
+  expect(states.get(own.id)).toMatchObject({
+    isConnectionUser: true,
+    offeredChange: null,
+    offersRemove: false,
+  });
+  await expect(
+    changes.changeAccount(OWNER, { appAccountId: own.id, action: "remove" }),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+});
+
+test("lists an active Notion member without offering changes when the connector only lists accounts", async ({
+  orm,
+}) => {
+  const { changes, chloe } = await scannedNotion(orm, []);
+
+  expect(chloe.status).toBe("active");
+  expect((await changes.readChangeStates(OWNER, [chloe.id])).get(chloe.id)).toMatchObject({
+    offeredChange: null,
+    offersRemove: false,
+    offersReconnect: false,
+  });
+});
 
 test("a Disable done by hand cannot offer Remove until a scan finds the member suspended", async ({
   orm,

@@ -19,6 +19,8 @@ export interface OffboardingAccount {
   isDirectory: boolean;
   /** Disable or Enable when offered now (`offeredChange`). */
   offeredChange: AccountAction | null;
+  /** Whether Remove is available for this account after Offboard. */
+  offersRemove: boolean;
   offersReconnect: boolean;
   isConnectionUser: boolean;
   /** The action of its running change; null without one. */
@@ -51,8 +53,8 @@ export type OffboardingByHandReason = (typeof OFFBOARDING_BY_HAND_REASONS)[numbe
 
 /**
  * Offboard disables every active account that offers Disable, the directory account first so the
- * person can no longer sign in anywhere with it. Any other active account, each pending
- * invitation, and an Enable or Invite still running, which would give access back afterwards, is
+ * person can no longer sign in anywhere with it. Active accounts offering Remove are left to
+ * Remove all. Other active accounts, pending invitations, and a running Enable or Invite need
  * the owner's work by hand. A suspended account, and one being disabled or removed, needs nothing.
  */
 export function offboardingPlanOf({
@@ -61,7 +63,7 @@ export function offboardingPlanOf({
   invitingAppIds,
 }: OffboardingFacts): OffboardingPlan {
   const toDisable = accounts.filter(
-    (account) => needsOwner(account) === null && isIdleAndActive(account),
+    (account) => isIdleAndActive(account) && account.offeredChange === "suspend",
   );
   return {
     accountIdsToDisable: [
@@ -88,7 +90,7 @@ function needsOwner(account: OffboardingAccount): OffboardingByHandReason | null
   if (account.runningChange === "reactivate") {
     return "change_is_running";
   }
-  if (!isIdleAndActive(account) || account.offeredChange === "suspend") {
+  if (!isIdleAndActive(account) || account.offeredChange === "suspend" || account.offersRemove) {
     return null;
   }
   if (account.isConnectionUser) {

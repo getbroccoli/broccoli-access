@@ -2,7 +2,15 @@ import { expect, it, type TestContext } from "vitest";
 
 import { ACTION_RUN_ANSWER, CONNECTOR_ERROR_ANSWER } from "../connectorCalls.js";
 import type { ConnectorFixture } from "./describeConnectorConformance.js";
-import { listAll, send, skipUnlessListed, startFlow, type Flow } from "./flow.js";
+import {
+  capabilitiesOf,
+  findListedAccount,
+  listAll,
+  send,
+  skipUnlessListed,
+  startFlow,
+  type Flow,
+} from "./flow.js";
 
 /** The remove checks of one connector; a connector that does not list `remove` skips them. */
 export function describeRemoveConformance(url: string, fixture: ConnectorFixture): void {
@@ -11,7 +19,7 @@ export function describeRemoveConformance(url: string, fixture: ConnectorFixture
   }) => checkRepeatedRemove(url, fixture, await memberToRemoveOf(url, fixture, skip)));
   it("answers a remove of the connection's own member with not_allowed", async ({ skip }) => {
     await skipUnlessListed(url, fixture, "remove", skip);
-    return checkRemoveOfConnectionUser(url, fixture);
+    return checkRemoveOfConnectionUser(url, fixture, skip);
   });
 }
 
@@ -23,11 +31,19 @@ async function checkRepeatedRemove(
   member: Member,
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
-
-  const refused = await send(flow, "actions/run", { action: "remove", account: member });
-  expect(CONNECTOR_ERROR_ANSWER.parse(refused).error.code).toBe("not_allowed");
-  const suspended = await send(flow, "actions/run", { action: "suspend", account: member });
-  expect(ACTION_RUN_ANSWER.parse(suspended).account?.values.status).toBe("suspended");
+  const capabilities = await capabilitiesOf(url, fixture.connector);
+  if (capabilities.includes("suspend")) {
+    const refused = await send(flow, "actions/run", { action: "remove", account: member });
+    expect(CONNECTOR_ERROR_ANSWER.parse(refused).error.code).toBe("not_allowed");
+    const suspended = await send(flow, "actions/run", { action: "suspend", account: member });
+    expect(ACTION_RUN_ANSWER.parse(suspended).account?.values.status).toBe("suspended");
+  } else {
+    const listedMember = await findListedAccount(
+      flow,
+      ({ sourceKey }) => sourceKey === member.sourceKey,
+    );
+    expect(listedMember?.values.status, "the fixture's member to remove").toBe("active");
+  }
 
   const first = await remove(flow, member);
   const listed = await listAll(flow);
@@ -40,16 +56,20 @@ async function checkRepeatedRemove(
   ]);
 }
 
-async function checkRemoveOfConnectionUser(url: string, fixture: ConnectorFixture): Promise<void> {
+async function checkRemoveOfConnectionUser(
+  url: string,
+  fixture: ConnectorFixture,
+  skip: TestContext["skip"],
+): Promise<void> {
   const [flow] = await startFlow(url, fixture);
-  const own = (await listAll(flow)).find(({ values }) => values.isConnectionUser);
-  expect(own, "the member the list marks as the connection's own").toBeDefined();
-  const account = { sourceKey: own!.sourceKey, email: own!.values.email };
+  const own = await findListedAccount(flow, ({ values }) => values.isConnectionUser);
+  if (!own) return skip(`${fixture.connector} lists no connection member`);
+  const account = { sourceKey: own.sourceKey, email: own.values.email };
 
   const answer = await send(flow, "actions/run", { action: "remove", account });
 
   expect(CONNECTOR_ERROR_ANSWER.parse(answer).error.code).toBe("not_allowed");
-  expect((await listAll(flow)).map(({ sourceKey }) => sourceKey)).toContain(own!.sourceKey);
+  expect((await listAll(flow)).map(({ sourceKey }) => sourceKey)).toContain(own.sourceKey);
 }
 
 /**

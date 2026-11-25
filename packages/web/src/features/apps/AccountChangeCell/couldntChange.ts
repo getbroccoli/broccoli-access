@@ -12,20 +12,27 @@ import { reconnectCauseLine } from "../reconnectReason";
 /**
  * Whether an account shows "Couldn't disable", "Couldn't enable" or "Couldn't remove": its latest
  * change failed, and its status is not yet what that change asked for, which a scan since may have
- * read; a failed Remove shows while the account is still disabled.
+ * read; a failed Remove shows for an active account when its connector cannot suspend it.
  */
 export function showsCouldntChange({
   status,
+  app,
   latestChange,
+  onlyIfExtra,
 }: {
   status: AppAccountStatus;
+  app?: RemovalApp;
   latestChange?: { status: AccountChangeStatus; action: AccountChangeAction } | null;
+  onlyIfExtra?: boolean;
 }): boolean {
   if (latestChange?.status !== "FAILED") {
     return false;
   }
-  // A member a scan read active again is not removable, so nothing is left to say.
-  if (latestChange.action === "REMOVE") return status === "SUSPENDED";
+  if (latestChange.action === "REMOVE")
+    return (
+      !onlyIfExtra &&
+      (status === "SUSPENDED" || app?.containerConnection?.connector?.canDisableAccounts === false)
+    );
   return status !== (latestChange.action === "SUSPEND" ? "SUSPENDED" : "ACTIVE");
 }
 
@@ -109,22 +116,25 @@ function scannedSince(app: FailedChangeFacts["app"], finishedAt: string): boolea
 
 /**
  * Whether the row offers Remove with a new confirmation: as the server offers it, unless the row
- * shows a failed Remove. After a refusal it is back once a scan since read the member still
- * disabled; the other failures offer Try again.
+ * shows a failed Remove. After a refusal it is back once a later scan confirms the member can
+ * still be removed; the other failures offer Try again.
  */
 export function offersFreshRemove({
   status,
   offersRemove,
   latestChange,
   app,
-}: Pick<FailedChangeFacts, "app"> & {
+  onlyIfExtra,
+}: {
+  app: RemovalApp;
   status: AppAccountStatus;
   offersRemove: boolean;
+  onlyIfExtra?: boolean;
   latestChange?:
     (NonNullable<FailedChangeFacts["latestChange"]> & { status: AccountChangeStatus }) | null;
 }): boolean {
-  if (!offersRemove) return false;
-  if (latestChange?.action !== "REMOVE" || !showsCouldntChange({ status, latestChange })) {
+  if (onlyIfExtra || !offersRemove) return false;
+  if (latestChange?.action !== "REMOVE" || !showsCouldntChange({ status, app, latestChange })) {
     return true;
   }
   return (
@@ -139,11 +149,26 @@ export function couldntChangeHint(
   failure: AccountChangeFailure,
   action: AccountChangeAction,
   { tryAgain, scanNow, reconnect }: FailedChangeOptions,
-  { firstName, app, roleConflict }: { firstName: string; app: string; roleConflict?: boolean },
+  {
+    firstName,
+    app,
+    roleConflict,
+    canDisableAccounts,
+  }: {
+    firstName: string;
+    app: string;
+    roleConflict?: boolean;
+    canDisableAccounts?: boolean;
+  },
 ): string {
   if (failure === "NOT_ALLOWED") {
-    // Broccoli Access itself refuses a Remove whose member a scan saw active again.
-    if (action === "REMOVE") return t("apps.couldnt.hintRemoveRefused", { firstName, app });
+    if (action === "REMOVE")
+      return t(
+        canDisableAccounts
+          ? "apps.couldnt.hintRemoveRefused"
+          : "apps.couldnt.hintActiveRemoveRefused",
+        { firstName, app },
+      );
     return t("apps.couldnt.hintByHandOnly", { app });
   }
   if (failure === "ACCOUNT_NOT_FOUND") {
@@ -215,29 +240,31 @@ type FailedChangeFacts = {
     failure?: AccountChangeFailure | null;
     finishedAt?: string | null;
   } | null;
-  app: {
-    containerConnection?: {
-      status?: "CONNECTED" | "RECONNECT";
-      scan?: { readAt?: string | null } | null;
-    } | null;
-  };
+  app: { containerConnection?: ChangeConnection | null };
+};
+
+type ChangeConnection = {
+  status?: "CONNECTED" | "RECONNECT";
+  scan?: { readAt?: string | null } | null;
+};
+
+type RemovalApp = {
+  containerConnection?: (ChangeConnection & { connector?: { canDisableAccounts: boolean } }) | null;
 };
 
 function reasonOf(
   failure: AccountChangeFailure,
-  {
-    action,
-    app,
-    workspace,
-    person,
-    connectionUserEmail,
-    credential,
-    historical,
-    integrationUser,
-  }: Parameters<typeof couldntChangeReason>[1],
+  about: Parameters<typeof couldntChangeReason>[1],
 ): string {
-  const withSession = credential === "APP_SESSION";
-  const causeAbout = { app, withSession, email: connectionUserEmail, workspace, integrationUser };
+  const { action, app, credential, historical, person } = about;
+  const { connectionUserEmail: email, integrationUser, workspace } = about;
+  const causeAbout = {
+    app,
+    withSession: credential === "APP_SESSION",
+    email,
+    workspace,
+    integrationUser,
+  };
   switch (failure) {
     case "UNEXPECTED_RESPONSE":
       return t("apps.couldnt.unexpectedResponse", { app });

@@ -2,6 +2,8 @@ export {
   AccountChangeCell,
   ChangeProgress,
   CouldntChangeDialog,
+  couldntChangeChipClassName,
+  couldntChangeCopy,
   InviteCell,
   offersFreshRemove,
   RemoveAccountDialog,

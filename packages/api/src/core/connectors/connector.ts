@@ -224,6 +224,14 @@ export class ConnectorError extends Error {
   }
 }
 
+/** Whether the core can read the app's accounts on the server. */
+export function canListAccounts({
+  capabilities,
+  runtimes,
+}: Pick<Connector, "capabilities" | "runtimes">): boolean {
+  return capabilities.includes("list_accounts") && runtimes.includes("server");
+}
+
 /**
  * Whether it can disable and enable its app's accounts: it lists both `suspend` and `reactivate`,
  * and the `server` runtime, the only one the core calls them on yet.

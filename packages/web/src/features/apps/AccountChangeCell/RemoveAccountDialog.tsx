@@ -44,12 +44,12 @@ export function RemoveAccountDialog({
   const host = connection?.adminUrl && URL.parse(connection.adminUrl)?.hostname;
   const target = { accountId: account.id, name: name ?? account.email, app };
   const confirm = async () => {
-    onClose();
     await changeAccount(target, "REMOVE");
+    onClose();
     onChanged?.();
   };
   return (
-    <AlertDialog open={open} onOpenChange={(next) => !next && onClose()}>
+    <AlertDialog open={open} onOpenChange={(next) => !next && !loading && onClose()}>
       <AlertDialogContent className="gap-[18px] p-6 data-[size=default]:sm:max-w-[560px]">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-xl font-semibold">
@@ -76,13 +76,13 @@ export function RemoveAccountDialog({
           {t("apps.change.removeWarning")}
         </AlertDialogDescription>
         <AlertDialogFooter className="m-0 border-0 bg-transparent p-0">
-          <AlertDialogCancel>{t("apps.change.cancel")}</AlertDialogCancel>
+          <AlertDialogCancel disabled={loading}>{t("apps.change.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             className="bg-red-800 text-white hover:bg-red-900"
             disabled={loading}
             onClick={() => void confirm()}
           >
-            {t("apps.change.confirmRemove", { app })}
+            {t(loading ? "apps.change.removing" : "apps.change.confirmRemove", { app })}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

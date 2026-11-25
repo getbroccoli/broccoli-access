@@ -1,5 +1,5 @@
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
-import { type AppSessionSource, canChangeAccounts } from "../../../core/connectors";
+import { type AppSessionSource, canListAccounts } from "../../../core/connectors";
 import type { Orm, Transact } from "../../../core/db";
 import type { Logger } from "../../../core/logger";
 import type { SecretBox } from "../../../core/secrets";
@@ -304,7 +304,7 @@ export function createContainerConnectionService(
       return new Map(
         connectors
           .filter(
-            ({ connector }) => catalogKeys.includes(connector.key) && canChangeAccounts(connector),
+            ({ connector }) => catalogKeys.includes(connector.key) && canListAccounts(connector),
           )
           .map((managing) => [managing.connector.key, managing]),
       );
@@ -313,7 +313,7 @@ export function createContainerConnectionService(
       ctx.require("MANAGE_WORKSPACE");
       // A connected connector may read an app it matched by name, which has no catalog key.
       const managing = (await connectorsWithConnections(dependencies))
-        .filter(({ connector, connection }) => !connection && canChangeAccounts(connector))
+        .filter(({ connector, connection }) => !connection && canListAccounts(connector))
         .map(({ connector }) => connector);
       const catalogApps = await connectedApps.readCatalogAppsWithoutApp(
         orm,

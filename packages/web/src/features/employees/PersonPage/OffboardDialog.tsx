@@ -26,6 +26,7 @@ import {
 } from "@/lib/useGoogleUserWrites";
 
 import { BY_HAND_REASONS } from "./byHandReasons";
+import { activeAccountsToRemove } from "./removeAllOffers";
 
 type Person = NonNullable<PersonPageQuery["employee"]>;
 
@@ -54,7 +55,8 @@ export function OffboardDialog({ person, onClose, googleUserWrites, initialSkipp
   const [offboard, offboarding] = usePayloadMutation(OffboardEmployeeDocument, {
     refetch: [PersonPageDocument],
   });
-  const { accountsToDisable, byHandWork } = person.offboarding;
+  const { accountsToDisable, accountsToRemove, byHandWork } = person.offboarding;
+  const removeLater = new Set(activeAccountsToRemove(accountsToRemove).map(({ app }) => app.name));
   const directoryAppId = person.directoryAccount?.app.id;
   // An app with two accounts of theirs shows once: unticking it keeps both. With the shared
   // Google app, which cannot ask Google for the permission, suspending is the owner's work.
@@ -149,6 +151,11 @@ export function OffboardDialog({ person, onClose, googleUserWrites, initialSkipp
               ))}
             </ul>
           </section>
+        )}
+        {removeLater.size > 0 && (
+          <p className="text-sm text-foreground/80">
+            {t("people.offboard.removeLater", { apps: [...removeLater].join(", ") })}
+          </p>
         )}
         <p className="text-sm text-foreground/80">{t("people.offboard.note")}</p>
         {asksGoogle && (

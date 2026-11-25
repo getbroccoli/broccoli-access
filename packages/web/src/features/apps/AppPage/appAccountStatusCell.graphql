@@ -3,6 +3,16 @@ fragment AppAccountStatusCell_appUser on AppUser {
   status
   offeredChange
   offersRemove
+  app {
+    id
+    containerConnection {
+      id
+      connector {
+        id
+        canDisableAccounts
+      }
+    }
+  }
   latestChange {
     id
     action

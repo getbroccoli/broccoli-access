@@ -117,6 +117,7 @@ What the container offers. The core shows connections and actions from this list
 - **`runtimes`:** where calls can run, in the order the core tries them: `server`, `owner_browser` or both. An API or SCIM connector lists `server` only, and so does Slack, which makes the calls Slack's own pages make. The core needs no other word for how a connector works.
 - **`capabilities`:** `list_accounts`, `suspend`, `reactivate`, `invite`, `list_invitations`, `remove` and `sign_in` in v1.
   - `sign_in`: the container can sign in to the app as the integration user. The core then offers the integration user in Connect, beside the owner's own session.
+- `suspend` and `reactivate` are listed together or not at all. A connector may list no action, only `list_accounts`: the core then shows its members and changes nothing.
 - **`roles`:** optional: the roles a member can be invited with, each `{ "key", "name", "isDefault" }`, with exactly one default. A connector without it invites with the app's default only.
 - **`connectionFields`:**
   - kind `text`: a value the owner types or pastes, such as an API key, with `secret` set to true or false;
@@ -211,6 +212,7 @@ Makes one change to one member, then reads the member again.
 - **`remove`'s answer:** `{ "changed": true, "removed": true }`, with no `account`. A member who is already gone succeeds with `changed: false`. The connection's own member is answered with `not_allowed`.
 - **Rules:**
   - Before changing anything, the connector checks that the connection still reaches the same workspace and finds exactly one member with this `sourceKey` and email. For `invite`, it checks the workspace only. For `remove`, no member with this `sourceKey` and email means already gone; more than one is `account_not_found`.
+  - For `remove`, a connector that lists `suspend` removes only a suspended member: an active member is answered with `not_allowed`, and nothing changes. A connector that cannot suspend removes an active member.
   - After the change, it reads the member again. Success means it saw the new status, never that a click went through. For `invite`, it reads the invitation, or the member, back. For `remove`, it reads the members again and the member is not among them.
   - Repeating an action is always safe, so the core may retry it.
 
@@ -328,16 +330,18 @@ To check a connector against the real app, a caller can ask for every call the c
 ## Conformance
 
 - `packages/connector-contract` exports a schema for every request and answer, and a suite that runs against any container's address.
-- The suite needs fixtures: for each connector, a connection to its fake app, a member to suspend and reactivate, and a way to make the fake show each error, and, for a connector that lists `invite`, an email with no member; for one that lists `remove`, a member to remove; for one that lists `sign_in`, an integration user that is invited as an admin.
+- The suite needs fixtures: for each connector, a connection to its fake app and a way to make the fake show each error; for one that lists `suspend` and `reactivate`, a member to suspend and reactivate, and, for a connector that lists `invite`, an email with no member; for one that lists `remove`, a member to remove; for one that lists `sign_in`, an integration user that is invited as an admin.
 - **What it checks:**
   - every answer matches its schema;
   - every error uses a listed code;
   - a request without the debug header gets no `appCalls`;
-  - an action repeated twice changes the member once;
+  - for a connector that lists `suspend` and `reactivate`, each repeated twice changes the member once;
+  - errors are caused through the first action the connector lists, in the order `suspend`, `invite`, `remove`, or through `accounts/list` when it lists none;
+  - for a connector that lists `remove`: removing the connection's own member is `not_allowed` only when its list marks one member `isConnectionUser`, and is skipped when it marks none (a key that belongs to no person); removing an active member is `not_allowed` only when the connector also lists `suspend`.
   - an action reports the status read afterwards;
   - `invite` repeated twice sends one invitation;
   - for a connector that lists `roles`, exactly one role is the default, and an invite with a role it does not list is answered with HTTP 400;
-  - for a connector that lists `remove`, a removed member is gone from the next list, `remove` repeated twice succeeds with `changed: false` the second time, and removing the connection's own member is `not_allowed`;
+  - for a connector that lists `remove`, a removed member is gone from the next list, `remove` repeated twice succeeds with `changed: false` the second time;
   - for a connector that lists `sign_in`, `connections/sign-in` answers with a connection that `accounts/list` accepts, and gives `not_invited`, `permission_missing` and `blocked_by_check` when the fixture makes the app show them;
   - for a connector that lists `list_invitations`, the next list returns the invitation `invite` just sent;
   - a runtime the connector does not list is answered with HTTP 400;

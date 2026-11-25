@@ -4,11 +4,37 @@ import {
   expect,
   failLinearCall,
   inviteTest as test,
+  accountChanges,
+  serveManifest,
   linearInvitations,
   postFakeControl,
   SYSTEM,
 } from "#test/support";
 import { appInvitations } from "../db";
+
+test.for([
+  {
+    name: "invite and remove",
+    capabilities: ["list_accounts", "invite", "remove"] as const,
+    offersInvite: true,
+  },
+  { name: "list only", capabilities: ["list_accounts"] as const, offersInvite: false },
+])(
+  "offers Invite only when listed on a no-suspend connector ($name)",
+  async (
+    { capabilities, offersInvite },
+    { workspace: { owner, ivan, input }, orm, fakeConnectors },
+  ) => {
+    const manifest = await serveManifest(fakeConnectors.url, ({ connectors }) => {
+      connectors.find(({ key }) => key === "linear")!.capabilities = [...capabilities];
+    });
+    const changes = accountChanges(orm, { connectorsUrl: manifest.url });
+
+    const rows = await changes.readAppInvites(owner, [ivan.id]);
+
+    expect(rows).toMatchObject(offersInvite ? [{ ...input, offered: true }] : []);
+  },
+);
 
 test("offers Ivan an Invite in Linear and no row in Google Workspace", async ({ workspace }) => {
   const { service, owner, input, ivan } = workspace;

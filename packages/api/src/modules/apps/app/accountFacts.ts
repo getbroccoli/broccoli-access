@@ -41,7 +41,7 @@ export async function readChangeFacts(
   return readAccountFacts(dependencies, db, accounts, connectors && changingConnectors(connectors));
 }
 
-/** What decides each account's Disable or Enable, by account id, read in one go. */
+/** What decides each account's actions, by account id, read in one go. */
 export async function readAccountFacts(
   dependencies: AccountChangeDependencies,
   db: Orm | Tx,
@@ -121,16 +121,15 @@ function gatherFacts(
       const change = latestByAccount.get(account.id) ?? null;
       // Whatever the owner marked it as: a change would lock Broccoli Access out of the app.
       const isIntegrationUsers = isAutomaticService(account) || account.email === integrationEmail;
+      const confirmedDisabled = member?.status === "suspended" || disabledHere(change, member);
       const offerFacts = {
         status: account.status,
         connection: connection && {
           status: connection.status,
           changesAccounts: changing.status.has(connection.connector),
-          removesAccounts:
-            changing.remove.has(connection.connector) &&
-            (member?.status === "suspended" || disabledHere(change, member)),
+          removesAccounts: changing.remove.has(connection.connector),
         },
-        record: member && !isIntegrationUsers ? { isConnectionUser } : null,
+        record: member && !isIntegrationUsers ? { isConnectionUser, confirmedDisabled } : null,
         changeRunning: change?.status === "running",
       };
       return [

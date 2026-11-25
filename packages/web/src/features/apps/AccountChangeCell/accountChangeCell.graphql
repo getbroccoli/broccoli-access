@@ -36,6 +36,7 @@ fragment AccountChangeCell_appUser on AppUser {
       }
       connector {
         id
+        canDisableAccounts
         connectionFields {
           key
           label

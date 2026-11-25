@@ -62,6 +62,41 @@ test("retries an unavailable manifest and keeps the successful list", async () =
   expect((await connectors.list()).map(({ key }) => key).sort()).toEqual(["linear", "slack"]);
 });
 
+test("lists Slack when Linear advertises suspend without reactivate", async ({
+  fakeConnectors,
+}) => {
+  const server = await serveManifest(fakeConnectors.url, ({ connectors }) => {
+    const linear = connectors.find(({ key }) => key === "linear")!;
+    linear.capabilities = linear.capabilities.filter((capability) => capability !== "reactivate");
+  });
+
+  const listed = await containerConnectors(server.url).list();
+
+  expect(listed.map(({ key }) => key)).toEqual(["slack"]);
+});
+
+test("retries a manifest when none of its connectors can be used", async ({ fakeConnectors }) => {
+  let restoreManifest!: () => void;
+  const server = await serveManifest(fakeConnectors.url, (manifest) => {
+    const original = manifest.connectors;
+    const linear = original.find(({ key }) => key === "linear")!;
+    const slack = original.find(({ key }) => key === "slack")!;
+    manifest.connectors = [
+      { ...linear, capabilities: ["list_accounts", "suspend"] },
+      { ...slack, connectionFields: [...slack.connectionFields, slack.connectionFields[0]!] },
+    ];
+    restoreManifest = () => {
+      manifest.connectors = original;
+    };
+  });
+  const connectors = containerConnectors(server.url);
+  expect(await connectors.list()).toEqual([]);
+
+  restoreManifest();
+
+  expect((await connectors.list()).map(({ key }) => key).sort()).toEqual(["linear", "slack"]);
+});
+
 test("omits only the connector that asks for the same field as both secret and public", async ({
   fakeConnectors,
 }) => {

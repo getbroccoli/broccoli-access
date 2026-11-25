@@ -10,6 +10,7 @@ import {
   googleScanWithLinearGrant,
   linearMemberStatus,
   scannedLinear,
+  scannedNotion,
   storedAppAccounts,
   storedImportRecords,
   storedRecordHistory,
@@ -19,6 +20,25 @@ import {
 
 import type { Orm } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
+
+test("runs a queued Remove on an active member when Notion cannot disable accounts", async ({
+  orm,
+  seed,
+}) => {
+  const owner = await seed.owner();
+  const { changes, chloe } = await scannedNotion(orm, ["invite", "remove"]);
+  const change = await changes.changeAccount(owner, { appAccountId: chloe.id, action: "remove" });
+
+  await changes.runChange(SYSTEM, change.id);
+
+  expect(await changes.readAccountChange(owner, change.id)).toMatchObject({
+    status: "succeeded",
+    appAccountId: null,
+  });
+  expect(await storedAppAccounts(orm)).not.toContainEqual(
+    expect.objectContaining({ id: chloe.id }),
+  );
+});
 
 test("a successful Remove clears an account without a person and a later scan leaves it gone", async ({
   orm,

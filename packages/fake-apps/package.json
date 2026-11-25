@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Fakes of the apps broccoli-access connects to, for development and tests.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./test/support": "./test/support/index.ts"
   },
   "imports": {
     "#test/support": "./test/support/index.ts"

@@ -52,7 +52,11 @@ export const CONNECTOR_DESCRIPTION = z.object({
   capabilities: z
     .array(z.string())
     .min(1)
-    .transform((capabilities) => capabilities.filter(isCapability)),
+    .transform((capabilities) => capabilities.filter(isCapability))
+    .refine(
+      (capabilities) => capabilities.includes("suspend") === capabilities.includes("reactivate"),
+      "suspend and reactivate must be listed together",
+    ),
   roles: z
     .array(ROLE)
     .refine((roles) => roles.filter((role) => role.isDefault).length === 1, {

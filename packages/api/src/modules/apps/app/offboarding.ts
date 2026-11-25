@@ -32,12 +32,12 @@ export interface EmployeeOffboarding {
   accountsToDisable: AppUser[];
   /** What the owner does by hand, as the offboarding plan orders it. */
   byHandWork: OffboardingByHandWork[];
-  /** Their disabled accounts that offer Remove now, never the directory's, by app name. */
+  /** Their accounts that offer Remove now, never the directory's, by app name. */
   accountsToRemove: AppUser[];
 }
 
 /**
- * Queues a Remove of each of the person's disabled accounts, in the apps the owner confirmed, as
+ * Queues a Remove of each of the person's removable accounts, in the apps the owner confirmed, as
  * single Removes from their rows would; returns their offboarding as it is afterwards.
  */
 export async function removeEmployeeAccounts(
@@ -327,6 +327,7 @@ function offboardingOf({
       status,
       isDirectory: appId === directoryAppId,
       offeredChange: changeState.offeredChange,
+      offersRemove: changeState.offersRemove,
       offersReconnect: changeState.offersReconnect,
       isConnectionUser: changeState.isConnectionUser,
       runningChange:

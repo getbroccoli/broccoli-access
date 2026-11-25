@@ -25,21 +25,17 @@ test("lists Linear with its catalog name, domain and connector when only Slack h
   ]);
 });
 
-test("leaves out an app whose connector cannot both suspend and reactivate", async ({
-  orm,
-  seed,
-  fakeConnectors,
-}) => {
+test("lists a list-only app for Connect", async ({ orm, seed, fakeConnectors }) => {
   await seed.app();
   const server = await serveManifest(fakeConnectors.url, ({ connectors }) => {
     const linear = connectors.find(({ key }) => key === "linear")!;
-    linear.capabilities = ["list_accounts", "suspend"];
+    linear.capabilities = ["list_accounts"];
   });
   const { service } = containerConnections(orm, server.url);
 
   const listed = await service.listAppsToConnect(OWNER);
 
-  expect(listed).toEqual([]);
+  expect(listed.map(({ catalogKey }) => catalogKey)).toEqual(["linear"]);
 });
 
 test("leaves an ignored Linear app out of the apps to connect", async ({

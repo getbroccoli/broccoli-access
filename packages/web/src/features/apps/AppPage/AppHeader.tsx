@@ -67,7 +67,7 @@ export function AppHeader({ app, onConnected }: Props) {
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <h1 className="truncate text-2xl font-semibold tracking-tight">{app.name}</h1>
               <AppStatusBadge status={app.status} />
-              {app.managingConnector && <CanDisableBadge />}
+              {app.managingConnector?.canDisableAccounts && <CanDisableBadge />}
               {app.connected && !needsReconnect && <ConnectedBadge />}
               <SessionSourceBadge sessionFrom={connection?.sessionFrom} />
               {needsReconnect && <ReconnectBadge />}
@@ -103,7 +103,9 @@ export function AppHeader({ app, onConnected }: Props) {
       </div>
       {connector && (
         <p className="rounded-lg bg-muted/50 px-3.5 py-3 text-sm text-foreground/80">
-          {t("apps.page.connectHint", { app: app.name })}
+          {t(connector.canDisableAccounts ? "apps.page.connectHint" : "apps.page.connectReadHint", {
+            app: app.name,
+          })}
         </p>
       )}
       {connection && needsReconnect && <ReconnectBanner connection={connection} />}

@@ -1,6 +1,6 @@
 import DataLoader from "dataloader";
 
-import { signsInAsIntegrationUser } from "../../../core/connectors";
+import { canChangeAccounts, signsInAsIntegrationUser } from "../../../core/connectors";
 import {
   mutationPayload,
   perRequest,
@@ -70,6 +70,7 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
       findingKind: ({ connector }) => connector.findingKinds.ownAppAccounts,
       notice: ({ connector }) => connector.notice,
       signsInAsIntegrationUser: ({ connector }) => signsInAsIntegrationUser(connector),
+      canDisableAccounts: ({ connector }) => canChangeAccounts(connector),
       connectionFields: ({ connector }) =>
         connector.connectionFields.map((field) => ({ ...field, kind: toEnum(field.kind) })),
       connection: ({ connection }) => connection,

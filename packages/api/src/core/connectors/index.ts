@@ -5,6 +5,7 @@ export {
   APP_SESSION_SOURCES,
   canChangeAccounts,
   canInvite,
+  canListAccounts,
   canRemoveAccounts,
   CONNECTOR_ERROR_CODES,
   ConnectorError,

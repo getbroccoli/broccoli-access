@@ -46,14 +46,16 @@ export function AccountChangeCell({ appUser, onlyIfExtra }: Props) {
   if (!user || (onlyIfExtra && user.status !== "ACTIVE")) {
     return null;
   }
-  if (!user.app.canChangeAccounts || user.isConnectionUser) {
+  const connector = user.app.containerConnection?.connector;
+  if (onlyIfExtra && connector?.canDisableAccounts === false) return null;
+  if (user.isConnectionUser)
+    return <span className={MUTED}>{t("apps.change.connectionUser")}</span>;
+  if (!user.app.canChangeAccounts)
     return (
       <span className={MUTED}>
-        {t(user.isConnectionUser ? "apps.change.connectionUser" : "apps.change.noConnection")}
+        {user.app.containerConnection ? "—" : t("apps.change.noConnection")}
       </span>
     );
-  }
-  const connector = user.app.containerConnection?.connector;
   if (user.offersReconnect && connector) {
     return (
       <span className="flex justify-end">
@@ -65,8 +67,10 @@ export function AccountChangeCell({ appUser, onlyIfExtra }: Props) {
   if (change?.status === "RUNNING") {
     return <ChangeProgress app={user.app.name} change={change} />;
   }
-  const failedRemove = change?.action === "REMOVE" && showsCouldntChange(user);
-  if (change && !failedRemove && showsCouldntChange(user)) {
+  const changeFacts = { ...user, onlyIfExtra };
+  const showsFailure = showsCouldntChange(changeFacts);
+  const failedRemove = change?.action === "REMOVE" && showsFailure;
+  if (change && !failedRemove && showsFailure) {
     return failedChangeOptions(user).tryAgain ? (
       <span className="flex justify-end">
         <TryAgainButton
@@ -102,7 +106,7 @@ export function AccountChangeCell({ appUser, onlyIfExtra }: Props) {
           retryOf={change.id}
         />
       )}
-      {offersFreshRemove(user) && (
+      {offersFreshRemove(changeFacts) && (
         <>
           <Button
             size="sm"
@@ -112,13 +116,15 @@ export function AccountChangeCell({ appUser, onlyIfExtra }: Props) {
           >
             {t("apps.change.remove")}
           </Button>
-          <RemoveAccountDialog
-            linked
-            open={removing}
-            onClose={() => setRemoving(false)}
-            account={user}
-            name={`${user.employee.firstName} ${user.employee.lastName}`}
-          />
+          {removing && (
+            <RemoveAccountDialog
+              linked
+              open
+              onClose={() => setRemoving(false)}
+              account={user}
+              name={`${user.employee.firstName} ${user.employee.lastName}`}
+            />
+          )}
         </>
       )}
     </span>

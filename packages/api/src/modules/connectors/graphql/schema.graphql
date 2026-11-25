@@ -13,6 +13,8 @@ type ContainerConnector {
   notice: String
   "Whether Broccoli Access can sign in to its app as the integration user, so Connect offers that beside the owner's own session."
   signsInAsIntegrationUser: Boolean!
+  "Whether Broccoli Access can disable and enable accounts through this connector."
+  canDisableAccounts: Boolean!
   "Its connection; null until connected."
   connection: ContainerConnection
 }
@@ -74,7 +76,7 @@ type AppSessionHandOver {
 type App {
   "Its connection through the connectors container; null for an app without one, and while the container has not listed its connectors since the API started."
   containerConnection: ContainerConnection
-  "The container connector that can disable and enable its accounts: the one whose key is its catalog key; null when none can, such as for Google Workspace, and while the container has not listed its connectors since the API started."
+  "The container connector that can read its accounts: the one whose key is its catalog key; null when none can, such as for Google Workspace, and while the container has not listed its connectors since the API started."
   managingConnector: ContainerConnector
 }
 

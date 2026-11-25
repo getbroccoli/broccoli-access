@@ -19,6 +19,9 @@ export function ContainerConnectorsSettings({ directoryScanning }: { directorySc
   if (connectors.length === 0) {
     return null;
   }
+  const description = connectors.every(({ canDisableAccounts }) => canDisableAccounts)
+    ? "settings.apps.description"
+    : "settings.apps.descriptionMixed";
 
   return (
     <section aria-labelledby="apps-title" className="flex flex-col gap-2.5">
@@ -26,7 +29,7 @@ export function ContainerConnectorsSettings({ directoryScanning }: { directorySc
         <h2 id="apps-title" className="text-sm font-semibold text-muted-foreground">
           {t("settings.apps.title")}
         </h2>
-        <p className="text-xs text-muted-foreground">{t("settings.apps.description")}</p>
+        <p className="text-xs text-muted-foreground">{t(description)}</p>
       </div>
       {connectors.map((connector) => (
         <ContainerConnectorCard key={connector.id} connector={connector} />
