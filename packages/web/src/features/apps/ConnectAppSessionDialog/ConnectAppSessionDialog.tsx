@@ -117,6 +117,8 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
               connection={connection}
               onConnected={() => {
                 setOpen(false);
+                // The next opening is Switch, which starts from its own first step.
+                setWay(null);
                 onConnected?.();
               }}
             />
