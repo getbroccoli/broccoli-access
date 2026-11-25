@@ -1,4 +1,4 @@
-import type { ConnectorErrorCode } from "../../../core/connectors";
+import type { AccountChangeError } from "./accountChange";
 import type { KnownApp, NewApp } from "./app";
 import { CATALOG_KEYS, catalogApp } from "./catalog";
 
@@ -19,7 +19,7 @@ export type ReconnectCause = (typeof RECONNECT_CAUSES)[number];
  * leaves it connected. The core calls connectors on the server only, so `authentication_failed`
  * always counts.
  */
-export function reconnectCauseOf(error: ConnectorErrorCode): ReconnectCause | null {
+export function reconnectCauseOf(error: AccountChangeError): ReconnectCause | null {
   return RECONNECT_CAUSES.find((cause) => cause === error) ?? null;
 }
 

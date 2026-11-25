@@ -30,7 +30,7 @@ import type { AccountChangeDependencies } from "./accountChangeService";
 export async function readChangeFacts(
   dependencies: AccountChangeDependencies,
   ctx: SecurityContext,
-  db: Orm,
+  db: Orm | Tx,
   ids: readonly string[],
 ) {
   ctx.require("MANAGE_WORKSPACE");

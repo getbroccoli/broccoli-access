@@ -43,9 +43,9 @@ test("identifies the account change that found the revoked key", async ({
   await postFakeControl(fakeConnectors.url, "linear/keys/revoke");
   await pending.service.runChange(SYSTEM, pending.change.id);
 
-  const reasons = await connections.readReconnectReasons(orm, [pending.change.connectionId]);
+  const reasons = await connections.readReconnectReasons(orm, [pending.linear.connectionId]);
 
-  expect(reasons.get(pending.change.connectionId)).toMatchObject({
+  expect(reasons.get(pending.linear.connectionId)).toMatchObject({
     cause: "authentication_failed",
     foundByChange: { id: pending.change.id },
   });

@@ -11,4 +11,5 @@ export const codegenMappers = {
   OffboardingByHandWork:
     "../../modules/apps/domain#OffboardingByHandWork as OffboardingByHandWorkModel",
   AccountChange: "../../modules/apps/app#LatestAccountChange as AccountChangeModel",
+  ProvisionStep: "../../modules/apps/app#ProvisionStep as ProvisionStepModel",
 };

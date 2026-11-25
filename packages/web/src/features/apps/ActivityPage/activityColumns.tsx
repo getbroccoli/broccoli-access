@@ -34,6 +34,9 @@ const CHANGE: DataTableColumn<AccountChangeRow> = {
       {startedFrom === "OFFBOARDING" && (
         <span className="text-xs text-muted-foreground">{t("apps.activity.fromOffboarding")}</span>
       )}
+      {startedFrom === "PROVISION" && (
+        <span className="text-xs text-muted-foreground">{t("apps.activity.fromProvision")}</span>
+      )}
     </span>
   ),
 };

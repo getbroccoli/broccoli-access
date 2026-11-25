@@ -31,13 +31,23 @@ type Props = {
   change: { id: string; action: AccountChangeAction };
   person: { name: string; firstName: string };
   app: string;
+  /** False for an app without a connection, which no scan will check. */
+  connected?: boolean;
 };
 
 /**
  * "I did it by hand", confirmed: the change becomes done by hand and the account takes its new
  * status at once, which changes the "still have access" counts elsewhere; an invite shows Invited.
  */
-export function DoneByHandDialog({ open, onClose, onDone, change, person, app }: Props) {
+export function DoneByHandDialog({
+  open,
+  onClose,
+  onDone,
+  change,
+  person,
+  app,
+  connected = true,
+}: Props) {
   const cache = useCache();
   const [markDoneByHand, { loading }] = usePayloadMutation(MarkAccountChangeDoneByHandDocument, {
     refetch:
@@ -63,7 +73,10 @@ export function DoneByHandDialog({ open, onClose, onDone, change, person, app }:
             {t(copy.title, { name: person.name, app })}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {t(copy.effect, { firstName: person.firstName, app })}
+            {t(connected ? copy.effect : "apps.byHand.inviteEffectNoConnection", {
+              firstName: person.firstName,
+              app,
+            })}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="m-0 border-0 bg-transparent p-0">

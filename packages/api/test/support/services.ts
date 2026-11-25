@@ -19,6 +19,7 @@ import {
   createAppService,
   createAppUserService,
   createAccountLinkService,
+  createProvisionService,
   type AccountLinkService,
   type AppService,
   type AppUserService,
@@ -41,8 +42,12 @@ import {
   type GoogleConnectionService,
 } from "../../src/modules/google";
 import { createTemplateService, templatesModule } from "../../src/modules/templates";
-import { createPersonPageReader, personPageLoader } from "../../src/modules";
-import { accountChanges } from "./accountChanges";
+import { createPersonPageReader, personPageLoader, readPersonPages } from "../../src/modules";
+import {
+  accountChangeDependencies,
+  type AccountChangeOptions,
+  accountChanges,
+} from "./accountChanges";
 import { fakeMail } from "./fakeMail";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { testTransactor } from "./testTransactor";
@@ -195,19 +200,31 @@ export function templateReviewTransactor(orm: Orm) {
 
 export function personPages(
   orm: Orm,
-  options: { connectors?: ConnectorRegistry; afterAssignments?: () => Promise<void> } = {},
+  options: AccountChangeOptions & { afterAssignments?: () => Promise<void> } = {},
 ) {
   const service = templates(orm, options);
   return createPersonPageReader(orm, {
-    ...service,
-    ...appUsers(orm),
-    ...accountChanges(orm, options),
+    ...pageReads(orm, options),
+    ...provisioning(orm, options),
     async readEmployeeTemplates(ctx, ids, db) {
       const assigned = await service.readEmployeeTemplates(ctx, ids, db);
       await options.afterAssignments?.();
       return assigned;
     },
   });
+}
+
+/** Provision with the real person pages behind it. */
+export function provisioning(orm: Orm, options: AccountChangeOptions = {}) {
+  const reads = pageReads(orm, options);
+  return createProvisionService({
+    ...accountChangeDependencies(orm, options),
+    readPersonPages: (ctx, ids, db) => readPersonPages(db, reads, ctx, ids),
+  });
+}
+
+function pageReads(orm: Orm, options: AccountChangeOptions) {
+  return { ...templates(orm, options), ...appUsers(orm), ...accountChanges(orm, options) };
 }
 
 function templateDependencies(

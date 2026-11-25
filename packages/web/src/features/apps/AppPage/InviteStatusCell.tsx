@@ -30,6 +30,10 @@ export function InviteStatusCell({ appInvite, roleBlocked }: Props) {
     return null;
   }
   const invite = fragment.data;
+  // Nothing failed in an app without a connection: its invite waits for the owner, by hand.
+  if (invite.latestInvite?.failure === "NO_CONNECTION") {
+    return null;
+  }
   if (invite.latestInvite?.status === "FAILED" && !invite.invitedAt) {
     return (
       <CouldntChangeDialog

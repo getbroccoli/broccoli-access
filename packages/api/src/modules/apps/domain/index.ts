@@ -33,18 +33,30 @@ export {
 export { ACCOUNT_NOTE_MAX_LENGTH, parseAccountNote } from "./accountNote";
 export { type AccountDates, accountSince, appSince, type Since } from "./since";
 export {
+  ACCOUNT_CHANGE_ERRORS,
   ACCOUNT_CHANGE_STARTS,
   ACCOUNT_CHANGE_STATUSES,
   type AccountChange,
   type AccountChangeAction,
   type AccountChangeAttempt,
+  type AccountChangeError,
   type AccountChangeStart,
+  type AccountChangeStatus,
+  type ChangeStart,
+  FROM_ACCOUNT,
+  startOfChange,
   offeredChange,
   offersReconnect,
   offersRemove,
   statusAfter,
 } from "./accountChange";
-export { type AppInviteFacts, type AppInviteState, inviteStateOf } from "./appInvite";
+export {
+  type AppInviteFacts,
+  type AppInviteState,
+  byHandInviteStateOf,
+  inviteStateOf,
+} from "./appInvite";
+export { type ProvisionAction, type ProvisionFacts, provisionActionOf } from "./provision";
 export {
   OFFBOARDING_BY_HAND_REASONS,
   type OffboardingAccount,

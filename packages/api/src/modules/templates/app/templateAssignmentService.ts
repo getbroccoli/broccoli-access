@@ -31,7 +31,7 @@ export interface TemplateAssignmentService {
   readEmployeeTemplates: (
     ctx: SecurityContext,
     employeeIds: readonly string[],
-    db?: Orm,
+    db?: Orm | Tx,
   ) => Promise<Template[][]>;
   readTemplatePeople: (
     ctx: SecurityContext,
@@ -45,7 +45,7 @@ export interface TemplateAssignmentService {
       templates: Template[][];
       invites: Awaited<ReturnType<PersonAccess["readAppInvites"]>>;
     },
-    db?: Orm,
+    db?: Orm | Tx,
   ) => Promise<PersonApp[][]>;
 }
 
@@ -67,7 +67,7 @@ export function createTemplateAssignmentService(deps: Dependencies): TemplateAss
     clearOffboarded: (tx, offboarded) => clearOffboarded(tx, apps, offboarded),
     assign: (ctx, input) => changeAssignment(deps, ctx, input, "assign"),
     takeOff: (ctx, input) => changeAssignment(deps, ctx, input, "takeOff"),
-    readEmployeeTemplates(ctx, employeeIds, db = orm) {
+    readEmployeeTemplates(ctx, employeeIds, db: Orm | Tx = orm) {
       ctx.require("MANAGE_WORKSPACE");
       return employeeTemplatesOf(db, employeeIds);
     },
@@ -82,7 +82,7 @@ export function createTemplateAssignmentService(deps: Dependencies): TemplateAss
           ),
       });
     },
-    async readEmployeeApps(ctx, employeeIds, shared, db = orm) {
+    async readEmployeeApps(ctx, employeeIds, shared, db: Orm | Tx = orm) {
       ctx.require("MANAGE_WORKSPACE");
       const repo = assignmentRepository(db);
       const [templates, choices, accounts, invites] = await Promise.all([

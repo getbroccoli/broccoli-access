@@ -72,7 +72,7 @@ type AccountChange {
   requestedAt: DateTime!
   "Its last error; null unless FAILED or DONE_BY_HAND."
   failure: AccountChangeFailure
-  "Where the owner's click was."
+  "Where the owner first asked for it: a Try again on its row keeps the start of the failed change it repeats."
   startedFrom: AccountChangeStart!
 }
 
@@ -82,6 +82,8 @@ enum AccountChangeStart {
   ACCOUNT
   "On Offboard, for every account of a person at once."
   OFFBOARDING
+  "On Provision, for every app a person is missing at once."
+  PROVISION
 }
 
 "The signed-in user who asked for an account change."
@@ -113,6 +115,8 @@ enum AccountChangeFailure {
   NOT_ALLOWED
   "The owner's Chrome went away during the call."
   OWNER_BROWSER_LOST
+  "The app has no connection, so the change failed when it was asked and the owner makes it by hand."
+  NO_CONNECTION
 }
 
 type AccountChangeEdge {
@@ -188,8 +192,10 @@ enum ReconnectCause {
 type Employee {
   "Their accounts in approved apps other than the directory, leaving out those not in their app (`inApp` false): the active ones, and the suspended ones in connected apps, by app name. Admins only."
   appAccounts: [AppUser!]!
-  "The connected apps whose last scan found neither their work email nor a member the owner linked to them, where Invite or Reconnect is offered, an invite was asked, or a scan read their pending invitation, also in an app whose connection cannot invite, by app name. Admins only."
+  "The connected apps whose last scan found neither their work email nor a member the owner linked to them, where Invite or Reconnect is offered, an invite was asked, or a scan read their pending invitation, also in an app whose connection cannot invite; and the apps without a connection where Provision left their invite for the owner to make by hand. By app name. Admins only."
   appInvites: [AppInvite!]!
+  "What Provision offers for them now: one step for each app they are missing that it can give, in no particular order; none for a person who is not active in the directory. The steps still list an app whose templates disagree on its role; provisionEmployee refuses it until the owner picks one. Admins only."
+  provisionSteps: [ProvisionStep!]!
   "Their account in the directory, such as Google Workspace, whatever its status; null without one. Admins only."
   directoryAccount: AppUser
   "What Offboard would do for them now, and when they were last offboarded. Admins only."
@@ -226,7 +232,23 @@ enum OffboardingByHandReason {
   CHANGE_IS_RUNNING
 }
 
-"An employee's row for a connected app they have no account in: Invite offered, their invite running, done or failed, or Invited by a pending invitation a scan read in the app, whoever sent it."
+"What Provision does for one app a person is missing."
+type ProvisionStep {
+  app: App!
+  action: ProvisionAction!
+}
+
+"How Provision gives a person one app."
+enum ProvisionAction {
+  "The app's connection invites them, with their template role."
+  INVITE
+  "The app's connection enables their disabled account."
+  REACTIVATE
+  "The app has no connection: the owner gives it in the app themselves, then confirms with I did it by hand."
+  GIVE_BY_HAND
+}
+
+"An employee's row for an app they have no account in. In a connected app: Invite offered, their invite running, done or failed, or Invited by a pending invitation a scan read in the app, whoever sent it. In an app without a connection: the invite Provision left for the owner to make by hand, FAILED with NO_CONNECTION until they say they did."
 type AppInvite {
   "Unique per employee and app."
   id: ID!
@@ -310,6 +332,13 @@ input EmployeeOffboardInput {
   "The employee to offboard."
   employeeId: ID!
   "The apps the owner left ticked: only their accounts are disabled. An account in any other app stays as it is, also one a scan found after the owner looked."
+  appIds: [ID!]!
+}
+
+input EmployeeProvisionInput {
+  "The employee to provision."
+  employeeId: ID!
+  "The apps of the provision steps the owner confirmed; an app without a step now gets nothing."
   appIds: [ID!]!
 }
 
@@ -427,7 +456,9 @@ type AppsMutations {
   inviteEmployee(input: AppInviteInput!): AppInvitePayload!
   "Offboards an employee: queues a Disable, started from offboarding, for each of their active accounts that offers one in the apps of `appIds`, the directory's first, and takes their templates and app choices off. What it cannot disable is by-hand work, never a change. Refused with a NotFoundError for an unknown employee. Admins only."
   offboardEmployee(input: EmployeeOffboardInput!): EmployeeOffboardPayload!
-  "I did it by hand: the owner reports making a failed change in the app themselves; Broccoli Access calls no app. The change becomes DONE_BY_HAND and the status Broccoli Access records for the account takes the new value at once, with a history line unless it already had that status; the next scan checks it. A removal immediately deletes the local account unless another source still finds it, in which case it remains listed as outside the app. A failed invite becomes DONE_BY_HAND, which shows the employee Invited. Refused with a NotFoundError for an unknown change, and with a ConflictError unless the change failed and is the latest: its account's latest change, or for an invite, the latest invite of its connection and email. Admins only."
+  "Provisions an employee with the apps the owner confirmed: for each of those apps' provision steps offered now, queues the Invite or the Enable, started from Provision, or for an app without a connection writes an invite that fails at once with NO_CONNECTION, for the owner to make by hand. Asking again while those run or wait writes nothing more. Refused with a NotFoundError for an unknown employee, and a ConflictError while a confirmed missing app's templates disagree on its role or its invite role is no longer offered. Admins only."
+  provisionEmployee(input: EmployeeProvisionInput!): EmployeeProvisionPayload!
+  "I did it by hand: the owner reports making a failed change in the app themselves; Broccoli Access calls no app. The change becomes DONE_BY_HAND and the status Broccoli Access records for the account takes the new value at once, with a history line unless it already had that status; the next scan checks it. A removal immediately deletes the local account unless another source still finds it, in which case it remains listed as outside the app. A failed invite becomes DONE_BY_HAND, which shows the employee Invited. Refused with a NotFoundError for an unknown change, and with a ConflictError unless the change failed and is the latest: its account's latest change, or for an invite, the latest invite of its connection and email, or in an app that still has no connection, of its app and person. Admins only."
   markAccountChangeDoneByHand(
     input: AccountChangeMarkDoneByHandInput!
   ): AccountChangeMarkDoneByHandPayload!
@@ -464,6 +495,14 @@ type EmployeeOffboardPayload {
 }
 
 union EmployeeOffboardError = NotFoundError
+
+"The employee after the request, with their changes queued or left to do by hand, or why it was refused."
+type EmployeeProvisionPayload {
+  employee: Employee
+  error: EmployeeProvisionError
+}
+
+union EmployeeProvisionError = NotFoundError | ConflictError
 
 "The account with its change done by hand, or why it was refused; appUser is null for an unlinked or deleted account and for an invite."
 type AccountChangeMarkDoneByHandPayload {

@@ -1,6 +1,6 @@
 import type { AccountChangeState } from "./accountChangeService";
 import type { AccountStatus } from "../../../core/connectors";
-import type { Orm } from "../../../core/db";
+import type { Orm, Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { appAccountRepository, type AppUserAccount } from "../db";
 import { accountSince, type Since } from "../domain";
@@ -31,7 +31,7 @@ export interface AppUserService {
   readUsersOfEmployees: (
     ctx: SecurityContext,
     employeeIds: readonly string[],
-    db?: Orm,
+    db?: Orm | Tx,
   ) => Promise<AppUser[]>;
 }
 
@@ -98,7 +98,7 @@ export function createAppUserService(dependencies: AppUserDependencies): AppUser
             nameRank(one) - nameRank(other),
         );
     },
-    async readUsersOfEmployees(ctx, employeeIds, db = orm) {
+    async readUsersOfEmployees(ctx, employeeIds, db: Orm | Tx = orm) {
       ctx.require("MANAGE_WORKSPACE");
       const inAppFacts = await findInAppFacts(db, dependencies);
       const [accounts, suspended, directoryAppId] = await Promise.all([

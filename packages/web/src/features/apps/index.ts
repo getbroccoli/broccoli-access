@@ -20,7 +20,7 @@ export {
 export { AppsPage } from "./AppsPage";
 export { appsSearch } from "./appsSearch";
 export { AppTable } from "./AppTable";
-export { forgetAppLists } from "./cache";
+export { forgetAppLists, forgetPersonApps } from "./cache";
 export { ConnectAppSessionDialog } from "./ConnectAppSessionDialog";
 export { ConnectContainerConnectorDialog } from "./ConnectContainerConnectorDialog";
 export { connectingFieldName } from "./connectingFieldName";

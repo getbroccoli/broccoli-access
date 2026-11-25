@@ -27,15 +27,17 @@ export async function applyAccountChange(
   const [before] = change.appAccountId ? await accounts.findByIds([change.appAccountId]) : [];
   const plan: AccountSyncPlan = { created: [], updated: [], deleted: [] };
   if (change.action === "remove") {
+    // A Remove is only asked through the account's connection.
+    const connectionId = change.connectionId!;
     await members.removeMember(tx, {
-      connectionId: change.connectionId,
+      connectionId,
       email: change.email,
       sourceKey: change.sourceKey!,
     });
     if (!before) return;
     // A scan may already have found a replacement member with the same email.
     const remaining = await members.findConnectionMembers(tx, {
-      connectionIds: [change.connectionId],
+      connectionIds: [connectionId],
       emails: [change.email],
     });
     if (remaining.length) return;

@@ -17,6 +17,7 @@ A manual check of the Activity page, which lists every Disable, Enable, Remove a
 - [ ] With the fake slowed (`curl -s -H 'content-type: application/json' -d '{"milliseconds": 5000}' "$FAKE/_fake/delay"`), confirm a Disable on Linear's page and open Activity from the left menu at once: the change shows as "Disabling in Linear…" with a spinner, then "On the server" without a reload.
 - [ ] Invite Ivan Petrov to Linear from his person page (see [A person's page](person-page.md#invite)): Activity's first row reads Ivan Petrov with ivan@acme.example, Linear, "Invite", "Mia Novak" and "Today at" the time asked, and "On the server".
 - [ ] After offboarding a person (see [A person's page](person-page.md#offboard)), each of their changes reads "Disable" with "Offboarding" below.
+- [ ] Provision a person who was not invited above, from their person page (see [A person's page](person-page.md#provision)): each change Provision wrote reads "Invite" with "Provision" below it; the app without a connection reads "Couldn’t invite" with "<App> had no connection" below, then "By hand" once the owner said so.
 - [ ] Chloé's name opens her person page.
 
 ## Removing a disabled account

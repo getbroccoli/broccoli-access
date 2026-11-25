@@ -21,6 +21,9 @@ import { applyAccountChange } from "./applyAccountChange";
 /** What a run needs: the service's dependencies and its connection service. */
 type RunDependencies = AccountChangeDependencies & { connections: AppConnectionService };
 
+/** A change the job runs: one without a connection fails when asked and never runs. */
+type RunnableChange = AccountChange & { connectionId: string };
+
 /** Runs a running change through its connector and saves how it ended; skips any other. */
 export async function runAccountChange(
   dependencies: RunDependencies,
@@ -30,7 +33,7 @@ export async function runAccountChange(
   ctx.requireSystem();
   const { orm, transact, logger } = dependencies;
   const change = await accountChangeRepository(orm).findById(changeId);
-  if (change?.status !== "running") {
+  if (change?.status !== "running" || !isRunnable(change)) {
     logger.info(
       { changeId, status: change?.status ?? null },
       "Account change skipped: not running",
@@ -87,7 +90,7 @@ async function failChange(
     calledServer,
     secretsUsed,
     reconnects,
-  }: ActionOutcome & { change: AccountChange; error: ConnectorErrorCode },
+  }: ActionOutcome & { change: RunnableChange; error: ConnectorErrorCode },
 ): Promise<{ finished: boolean; turnedToReconnect: boolean }> {
   if (!reconnects || !reconnectCauseOf(error)) {
     return {
@@ -128,10 +131,14 @@ interface ActionOutcome {
   reconnects: boolean;
 }
 
+function isRunnable(change: AccountChange): change is RunnableChange {
+  return change.connectionId !== null;
+}
+
 async function runAction(
   dependencies: RunDependencies,
   ctx: SecurityContext,
-  change: AccountChange,
+  change: RunnableChange,
 ): Promise<ActionOutcome> {
   const { orm, connections, connectors, wait, logger } = dependencies;
   // One stored version, so a connection changed meanwhile never pairs old settings with new secrets.
@@ -220,7 +227,7 @@ async function makeChange(
 async function saveConnectionUpdate(
   { transact, connections, logger }: RunDependencies,
   ctx: SecurityContext,
-  change: AccountChange,
+  change: RunnableChange,
   update: ConnectionUpdate & { replacing: Record<string, unknown> },
 ): Promise<void> {
   if (!update.settings && !update.secrets) {
@@ -312,7 +319,7 @@ async function finishSucceeded(
 
 async function canStillRemove(
   { members, orm }: RunDependencies,
-  change: AccountChange,
+  change: RunnableChange,
 ): Promise<boolean> {
   const matches = await members.findConnectionMembers(orm, {
     connectionIds: [change.connectionId],

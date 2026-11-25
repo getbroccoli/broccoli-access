@@ -108,3 +108,17 @@ Connect Slack and Linear, assign a template to Chloé Martin, and set `GOOGLE` t
 ## Phone width
 
 - [ ] At 390 px wide, nothing overflows the page; the table stays inside its frame.
+
+## Provision
+
+Start on a freshly seeded stack (`pnpm dev --drop-db`), since the checks above change the people these use. Connect Slack and Linear (see [Connections settings](connections-settings.md#apps)) and set `FAKE` as "Disable and Enable" in [App page](app-page.md) says. In Templates, create Everyone with Slack and Claude, and Engineer with Linear as Admin. Open Ivan Petrov, who has no Slack or Linear member and no Claude account, and assign both.
+
+- [ ] Below Ivan's apps a bar reads "3 apps missing." with "Provision". Slack, Linear and Claude show **Missing**.
+- [ ] "Provision" asks "Provision Ivan Petrov?" with ivan@acme.example, and lists Claude with "By hand", Linear with "Admin" and "Broccoli Access", and Slack with "Member" and "Broccoli Access"; then "Each app Broccoli Access invites Ivan to sends its own invitation email.", "Invite Ivan in each app marked By hand yourself, then confirm it with By hand on this page.", "Cancel" and "Provision 3 apps". When every listed app is an invite the line reads "Each app sends Ivan its own invitation email." Cancel changes nothing.
+- [ ] Confirming shows "Inviting to Linear…" and "Inviting to Slack…", then "Invited on <today>" on both without a reload. `curl -s "$FAKE/_fake/state" | jq '.invitations'` lists one invitation for ivan@acme.example in `slack`, and one in `linear` with the role `admin`.
+- [ ] The bar now reads "1 app missing." without "Provision", and Claude's row shows **Missing** with "By hand". "By hand" asks "Did you invite Ivan Petrov to Claude yourself?" and "Broccoli Access marks Ivan as invited to Claude, done by hand by you."; "Yes, I did it" turns the row to "Invited on <today>" and the bar goes.
+- [ ] After `curl -s -X POST "$FAKE/_fake/slack/invitations/ivan@acme.example/accept"`, the same for `linear`, and "Scan now" on both apps' pages, Ivan's Slack and Linear rows read "Active" with "—" as their role, since an account keeps the role it has in its app, and nothing is missing.
+- [ ] Create a second template, Design, with Linear as Guest, and assign it and Engineer to Lena Fischer, who has no Linear member: the bar reads "1 app missing. Pick Linear’s role first." and "Provision" is disabled until a role is picked on Linear's row.
+- [ ] After `fail unexpected_response` (see [the app page](app-page.md#when-a-change-fails)), provisioning Lena ends Linear's row with **Missing**, "Couldn’t invite" and "Try again"; the bar offers "Provision" again, and either one invites her. Activity reads "Provision" under both of her invites.
+- [ ] Hannah Weber has a disabled Linear account. With Engineer assigned, her Linear row shows "—" as its role, "Disabled" and **Missing**; the dialog lists Linear with "Enable" and no line about invitation emails, and confirming ends with "Active" and "Disable".
+- [ ] Ana Ruiz, suspended in Google, shows no "Provision" whatever her templates.

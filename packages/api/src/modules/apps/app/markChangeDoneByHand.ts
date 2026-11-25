@@ -2,7 +2,7 @@ import { ApplicationError } from "../../../core/applicationError";
 import type { Tx } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
-import { accountChangeRepository, appAccountRepository } from "../db";
+import { accountChangeRepository, appAccountRepository, appConnectionRepository } from "../db";
 import type { AccountChange } from "../domain";
 import type { AccountChangeDependencies, LatestAccountChange } from "./accountChangeService";
 import { applyAccountChange } from "./applyAccountChange";
@@ -72,8 +72,8 @@ async function lockLatestFailure(tx: Tx, id: string): Promise<AccountChange> {
 }
 
 /**
- * The newest change of the change's account, or for an invite, of its connection and email;
- * undefined once a scan deleted the account. A Try again asked meanwhile holds the account until it
+ * The newest change of the change's account, or for an invite, of its connection and email, or
+ * without a connection of its app and person while the app stays without one; undefined once a scan deleted the account. A Try again asked meanwhile holds the account until it
  * commits, and is then read here. An invite locks nothing more: a failing run locks its connection
  * before its change, and an invite done by hand sets nothing, so a Try again asked meanwhile only
  * runs as well.
@@ -84,7 +84,16 @@ async function lockLatestOfSubject(
 ): Promise<AccountChange | undefined> {
   const changes = accountChangeRepository(tx);
   if (change.action === "invite") {
-    const [latest] = await changes.findLatestInvites([change.connectionId], [change.email]);
+    if (change.connectionId) {
+      const [latest] = await changes.findLatestInvites([change.connectionId], [change.email]);
+      return latest;
+    }
+    // An app connected since invites through its connection: its by-hand invite is history.
+    const [connection] = await appConnectionRepository(tx).findByApps([change.appId]);
+    const [latest] =
+      connection || !change.employeeId
+        ? []
+        : await changes.findLatestInvitesWithoutConnection([change.employeeId], [change.appId]);
     return latest;
   }
   if (!change.appAccountId) {

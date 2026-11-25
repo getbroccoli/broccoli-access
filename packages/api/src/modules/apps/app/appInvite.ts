@@ -17,16 +17,27 @@ import {
   appInvitationRepository,
   appRepository,
 } from "../db";
-import { type AccountChange, type AppInviteState, inviteStateOf } from "../domain";
+import {
+  type AccountChange,
+  type AppInviteState,
+  type ChangeStart,
+  FROM_ACCOUNT,
+  inviteStateOf,
+  startOfChange,
+} from "../domain";
 import {
   type AccountChangeDependencies,
   type LatestAccountChange,
   RUN_JOB,
   withPlace,
 } from "./accountChangeService";
+import { readByHandInvites } from "./byHandInvites";
 import { findEmployeesInDirectory } from "./directory";
 
-/** An employee's row for an app they have no account in: Invite, its running invite, Invited, or Couldn't invite. */
+/**
+ * An employee's row for an app they have no account in: Invite, its running invite, Invited, or
+ * Couldn't invite; in an app without a connection, the invite the owner makes by hand.
+ */
 export interface AppInvite extends AppInviteState {
   /** The employee's and the app's ids, joined; unique per employee and app. */
   id: string;
@@ -52,19 +63,22 @@ export async function inviteEmployee(
   const requestedBy = ctx.user.userId;
   // Read before the transaction: the container's list may take a while to answer.
   const connectors = await dependencies.connectors.list();
-  const request = { ctx, employeeId, appId, requestedBy, connectors };
+  const request = { ctx, employeeId, appId, requestedBy, connectors, start: FROM_ACCOUNT };
   const invite = await queueInvite(dependencies, request);
   const { id: changeId, connectionId } = invite.latestInvite!;
   dependencies.logger.info({ changeId, employeeId, connectionId }, "Invite requested");
   return invite;
 }
 
-/** The employees' rows for the connected apps they have no account in, by employee, then app name. */
+/**
+ * The employees' rows for the connected apps they have no account in, and for the apps without a
+ * connection where an invite is theirs to make by hand, by employee, then app name.
+ */
 export async function readAppInvites(
   dependencies: AccountChangeDependencies,
   ctx: SecurityContext,
   employeeIds: readonly string[],
-  db = dependencies.orm,
+  db: Orm | Tx = dependencies.orm,
 ): Promise<AppInvite[]> {
   ctx.require("MANAGE_WORKSPACE");
   const employees = await dependencies.employees.readEmployees(ctx, employeeIds, db);
@@ -73,10 +87,16 @@ export async function readAppInvites(
     appConnectionRepository(db).findAll(),
   ]);
   const facts = await readInviteFacts(dependencies, db, { employees, connections, connectors });
-  const byAppName = await sortByAppName(db, connections);
-  const rows = employees.flatMap((employee) =>
-    byAppName.flatMap((connection) => appInviteOf(employee, connection, facts) ?? []),
+  const connected = employees.flatMap((employee) =>
+    connections.flatMap((connection) => appInviteOf(employee, connection, facts) ?? []),
   );
+  const byHand = await readByHandInvites(
+    dependencies,
+    db,
+    employees.map(({ id }) => id),
+    connections,
+  );
+  const rows = await sortByAppName(db, employees, [...connected, ...byHand]);
   const running = rows.flatMap(({ latestInvite }) =>
     latestInvite?.status === "running" ? [latestInvite.id] : [],
   );
@@ -95,12 +115,13 @@ interface InvitedEmployee {
   email: string;
 }
 
-interface InviteRequest {
+export interface InviteRequest {
   ctx: SecurityContext;
   employeeId: string;
   appId: string;
   requestedBy: string;
   connectors: readonly Connector[];
+  start: ChangeStart;
 }
 
 /** Wait for a template edit outside the account sync lock, then recheck all invite facts. */
@@ -116,10 +137,10 @@ async function queueInvite(
 }
 
 /** Writes and queues the invite, or returns null if a template edit holds its app. */
-async function askForInvite(
+export async function askForInvite(
   dependencies: AccountChangeDependencies,
   tx: Tx,
-  { ctx, employeeId, appId, requestedBy, connectors }: InviteRequest,
+  { ctx, employeeId, appId, requestedBy, connectors, start }: InviteRequest,
 ): Promise<AppInvite | null> {
   await appAccountRepository(tx).lockForSync();
   const connection = await findConnectionOfApp(tx, appId);
@@ -151,8 +172,10 @@ async function askForInvite(
     sourceKey: null,
     requestedBy,
     requestedAt: new Date(),
-    startedFrom: "account",
-    employeeId: null,
+    ...startOfChange(
+      { ...start, action: "invite", subjectEmployeeId: employee.id },
+      facts.latestInvites.get(inviteKey(connection.id, employee.email)) ?? null,
+    ),
   });
   // A concurrent invite of the same email committed first.
   if (!change) {
@@ -233,7 +256,7 @@ async function readInviteFacts(
       ]),
     ),
     latestInvites: new Map(
-      latest.map((change) => [inviteKey(change.connectionId, change.email), change]),
+      latest.map((change) => [inviteKey(change.connectionId!, change.email), change]),
     ),
     invitingConnectors: new Set(connectors.filter(canInvite).map(({ key }) => key)),
     invitationListingConnectors: new Set(connectors.filter(listsInvitations).map(({ key }) => key)),
@@ -302,13 +325,17 @@ function appInviteOf(
 }
 
 async function sortByAppName(
-  db: Orm,
-  connections: readonly AppConnection[],
-): Promise<AppConnection[]> {
-  const apps = await appRepository(db).findByIds(connections.map(({ appId }) => appId));
+  db: Orm | Tx,
+  employees: readonly InvitedEmployee[],
+  rows: readonly AppInvite[],
+): Promise<AppInvite[]> {
+  const apps = await appRepository(db).findByIds([...new Set(rows.map(({ appId }) => appId))]);
   const names = new Map(apps.map(({ id, name }) => [id, name]));
-  return connections.toSorted((one, other) =>
-    names.get(one.appId)!.localeCompare(names.get(other.appId)!),
+  const ranks = new Map(employees.map(({ id }, rank) => [id, rank]));
+  return rows.toSorted(
+    (one, other) =>
+      ranks.get(one.employeeId)! - ranks.get(other.employeeId)! ||
+      names.get(one.appId)!.localeCompare(names.get(other.appId)!),
   );
 }
 

@@ -1,7 +1,13 @@
 import { readSdl } from "../../core/graphql";
 import type { ModuleManifest } from "../../core/moduleManifest";
 import { PrincipalSecurityContext } from "../../core/security";
-import type { AccountLinkService, AccountChangeService, AppService, AppUserService } from "./app";
+import type {
+  AccountLinkService,
+  AccountChangeService,
+  AppService,
+  AppUserService,
+  ProvisionService,
+} from "./app";
 import { createResolvers, type ReadEmployees } from "./graphql";
 
 // Public values.
@@ -13,6 +19,7 @@ export {
   createAppInvitationService,
   createAppService,
   createAppUserService,
+  createProvisionService,
 } from "./app";
 
 // Public types.
@@ -24,14 +31,19 @@ export type {
   AppInvitationService,
   AppService,
   AppUserService,
+  ProvisionService,
 } from "./app";
 
 /**
  * The apps people use and their users: found by scans or connected, approved or ignored by the
- * owner, and their accounts disabled and enabled.
+ * owner, their accounts disabled and enabled, and people provisioned with the apps they miss.
  */
 export function appsModule(
-  services: AppService & AppUserService & AccountChangeService & AccountLinkService,
+  services: AppService &
+    AppUserService &
+    AccountChangeService &
+    AccountLinkService &
+    ProvisionService,
   people: Parameters<typeof createResolvers>[1],
   readEmployees: ReadEmployees,
 ): ModuleManifest {

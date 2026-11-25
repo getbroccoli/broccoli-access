@@ -51,10 +51,13 @@ export function createResolvers(services: EmployeeService & EmployeeReadService)
       employee: (invite, _args, context) => employeesById(context).load(invite.employeeId),
     },
     AccountChange: {
-      employee: (change, _args, context) =>
-        change.appAccountId
+      employee: (change, _args, context) => {
+        // The person a provision was for stays its person, whatever their email is now.
+        if (change.employeeId) return employeesById(context).load(change.employeeId);
+        return change.appAccountId
           ? accountOwners(context).load(change.appAccountId)
-          : employeesByEmail(context).load(change.email),
+          : employeesByEmail(context).load(change.email);
+      },
     },
     User: {
       employee: (_user, _args, context) => services.readMyEmployee(context.getActor()),

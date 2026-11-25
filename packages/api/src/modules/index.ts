@@ -10,6 +10,7 @@ import {
   createAppConnectionService,
   createAppService,
   createAppUserService,
+  createProvisionService,
 } from "./apps";
 import {
   connectorsModule,
@@ -30,7 +31,7 @@ import {
 } from "./google";
 import { createImportRecordService, createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
-import { createPersonPageReader, personPageLoader } from "./personPageReader";
+import { createPersonPageReader, personPageLoader, readPersonPages } from "./personPageReader";
 import { readInviteRole, createTemplateService, templatesModule } from "./templates";
 
 /** Settings that only some modules need, read from the environment by `main.ts`. */
@@ -102,7 +103,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     integrationUser: integrationUsers,
   });
   const employees = createEmployeeReadService({ ...core, accounts: apps });
-  const changes = createAccountChangeService({
+  const changeDependencies = {
     readInviteRole,
     directoryConnectors,
     ...core,
@@ -110,7 +111,8 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     members: importRecords,
     employees,
     integrationUser: integrationUsers,
-  });
+  };
+  const changes = createAccountChangeService(changeDependencies);
   const users = createAppUserService({
     ...core,
     connectors: directoryConnectors,
@@ -122,9 +124,12 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     apps: { ...apps, readAppRoles: changes.readAppRoles, readAppInvites: changes.readAppInvites },
     employees,
   });
-  const people = personPageLoader(
-    createPersonPageReader(core.orm, { ...users, ...changes, ...templates }),
-  );
+  const pageReads = { ...users, ...changes, ...templates };
+  const provision = createProvisionService({
+    ...changeDependencies,
+    readPersonPages: (ctx, ids, db) => readPersonPages(db, pageReads, ctx, ids),
+  });
+  const people = personPageLoader(createPersonPageReader(core.orm, { ...pageReads, ...provision }));
   const manifests = [
     systemModule({
       ...core,
@@ -147,6 +152,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
         ...apps,
         ...users,
         ...changes,
+        ...provision,
         ...createAccountLinkService({
           ...core,
           connectors: directoryConnectors,
@@ -182,4 +188,4 @@ function createConnectors(
   return { directoryConnectors, containerConnectors, connectors };
 }
 
-export { createPersonPageReader, personPageLoader } from "./personPageReader";
+export { createPersonPageReader, personPageLoader, readPersonPages } from "./personPageReader";

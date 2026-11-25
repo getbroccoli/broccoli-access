@@ -11,19 +11,13 @@ import {
   ACCOUNT_CHANGE_SORT_VALUES,
   accountChangeRepository,
   type AppConnection,
-  appAccountRepository,
   appConnectionRepository,
 } from "../db";
-import type { AccountChange, AccountChangeAction } from "../domain";
+import { type AccountChange, type AccountChangeAction, FROM_ACCOUNT } from "../domain";
 import type { ConnectionMembers, EmployeesByName, IntegrationUser } from "../ports";
-import {
-  type ChangingConnectors,
-  changingConnectors,
-  ensureSameRetry,
-  readAccountFacts,
-  readChangeFacts,
-} from "./accountFacts";
+import { changingConnectors, readChangeFacts } from "./accountFacts";
 import { createAppConnectionService } from "./appConnectionService";
+import { askForChange } from "./askForChange";
 import { type AppInvite, inviteEmployee, readAppInvites } from "./appInvite";
 import { loggingRefusal } from "./loggingRefusal";
 import { markChangeDoneByHand } from "./markChangeDoneByHand";
@@ -63,13 +57,14 @@ export interface AccountChangeService {
   ) => Promise<AppInvite>;
   /**
    * The employees' rows for the apps whose connection's connector lists `invite` and whose last scan
-   * found no member with their email, where Invite or Reconnect is offered or an invite was asked;
-   * by employee, then app name. Needs MANAGE_WORKSPACE.
+   * found no member with their email, where Invite or Reconnect is offered or an invite was asked,
+   * and for the apps without a connection where their invite is the owner's to make by hand; by
+   * employee, then app name. Needs MANAGE_WORKSPACE.
    */
   readAppInvites: (
     ctx: SecurityContext,
     employeeIds: readonly string[],
-    db?: Orm,
+    db?: Orm | Tx,
   ) => Promise<AppInvite[]>;
   /**
    * The run's job: makes the change through the connector, trying a rate-limited or unavailable
@@ -85,7 +80,8 @@ export interface AccountChangeService {
    * "I did it by hand": the change, failed and its account's latest, becomes `done_by_hand` with its
    * error kept, and the account takes the status the change asked for at once, with a history line
    * by the signed-in user unless it already had it. A failed invite, its connection's and email's
-   * latest, becomes `done_by_hand` alone. Needs MANAGE_WORKSPACE; refuses an unknown change with
+   * latest, or without a connection its app's and email's, becomes `done_by_hand` alone. Needs
+   * MANAGE_WORKSPACE; refuses an unknown change with
    * NOT_FOUND, and any other with CONFLICT.
    */
   markChangeDoneByHand: (ctx: SecurityContext, changeId: string) => Promise<LatestAccountChange>;
@@ -111,7 +107,7 @@ export interface AccountChangeService {
   readChangeStates: (
     ctx: SecurityContext,
     appAccountIds: readonly string[],
-    db?: Orm,
+    db?: Orm | Tx,
   ) => Promise<Map<string, AccountChangeState>>;
   /**
    * Each of the connections' app, status and, while it needs reconnecting, why, by connection id;
@@ -225,7 +221,14 @@ export function createAccountChangeService(
         // Read before the transaction: the container's list may take a while to answer.
         const changing = await changingConnectors(dependencies.connectors);
         return dependencies.transact((tx) =>
-          askForChange(dependencies, tx, { appAccountId, action, retryOf, requestedBy, changing }),
+          askForChange(dependencies, tx, {
+            appAccountId,
+            action,
+            retryOf,
+            requestedBy,
+            changing,
+            start: FROM_ACCOUNT,
+          }),
         );
       });
       logger.info(
@@ -242,7 +245,7 @@ export function createAccountChangeService(
     offboardEmployee: (ctx, input) => offboardEmployee(dependencies, ctx, input),
     readOffboardings: (ctx, employeeIds, db) =>
       readOffboardings(dependencies, ctx, employeeIds, db),
-    async readChangeStates(ctx, appAccountIds, db = orm) {
+    async readChangeStates(ctx, appAccountIds, db: Orm | Tx = orm) {
       return changeStatesOf(db, await readChangeFacts(dependencies, ctx, db, appAccountIds));
     },
     async readConnectionStates(ctx, connectionIds) {
@@ -316,63 +319,6 @@ export function createAccountChangeService(
 
 /** The job that runs a change, one per connection at a time. */
 export const RUN_JOB = "apps.runAccountChange";
-
-const NOT_OFFERED = "This change is not offered on this account now.";
-
-/** Writes the running change and queues its run in the connection's group, refusing what is not offered. */
-async function askForChange(
-  dependencies: AccountChangeDependencies,
-  tx: Tx,
-  {
-    appAccountId,
-    action,
-    requestedBy,
-    changing,
-    retryOf,
-  }: {
-    appAccountId: string;
-    action: AccountChangeAction;
-    requestedBy: string;
-    changing: ChangingConnectors;
-    retryOf?: string | null;
-  },
-): Promise<LatestAccountChange> {
-  const id = parseUuid(appAccountId);
-  // Locked, so a change finishing meanwhile commits first and its outcome is read below.
-  const account = id && (await appAccountRepository(tx).lockById(id));
-  if (!account) {
-    throw new ApplicationError("NOT_FOUND", "No app account has this id.");
-  }
-  const facts = await readAccountFacts(dependencies, tx, [account], changing);
-  const { offered, offersRemove, connection, member } = facts.get(account.id)!;
-  if (retryOf != null) ensureSameRetry(facts.get(account.id)!, action, retryOf);
-  // shortcut: a first confirmation follows a replacement suspended member at the same email;
-  // bind the opened dialog to the upstream key if memberships start changing during confirmation.
-  const allowed = action === "remove" ? offersRemove : offered === action;
-  if (!allowed || !connection || !member) {
-    throw new ApplicationError("CONFLICT", NOT_OFFERED);
-  }
-  const changes = accountChangeRepository(tx);
-  const change = await changes.insertRunning({
-    appAccountId: account.id,
-    appId: account.appId,
-    email: account.email,
-    connectionId: connection.id,
-    action,
-    sourceKey: member.sourceKey,
-    role: null,
-    requestedBy,
-    requestedAt: new Date(),
-    startedFrom: "account",
-    employeeId: null,
-  });
-  // A concurrent ask of the same account committed first.
-  if (!change) {
-    throw new ApplicationError("CONFLICT", NOT_OFFERED);
-  }
-  await dependencies.jobs.send(tx, RUN_JOB, { changeId: change.id }, { group: connection.id });
-  return withPlace(change, await changes.countChangesAhead([change.id]));
-}
 
 /** The change with its place in its connection's queue while it runs. */
 export function withPlace(change: AccountChange, ahead: Map<string, number>): LatestAccountChange {

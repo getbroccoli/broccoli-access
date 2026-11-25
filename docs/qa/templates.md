@@ -55,7 +55,7 @@ A manual check of the Templates page and a template's page against a development
 - [ ] Give Engineer to Ivan Petrov. Under **Role**, his Linear row shows Admin from Engineer. Open Invite, check that the confirmation names Ivan, Linear and Admin, then cancel.
 - [ ] Give Ivan Design with Linear set to its default. The conflict names both source templates and blocks Invite. Choose Default and open Invite again. The confirmation identifies the app default. Cancel.
 - [ ] Take Design off Ivan. Open Invite, confirm Admin, and check Ivan’s Linear invitation in the fake connectors’ `GET /_fake/state` for the role `admin`.
-- [ ] Repeat the conflict with Chloé, who already has a Linear account. At the picker, check that the guidance explains that the choice applies to future invites. Pick Admin. Her expected role changes, and her member role in the fake stays the same. On a person with a queued invite, changing the expected role also preserves the role on that invitation when it arrives.
+- [ ] Repeat the conflict with Chloé, who already has a Linear account. At the picker, check that the guidance explains that the choice applies to future invites. Pick Admin. The picker goes, her Role cell reads "—", since an account keeps the role it has in its app, and her member role in the fake stays the same. On a person with a queued invite, changing the expected role also preserves the role on that invitation when it arrives.
 
 ## Role changes across tabs and connector updates
 

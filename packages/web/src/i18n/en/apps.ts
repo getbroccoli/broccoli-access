@@ -91,6 +91,7 @@ export const appsEn = {
   "apps.activity.askedToday": "Today at {time}",
   "apps.activity.askedOn": "{day} at {time}",
   "apps.activity.fromOffboarding": "Offboarding",
+  "apps.activity.fromProvision": "Provision",
   "apps.activity.onServer": "On the server",
   "apps.activity.byHand": "By hand",
   "apps.activity.byHandToday": "At {time}, after it couldn’t run",
@@ -101,6 +102,9 @@ export const appsEn = {
   "apps.activity.reason.securityCheck": "{app} asked for a security check",
   "apps.activity.reason.notAllowed": "{app} doesn’t allow this change",
   "apps.activity.reason.removeRefused": "The removal was refused",
+  "apps.activity.reason.noConnection": "{app} had no connection",
+  "apps.change.byHand": "By hand",
+  "apps.change.byHandName": "Confirm you invited {name} to {app} by hand",
   "apps.activity.empty": "No Disable, Enable, Remove or Invite yet.",
   "apps.activity.error": "Couldn’t load Activity",
   "apps.activity.retry": "Try again",
@@ -203,6 +207,8 @@ export const appsEn = {
     "{app} doesn’t allow this change. {app} refuses it for some members, such as the workspace’s owner.",
   "apps.couldnt.removeNotAllowed":
     "The removal was refused. Only a disabled member can be removed, and {app} refuses it for some members, such as the workspace’s owner.",
+  "apps.couldnt.noConnection":
+    "{app} had no connection when this was asked, so Broccoli Access couldn’t make this change itself.",
   "apps.couldnt.browserLost": "The Chrome window making the change closed before {app} answered.",
   "apps.couldnt.hintDisable":
     "Try again in a while, or deactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
@@ -249,6 +255,8 @@ export const appsEn = {
     "Broccoli Access marks {firstName}’s {app} account as enabled, done by hand by you. The next scan checks it.",
   "apps.byHand.inviteEffect":
     "Broccoli Access marks {firstName} as invited to {app}, done by hand by you. The next scan finds their account once they accept.",
+  "apps.byHand.inviteEffectNoConnection":
+    "Broccoli Access marks {firstName} as invited to {app}, done by hand by you.",
   "apps.byHand.notYet": "Not yet",
   "apps.byHand.confirm": "Yes, I did it",
   "apps.byHand.refused":

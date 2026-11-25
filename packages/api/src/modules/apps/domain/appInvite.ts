@@ -61,6 +61,21 @@ export function inviteStateOf(facts: AppInviteFacts): AppInviteState | null {
 }
 
 /**
+ * The row of an app without a connection, for an invite the owner makes by hand: never offered,
+ * and Invited since the owner said "I did it by hand".
+ */
+export function byHandInviteStateOf(
+  latestInvite: Pick<AccountChange, "status" | "finishedAt">,
+): AppInviteState {
+  const done = latestInvite.status === "done_by_hand";
+  return {
+    offered: false,
+    offersReconnect: false,
+    invitedAt: done ? latestInvite.finishedAt : null,
+  };
+}
+
+/**
  * Since when the employee is Invited; null when they are not. A connection whose scans read the
  * pending invitations dates it by the invitation its last scan read, as the app dates it, else
  * since a scan first saw it; or by an invite done since that scan, which could not read it yet.

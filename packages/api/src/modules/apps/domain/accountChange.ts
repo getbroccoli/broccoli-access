@@ -1,6 +1,11 @@
 import type { RuntimeKind } from "@broccoli-access/connector-contract";
 
-import type { AccountAction, AccountStatus, ConnectorErrorCode } from "../../../core/connectors";
+import {
+  type AccountAction,
+  type AccountStatus,
+  CONNECTOR_ERROR_CODES,
+  type ConnectorErrorCode,
+} from "../../../core/connectors";
 
 /**
  * One Disable, Enable or Remove of one app account, or one Invite of an employee to an app, from the
@@ -15,7 +20,8 @@ export interface AccountChange {
   email: string;
   /** The requested invite role, null for the default and for other changes. */
   role: string | null;
-  connectionId: string;
+  /** Null for a change in an app without a connection, which fails at once and is made by hand. */
+  connectionId: string | null;
   action: AccountChangeAction;
   /** The member's id in the app, copied from the connection's record when the owner asked; null for an invite. */
   sourceKey: string | null;
@@ -23,21 +29,52 @@ export interface AccountChange {
   /** Each runtime tried, in order; `error` is null for the one that worked. */
   attempts: AccountChangeAttempt[];
   /** The last error; set exactly when `failed` or `done_by_hand`. */
-  error: ConnectorErrorCode | null;
+  error: AccountChangeError | null;
   /** The user who asked. */
   requestedBy: string;
   requestedAt: Date;
   /** When it stopped `running`. */
   finishedAt: Date | null;
   startedFrom: AccountChangeStart;
-  /** The person an offboarding is for; null when it started from the account. */
+  /** The person an offboarding or a provision is for; null when it started from the account. */
   employeeId: string | null;
 }
 
-/** Where the owner's click was: on the account's or invite's own row, or on Offboard. */
-export const ACCOUNT_CHANGE_STARTS = ["account", "offboarding"] as const;
+/** Where the owner's click was: on the account's or invite's own row, on Offboard or on Provision. */
+export const ACCOUNT_CHANGE_STARTS = ["account", "offboarding", "provision"] as const;
 
 export type AccountChangeStart = (typeof ACCOUNT_CHANGE_STARTS)[number];
+
+/** Where the owner's click was, and for Offboard or Provision, the person it is for. */
+export type ChangeStart = Pick<AccountChange, "startedFrom" | "employeeId">;
+
+/** The owner asked on the account's or the invite's own row. */
+export const FROM_ACCOUNT: ChangeStart = { startedFrom: "account", employeeId: null };
+
+/**
+ * Where a change asked now started. Asked on its own row after the subject's latest change failed
+ * with the same action, it is a Try again and keeps that change's start, so a provisioned change
+ * stays Provision's, unless it was provisioned for another person than the subject's
+ * (`subjectEmployeeId`), who has their email or account now. Asked from Provision, it is
+ * Provision's.
+ */
+export function startOfChange(
+  asked: ChangeStart & Pick<AccountChange, "action"> & { subjectEmployeeId: string | null },
+  latest: Pick<AccountChange, "action" | "status" | "startedFrom" | "employeeId"> | null,
+): ChangeStart {
+  const retried =
+    asked.startedFrom === "account" &&
+    latest?.status === "failed" &&
+    latest.action === asked.action &&
+    (latest.employeeId === null || latest.employeeId === asked.subjectEmployeeId);
+  const { startedFrom, employeeId } = retried ? latest : asked;
+  return { startedFrom, employeeId };
+}
+
+/** A connector's error, or `no_connection`: the app has no connection to make the change through. */
+export const ACCOUNT_CHANGE_ERRORS = [...CONNECTOR_ERROR_CODES, "no_connection"] as const;
+
+export type AccountChangeError = (typeof ACCOUNT_CHANGE_ERRORS)[number];
 
 /** Disable (`suspend`), Enable (`reactivate`) Remove (`remove`) or Invite (`invite`). */
 export type AccountChangeAction = AccountAction | "invite" | "remove";

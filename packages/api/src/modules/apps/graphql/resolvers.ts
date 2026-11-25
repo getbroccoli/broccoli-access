@@ -23,6 +23,8 @@ import type {
   AppSummary,
   AppUser,
   AppUserService,
+  ProvisionService,
+  ProvisionStep,
 } from "../app";
 import type { AccountChange } from "../domain";
 import {
@@ -31,10 +33,11 @@ import {
   type OffboardingServices,
   type ReadEmployees,
 } from "./offboardingResolvers";
+import { provisionMutations, provisionStepResolvers } from "./provisionResolvers";
 
 type AppResolverServices = AccountLinkService &
   Pick<
-    AppService & AppUserService & AccountChangeService,
+    AppService & AppUserService & AccountChangeService & ProvisionService,
     | "listApps"
     | "readApp"
     | "readApps"
@@ -53,11 +56,16 @@ type AppResolverServices = AccountLinkService &
     | "readRequesterNames"
     | "markChangeDoneByHand"
     | "inviteEmployee"
+    | "provisionEmployee"
   >;
 
 export function createResolvers(
   services: AppResolverServices & OffboardingServices,
-  people: RequestLoader<{ appAccounts: AppUser[]; appInvites: AppInvite[] }>,
+  people: RequestLoader<{
+    appAccounts: AppUser[];
+    appInvites: AppInvite[];
+    provisionSteps: ProvisionStep[];
+  }>,
   readEmployees: ReadEmployees,
 ): Resolvers {
   const loaders = createLoaders(services);
@@ -96,6 +104,7 @@ export function createResolvers(
     AppsMutations: {
       ...appsMutations(services),
       ...offboardingMutations(services, readEmployees),
+      ...provisionMutations(services, readEmployees),
     },
     OffboardingByHandWork: offboarding.OffboardingByHandWork,
     AccountWithoutPerson: accountWithoutPersonResolvers(loaders.changeStates),
@@ -119,6 +128,7 @@ export function createResolvers(
         (await loaders.actions(user, context)).latestChange,
     },
     AppInvite: { app: appOf },
+    ProvisionStep: { app: appOf, ...provisionStepResolvers },
     PersonApp: { app: appOf },
     TemplateApp: { app: appOf },
     ContainerConnection: {
@@ -182,6 +192,8 @@ export function createResolvers(
       appInvites: async (employee, _args, context) =>
         (await people(context).load(employee.id)).appInvites,
       ...offboarding.Employee,
+      provisionSteps: async (employee, _args, context) =>
+        (await people(context).load(employee.id)).provisionSteps,
     },
   };
 }

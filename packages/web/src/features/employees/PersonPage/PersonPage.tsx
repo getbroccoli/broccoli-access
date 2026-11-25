@@ -16,11 +16,12 @@ import { OffboardDialog } from "./OffboardDialog";
 import { OffboardedNotice } from "./OffboardedNotice";
 import { PersonTemplates } from "./PersonTemplates";
 import { CurrentAccessTable } from "./CurrentAccessTable";
+import { ProvisionBar } from "./ProvisionBar";
 
 /**
  * A person: their status in Google, a warning while suspended with access, and their current
- * access, with the connected apps they may be invited to; Offboard, and afterwards what still
- * needs the owner.
+ * access, with the connected apps they may be invited to and Provision for the apps they miss;
+ * Offboard, and afterwards what still needs the owner.
  */
 export function PersonPage() {
   const { employeeId } = useParams({ from: ROUTE });
@@ -162,6 +163,7 @@ export function PersonPage() {
             {t("people.person.moreApps")}
           </Button>
         )}
+        <ProvisionBar person={person} />
       </section>
     </div>
   );

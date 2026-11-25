@@ -50,6 +50,10 @@ export function couldntChangeReason(
   const reconnect = toReconnect
     ? ` ${t(credential === "APP_SESSION" ? "apps.couldnt.reconnectSession" : "apps.couldnt.reconnectKey", { app })}`
     : "";
+  // Broccoli Access never reached an app without a connection, so it says nothing of the app.
+  if (failure === "NO_CONNECTION") {
+    return reasonOf(failure, about);
+  }
   // A refusal changed nothing; any other failed Remove may have removed the member unseen.
   const unconfirmed = about.action === "REMOVE" && failure !== "NOT_ALLOWED";
   return `${reasonOf(failure, about)}${reconnect} ${t(unconfirmed ? "apps.couldnt.unconfirmedRemoval" : "apps.couldnt.nothingChanged", { app })}`;
@@ -256,5 +260,7 @@ function reasonOf(
       });
     case "OWNER_BROWSER_LOST":
       return t("apps.couldnt.browserLost", { app });
+    case "NO_CONNECTION":
+      return t("apps.couldnt.noConnection", { app });
   }
 }

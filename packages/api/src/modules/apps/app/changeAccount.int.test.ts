@@ -46,6 +46,8 @@ test("stores Chloé's running Disable with her Linear source key and queues it b
     sourceKey: ACME_LINEAR.members.find(({ email }) => email === chloe.email)!.sourceKey,
     status: "running",
     attempts: [],
+    startedFrom: "account",
+    employeeId: null,
     error: null,
     requestedBy: owner.user!.userId,
     requestedAt: expect.any(Date) as unknown,

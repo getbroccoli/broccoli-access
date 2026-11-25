@@ -81,6 +81,7 @@ const REASONS: Record<AccountChangeFailure, MessageKey> = {
   OWNER_BROWSER_LOST: "apps.activity.reason.tryLater",
   ACCOUNT_NOT_FOUND: "apps.activity.reason.scanNow",
   NOT_ALLOWED: "apps.activity.reason.notAllowed",
+  NO_CONNECTION: "apps.activity.reason.noConnection",
 };
 
 /** Broccoli Access itself refuses a Remove whose member is active again, so the app is not named. */

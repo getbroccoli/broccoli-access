@@ -6,6 +6,7 @@ fragment InviteStatusCell_appInvite on AppInvite {
     id
     action
     status
+    failure
     ...CouldntChangeDialog_accountChange
   }
 }
