@@ -43,14 +43,13 @@ export async function finishSetupWithDemoApps(browser: Browser) {
 }
 
 export async function scannedApps(browser: Browser) {
-  let discovered: { id: string; name: string; preselected: boolean }[] = [];
+  let discovered: { id: string; name: string }[] = [];
   await expect
     .poll(
       async () => {
         const response = await browser.graphql(`{
       apps(status: DISCOVERED) {
-        edges { node { id name domain status peopleCount foundVia since { at before } preselected } }
-        pageInfo { endCursor hasNextPage }
+        edges { node { id name } }
       }
       setup { step }
     }`);

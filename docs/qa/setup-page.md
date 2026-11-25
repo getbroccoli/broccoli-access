@@ -38,11 +38,12 @@ A manual check of setup held by one browser, which connects Google Workspace wit
 ## Select your apps
 
 - [ ] Applications opens on Discovered as on the design: the banner "Last step: select the apps your company uses" with "We found 37 apps…", tabs "Approved 1", "Discovered 37", "Ignored 0", and the left menu's Applications showing 37.
-- [ ] The table lists App (logo or initial, name, domain), People (four avatars, then "+N" for the rest), Found via and Since, the most people first. Only Slack is checked and shows "Manageable" after its name. Its link has the description "Broccoli Access can manage accounts in this app once you connect it." The button says "Approve 1 and finish".
+- [ ] The table lists App (logo or initial, name, domain), People (four avatars, then "+N" for the rest), Found via and Since, the most people first. Only Slack starts checked. The button says "Approve 1 and finish".
+- [ ] Slack is the only app with "Manageable" after its name. Its link has the description "Broccoli Access can manage accounts in this app once you connect it."
 - [ ] Below the first twelve apps, "Show 25 more apps" shows the rest.
-- [ ] Unchecking Slack makes the button "Approve 0 and finish". Checking ChatGPT makes it "Approve 1 and finish". The header checkbox selects all apps, and again none. Select Slack again to continue.
+- [ ] Unchecking Slack leaves its chip visible and makes the button "Approve 0 and finish". Checking ChatGPT leaves it without a chip and makes the button "Approve 1 and finish". The header checkbox selects all apps, and again none. Select Slack again to continue.
 - [ ] Reloading keeps the owner on Applications; `/setup`, `/people` and `/` lead back to it.
-- [ ] "Approve 1 and finish" opens Approved: Google Workspace and Slack are approved, "Discovered 0", "Ignored 36", no banner and no count in the left menu. Reloading stays there, and `/setup` and `/` open it too.
+- [ ] "Approve 1 and finish" opens Approved with Google Workspace and Slack approved. The tabs show "Discovered 0" and "Ignored 36". The banner and the left menu's count are gone. Reloading stays there, and `/setup` and `/` open it too.
 
 ## Starting over
 

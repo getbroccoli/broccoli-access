@@ -103,48 +103,40 @@ test("refuses an app user limit below one with a field error", async ({ env }) =
 }, 90_000);
 
 connectorTest(
-  "preselects discovered apps with a managing connector",
+  "finishes setup with the only discovered app that has a managing connector",
   async ({ env }) => {
     const { browser } = await env.signInAsOwner();
     await scannedApps(browser);
 
-    const response = await browser.graphql(`{
-    apps(status: DISCOVERED) {
-      edges { node { name preselected managingConnector { id } } }
-    }
-  }`);
-
+    const selection = await browser.graphql(`{
+      apps(status: DISCOVERED) {
+        edges { node { id name preselected managingConnector { id } } }
+      }
+    }`);
     type DiscoveredApp = {
+      id: string;
       name: string;
       preselected: boolean;
       managingConnector: { id: string } | null;
     };
-    const body = (await response.json()) as {
+    const body = (await selection.json()) as {
       data: { apps: { edges: { node: DiscoveredApp }[] } };
     };
     expect(body).not.toHaveProperty("errors");
-    const { edges } = body.data.apps;
-    expect(edges.find(({ node }) => node.name === "Slack")?.node).toEqual({
-      name: "Slack",
-      preselected: true,
-      managingConnector: { id: "slack" },
-    });
-    expect(edges.find(({ node }) => node.name === "Figma")?.node).toEqual({
-      name: "Figma",
-      preselected: false,
-      managingConnector: null,
-    });
-  },
-  90_000,
-);
-
-connectorTest(
-  "finishes setup with Slack as the only default selection",
-  async ({ env }) => {
-    const { browser } = await env.signInAsOwner();
-    const discovered = await scannedApps(browser);
+    const discovered = body.data.apps.edges.map(({ node }) => node);
     const selected = discovered.filter(({ preselected }) => preselected);
-    expect(selected.map(({ name }) => name)).toEqual(["Slack"]);
+    expect(selected).toMatchObject([
+      { name: "Slack", preselected: true, managingConnector: { id: "slack" } },
+    ]);
+    expect(discovered.filter(({ managingConnector }) => managingConnector !== null)).toEqual(
+      selected,
+    );
+    for (const name of ["Figma", "Asana"]) {
+      expect(discovered.find((app) => app.name === name)).toMatchObject({
+        preselected: false,
+        managingConnector: null,
+      });
+    }
 
     const response = await browser.graphql(
       `

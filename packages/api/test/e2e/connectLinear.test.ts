@@ -10,6 +10,7 @@ import {
   NOTION_INPUT,
   testNotion,
   scannedApps,
+  startSimpleHttpServer,
   TestEnv,
 } from "#test/support";
 
@@ -257,20 +258,33 @@ baseTest.for([
 );
 
 baseTest(
-  "the server starts with no connectors or default app selections when the container is unavailable",
+  "loads discovered apps promptly when the connectors container hangs",
   async ({ fakeGoogle }) => {
+    const container = await startSimpleHttpServer((request, response) => {
+      if (request.url !== "/v1/connectors") response.writeHead(404).end();
+    });
+    onTestFinished(() => container.stop());
     const env = await TestEnv.start({
       googleUrl: fakeGoogle.url,
-      connectorsUrl: "http://127.0.0.1:0",
+      connectorsUrl: container.url,
     });
     onTestFinished(() => env.stop());
     const { browser } = await env.signInAsOwner();
-
-    const response = await browser.graphql("{ containerConnectors { id } }");
     const discovered = await scannedApps(browser);
 
-    expect(await response.json()).toEqual({ data: { containerConnectors: [] } });
-    expect(discovered.filter(({ preselected }) => preselected).map(({ name }) => name)).toEqual([]);
+    const startedAt = performance.now();
+    const response = await browser.graphql(`{
+      apps(status: DISCOVERED) { edges { node { id name preselected } } }
+    }`);
+    const body: unknown = await response.json();
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(elapsedMs).toBeLessThan(8_000);
+    expect(body).toEqual({
+      data: {
+        apps: { edges: discovered.map((app) => ({ node: { ...app, preselected: false } })) },
+      },
+    });
   },
   90_000,
 );

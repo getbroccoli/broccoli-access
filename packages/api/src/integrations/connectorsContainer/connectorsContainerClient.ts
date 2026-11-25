@@ -121,8 +121,8 @@ const CALL_TIMEOUT_MS = 120_000;
 /** The contract's wait for a call that signs in through several pages, which may take 180 seconds. */
 const SIGN_IN_TIMEOUT_MS = 240_000;
 
-/** The list is fixed when the container starts, so a slower answer means it is down. */
-const LIST_TIMEOUT_MS = 10_000;
+/** The Discovered tab waits for this static manifest, so keep the deadline short. */
+const LIST_TIMEOUT_MS = 2_000;
 
 /** Above a page of every member a robot may answer with, and an error's 1 MB screenshot. */
 const MAX_ANSWER_BYTES = 16 * 1024 * 1024;
