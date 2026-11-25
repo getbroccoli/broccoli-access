@@ -73,7 +73,7 @@ function nameOf({ firstName, lastName }: Extra["employee"]) {
 }
 
 function extraReason(reason: Extra["reason"]) {
-  if (reason === "review") return t("people.differences.accessChanged");
+  if (reason === "review") return t("people.differences.takenOutOfExpectedApps");
   if (reason === "removed") return t("people.differences.accessRemoved");
   return t("people.differences.outsideTemplates");
 }

@@ -21,7 +21,7 @@ export const peopleEn = {
   "people.differences.disableRefused":
     "Couldn’t disable the account. Refresh Differences and try again.",
   "people.differences.why": "Why",
-  "people.differences.accessChanged": "Their expected access changed",
+  "people.differences.takenOutOfExpectedApps": "Taken out of their expected apps",
   "people.differences.accessRemoved": "Removed for this person",
   "people.differences.outsideTemplates": "Not in their templates",
   "people.differences.keep": "Keep",

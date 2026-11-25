@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { CouldntChangeDialog } from "@/features/apps";
 import { t } from "@/i18n";
 
+import { provisionButtonLabel } from "./provisionButtonLabel";
+
 type Missing = NonNullable<PeopleDifferencesQuery["accessDifferences"]["missing"]>[number];
 
 type Props = {
@@ -35,6 +37,7 @@ export function MissingAppCard({ differences, refresh }: Props) {
   const ready = differences.filter(
     (row) => row.provisionStep && !isRunning(row) && !row.roleNeedsAttention,
   );
+  const actionLabel = provisionButtonLabel(ready);
   const isProvisioning = submitting || (!ready.length && differences.some(isRunning));
   const confirm = async () => {
     setOpen(false);
@@ -72,7 +75,7 @@ export function MissingAppCard({ differences, refresh }: Props) {
         <AlertDialogTrigger
           render={<Button type="button" size="lg" className="px-4" disabled={submitting} />}
         >
-          {t(isProvisioning ? "people.differences.provisioning" : "people.provision.button")}
+          {t(isProvisioning ? "people.differences.provisioning" : actionLabel)}
         </AlertDialogTrigger>
         <AlertDialogContent className="p-6 data-[size=default]:max-w-[calc(100%-2rem)] data-[size=default]:sm:max-w-lg">
           <AlertDialogHeader>
@@ -126,7 +129,7 @@ export function MissingAppCard({ differences, refresh }: Props) {
               disabled={!ready.length || submitting}
               onClick={() => void confirm()}
             >
-              {t("people.provision.button")}
+              {t(actionLabel)}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
