@@ -3,6 +3,9 @@
 **/.turbo
 **/coverage
 .git
+# The conformance suite and its standalone doubles run outside this image.
+packages/fake-apps/test
+packages/fake-apps/src/**/*.test.ts
 # Development data and environment files hold secrets, in any folder.
 **/.data
 **/.env
