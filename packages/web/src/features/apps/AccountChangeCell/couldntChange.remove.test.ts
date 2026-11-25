@@ -19,24 +19,51 @@ function refusedRemove(readAt: string | null, failure: "NOT_ALLOWED" | "UNEXPECT
   } as const;
 }
 
-it("hides “Couldn’t remove” when a scan finds the account active and it has no Remove offer", () => {
-  const latestChange = { status: "FAILED", action: "REMOVE" } as const;
-  expect(showsCouldntChange({ status: "SUSPENDED", latestChange })).toBe(true);
-  // A scan since read the member active: nothing is left to remove.
-  expect(showsCouldntChange({ status: "ACTIVE", latestChange })).toBe(false);
+it("shows a failed Remove for a disabled member without a Remove offer", () => {
+  const account = { ...refusedRemove(null, "NOT_ALLOWED"), offersRemove: false };
+
+  expect(showsCouldntChange(account)).toBe(true);
+});
+
+it("hides a stale failed Remove for an active member whose connector can disable accounts", () => {
+  const account = {
+    status: "ACTIVE",
+    offersRemove: false,
+    latestChange: { status: "FAILED", action: "REMOVE" },
+    app: { containerConnection: { connector: { canDisableAccounts: true } } },
+  } as const;
+
+  expect(showsCouldntChange(account)).toBe(false);
+});
+
+it("shows a failed Remove for an active member without a Remove offer when the connector cannot disable accounts", () => {
+  const account = {
+    status: "ACTIVE",
+    offersRemove: false,
+    latestChange: { status: "FAILED", action: "REMOVE" },
+    app: { containerConnection: { connector: { canDisableAccounts: false } } },
+  } as const;
+
+  expect(showsCouldntChange(account)).toBe(true);
 });
 
 it("keeps a refused Remove visible on a removable active member until a scan allows a fresh Remove", () => {
-  const active = { ...refusedRemove(null, "NOT_ALLOWED"), status: "ACTIVE" } as const;
-  const scanned = {
-    ...refusedRemove("2026-11-22T10:00:01Z", "NOT_ALLOWED"),
+  const connector = { canDisableAccounts: false };
+  const active = {
+    ...refusedRemove(null, "NOT_ALLOWED"),
     status: "ACTIVE",
+    app: { containerConnection: { connector, scan: null } },
+  } as const;
+  const scanned = {
+    ...active,
+    app: { containerConnection: { connector, scan: { readAt: "2026-11-22T10:00:01Z" } } },
   } as const;
 
   expect.soft(showsCouldntChange(active)).toBe(true);
   expect.soft(offersFreshRemove(active)).toBe(false);
   expect(failedChangeOptions(active).tryAgain).toBe(false);
   expect(offersFreshRemove(scanned)).toBe(true);
+  expect(offersFreshRemove({ ...scanned, offersRemove: false })).toBe(false);
 });
 
 it.for([
@@ -95,7 +122,7 @@ it("explains that a failed Remove may already have removed the member", () => {
   expect(reason).not.toContain("Nothing changed");
 });
 
-it("does not blame the app alone for a refused Remove, which Broccoli Access may have stopped", () => {
+it.for([false, true])("explains a refused Remove (historical: %s)", (historical) => {
   const reason = couldntChangeReason("NOT_ALLOWED", {
     app: "Linear",
     workspace: "Acme",
@@ -104,10 +131,12 @@ it("does not blame the app alone for a refused Remove, which Broccoli Access may
     credential: "TEXT",
     toReconnect: false,
     action: "REMOVE",
+    historical,
   });
-  expect(reason).toContain("Only a disabled member can be removed");
-  expect(reason).toContain("Nothing changed in Linear.");
-  expect(reason).not.toContain("Linear doesn’t allow this change");
+
+  expect(reason).toBe(
+    "The removal was refused. Check the member’s access and your permissions in Linear. Nothing changed in Linear.",
+  );
 });
 
 it("points a refused Remove to a scan or removing by hand, not to someone with more rights", () => {

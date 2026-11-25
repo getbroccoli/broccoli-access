@@ -84,6 +84,13 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
         name
         catalogKey
         canChangeAccounts
+        containerConnection {
+          id
+          connector {
+            id
+            canDisableAccounts
+          }
+        }
       }
       latestChange {
         action
@@ -109,6 +116,13 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
         name
         catalogKey
         canChangeAccounts
+        containerConnection {
+          id
+          connector {
+            id
+            canDisableAccounts
+          }
+        }
       }
       latestChange {
         action
@@ -138,6 +152,7 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
       accountsToRemove {
         id
         email
+        status
         app {
           id
           name

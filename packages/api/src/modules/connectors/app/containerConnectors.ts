@@ -72,7 +72,17 @@ export function createContainerConnectors({
   return withFind({
     list() {
       connectors ??= client.readConnectors().then(
-        (descriptions) => {
+        ({ descriptions, rejected }) => {
+          if (rejected.length) {
+            logger.warn(
+              { connectors: rejected.filter((key) => key !== null), count: rejected.length },
+              "Connectors container listed invalid entries",
+            );
+            if (!descriptions.length) {
+              connectors = undefined;
+              return [];
+            }
+          }
           const usable = descriptions.filter(hasDistinctFieldKeys);
           logger.info(
             {

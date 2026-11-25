@@ -88,13 +88,17 @@ async function checkListedInvitation(
 
 async function checkInviteOfMember(url: string, fixture: ConnectorFixture): Promise<void> {
   const [flow] = await startFlow(url, fixture);
-  const listed = (await listAll(flow)).find(({ values }) => values.status === "active");
-  expect(listed, "an active member for the invite to read back").toBeDefined();
+  let member = fixture.member ?? fixture.memberToRemove;
+  if (!member) {
+    const active = (await listAll(flow)).find(({ values }) => values.status === "active");
+    expect(active, "an active member for the invite to read back").toBeDefined();
+    member = { sourceKey: active!.sourceKey, email: active!.values.email };
+  }
 
-  const answer = await invite(flow, { email: listed!.values.email });
+  const answer = await invite(flow, { email: member.email });
 
   expect(answer.changed).toBe(false);
-  expect(answer.account?.sourceKey).toBe(listed!.sourceKey);
+  expect(answer.account?.sourceKey).toBe(member.sourceKey);
   expect(answer.account?.values.status).toBe("active");
 }
 

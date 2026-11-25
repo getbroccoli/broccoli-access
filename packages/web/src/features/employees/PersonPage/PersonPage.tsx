@@ -22,6 +22,7 @@ import { CurrentAccessTable } from "./CurrentAccessTable";
 import { DirectoryProvisionPanel } from "./DirectoryProvisionPanel";
 import { FirstPasswordDialog } from "./FirstPasswordDialog";
 import { ProvisionBar } from "./ProvisionBar";
+import { showRemoveAll } from "./removeAllOffers";
 
 /**
  * A person: their status in Google, a warning while suspended with access, and their current
@@ -191,9 +192,11 @@ export function PersonPage() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-semibold tracking-tight">{t("templates.apps.title")}</h2>
           {me.isOwner && person.status === "ACTIVE" && <AddPersonAppMenu employeeId={person.id} />}
-          {offboardedAt && person.offboarding.accountsToRemove.length > 0 && (
-            <RemoveAllDialog person={person} />
-          )}
+          {showRemoveAll({
+            offboardedAt,
+            directoryStatus: person.directoryAccount?.status,
+            accountsToRemove: person.offboarding.accountsToRemove,
+          }) && <RemoveAllDialog person={person} />}
         </div>
         <CurrentAccessTable person={person} />
         {person.personApps.pageInfo.hasNextPage && (

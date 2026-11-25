@@ -33,7 +33,7 @@ for (const scenario of [
             invitee: { email: "new.hire@acme.example" },
           }),
           reset: (url) => Promise.resolve(servers.get(url)!.reset()),
-          causeError: (url, code) => Promise.resolve(servers.get(url)!.causeError(code)),
+          causeError: (url, code) => servers.get(url)!.causeError(code),
         },
       ],
     });

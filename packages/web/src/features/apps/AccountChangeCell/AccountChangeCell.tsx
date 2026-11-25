@@ -113,13 +113,15 @@ export function AccountChangeCell({ appUser, onlyIfExtra }: Props) {
           >
             {t("apps.change.remove")}
           </Button>
-          <RemoveAccountDialog
-            linked
-            open={removing}
-            onClose={() => setRemoving(false)}
-            account={user}
-            name={`${user.employee.firstName} ${user.employee.lastName}`}
-          />
+          {removing && (
+            <RemoveAccountDialog
+              linked
+              open
+              onClose={() => setRemoving(false)}
+              account={user}
+              name={`${user.employee.firstName} ${user.employee.lastName}`}
+            />
+          )}
         </>
       )}
     </span>

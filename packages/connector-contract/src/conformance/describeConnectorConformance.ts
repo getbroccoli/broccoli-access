@@ -9,13 +9,16 @@ import {
   type ConnectorCall,
   type ConnectorErrorCode,
 } from "../connectorCalls.js";
-import { CONNECTOR_MANIFEST } from "../connectorManifest.js";
+import {
+  CONNECTOR_MANIFEST,
+  type Capability,
+  type ConnectorDescription,
+} from "../connectorManifest.js";
 import { describeInviteConformance } from "./describeInviteConformance.js";
 import { describeRemoveConformance } from "./describeRemoveConformance.js";
 import { describeSignInConformance, SIGN_IN_ERROR_CODES } from "./describeSignInConformance.js";
 import {
   actionFields,
-  capabilitiesOf,
   getManifest,
   listAll,
   listPages,
@@ -86,12 +89,13 @@ export interface ConnectorFixture {
  */
 export function describeConnectorConformance({ urls, fixtures }: ConformanceOptions): void {
   const [url, otherUrl] = urls;
+  let manifest: Promise<Map<string, ConnectorDescription[]>> | undefined;
+  const readManifest = () => (manifest ??= getManifest(url).then(connectorsByKey));
   // The checks share the containers and reset their apps, so they never run concurrently.
   describe("container conformance", { timeout: NO_CHECK_TIMEOUT, concurrent: false }, () => {
     it("has a fixture for every connector in a manifest that matches its schema", async () => {
-      const manifest = CONNECTOR_MANIFEST.parse(await getManifest(url));
-
-      const keys = manifest.connectors.map(({ key }) => key);
+      const listed = await readManifest();
+      const keys = [...listed.values()].flat().map(({ key }) => key);
       expect(fixtures.map(({ connector }) => connector).toSorted()).toEqual(keys.toSorted());
     });
   });
@@ -100,6 +104,7 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
       `${fixture.connector} conformance`,
       { timeout: NO_CHECK_TIMEOUT, concurrent: false },
       () => {
+        const description = async () => (await readManifest()).get(fixture.connector)?.[0];
         beforeEach(() => withinDeadline(fixture.reset(url), "the fixture's reset"));
         it("answers a connection test that matches its schema", () => startFlow(url, fixture));
         it("lists members with unique keys on pages that match their schema", () =>
@@ -113,20 +118,9 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
         describeInviteConformance(url, fixture);
         describeRemoveConformance(url, fixture);
         describeSignInConformance(url, fixture);
-        // A check, not a throw while collecting: Vitest would then skip the caller's afterAll(stop).
-        if (fixture.cannotCause !== undefined)
-          it("lists in cannotCause only errors its connector can never give, each with a one-line reason", () =>
-            checkCannotCause(url, fixture));
-        it.for(ACTION_ERROR_CODES)(
-          "answers %s, when the fixture causes it, as that error",
-          (code, { skip }) => {
-            const reason = cannotCauseReason(fixture, code);
-            if (reason !== undefined) skip(`${fixture.connector} cannot cause ${code}: ${reason}`);
-            return checkError(url, fixture, code);
-          },
-        );
-        it("answers a runtime the connector does not list with HTTP 400", () =>
-          checkUnlistedRuntimes(url, fixture));
+        describeErrors(url, fixture, description);
+        it("answers a runtime the connector does not list with HTTP 400", async () =>
+          checkUnlistedRuntimes(url, fixture, await description()));
         it("gives the same answers from two containers of the same image, apart from renewed secrets", async () => {
           expect(await answersOf(otherUrl, fixture)).toEqual(await answersOf(url, fixture));
         });
@@ -145,6 +139,9 @@ const ACTION_ERROR_CODES = CONNECTOR_ERROR_CODES.filter(
 
 type ActionErrorCode = Exclude<ConnectorErrorCode, "not_invited">;
 
+/** These errors name a target member or a refused change, neither of which a list requests. */
+const ACTION_ONLY_ERRORS = new Set<ActionErrorCode>(["account_not_found", "not_allowed"]);
+
 /** The errors only some connectors meet: a check that only a robot's page shows, and a lost owner's browser. */
 const OPTIONAL_ERROR_CODES = [
   "blocked_by_check",
@@ -153,6 +150,31 @@ const OPTIONAL_ERROR_CODES = [
 
 /** Any character that ends a line, which would break a one-line skip note. */
 const LINE_BREAK = /[\n\r\u2028\u2029]/;
+
+function connectorsByKey(manifest: unknown): Map<string, ConnectorDescription[]> {
+  return Map.groupBy(CONNECTOR_MANIFEST.parse(manifest).connectors, ({ key }) => key);
+}
+
+function describeErrors(
+  url: string,
+  fixture: ConnectorFixture,
+  description: () => Promise<ConnectorDescription | undefined>,
+): void {
+  // A check, not a throw while collecting: Vitest would then skip the caller's afterAll(stop).
+  if (fixture.cannotCause !== undefined)
+    it("lists in cannotCause only errors its connector can never give, each with a one-line reason", () =>
+      checkCannotCause(url, fixture));
+  it.for(ACTION_ERROR_CODES)(
+    "answers %s, when the fixture causes it, as that error",
+    async (code, { skip }) => {
+      const reason = cannotCauseReason(fixture, code);
+      if (reason !== undefined) skip(`${fixture.connector} cannot cause ${code}: ${reason}`);
+      const action = firstActionOf((await description())?.capabilities ?? [], fixture);
+      if (!action && ACTION_ONLY_ERRORS.has(code)) skip(`${code} applies only to actions`);
+      return checkError(url, fixture, code, action);
+    },
+  );
+}
 
 async function checkList(url: string, fixture: ConnectorFixture): Promise<void> {
   const [flow] = await startFlow(url, fixture);
@@ -180,9 +202,9 @@ async function checkError(
   url: string,
   fixture: ConnectorFixture,
   code: ActionErrorCode,
+  action: ReturnType<typeof firstActionOf>,
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
-  const action = await firstActionOf(url, fixture);
   await withinDeadline(fixture.causeError(url, code), "the fixture's causeError");
 
   const answer = action
@@ -192,8 +214,7 @@ async function checkError(
   expect(CONNECTOR_ERROR_ANSWER.parse(answer).error.code).toBe(code);
 }
 
-async function firstActionOf(url: string, fixture: ConnectorFixture) {
-  const capabilities = await capabilitiesOf(url, fixture.connector);
+function firstActionOf(capabilities: readonly Capability[], fixture: ConnectorFixture) {
   const action = (["suspend", "invite", "remove"] as const).find((candidate) =>
     capabilities.includes(candidate),
   );
@@ -229,17 +250,20 @@ function isOneLineText(text: unknown): text is string {
 }
 
 /** Each call as it would succeed, with only its runtime changed. */
-async function checkUnlistedRuntimes(url: string, fixture: ConnectorFixture): Promise<void> {
-  const listed = await runtimesOf(url, fixture.connector);
+async function checkUnlistedRuntimes(
+  url: string,
+  fixture: ConnectorFixture,
+  connector: ConnectorDescription | undefined,
+): Promise<void> {
   const [flow] = await startFlow(url, fixture);
-  const action = await firstActionOf(url, fixture);
+  const action = firstActionOf(connector?.capabilities ?? [], fixture);
   const calls: [ConnectorCall, object][] = [
     ["connections/test", {}],
     ["accounts/list", { cursor: null }],
   ];
   if (action) calls.push(["actions/run", action]);
 
-  for (const runtime of unlistedRuntimes(listed)) {
+  for (const runtime of unlistedRuntimes(connector?.runtimes ?? [])) {
     for (const [path, fields] of calls) {
       const body = { ...requestOf(flow), ...fields, runtime };
       expect((await post(url, path, body)).status, `${path} on ${runtime.kind}`).toBe(400);
@@ -271,10 +295,14 @@ async function answersOf(url: string, fixture: ConnectorFixture): Promise<unknow
   );
   const [flow, testAnswer] = await startFlow(url, fixture);
   const answers = [manifest, testAnswer, ...(await listPages(flow))];
-  if (connector?.capabilities.includes("suspend")) {
-    const action = await send(flow, "actions/run", actionFields(fixture, "suspend"));
-    expect(ACTION_RUN_ANSWER.safeParse(action).error, "the action's answer").toBeUndefined();
-    answers.push(action);
+  const capabilities = connector?.capabilities ?? [];
+  const actions = capabilities.includes("suspend")
+    ? (["suspend"] as const)
+    : (["invite", "remove"] as const).filter((action) => capabilities.includes(action));
+  for (const action of actions) {
+    const answer = await send(flow, "actions/run", actionFields(fixture, action));
+    expect(ACTION_RUN_ANSWER.safeParse(answer).error, `the ${action} answer`).toBeUndefined();
+    answers.push(answer);
   }
   return answers.map(withoutRenewedSecrets);
 }

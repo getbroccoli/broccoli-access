@@ -70,7 +70,11 @@ export async function startNotionConnector(
       nextError = undefined;
     },
     causeError(code: ConnectorErrorCode) {
+      if (errorOperation === "list" && (code === "account_not_found" || code === "not_allowed")) {
+        return Promise.reject(new Error(`${code} requires a write operation`));
+      }
       nextError = code;
+      return Promise.resolve();
     },
   };
 

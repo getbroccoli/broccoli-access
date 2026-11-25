@@ -208,7 +208,7 @@ export const appsEn = {
   "apps.couldnt.notAllowed":
     "{app} doesn’t allow this change. {app} refuses it for some members, such as the workspace’s owner.",
   "apps.couldnt.removeNotAllowed":
-    "The removal was refused. Only a disabled member can be removed, and {app} refuses it for some members, such as the workspace’s owner.",
+    "The removal was refused. Check the member’s access and your permissions in {app}.",
   "apps.couldnt.noConnection":
     "{app} had no connection when this was asked, so Broccoli Access couldn’t make this change itself.",
   "apps.couldnt.browserLost": "The Chrome window making the change closed before {app} answered.",

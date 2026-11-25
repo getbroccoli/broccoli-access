@@ -102,7 +102,7 @@ export const settingsEn = {
   "settings.connections.directory": "Directory",
   "settings.apps.title": "Apps",
   "settings.apps.description":
-    "Connect an app to see its members, and disable or enable their accounts from here.",
+    "Connect apps to see their members and manage access where supported.",
   "settings.apps.notConnected": "Not connected",
   "settings.apps.throughApi": "Through {app}’s API, with a {field} made by a {app} admin.",
   "settings.apps.throughAppSession":
@@ -230,8 +230,7 @@ export const settingsEn = {
     "{app} refused your session. Sign in to {app} again, then Connect {app} again.",
   "settings.apps.oneMember": "1 member.",
   "settings.apps.members": "{count} members.",
-  "settings.apps.dialog.description":
-    "Broccoli Access reads your {app} members and disables or enables them when you ask, through {app}’s API.",
+  "settings.apps.dialog.description": "Broccoli Access reads members through {app}’s API.",
   "settings.apps.dialog.secretHint": "{help} Broccoli Access stores it encrypted on your server.",
   "settings.apps.dialog.cancel": "Cancel",
   "settings.apps.dialog.connecting": "Connecting…",

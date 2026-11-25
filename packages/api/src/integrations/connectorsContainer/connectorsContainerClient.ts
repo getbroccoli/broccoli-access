@@ -11,8 +11,8 @@ import {
   CONNECTION_TEST_ANSWER,
   type ConnectionTestAnswer,
   type ConnectionTestRequest,
+  CONNECTOR_DESCRIPTION,
   CONNECTOR_ERROR_CODES,
-  CONNECTOR_MANIFEST,
   type ConnectorDescription,
   type ConnectorErrorCode,
   INTEGRATION_USER_SETUP_ANSWER,
@@ -25,8 +25,8 @@ import { fetchBytes, fetchJson, urlUnder } from "../../utils";
 
 /** The connectors container, spoken to over the connector contract. */
 export interface ConnectorsContainerClient {
-  /** The connectors it offers; rejects when it does not answer with a valid list. */
-  readConnectors(): Promise<ConnectorDescription[]>;
+  /** Parses each connector independently so an invalid entry does not hide the others. */
+  readConnectors(): Promise<ConnectorListing>;
   testConnection(request: ConnectionTestRequest): Promise<ContainerAnswer<ConnectionTestAnswer>>;
   listAccounts(request: AccountsListRequest): Promise<ContainerAnswer<AccountsListAnswer>>;
   runAction(request: ActionRunRequest): Promise<ContainerAnswer<ActionRunAnswer>>;
@@ -38,6 +38,11 @@ export interface ConnectorsContainerClient {
   signInToApp(
     request: ConnectionSignInRequest,
   ): Promise<ContainerAnswer<ConnectionSignInAnswer, ConnectorErrorCode>>;
+}
+
+interface ConnectorListing {
+  descriptions: ConnectorDescription[];
+  rejected: (string | null)[];
 }
 
 /**
@@ -52,14 +57,14 @@ type CallErrorCode = Exclude<ConnectorErrorCode, "not_invited">;
 export function createConnectorsContainerClient(url: string): ConnectorsContainerClient {
   return {
     async readConnectors() {
-      const manifest = await fetchJson(urlUnder(url, "v1/connectors"), CONNECTOR_MANIFEST, {
+      const manifest = await fetchJson(urlUnder(url, "v1/connectors"), CONNECTOR_LIST, {
         timeoutMs: LIST_TIMEOUT_MS,
         maxBytes: MAX_ANSWER_BYTES,
       });
       if (manifest === null) {
         throw new Error("The connectors container answered 404 for its connectors");
       }
-      return manifest.connectors;
+      return connectorListing(manifest.connectors);
     },
     testConnection: (request) =>
       callWithoutSignIn(urlUnder(url, "v1/connections/test"), request, CONNECTION_TEST_ANSWER),
@@ -82,6 +87,23 @@ export function createConnectorsContainerClient(url: string): ConnectorsContaine
         SIGN_IN_TIMEOUT_MS,
       ),
   };
+}
+
+const CONNECTOR_LIST = z.object({ connectors: z.array(z.unknown()) });
+const CONNECTOR_KEY = z.object({ key: z.string().regex(/^[a-z0-9_-]+$/i) });
+
+function connectorListing(entries: readonly unknown[]): ConnectorListing {
+  const descriptions: ConnectorDescription[] = [];
+  const rejected: (string | null)[] = [];
+  for (const entry of entries) {
+    const result = CONNECTOR_DESCRIPTION.safeParse(entry);
+    if (result.success) {
+      descriptions.push(result.data);
+    } else {
+      rejected.push(CONNECTOR_KEY.safeParse(entry).data?.key ?? null);
+    }
+  }
+  return { descriptions, rejected };
 }
 
 /** The contract's wait for any call: no answer by then is the container failing. */

@@ -47,9 +47,9 @@ type AppUser {
   isConnectionUser: Boolean!
   "SUSPEND (Disable) on an active account or REACTIVATE (Enable) on a suspended one, when the owner may ask for it now; null when the app's connection cannot change accounts or needs reconnecting, its last scan did not list the account, the account is the connection's user, or a change of it is running."
   offeredChange: AccountChangeAction
-  "Whether this disabled member may also be removed from its app."
+  "Whether this member may be removed from its app now."
   offersRemove: Boolean!
-  "Whether its row shows Reconnect instead of Disable or Enable: it would offer one, but its app's connection needs reconnecting."
+  "Whether its row shows Reconnect instead of Disable, Enable or Remove: it would offer an action, but its app's connection needs reconnecting."
   offersReconnect: Boolean!
   "Its latest Disable, Enable or Remove; null before the first."
   latestChange: AccountChange
@@ -212,7 +212,7 @@ type EmployeeOffboarding {
   offboardedAt: DateTime
   "Their active accounts that offer Disable now, which Offboard disables: the directory's first, then by app name."
   accountsToDisable: [AppUser!]!
-  "What the owner does by hand, since Broccoli Access cannot: their other active accounts and the accounts being enabled, then their pending invitations, then their running invites, each group by app name."
+  "What the owner does by hand: active accounts outside Disable and Remove all and accounts being enabled, then pending invitations, then running invites, each group by app name."
   byHandWork: [OffboardingByHandWork!]!
   "Their accounts that offer Remove now, never the directory's, by app name."
   accountsToRemove: [AppUser!]!

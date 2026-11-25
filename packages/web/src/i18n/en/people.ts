@@ -208,6 +208,8 @@ export const peopleEn = {
   "people.offboard.oneAppNeedsYou": "1 app needs you:",
   "people.offboard.appsNeedYou": "{count} apps need you:",
   "people.offboard.removeAll": "Remove all…",
+  "people.offboard.removeLater":
+    "Use Remove all after offboarding to remove the active accounts in {apps}.",
   "people.offboard.removeAllTitle": "Remove {name} from these apps?",
   "people.offboard.removeAllConfirm": "Remove all",
   "people.offboard.removeAllFailed":

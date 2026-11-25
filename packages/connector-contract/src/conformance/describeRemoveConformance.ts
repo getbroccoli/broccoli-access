@@ -23,17 +23,17 @@ async function checkRepeatedRemove(
   member: Member,
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
-  const listedMember = (await listAll(flow)).find(
-    ({ sourceKey }) => sourceKey === member.sourceKey,
-  );
-  expect(listedMember?.values.status, "the fixture's member to remove").toBe("active");
-
   const capabilities = await capabilitiesOf(url, fixture.connector);
   if (capabilities.includes("suspend")) {
     const refused = await send(flow, "actions/run", { action: "remove", account: member });
     expect(CONNECTOR_ERROR_ANSWER.parse(refused).error.code).toBe("not_allowed");
     const suspended = await send(flow, "actions/run", { action: "suspend", account: member });
     expect(ACTION_RUN_ANSWER.parse(suspended).account?.values.status).toBe("suspended");
+  } else {
+    const listedMember = (await listAll(flow)).find(
+      ({ sourceKey }) => sourceKey === member.sourceKey,
+    );
+    expect(listedMember?.values.status, "the fixture's member to remove").toBe("active");
   }
 
   const first = await remove(flow, member);

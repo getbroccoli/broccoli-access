@@ -12,21 +12,24 @@ import { reconnectCauseLine } from "../reconnectReason";
 /**
  * Whether an account shows "Couldn't disable", "Couldn't enable" or "Couldn't remove": its latest
  * change failed, and its status is not yet what that change asked for, which a scan since may have
- * read; a failed Remove shows while the account is disabled or still offers Remove.
+ * read; a failed Remove shows for an active account when its connector cannot suspend it.
  */
 export function showsCouldntChange({
   status,
-  offersRemove,
+  app,
   latestChange,
 }: {
   status: AppAccountStatus;
-  offersRemove?: boolean;
+  app?: RemovalApp;
   latestChange?: { status: AccountChangeStatus; action: AccountChangeAction } | null;
 }): boolean {
   if (latestChange?.status !== "FAILED") {
     return false;
   }
-  if (latestChange.action === "REMOVE") return status === "SUSPENDED" || offersRemove === true;
+  if (latestChange.action === "REMOVE")
+    return (
+      status === "SUSPENDED" || app?.containerConnection?.connector?.canDisableAccounts === false
+    );
   return status !== (latestChange.action === "SUSPEND" ? "SUSPENDED" : "ACTIVE");
 }
 
@@ -118,17 +121,15 @@ export function offersFreshRemove({
   offersRemove,
   latestChange,
   app,
-}: Pick<FailedChangeFacts, "app"> & {
+}: {
+  app: RemovalApp;
   status: AppAccountStatus;
   offersRemove: boolean;
   latestChange?:
     (NonNullable<FailedChangeFacts["latestChange"]> & { status: AccountChangeStatus }) | null;
 }): boolean {
   if (!offersRemove) return false;
-  if (
-    latestChange?.action !== "REMOVE" ||
-    !showsCouldntChange({ status, offersRemove, latestChange })
-  ) {
+  if (latestChange?.action !== "REMOVE" || !showsCouldntChange({ status, app, latestChange })) {
     return true;
   }
   return (
@@ -234,12 +235,16 @@ type FailedChangeFacts = {
     failure?: AccountChangeFailure | null;
     finishedAt?: string | null;
   } | null;
-  app: {
-    containerConnection?: {
-      status?: "CONNECTED" | "RECONNECT";
-      scan?: { readAt?: string | null } | null;
-    } | null;
-  };
+  app: { containerConnection?: ChangeConnection | null };
+};
+
+type ChangeConnection = {
+  status?: "CONNECTED" | "RECONNECT";
+  scan?: { readAt?: string | null } | null;
+};
+
+type RemovalApp = {
+  containerConnection?: (ChangeConnection & { connector?: { canDisableAccounts: boolean } }) | null;
 };
 
 function reasonOf(
