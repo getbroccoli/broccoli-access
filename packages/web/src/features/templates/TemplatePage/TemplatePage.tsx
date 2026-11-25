@@ -6,6 +6,7 @@ import { useRef } from "react";
 
 import { TemplatePageDocument, MoreTemplatePeopleDocument } from "@/__generated__/graphql";
 import { t } from "@/i18n";
+import { GOOGLE_WORKSPACE } from "@/lib/useGoogleUserWrites";
 
 import { AddAppMenu } from "./AddAppMenu";
 import { DeleteTemplateButton } from "./DeleteTemplateButton";
@@ -29,7 +30,10 @@ export function TemplatePage() {
     return null;
   }
   const inTemplate = new Set(template.apps.map(({ app }) => app.id));
-  const appsToAdd = data.apps.edges.map(({ node }) => node).filter(({ id }) => !inTemplate.has(id));
+  // Every person already has the directory's app, so a template never gives it.
+  const appsToAdd = data.apps.edges
+    .map(({ node }) => node)
+    .filter(({ id, catalogKey }) => !inTemplate.has(id) && catalogKey !== GOOGLE_WORKSPACE);
 
   return (
     <div className="flex flex-col gap-5">

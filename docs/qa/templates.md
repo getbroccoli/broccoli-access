@@ -19,7 +19,7 @@ A manual check of the Templates page and a template's page against a development
 ## A template's page
 
 - [ ] The page shows "Templates" as the way back, the name with "Rename" and "Delete", "Apps" with "Add app", and "People with this template 0" with "Nobody has this template yet."
-- [ ] "Add app" lists the approved apps that are not in the template. Choosing Slack, then Linear, adds each as a row in that order, and each leaves the menu.
+- [ ] "Add app" lists the approved apps that are not in the template, never Google Workspace. Choosing Slack, then Linear, adds each as a row in that order, and each leaves the menu.
 - [ ] "Rename" opens the dialog with the current name; saving "Developer" changes the title, and a reload keeps it.
 - [ ] "Take out" on Linear removes its row and offers Linear in "Add app" again; a reload keeps Slack only.
 - [ ] Templates shows "Developer" with "Slack" and 0.

@@ -56,7 +56,7 @@ input TemplateDeleteInput {
 input TemplateAddAppInput {
   "The template."
   id: ID!
-  "The id of one of the company's approved apps."
+  "The id of one of the company's approved apps other than the directory's, such as Google Workspace."
   appId: ID!
 }
 
@@ -258,7 +258,7 @@ type TemplatesMutations {
   update(input: TemplateUpdateInput!): TemplateUpdatePayload!
   "Deletes a template, its list of apps and its assignments to people; the apps themselves and every account stay. Admins only."
   delete(input: TemplateDeleteInput!): TemplateDeletePayload!
-  "Adds an approved app to a template; an app already in it changes nothing. Admins only."
+  "Adds an approved app other than the directory's to a template; an app already in it changes nothing. Admins only."
   addApp(input: TemplateAddAppInput!): TemplateAddAppPayload!
   "Takes an app out of a template; an app that is not in it changes nothing. Admins only."
   takeOutApp(input: TemplateTakeOutAppInput!): TemplateTakeOutAppPayload!

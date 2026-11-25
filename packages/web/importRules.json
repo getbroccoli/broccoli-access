@@ -93,6 +93,7 @@
       "src/components/ui",
       "src/features/apps",
       "src/i18n",
+      "src/lib/useGoogleUserWrites",
       "src/shell"
     ],
     "src/features/settings": [
