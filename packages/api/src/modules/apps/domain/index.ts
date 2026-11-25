@@ -28,6 +28,7 @@ export {
   type InAppFacts,
   isAutomaticService,
   planAccountSync,
+  keepAccountFindings,
 } from "./appAccount";
 export { ACCOUNT_NOTE_MAX_LENGTH, parseAccountNote } from "./accountNote";
 export { type AccountDates, accountSince, appSince, type Since } from "./since";
@@ -38,6 +39,7 @@ export {
   type AccountChangeAttempt,
   offeredChange,
   offersReconnect,
+  offersRemove,
   statusAfter,
 } from "./accountChange";
 export { type AppInviteFacts, type AppInviteState, inviteStateOf } from "./appInvite";

@@ -39,7 +39,14 @@ type Props = {
    * the employee's invite row, offering INVITE while Invite is offered; absent where the change is
    * history, as on Activity, which shows only why.
    */
-  row?: { id: string; roleConflict?: boolean; offeredChange: AccountChangeAction | null };
+  row?: {
+    id: string;
+    /** How the row names an account without an employee; its email otherwise. */
+    name?: string | null;
+    roleConflict?: boolean;
+    offeredChange?: AccountChangeAction | null;
+    offersRemove?: boolean;
+  };
   /**
    * Called once Try again was asked or the change was marked done by hand, by a row of an account
    * without an employee, which the answers do not carry.
@@ -75,12 +82,11 @@ export function CouldntChangeDialog({
   }
   const { employee, app } = change;
   const connection = app.containerConnection;
-  const name = employee ? `${employee.firstName} ${employee.lastName}` : change.email;
-  const firstName = employee?.firstName ?? change.email;
+  const accountName = row?.name ?? change.email;
+  const name = employee ? `${employee.firstName} ${employee.lastName}` : accountName;
+  const firstName = employee?.firstName ?? accountName;
   const workspace = connection?.scan?.sourceName ?? app.name;
-  const options = row
-    ? failedChangeOptions({ offeredChange: row.offeredChange, latestChange: change, app })
-    : NO_OPTIONS;
+  const options = row ? failedChangeOptions({ ...row, latestChange: change, app }) : NO_OPTIONS;
   const copy = COPY[change.action];
   const reason = couldntChangeReason(change.failure, {
     action: change.action,
@@ -95,9 +101,13 @@ export function CouldntChangeDialog({
   });
   const tryAgain = (target: ChangeTarget) => {
     setShown(null);
-    void changeAccount(target, change.action).then(onChanged);
+    void changeAccount(
+      target,
+      change.action,
+      change.action === "REMOVE" ? change.id : undefined,
+    ).then(onChanged);
   };
-  const target = row && rowTarget(row.id, change);
+  const target = row && rowTarget(row.id, change, name);
   const scan = (connectionId: string) => {
     setShown(null);
     scanNow({ variables: { connectionId } }).catch(() => toast.error(t("scans.scanNowFailed")));
@@ -222,6 +232,7 @@ const COPY = {
     chip: "apps.couldnt.enable",
     title: "apps.couldnt.enableTitle",
   },
+  REMOVE: { chip: "apps.couldnt.remove", title: "apps.couldnt.removeTitle" },
   INVITE: {
     chip: "apps.couldnt.invite",
     title: "apps.couldnt.inviteTitle",
@@ -231,11 +242,11 @@ const COPY = {
 type FailedChange = CouldntChangeDialog_AccountChangeFragment;
 
 /** What Try again asks for: an invite goes to an employee; an account without one goes by its email. */
-function rowTarget(rowId: string, { action, employee, email, app }: FailedChange) {
+function rowTarget(rowId: string, { action, employee, app }: FailedChange, name: string) {
   if (employee) {
     return changeTargetOf({ id: rowId, employee, app }, action);
   }
-  return action === "INVITE" ? undefined : { name: email, app: app.name, accountId: rowId };
+  return action === "INVITE" ? undefined : { name, app: app.name, accountId: rowId };
 }
 
 /** "Asked by Mia Novak today at 10:14.", or on an earlier day. */

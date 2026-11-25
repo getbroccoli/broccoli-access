@@ -76,6 +76,11 @@ export interface ConnectorSession {
     action: AccountAction,
     account: { sourceKey: string; email: string },
   ): Promise<ActionResult>;
+  /** Removes the identified member and verifies their absence. */
+  remove?(account: {
+    sourceKey: string;
+    email: string;
+  }): Promise<{ connection?: ConnectionUpdate }>;
   /**
    * Invites the email as a member, unless it already has a member or a pending invitation, then
    * reads the invitation or the member back. A connector that lists `invite` has it.
@@ -217,6 +222,14 @@ export function canChangeAccounts({
     capabilities.includes("reactivate") &&
     runtimes.includes("server")
   );
+}
+
+/** Whether the connector can remove a member on the server. */
+export function canRemoveAccounts({
+  capabilities,
+  runtimes,
+}: Pick<Connector, "capabilities" | "runtimes">): boolean {
+  return capabilities.includes("remove") && runtimes.includes("server");
 }
 
 /** Whether it can invite an email to its app: it lists `invite` and the `server` runtime. */

@@ -103,6 +103,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   const employees = createEmployeeReadService({ ...core, accounts: apps });
   const changes = createAccountChangeService({
     readInviteRole,
+    directoryConnectors,
     ...core,
     connectors,
     members: importRecords,

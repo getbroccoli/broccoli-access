@@ -55,7 +55,7 @@ On a new stack (`pnpm dev --drop-db`), add Linear grants for a few Acme people w
 
 On Linear's page, connected as above. Set `FAKE=http://127.0.0.1:<port>`, the port of the printed "Fake connectors (Acme)" address. Make Chloé active again first: `curl -s -X POST "$FAKE/_fake/linear/members/chloe@acme.example/reactivate"`, then "Scan now" until "In Linear" reads "Active".
 
-- [ ] "Disable and Enable act in the Acme workspace." shows on the right of "Users".
+- [ ] "Account changes apply to the Acme workspace." shows on the right of "Users".
 - [ ] Mia Novak reads "You" beside her name and "Connected as you" at the end of her row; Hannah Weber ends with "Enable", the others with "Disable".
 - [ ] "Disable" on Chloé opens "Disable Chloé Martin in Linear?" listing Person (initials, "Chloé Martin chloe@acme.example"), App (Linear) and Workspace (Acme), then "Chloé can no longer sign in to this workspace. You can enable the account again later.", "Broccoli Access makes the change with your personal API key, then reads the account back from Linear.", "Cancel" and "Disable in Linear"; "Cancel" and Escape change nothing.
 - [ ] "Disable in Linear" closes the dialog; the row reads "Disabling in Linear…" with a spinner, then "In Linear" reads "Disabled", the row "Disabled just now" with "Enable", and a toast "Chloé Martin is disabled in Linear." with "View in Activity" shows at the bottom right; `curl -s "$FAKE/_fake/state"` lists Chloé suspended.
@@ -65,6 +65,19 @@ On Linear's page, connected as above. Set `FAKE=http://127.0.0.1:<port>`, the po
 - [ ] After `curl -s -X POST "$FAKE/_fake/linear/keys/revoke"`, disabling Chloé fails and the page, without a reload, shows "Reconnect" instead of "Connected" in the header, no "Scan now", an amber banner "Linear refused the API key: it was revoked or expired. Changes in Linear fail until you paste a new key." with "Reconnect Linear", and "Reconnect" at the end of every row that offered Disable or Enable; Mia's row still reads "Connected as you".
 - [ ] Chloé's "Couldn’t disable" opens "Couldn’t disable Chloé Martin in Linear" with "Linear refused the API key: it was revoked or expired. Reconnect Linear with a new key, then try again. Nothing changed in Linear.", "After you reconnect, this row shows Try again. Or deactivate Chloé in Linear’s admin yourself and tell Broccoli Access.", "I did it by hand", "Open Linear admin" and "Reconnect Linear"; after reconnecting from there (as below), the dialog offers "Try again" instead.
 - [ ] "Reconnect Linear", or a row's "Reconnect", opens "Paste a new key for Linear"; after `curl -s -X POST "$FAKE/_fake/reset"`, `lin_api_acme_fake` brings back "Connected" and "Scan now" without a reload; Chloé's row offers "Try again", the others "Disable" or "Enable".
+
+## Remove
+
+On Linear's page as above; `fail <code>` is explained under "When a change fails".
+
+- [ ] Hannah Weber (disabled) ends with "Enable" and "Remove"; active rows and Mia's show no "Remove", and Google Workspace's page has none. Each button is named for its row, as "Remove hannah@acme.example from Linear".
+- [ ] "Remove" on Hannah opens "Remove Hannah Weber from Linear?" with Person, App, Workspace (Acme) and "This cannot be undone."; "Cancel" and Escape change nothing.
+- [ ] "Remove from Linear" closes the dialog; the row reads "Removing from Linear…", then leaves the list, and a toast "Removed hannah@acme.example from Linear." with "View in Activity" shows at the bottom right. `curl -s "$FAKE/_fake/state"` no longer lists her, and "Scan now" does not bring her back.
+- [ ] Disable Chloé, then remove her without a scan in between: Remove is offered right after "Disabled just now".
+- [ ] After `fail unexpected_response`, removing a disabled member ends with "Couldn’t remove" and "Try again" on the row; the dialog says Broccoli Access couldn’t confirm the removal and to check the member list in Linear. "Try again" removes the member.
+- [ ] Disable David, reactivate him in the fake (`curl -s -X POST "$FAKE/_fake/linear/members/david@acme.example/reactivate"`) and remove him without a scan: "Couldn’t remove" with no "Try again"; the dialog reads "Only a disabled member can be removed" and "Nothing changed in Linear.". After "Scan now" the row reads "Active" with "Disable" only, and "Couldn’t remove" is gone.
+- [ ] After `fail not_allowed`, removing a disabled member ends with "Couldn’t remove" and no "Remove"; after "Scan now" the row still reads "Couldn’t remove" and offers "Remove" again.
+- [ ] "I did it by hand" on a failed Remove asks "Did you remove <name> from Linear yourself?"; "Yes, I did it" drops the row and Activity reads "By hand".
 
 ## When a change fails
 

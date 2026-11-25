@@ -3,6 +3,7 @@ import { expect } from "vitest";
 
 import {
   callConnector,
+  control,
   linearRequest,
   memberAccount,
   readState,
@@ -223,8 +224,12 @@ it("reports an unknown member as already removed", async ({ connectors: { url } 
   expect(result.body).toEqual({ changed: false, removed: true });
 });
 
-it("preserves the member whose Linear key requested removal", async ({ connectors: { url } }) => {
-  const account = memberAccount(ACME_LINEAR, "admin@acme.example");
+it.for([
+  { email: "chloe@acme.example", reason: "an active member" },
+  { email: "admin@acme.example", reason: "the suspended member whose key connects Linear" },
+])("refuses to remove $reason", async ({ email }, { connectors: { url } }) => {
+  const account = memberAccount(ACME_LINEAR, email);
+  if (email === "admin@acme.example") await control(url, `/linear/members/${email}/suspend`);
 
   const result = await callConnector(url, "actions/run", {
     ...linearRequest,
@@ -241,7 +246,7 @@ it("records changed Linear actions in order with the member who made them", asyn
 }) => {
   const account = memberAccount(ACME_LINEAR, "chloe@acme.example");
   const invitee = { email: "ivan@acme.example" };
-  for (const action of ["suspend", "suspend", "reactivate", "remove"]) {
+  for (const action of ["suspend", "suspend", "reactivate", "suspend", "remove"]) {
     await callConnector(url, "actions/run", { ...linearRequest, action, account });
   }
   await callConnector(url, "actions/run", { ...linearRequest, action: "invite", account: invitee });
@@ -250,6 +255,7 @@ it("records changed Linear actions in order with the member who made them", asyn
   expect((await readState(url)).changes.linear).toEqual([
     { action: "suspend", email: account.email, madeBy },
     { action: "reactivate", email: account.email, madeBy },
+    { action: "suspend", email: account.email, madeBy },
     { action: "remove", email: account.email, madeBy },
     { action: "invite", email: invitee.email, madeBy },
   ]);

@@ -60,7 +60,7 @@ export const appsEn = {
   "apps.page.noUsers": "No app accounts linked to people yet.",
   "apps.page.column.actions": "Actions",
   "apps.page.you": "You",
-  "apps.page.changesActIn": "Disable and Enable act in the {workspace} workspace.",
+  "apps.page.changesActIn": "Account changes apply to the {workspace} workspace.",
   "apps.change.disable": "Disable",
   "apps.change.enable": "Enable",
   "apps.change.disableName": "Disable {name} in {app}",
@@ -82,8 +82,8 @@ export const appsEn = {
   "apps.change.enabledToast": "{name} is enabled in {app}.",
   "apps.change.viewInActivity": "View in Activity",
   "apps.activity.title": "Activity",
-  "apps.activity.description": "Every Disable, Enable and Invite, newest first.",
-  "apps.activity.column.person": "Person",
+  "apps.activity.description": "Every Disable, Enable, Remove and Invite, newest first.",
+  "apps.activity.column.person": "Person or account",
   "apps.activity.column.app": "App",
   "apps.activity.column.change": "Change",
   "apps.activity.column.asked": "Asked",
@@ -99,13 +99,34 @@ export const appsEn = {
   "apps.activity.reason.scanNow": "Scan {app} now",
   "apps.activity.reason.securityCheck": "{app} asked for a security check",
   "apps.activity.reason.notAllowed": "{app} doesn’t allow this change",
-  "apps.activity.empty": "No Disable, Enable or Invite yet.",
+  "apps.activity.reason.removeRefused": "The removal was refused",
+  "apps.activity.empty": "No Disable, Enable, Remove or Invite yet.",
   "apps.activity.error": "Couldn’t load Activity",
   "apps.activity.retry": "Try again",
   "apps.change.refused":
     "Couldn’t ask to change {name} in {app}. Reload the page to see the account’s status.",
   "apps.change.inviteRefused":
     "Couldn’t ask to invite {name} to {app}. Check the invite status and the role on their templates, then try again.",
+  "apps.change.remove": "Remove",
+  "apps.change.removeName": "Remove {name} from {app}",
+  "apps.change.removeTitle": "Remove {name} from {app}?",
+  "apps.change.removeWarning": "This cannot be undone.",
+  "apps.change.confirmRemove": "Remove from {app}",
+  "apps.change.removing": "Removing from {app}…",
+  "apps.change.removedToast": "Removed {name} from {app}.",
+  "apps.couldnt.remove": "Couldn’t remove",
+  "apps.couldnt.removeTitle": "Couldn’t remove {name} from {app}",
+  "apps.couldnt.tryAgainRemove": "Try again to remove {name} from {app}",
+  "apps.couldnt.hintRemove":
+    "Try again in a while, or remove {firstName} from {app} yourself and tell Broccoli Access.",
+  "apps.couldnt.hintRemoveByHand":
+    "Remove {firstName} from {app} yourself and tell Broccoli Access.",
+  "apps.couldnt.hintRemoveAfterReconnect":
+    "Reconnect to try again, or remove {firstName} from {app} yourself and tell Broccoli Access.",
+  "apps.byHand.removeTitle": "Did you remove {name} from {app} yourself?",
+  "apps.byHand.removeEffect":
+    "Broccoli Access updates the list now. If another source still finds this account, it stays listed as “Not in {app}”. The next scan checks the removal.",
+  "apps.reconnect.foundByRemove": "Found when you tried to remove {name} {when}.",
   "apps.change.disableTitle": "Disable {name} in {app}?",
   "apps.change.enableTitle": "Enable {name} in {app}?",
   "apps.change.inviteTitle": "Invite {name} to {app}?",
@@ -135,6 +156,10 @@ export const appsEn = {
   "apps.couldnt.askedToday": "Asked by {name} today at {time}.",
   "apps.couldnt.askedOn": "Asked by {name} on {day} at {time}.",
   "apps.couldnt.stillHasAccess": "{firstName} still has access to the {workspace} workspace.",
+  "apps.change.retryRefused":
+    "This removal could not be retried. Reload the page, then choose Remove again if it is still offered.",
+  "apps.couldnt.unconfirmedRemoval":
+    "Broccoli Access couldn’t confirm the removal. Check the member list in {app}.",
   "apps.couldnt.nothingChanged": "Nothing changed in {app}.",
   "apps.couldnt.unexpectedResponse":
     "{app} gave an answer Broccoli Access doesn’t recognise. {app} may have changed how its admin pages work.",
@@ -157,6 +182,8 @@ export const appsEn = {
     "{app} has no member matching {name} ({email}). The account may have been removed, or its email changed in {app}.",
   "apps.couldnt.notAllowed":
     "{app} doesn’t allow this change. {app} refuses it for some members, such as the workspace’s owner.",
+  "apps.couldnt.removeNotAllowed":
+    "The removal was refused. Only a disabled member can be removed, and {app} refuses it for some members, such as the workspace’s owner.",
   "apps.couldnt.browserLost": "The Chrome window making the change closed before {app} answered.",
   "apps.couldnt.hintDisable":
     "Try again in a while, or deactivate {firstName} in {app}’s admin yourself and tell Broccoli Access.",
@@ -172,6 +199,8 @@ export const appsEn = {
     "Invite {firstName} in {app}’s admin yourself and tell Broccoli Access.",
   "apps.couldnt.hintByHandOnly":
     "Trying again won’t help. If someone with more rights in {app} makes the change there, tell Broccoli Access.",
+  "apps.couldnt.hintRemoveRefused":
+    "Trying again won’t help. Scan {app} to see whether {firstName} is still disabled, or remove {firstName} from {app} yourself and tell Broccoli Access.",
   "apps.couldnt.hintScan":
     "Trying again won’t help. Scan {app} to bring its member list up to date.",
   "apps.couldnt.hintScanAfterReconnect":

@@ -10,17 +10,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { t } from "@/i18n";
 
-export type AccountDecision = "link" | MarkedAccountKind | "SUSPEND" | "REACTIVATE";
+export type AccountDecision = "link" | MarkedAccountKind | "SUSPEND" | "REACTIVATE" | "REMOVE";
 
 type Props = {
   disabled: boolean;
   /** Disable or Enable, when the account offers one now. */
   offeredChange: AccountChangeAction | null;
+  offersRemove: boolean;
   onChoose: (action: AccountDecision) => void;
 };
 
-/** What the owner can decide on an unlinked account: whose it is, and Disable or Enable when offered. */
-export function DecideAccountMenu({ disabled, offeredChange, onChoose }: Props) {
+/** What the owner can decide on an unlinked account: whose it is, and Disable, Enable or Remove when offered. */
+export function DecideAccountMenu({ disabled, offeredChange, offersRemove, onChoose }: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button size="sm" variant="outline" disabled={disabled} />}>
@@ -40,6 +41,11 @@ export function DecideAccountMenu({ disabled, offeredChange, onChoose }: Props) 
         {(offeredChange === "SUSPEND" || offeredChange === "REACTIVATE") && (
           <DropdownMenuItem onClick={() => onChoose(offeredChange)}>
             {t(offeredChange === "SUSPEND" ? "apps.change.disable" : "apps.change.enable")}
+          </DropdownMenuItem>
+        )}
+        {offersRemove && (
+          <DropdownMenuItem variant="destructive" onClick={() => onChoose("REMOVE")}>
+            {t("apps.change.remove")}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

@@ -3,6 +3,7 @@ import { createRecordHistoryService, type HistoryAppend } from "../../../core/re
 import type { SecurityContext } from "../../../core/security";
 import { accountChangeRepository, appAccountRepository, appConnectionRepository } from "../db";
 import {
+  type AppAccount,
   type AccountSyncPlan,
   accountChanges,
   type FoundAccount,
@@ -70,7 +71,7 @@ export function createAppAccountService(): AppAccountService {
         statusKeptIn: new Set(otherConnections.map(({ appId }) => appId)),
         statusKeptFor: new Set(changed),
       });
-      await applyPlan(ctx, tx, plan, cause);
+      await applyAccountSync(ctx, tx, plan, { cause });
       return { accountsSetToService: countSetToService(plan) };
     },
     async holdAccountSyncs(ctx, tx) {
@@ -91,11 +92,11 @@ function countSetToService({ created, updated }: AccountSyncPlan): number {
 }
 
 /** Writes the plan's accounts, then their history: one line per created, updated or deleted account. */
-async function applyPlan(
+export async function applyAccountSync(
   ctx: SecurityContext,
   tx: Tx,
   { created, updated, deleted }: AccountSyncPlan,
-  cause: HistoryAppend["cause"],
+  line: Pick<HistoryAppend, "cause" | "requestedBy">,
 ): Promise<void> {
   const repository = appAccountRepository(tx);
   const inserted = await repository.insertMany(created);
@@ -110,11 +111,25 @@ async function applyPlan(
       (account) => account.appId,
     ),
   );
-  if (appIds.size) tx.publish("apps.accountsChanged", { appIds: [...appIds], cause });
+  if (appIds.size)
+    tx.publish("apps.accountsChanged", {
+      appIds: [...appIds],
+      cause: line.cause,
+      requestedBy: line.requestedBy ?? ctx.user?.userId,
+    });
+  await appendAccountHistory(ctx, tx, { created: inserted, updated, deleted }, line);
+}
+
+async function appendAccountHistory(
+  ctx: SecurityContext,
+  tx: Tx,
+  { created, updated, deleted }: Omit<AccountSyncPlan, "created"> & { created: AppAccount[] },
+  line: Pick<HistoryAppend, "cause" | "requestedBy">,
+) {
   const history = [
     {
       operation: "CREATED" as const,
-      records: inserted.map((account) => ({
+      records: created.map((account) => ({
         recordId: account.id,
         changes: accountChanges(null, account),
       })),
@@ -136,7 +151,12 @@ async function applyPlan(
   ];
   for (const { operation, records } of history) {
     if (records.length > 0) {
-      await recordHistory.append(ctx, tx, { recordType: "app_account", operation, cause, records });
+      await recordHistory.append(ctx, tx, {
+        recordType: "app_account",
+        operation,
+        ...line,
+        records,
+      });
     }
   }
 }

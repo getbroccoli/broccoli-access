@@ -40,6 +40,7 @@ export async function scanSource(
   dependencies: ScanDependencies,
   { sourceId, connectionId }: { sourceId: string; connectionId: string },
   progressBySource: Map<string, ScanProgress>,
+  restarted = false,
 ): Promise<ScanFailure | null> {
   const { orm, apps } = dependencies;
   const { connection, secrets, revision } = (await apps.readConnectionWithSecrets(
@@ -55,12 +56,13 @@ export async function scanSource(
     if (!connector) {
       throw new ConnectorError("app_unavailable");
     }
-    await readAndSave(
-      ctx,
-      dependencies,
-      { sourceId, connection, connector, used, revision },
-      progressBySource,
-    );
+    const target = { sourceId, connection, connector, used, revision };
+    if (!(await readAndSave(ctx, dependencies, target, progressBySource))) {
+      if (restarted)
+        throw new ApplicationError("CONFLICT", "The roster changed on both scan attempts.");
+      dependencies.logger.info({ sourceId }, "Restarting scan after an overlapping removal");
+      return scanSource(ctx, dependencies, { sourceId, connectionId }, progressBySource, true);
+    }
     return null;
   } catch (error) {
     if (!(error instanceof ConnectorError)) {
@@ -84,22 +86,27 @@ interface SecretsInUse {
 /** The scan's connection as the apps module gives it, without its secrets. */
 type ScannedConnection = NonNullable<Awaited<ReturnType<ScannedApps["readConnectionById"]>>>;
 
+interface ScanTarget {
+  sourceId: string;
+  connection: ScannedConnection;
+  connector: Connector;
+  used: SecretsInUse;
+  revision: string;
+}
+
 async function readAndSave(
   ctx: SecurityContext,
   dependencies: ScanDependencies,
-  target: {
-    sourceId: string;
-    connection: ScannedConnection;
-    connector: Connector;
-    used: SecretsInUse;
-    revision: string;
-  },
+  target: ScanTarget,
   progressBySource: Map<string, ScanProgress>,
-): Promise<void> {
+): Promise<boolean> {
   const { used, ...scanned } = target;
   const { sourceId, connection, connector } = scanned;
   const renewing = { connectionId: connection.id, used };
   const readStartedAt = new Date();
+  const savedCount = connector.isDirectory
+    ? null
+    : (await importSourceRepository(dependencies.orm).countRecords(sourceId)).accounts;
   const retrying = <T>(call: () => Promise<T>) => withRetries(dependencies, sourceId, call);
   const session = await retrying(() =>
     connector.openSession({ settings: connection.settings, secrets: used.secrets }),
@@ -118,19 +125,16 @@ async function readAndSave(
     accounts,
     retrying,
   });
-  const findings = { ...scanned, readStartedAt, invitations, ...read };
-  const outcome = await saveScan(ctx, dependencies, findings);
-  dependencies.logger.info(
-    {
-      sourceId,
-      accounts: accounts.length,
-      ...found,
-      invitations: invitations.length,
-      photoChanges: read.photos.size,
-      ...outcome,
-    },
-    "Scan finished",
-  );
+  const outcome = await saveScan(ctx, dependencies, {
+    ...scanned,
+    savedCount,
+    readStartedAt,
+    invitations,
+    ...read,
+  });
+  if (!outcome) return false;
+  logScan(dependencies, sourceId, found, { accounts, invitations, photos: read.photos }, outcome);
+  return true;
 }
 
 /**
@@ -140,9 +144,12 @@ async function readAndSave(
 async function saveScan(
   ctx: SecurityContext,
   dependencies: ScanDependencies,
-  findings: ScanFindings & { revision: string },
-): Promise<{ saved: boolean; finishedSetupScan: boolean; accountsSetToService: number }> {
-  const { sourceId, accounts } = findings;
+  findings: ScanFindings & {
+    revision: string;
+    savedCount: number | null;
+  },
+): Promise<{ saved: boolean; finishedSetupScan: boolean; accountsSetToService: number } | null> {
+  const { sourceId, accounts, savedCount } = findings;
   return dependencies.transact(async (tx) => {
     const sources = importSourceRepository(tx);
     const source = await sources.lockById(sourceId);
@@ -162,6 +169,10 @@ async function saveScan(
       // The job retries from a fresh connection; stale findings must never reach app history.
       throw new ApplicationError("CONFLICT", "The directory connection changed during the scan.");
     }
+    // Only Remove can delete this source's records between scan saves.
+    // shortcut: an unsettled remote removal can still shift a page; the next scan reconciles it.
+    if (savedCount !== null && savedCount !== (await sources.countRecords(sourceId)).accounts)
+      return null;
     await sources.replaceRecords(sourceId, accounts);
     const { accountsSetToService } = await syncAccounts(ctx, tx, findings, dependencies);
     await sources.markScanned(sourceId, new Date());
@@ -254,5 +265,25 @@ async function saveConnectionUpdate(
       saved,
     },
     "Scan answered with renewed settings or secrets",
+  );
+}
+
+function logScan(
+  { logger }: ScanDependencies,
+  sourceId: string,
+  found: ScanCounts,
+  read: { accounts: ImportedAccount[]; invitations: PendingInvitation[]; photos: { size: number } },
+  outcome: { saved: boolean; finishedSetupScan: boolean },
+) {
+  logger.info(
+    {
+      sourceId,
+      accounts: read.accounts.length,
+      ...found,
+      invitations: read.invitations.length,
+      photoChanges: read.photos.size,
+      ...outcome,
+    },
+    "Scan finished",
   );
 }

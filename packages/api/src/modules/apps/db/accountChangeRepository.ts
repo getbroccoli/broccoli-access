@@ -38,6 +38,7 @@ export interface AccountChangeRepository {
       status: "succeeded" | "failed";
       finishedAt: Date;
     },
+    expectedStatus?: AccountChange["status"],
   ): Promise<void>;
   /** Turns a failed change into `done_by_hand`, keeping its error, attempts and finish. */
   markDoneByHand(id: string): Promise<AccountChange>;
@@ -107,11 +108,11 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .for("update");
       return row ? toChange(row) : null;
     },
-    finish: async (id, { status, attempts, error, finishedAt }) => {
+    finish: async (id, { status, attempts, error, finishedAt }, expectedStatus = "running") => {
       await orm()
         .update(accountChanges)
         .set({ status, attempts: attempts.map(storedAttempt), error, finishedAt })
-        .where(and(eq(accountChanges.id, id), eq(accountChanges.status, "running")));
+        .where(and(eq(accountChanges.id, id), eq(accountChanges.status, expectedStatus)));
     },
     markDoneByHand: async (id) => {
       const [row] = await orm()
@@ -136,6 +137,7 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
         .where(
           and(
             anyOf(accountChanges.appAccountId, appAccountIds),
+            anyOf(accountChanges.action, ["suspend", "reactivate"]),
             or(
               eq(accountChanges.status, "running"),
               and(eq(accountChanges.status, "succeeded"), gte(accountChanges.finishedAt, since)),

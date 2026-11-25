@@ -1,16 +1,19 @@
 import type { FragmentType } from "@apollo/client";
 import { useFragment } from "@apollo/client/react";
+import { useState } from "react";
 
 import {
   type AccountChangeCell_AppUserFragment,
   AccountChangeCell_AppUserFragmentDoc,
 } from "@/__generated__/graphql";
+import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 
 import { ReconnectButton } from "../ReconnectButton";
 import { ChangeProgress } from "./ChangeProgress";
 import { ConfirmAccountChangeDialog } from "./ConfirmAccountChangeDialog";
-import { failedChangeOptions, showsCouldntChange } from "./couldntChange";
+import { failedChangeOptions, offersFreshRemove, showsCouldntChange } from "./couldntChange";
+import { RemoveAccountDialog } from "./RemoveAccountDialog";
 import { TryAgainButton } from "./TryAgainButton";
 import { changeTargetOf } from "./useChangeAccount";
 import { useJustNow } from "./useJustNow";
@@ -28,6 +31,7 @@ type Props = {
  * accounts, and Reconnect while the connection needs it.
  */
 export function AccountChangeCell({ appUser }: Props) {
+  const [removing, setRemoving] = useState(false);
   const fragment = useFragment({
     fragment: AccountChangeCell_AppUserFragmentDoc,
     // The document also holds the fragments of the Reconnect button, which this one spreads.
@@ -60,7 +64,8 @@ export function AccountChangeCell({ appUser }: Props) {
   if (change?.status === "RUNNING") {
     return <ChangeProgress app={user.app.name} change={change} />;
   }
-  if (change && showsCouldntChange(user)) {
+  const failedRemove = change?.action === "REMOVE" && showsCouldntChange(user);
+  if (change && !failedRemove && showsCouldntChange(user)) {
     return failedChangeOptions(user).tryAgain ? (
       <span className="flex justify-end">
         <TryAgainButton target={changeTargetOf(user, change.action)} action={change.action} />
@@ -69,7 +74,7 @@ export function AccountChangeCell({ appUser }: Props) {
   }
   return (
     <span className="flex items-center justify-end gap-3">
-      {justNow && succeeded && (
+      {justNow && succeeded && succeeded.action !== "REMOVE" && (
         <span className={MUTED}>
           {t(
             succeeded.action === "SUSPEND"
@@ -78,12 +83,38 @@ export function AccountChangeCell({ appUser }: Props) {
           )}
         </span>
       )}
-      {user.offeredChange && (
+      {user.offeredChange && user.offeredChange !== "REMOVE" && (
         <ConfirmAccountChangeDialog
           accountEmail={user.email}
           row={user}
           action={user.offeredChange}
         />
+      )}
+      {failedRemove && failedChangeOptions(user).tryAgain && (
+        <TryAgainButton
+          target={changeTargetOf(user, change.action)}
+          action={change.action}
+          retryOf={change.id}
+        />
+      )}
+      {offersFreshRemove(user) && (
+        <>
+          <Button
+            size="sm"
+            variant="outline"
+            aria-label={t("apps.change.removeName", { name: user.email, app: user.app.name })}
+            onClick={() => setRemoving(true)}
+          >
+            {t("apps.change.remove")}
+          </Button>
+          <RemoveAccountDialog
+            linked
+            open={removing}
+            onClose={() => setRemoving(false)}
+            account={user}
+            name={`${user.employee.firstName} ${user.employee.lastName}`}
+          />
+        </>
       )}
     </span>
   );

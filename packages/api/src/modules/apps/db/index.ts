@@ -10,7 +10,6 @@ export { appAccounts } from "./appAccountsTable";
 export {
   appAccountRepository,
   type AppAccountRepository,
-  type AppUserAccount,
   type EmployeeAppAccount,
   type UnlinkedAccount,
   UNLINKED_SORT_VALUES,
@@ -23,3 +22,5 @@ export {
   type AppInvitation,
   type AppInvitationRepository,
 } from "./appInvitationRepository";
+
+export type { AppUserAccount } from "./inApp";

@@ -5,6 +5,12 @@ import { type ConnectionMember, importSourceRepository } from "../db";
 export interface ImportRecordService {
   /** The email of the connection’s member with this stable id, from its last saved scan. */
   findMemberEmail(db: Orm | Tx, connectionId: string, sourceKey: string): Promise<string | null>;
+  /** Forgets only the member removed from this connection. Joins the account change transaction. */
+  removeMember(
+    tx: Tx,
+    member: { connectionId: string; sourceKey: string; email: string },
+  ): Promise<void>;
+
   /**
    * The members with one of `emails` that the last saved scan of one of `connectionIds` found.
    * Trusted read: no `ctx`.
@@ -24,6 +30,7 @@ export function createImportRecordService(): ImportRecordService {
   return {
     findMemberEmail: (db, connectionId, sourceKey) =>
       importSourceRepository(db).findMemberEmail(connectionId, sourceKey),
+    removeMember: (tx, member) => importSourceRepository(tx).removeMember(member),
     findConnectionMembers: (db, members) =>
       importSourceRepository(db).findConnectionMembers(members),
     findLastScans: async (db) =>

@@ -24,6 +24,11 @@ async function checkRepeatedRemove(
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
 
+  const refused = await send(flow, "actions/run", { action: "remove", account: member });
+  expect(CONNECTOR_ERROR_ANSWER.parse(refused).error.code).toBe("not_allowed");
+  const suspended = await send(flow, "actions/run", { action: "suspend", account: member });
+  expect(ACTION_RUN_ANSWER.parse(suspended).account?.values.status).toBe("suspended");
+
   const first = await remove(flow, member);
   const listed = await listAll(flow);
   const second = await remove(flow, member);

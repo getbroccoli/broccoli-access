@@ -3,6 +3,7 @@ import { Check } from "@phosphor-icons/react";
 import type { FragmentType } from "@apollo/client";
 
 import type {
+  AccountChangeAction,
   AccountChangeFailure,
   CouldntChangeDialog_AccountChangeFragment,
 } from "@/__generated__/graphql";
@@ -57,7 +58,7 @@ export function ChangeOutcome({ change }: Props) {
       <CouldntChangeDialog change={change} triggerClassName={FAILED} />
       {change.failure && (
         <span className="text-xs text-muted-foreground">
-          {t(REASONS[change.failure], { app: app.name })}
+          {t(reasonKey(change.action, change.failure), { app: app.name })}
         </span>
       )}
     </span>
@@ -81,6 +82,13 @@ const REASONS: Record<AccountChangeFailure, MessageKey> = {
   ACCOUNT_NOT_FOUND: "apps.activity.reason.scanNow",
   NOT_ALLOWED: "apps.activity.reason.notAllowed",
 };
+
+/** Broccoli Access itself refuses a Remove whose member is active again, so the app is not named. */
+function reasonKey(action: AccountChangeAction, failure: AccountChangeFailure): MessageKey {
+  return action === "REMOVE" && failure === "NOT_ALLOWED"
+    ? "apps.activity.reason.removeRefused"
+    : REASONS[failure];
+}
 
 function byHandNote(finishedAt: string | null): string {
   if (finishedAt === null) {

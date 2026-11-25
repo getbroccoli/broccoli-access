@@ -239,6 +239,12 @@ function containerSession(
       }
       return { status: answer.account.values.status, connection: answer.connection };
     },
+    async remove(account) {
+      const answer = answerOf(await client.runAction({ ...request(), action: "remove", account }));
+      if (!answer.removed) throw new ConnectorError("unexpected_response");
+      keep(answer.connection);
+      return { connection: answer.connection };
+    },
     async invite(email, role) {
       const answer = answerOf(
         await client.runAction({ ...request(), action: "invite", account: { email, role } }),

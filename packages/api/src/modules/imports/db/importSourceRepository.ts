@@ -1,4 +1,4 @@
-import { and, count, eq, type SQL, sql } from "drizzle-orm";
+import { and, count, eq, inArray, type SQL, sql } from "drizzle-orm";
 
 import {
   ACCOUNT_VALUES_VERSION,
@@ -33,6 +33,7 @@ export interface ImportSourceRepository {
   markScanning(id: string): Promise<void>;
   /** Makes the source's records exactly `accounts`. */
   replaceRecords(id: string, accounts: readonly ImportedAccount[]): Promise<void>;
+  removeMember(member: { connectionId: string; sourceKey: string; email: string }): Promise<void>;
   /** The accounts the source's last saved scan found. */
   findRecords(id: string): Promise<Pick<ImportedAccount, "sourceKey" | "raw">[]>;
   /** The email of the member with this stable source key, or null if absent from the scan. */
@@ -58,6 +59,7 @@ export interface ImportSourceRepository {
 
 /** A member of a connected app as its connection's last saved scan found it. */
 export interface ConnectionMember {
+  status: "active" | "suspended";
   displayName: string | null;
   connectionId: string;
   /** Lowercased. */
@@ -103,6 +105,21 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
         await orm().insert(importRecords).values(batch);
       }
     },
+    removeMember: async ({ connectionId, sourceKey, email }) => {
+      const source = orm()
+        .select({ id: importSources.id })
+        .from(importSources)
+        .where(eq(importSources.connectionId, connectionId));
+      await orm()
+        .delete(importRecords)
+        .where(
+          and(
+            inArray(importRecords.sourceId, source),
+            eq(importRecords.sourceKey, sourceKey),
+            sql`(${importRecords.values} ->> 'email') = ${email}`,
+          ),
+        );
+    },
     findRecords: (id) =>
       orm()
         .select({
@@ -144,6 +161,7 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
           connectionId: importSources.connectionId,
           // The builder has no JSON operators; the keys are constants.
           email: sql<string>`${importRecords.values} ->> 'email'`,
+          status: sql<ConnectionMember["status"]>`${importRecords.values} ->> 'status'`,
           displayName: sql<string | null>`${importRecords.values} ->> 'displayName'`,
           sourceKey: importRecords.sourceKey,
           isConnectionUser: sql<boolean>`coalesce((${importRecords.values} ->> 'isConnectionUser')::boolean, false)`,

@@ -67,7 +67,7 @@ The fixture causes every error except those it lists in `cannotCause`, the error
 
 A connector that lists `invite` needs `invitee` in its fixture; the invite checks of any other connector show as skipped. The same holds for the capabilities added later, so a fixture written before them still runs:
 
-- `remove` needs `memberToRemove`: the suite removes that member twice, checks the next list is without them, and that removing the connection's own member answers `not_allowed`.
+- `remove` needs `memberToRemove`: the suite checks that removing the active member returns `not_allowed`, suspends them, removes them twice, checks the next list is without them, and that removing the connection's own member answers `not_allowed`.
 - `roles` in the manifest: an invite of `invitee` with a role the connector does not list must answer HTTP 400.
 - `sign_in` needs `signIn`: `integrationUser` (`email`, `password`, `totpSecret`), which `reset` leaves invited as an admin in the fake app, and `causeError(url, code)`, which makes the next `connections/sign-in` answer `not_invited`, `permission_missing` or `blocked_by_check`. The suite signs in and lists the members with the connection it gets.
 

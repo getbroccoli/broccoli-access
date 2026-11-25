@@ -2,6 +2,7 @@ fragment AppAccountStatusCell_appUser on AppUser {
   id
   status
   offeredChange
+  offersRemove
   latestChange {
     id
     action

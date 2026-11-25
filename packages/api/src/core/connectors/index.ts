@@ -4,6 +4,7 @@ export {
   ACCOUNT_VALUES_VERSION,
   canChangeAccounts,
   canInvite,
+  canRemoveAccounts,
   CONNECTOR_ERROR_CODES,
   ConnectorError,
   listsInvitations,

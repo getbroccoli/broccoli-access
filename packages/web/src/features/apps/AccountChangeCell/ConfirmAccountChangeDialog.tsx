@@ -3,6 +3,7 @@ import { useState } from "react";
 import type {
   AccountChangeAction,
   AccountChangeCell_AppUserFragment,
+  InviteCell_AppInviteFragment,
 } from "@/__generated__/graphql";
 import { AppMark } from "@/components/AppMark";
 import { Avatar } from "@/components/Avatar";
@@ -25,10 +26,13 @@ import { changeTargetOf, useChangeAccount } from "./useChangeAccount";
 
 type Props = {
   /** The account for Disable and Enable, or the employee's invite row for Invite. */
-  row: Pick<AccountChangeCell_AppUserFragment, "id" | "employee" | "app">;
+  row: Pick<
+    AccountChangeCell_AppUserFragment | InviteCell_AppInviteFragment,
+    "id" | "employee" | "app"
+  >;
   accountEmail?: string;
   expectedRole?: string;
-  action: AccountChangeAction;
+  action: Exclude<AccountChangeAction, "REMOVE">;
 };
 
 /**

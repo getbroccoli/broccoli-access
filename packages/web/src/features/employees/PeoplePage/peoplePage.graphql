@@ -68,15 +68,29 @@ query AccountsWithoutPerson($after: String, $first: Int = 100) {
         displayName
         status
         offeredChange
+        offersRemove
         latestChange {
           id
           action
           status
           changesAhead
+          failure
+          finishedAt
         }
         app {
           id
           name
+          containerConnection {
+            adminUrl
+            id
+            # shortcut: reads each connection's scan for the workspace name the Remove dialog shows;
+            # read it when the dialog opens once the list spans many connected apps.
+            scan {
+              id
+              sourceName
+              readAt
+            }
+          }
         }
         suggestedEmployee {
           id

@@ -3,7 +3,7 @@ import type { RuntimeKind } from "@broccoli-access/connector-contract";
 import type { AccountAction, AccountStatus, ConnectorErrorCode } from "../../../core/connectors";
 
 /**
- * One Disable or Enable of one app account, or one Invite of an employee to an app, from the
+ * One Disable, Enable or Remove of one app account, or one Invite of an employee to an app, from the
  * owner's click to its result.
  */
 export interface AccountChange {
@@ -31,8 +31,8 @@ export interface AccountChange {
   finishedAt: Date | null;
 }
 
-/** Disable (`suspend`), Enable (`reactivate`) or Invite (`invite`). */
-export type AccountChangeAction = AccountAction | "invite";
+/** Disable (`suspend`), Enable (`reactivate`) Remove (`remove`) or Invite (`invite`). */
+export type AccountChangeAction = AccountAction | "invite" | "remove";
 
 /** `running` covers waiting for its turn too; `done_by_hand` follows a failure. */
 export const ACCOUNT_CHANGE_STATUSES = ["running", "succeeded", "failed", "done_by_hand"] as const;
@@ -53,6 +53,7 @@ export interface AccountChangeFacts {
     status: "connected" | "reconnect";
     /** Whether its connector lists `suspend` and `reactivate`. */
     changesAccounts: boolean;
+    removesAccounts?: boolean;
   } | null;
   /** The connection's record for the account's email from its last scan; null when it lists none. */
   record: { isConnectionUser: boolean } | null;
@@ -66,22 +67,16 @@ export interface AccountChangeFacts {
  * listing the account, which is not the connection's own user, with no change running. Null
  * otherwise.
  */
-export function offeredChange({
-  status,
-  connection,
-  record,
-  changeRunning,
-}: AccountChangeFacts): AccountAction | null {
-  const changeable =
-    connection?.status === "connected" &&
-    connection.changesAccounts &&
-    record !== null &&
-    !record.isConnectionUser &&
-    !changeRunning;
-  if (!changeable) {
-    return null;
-  }
-  return status === "active" ? "suspend" : "reactivate";
+export function offeredChange(facts: AccountChangeFacts): AccountAction | null {
+  if (!facts.connection?.changesAccounts || !canActOnMember(facts)) return null;
+  return facts.status === "active" ? "suspend" : "reactivate";
+}
+
+/** A disabled member can also be removed when its connector offers that action. */
+export function offersRemove(facts: AccountChangeFacts): boolean {
+  return (
+    facts.status === "suspended" && !!facts.connection?.removesAccounts && canActOnMember(facts)
+  );
 }
 
 /**
@@ -90,13 +85,21 @@ export function offeredChange({
  */
 export function offersReconnect(facts: AccountChangeFacts): boolean {
   const { connection } = facts;
-  return (
-    connection?.status === "reconnect" &&
-    offeredChange({ ...facts, connection: { ...connection, status: "connected" } }) !== null
-  );
+  if (connection?.status !== "reconnect") return false;
+  const connected = { ...facts, connection: { ...connection, status: "connected" as const } };
+  return offeredChange(connected) !== null || offersRemove(connected);
 }
 
 /** The status an action leaves the account in. */
 export function statusAfter(action: AccountAction): AccountStatus {
   return action === "suspend" ? "suspended" : "active";
+}
+
+function canActOnMember({ connection, record, changeRunning }: AccountChangeFacts): boolean {
+  return (
+    connection?.status === "connected" &&
+    record !== null &&
+    !record.isConnectionUser &&
+    !changeRunning
+  );
 }

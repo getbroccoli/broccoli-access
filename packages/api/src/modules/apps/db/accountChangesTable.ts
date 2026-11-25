@@ -9,7 +9,7 @@ import { appAccounts } from "./appAccountsTable";
 import { appConnections } from "./appConnectionsTable";
 import { apps } from "./appsTable";
 
-/** One Disable or Enable of one app account, or one Invite of an employee to an app, from the owner's click to its result. */
+/** One Disable, Enable or Remove of one app account, or one Invite of an employee to an app, from the owner's click to its result. */
 export const accountChanges = pgTable(
   "account_changes",
   {
@@ -29,7 +29,7 @@ export const accountChanges = pgTable(
     connectionId: uuid("connection_id")
       .notNull()
       .references(() => appConnections.id),
-    action: text("action", { enum: ["suspend", "reactivate", "invite"] }).notNull(),
+    action: text("action", { enum: ["suspend", "reactivate", "invite", "remove"] }).notNull(),
     /** The member's id in the app, copied from the connection's import record; null for an invite. */
     sourceKey: text("source_key"),
     status: text("status", { enum: ACCOUNT_CHANGE_STATUSES }).notNull(),
@@ -52,7 +52,10 @@ export const accountChanges = pgTable(
       .on(table.connectionId, table.email)
       .where(sql`${table.status} = 'running' and ${table.action} = 'invite'`),
     index("account_changes_app_account").on(table.appAccountId, table.requestedAt),
-    check("account_changes_action", sql`${table.action} in ('suspend', 'reactivate', 'invite')`),
+    check(
+      "account_changes_action",
+      sql`${table.action} in ('suspend', 'reactivate', 'invite', 'remove')`,
+    ),
     check(
       "account_changes_status",
       sql`${table.status} in ('running', 'succeeded', 'failed', 'done_by_hand')`,

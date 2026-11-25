@@ -4,6 +4,7 @@ fragment AccountChangeCell_appUser on AppUser {
   status
   isConnectionUser
   offeredChange
+  offersRemove
   offersReconnect
   latestChange {
     id
@@ -26,6 +27,7 @@ fragment AccountChangeCell_appUser on AppUser {
     catalogKey
     canChangeAccounts
     containerConnection {
+      adminUrl
       id
       scan {
         id
@@ -60,5 +62,13 @@ mutation ChangeAccount($input: AppUserChangeInput!) {
         }
       }
     }
+  }
+}
+
+# How a Remove ended, for the row it took away with the account.
+query RemovalOutcome($id: ID!) {
+  accountChange(id: $id) {
+    id
+    status
   }
 }

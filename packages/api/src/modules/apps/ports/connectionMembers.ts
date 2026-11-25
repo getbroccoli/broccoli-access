@@ -5,6 +5,12 @@ import type { Orm, Tx } from "../../../core/db";
  * each connection last finished a scan.
  */
 export interface ConnectionMembers {
+  /** Forgets only the member removed from this connection. Joins the account change transaction. */
+  removeMember(
+    tx: Tx,
+    member: { connectionId: string; sourceKey: string; email: string },
+  ): Promise<void>;
+
   /**
    * The members with one of `emails` that the last saved scan of one of `connectionIds` saw. Trusted
    * read: no `ctx`.
@@ -22,6 +28,7 @@ export interface ConnectionMembers {
 
 /** A member of a connected app as its connection's last scan saw it. */
 export interface ConnectionMember {
+  status: "active" | "suspended";
   displayName: string | null;
   connectionId: string;
   /** Lowercased. */

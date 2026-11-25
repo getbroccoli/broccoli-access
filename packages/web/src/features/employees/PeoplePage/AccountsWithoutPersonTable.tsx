@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { offersFreshRemove, RemoveAccountDialog } from "@/features/apps";
 import { t } from "@/i18n";
 
 import { removeAccountWithoutPerson } from "../cache";
@@ -125,6 +126,7 @@ export function AccountsWithoutPersonTable({
                     <DecideAccountMenu
                       disabled={mutation.loading || loading}
                       offeredChange={account.offeredChange ?? null}
+                      offersRemove={offersFreshRemove(account)}
                       onChoose={(action) => setChoosing({ id: account.id, action })}
                     />
                   </span>
@@ -154,6 +156,15 @@ export function AccountsWithoutPersonTable({
           action={decision.action}
           onAsked={refresh}
           onClose={() => setChoosing(null)}
+        />
+      )}
+      {choosing && decision?.action === "REMOVE" && (
+        <RemoveAccountDialog
+          open
+          account={choosing}
+          name={choosing.displayName ?? null}
+          onClose={() => setChoosing(null)}
+          onChanged={() => void refresh()}
         />
       )}
       {choosing && decision?.action === "link" && (

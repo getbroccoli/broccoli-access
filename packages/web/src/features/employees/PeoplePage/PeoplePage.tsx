@@ -45,8 +45,11 @@ export function PeoplePage() {
     fetchPolicy: "cache-and-network",
   });
   const { accounts, marked } = useAccountsWithoutPerson(showAccounts);
-  const refreshAccounts = () =>
-    Promise.allSettled([accounts.refresh(), marked.refresh(), badge.refetch()]);
+  const refreshAccounts = async () => {
+    await Promise.allSettled([accounts.refresh(), marked.refresh()]);
+    // The count is read after the list, so an account a removal took off the list has left it too.
+    return badge.refetch();
+  };
   const connection = directory.data?.setup.googleWorkspace;
   const isScanning = connection?.scan?.status === "SCANNING";
   usePollWhileScanning(isScanning, directory);

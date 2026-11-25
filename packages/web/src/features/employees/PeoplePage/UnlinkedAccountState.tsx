@@ -19,7 +19,7 @@ type Props = {
 };
 
 /**
- * What an unlinked account's row shows of Disable and Enable: the change while it runs, "Couldn't
+ * What an unlinked account's row shows of Disable, Enable and Remove: the change while it runs, "Couldn't
  * disable" opening why and what helps once it failed, and "Disabled" on a suspended account.
  */
 export function UnlinkedAccountState({ account, onChanged }: Props) {
@@ -36,7 +36,12 @@ export function UnlinkedAccountState({ account, onChanged }: Props) {
     return (
       <CouldntChangeDialog
         change={failure.data.accountChange}
-        row={{ id: account.id, offeredChange: account.offeredChange ?? null }}
+        row={{
+          id: account.id,
+          name: account.displayName,
+          offeredChange: account.offeredChange ?? null,
+          offersRemove: account.offersRemove,
+        }}
         onChanged={onChanged}
       />
     );
