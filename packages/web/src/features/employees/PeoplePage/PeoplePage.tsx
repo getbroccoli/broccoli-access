@@ -17,6 +17,7 @@ import { useRefetchAfterScan } from "@/lib/useRefetchAfterScan";
 
 import { SEARCH_MAX_LENGTH } from "../peopleSearch";
 import { AccountsWithoutPersonTable } from "./AccountsWithoutPersonTable";
+import { MarkedAccountsTable } from "./MarkedAccountsTable";
 import { PeopleHeader } from "./PeopleHeader";
 import { PeopleTable } from "./PeopleTable";
 import { PeopleTabs } from "./PeopleTabs";
@@ -43,7 +44,9 @@ export function PeoplePage() {
     skip: !me.isOwner,
     fetchPolicy: "cache-and-network",
   });
-  const accounts = useAccountsWithoutPerson(showAccounts);
+  const { accounts, marked } = useAccountsWithoutPerson(showAccounts);
+  const refreshAccounts = () =>
+    Promise.allSettled([accounts.refresh(), marked.refresh(), badge.refetch()]);
   const connection = directory.data?.setup.googleWorkspace;
   const isScanning = connection?.scan?.status === "SCANNING";
   usePollWhileScanning(isScanning, directory);
@@ -51,7 +54,7 @@ export function PeoplePage() {
     Promise.allSettled([
       refetch(),
       ...(me.isOwner ? [badge.refetch()] : []),
-      ...(showAccounts ? [accounts.refresh()] : []),
+      ...(showAccounts ? [accounts.refresh(), marked.refresh()] : []),
     ]);
   useRefetchAfterScan(isScanning, refresh);
   useRefetchAfterContainerConnectorScans(refresh);
@@ -101,9 +104,21 @@ export function PeoplePage() {
         <AccountsWithoutPersonTable
           accounts={accounts.data.accountsWithoutPerson}
           loading={accounts.loading}
-          refresh={refresh}
-          refreshCounts={() => void Promise.allSettled([refetch(), badge.refetch()])}
+          refresh={refreshAccounts}
+          onLinked={() => void Promise.allSettled([refetch(), accounts.refill()])}
+          onMarked={() => Promise.allSettled([accounts.refill(), marked.refresh()])}
           loadMore={() => void accounts.loadMore()}
+        />
+      )}
+      {showAccounts && marked.error && !marked.data && (
+        <LoadError message={t("people.accounts.loadFailed")} retry={marked.refetch} />
+      )}
+      {showAccounts && marked.data && (
+        <MarkedAccountsTable
+          accounts={marked.data.markedAccounts}
+          loading={marked.loading}
+          refresh={refreshAccounts}
+          loadMore={() => void marked.loadMore()}
         />
       )}
       {!showAccounts && people && (

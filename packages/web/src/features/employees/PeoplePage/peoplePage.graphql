@@ -26,6 +26,9 @@ mutation LinkAccount($input: AppAccountLinkInput!) {
       }
       error {
         __typename
+        ... on Error {
+          message
+        }
       }
     }
   }
@@ -63,6 +66,14 @@ query AccountsWithoutPerson($after: String, $first: Int = 100) {
         id
         email
         displayName
+        status
+        offeredChange
+        latestChange {
+          id
+          action
+          status
+          changesAhead
+        }
         app {
           id
           name
@@ -75,5 +86,69 @@ query AccountsWithoutPerson($after: String, $first: Int = 100) {
         }
       }
     }
+  }
+}
+
+query MarkedAccounts($after: String, $first: Int = 100) {
+  markedAccounts(after: $after, first: $first) {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    edges {
+      node {
+        id
+        email
+        kind
+        note
+        canEdit
+        app {
+          id
+          name
+        }
+      }
+    }
+  }
+}
+
+mutation MarkAccount($input: AppAccountMarkInput!) {
+  apps {
+    markAccount(input: $input) {
+      account {
+        id
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation EditAccountNote($input: AppAccountNoteInput!) {
+  apps {
+    editAccountNote(input: $input) {
+      account {
+        id
+        note
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+# What a failed change's dialog shows. The list is read without the cache, which masks fragments
+# away, so the row of a failed change reads them here.
+query UnlinkedAccountChange($id: ID!) {
+  accountChange(id: $id) {
+    id
+    ...CouldntChangeDialog_accountChange
   }
 }

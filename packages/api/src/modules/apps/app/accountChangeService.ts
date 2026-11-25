@@ -15,10 +15,11 @@ import {
   appConnectionRepository,
 } from "../db";
 import type { AccountChange, AccountChangeAction } from "../domain";
-import type { ConnectionMembers, EmployeesByName } from "../ports";
-import { changingConnectors, readAccountFacts } from "./accountFacts";
+import type { ConnectionMembers, EmployeesByName, IntegrationUser } from "../ports";
+import { changingConnectors, readAccountFacts, readChangeFacts } from "./accountFacts";
 import { createAppConnectionService } from "./appConnectionService";
 import { type AppInvite, inviteEmployee, readAppInvites } from "./appInvite";
+import { loggingRefusal } from "./loggingRefusal";
 import { markChangeDoneByHand } from "./markChangeDoneByHand";
 import type { ReconnectReason } from "./connectionReconnects";
 import { failRunningChange, runAccountChange } from "./runAccountChange";
@@ -102,6 +103,11 @@ export interface AccountChangeService {
     appIds: readonly string[],
   ) => Promise<Set<string>>;
   /**
+   * One account change, a running one with its place in its connection's queue; null for an
+   * unknown id. Needs MANAGE_WORKSPACE.
+   */
+  readAccountChange: (ctx: SecurityContext, id: string) => Promise<LatestAccountChange | null>;
+  /**
    * Every account change, newest first by when it was asked (then by id), one page at a time; a
    * running one with its place in its connection's queue. Needs MANAGE_WORKSPACE.
    */
@@ -160,6 +166,8 @@ export interface AccountChangeDependencies {
   members: ConnectionMembers;
   /** The employees module, which owns their emails, which invites go to. */
   employees: EmployeesByName;
+  /** Whose accounts never offer a change. */
+  integrationUser: IntegrationUser;
   /** Waits between attempts of a call; tests pass one that does not wait. */
   wait?: (ms: number) => Promise<void>;
 }
@@ -174,16 +182,22 @@ export function createAccountChangeService(
   };
   return {
     async changeAccount(ctx, { appAccountId, action }) {
-      ctx.require("MANAGE_WORKSPACE");
-      if (!ctx.user) {
-        throw new ApplicationError("FORBIDDEN", "Only a signed-in user can ask for this change.");
-      }
-      const requestedBy = ctx.user.userId;
-      // Read before the transaction: the container's list may take a while to answer.
-      const changing = await changingConnectors(dependencies.connectors);
-      const change = await dependencies.transact((tx) =>
-        askForChange(dependencies, tx, { appAccountId, action, requestedBy, changing }),
-      );
+      const refusal = {
+        message: "Account change refused",
+        ids: { appAccountId: parseUuid(appAccountId), action },
+      };
+      const change = await loggingRefusal(logger, refusal, async () => {
+        ctx.require("MANAGE_WORKSPACE");
+        if (!ctx.user) {
+          throw new ApplicationError("FORBIDDEN", "Only a signed-in user can ask for this change.");
+        }
+        const requestedBy = ctx.user.userId;
+        // Read before the transaction: the container's list may take a while to answer.
+        const changing = await changingConnectors(dependencies.connectors);
+        return dependencies.transact((tx) =>
+          askForChange(dependencies, tx, { appAccountId, action, requestedBy, changing }),
+        );
+      });
       logger.info(
         { changeId: change.id, appAccountId, connectionId: change.connectionId, action },
         "Account change requested",
@@ -196,17 +210,15 @@ export function createAccountChangeService(
     failChange: (ctx, changeId) => failRunningChange(dependencies, ctx, changeId),
     markChangeDoneByHand: (ctx, changeId) => markChangeDoneByHand(dependencies, ctx, changeId),
     async readChangeStates(ctx, appAccountIds, db = orm) {
-      ctx.require("MANAGE_WORKSPACE");
-      const changing = await changingConnectors(dependencies.connectors);
-      const accounts = await appAccountRepository(db).findByIds(appAccountIds);
-      const facts = await readAccountFacts(dependencies, db, accounts, changing);
+      const facts = await readChangeFacts(dependencies, ctx, db, appAccountIds);
       const running = [...facts.values()].flatMap(({ latest }) =>
         latest?.status === "running" ? [latest.id] : [],
       );
-      const ahead = await accountChangeRepository(db).countChangesAhead(running);
+      const ahead = running.length
+        ? await accountChangeRepository(db).countChangesAhead(running)
+        : new Map<string, number>();
       return new Map(
-        accounts.map(({ id }) => {
-          const { isConnectionUser, latest, offered, reconnectOffered } = facts.get(id)!;
+        Array.from(facts, ([id, { isConnectionUser, latest, offered, reconnectOffered }]) => {
           return [
             id,
             {
@@ -252,6 +264,13 @@ export function createAccountChangeService(
       return new Set(
         connections.filter(({ connector }) => changing.has(connector)).map(({ appId }) => appId),
       );
+    },
+    async readAccountChange(ctx, id) {
+      ctx.require("MANAGE_WORKSPACE");
+      const changes = accountChangeRepository(orm);
+      const changeId = parseUuid(id);
+      const change = changeId && (await changes.findById(changeId));
+      return change ? withPlace(change, await changes.countChangesAhead([change.id])) : null;
     },
     async listAccountChanges(ctx, pageArgs) {
       ctx.require("MANAGE_WORKSPACE");

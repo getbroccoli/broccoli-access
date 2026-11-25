@@ -40,6 +40,11 @@ type Props = {
    * history, as on Activity, which shows only why.
    */
   row?: { id: string; roleConflict?: boolean; offeredChange: AccountChangeAction | null };
+  /**
+   * Called once Try again was asked or the change was marked done by hand, by a row of an account
+   * without an employee, which the answers do not carry.
+   */
+  onChanged?: () => void;
   /** The trigger's look; the account row's chip by default. */
   triggerClassName?: string;
 };
@@ -49,7 +54,12 @@ type Props = {
  * admin page and, for an account, what helps now: Try again, I did it by hand (confirmed in its own
  * dialog), or a scan.
  */
-export function CouldntChangeDialog({ change: changeRef, row, triggerClassName = CHIP }: Props) {
+export function CouldntChangeDialog({
+  change: changeRef,
+  row,
+  onChanged,
+  triggerClassName = CHIP,
+}: Props) {
   const fragment = useFragment({
     fragment: CouldntChangeDialog_AccountChangeFragmentDoc,
     // The document also holds the fragments of the Reconnect button, which this one spreads.
@@ -85,10 +95,9 @@ export function CouldntChangeDialog({ change: changeRef, row, triggerClassName =
   });
   const tryAgain = (target: ChangeTarget) => {
     setShown(null);
-    void changeAccount(target, change.action);
+    void changeAccount(target, change.action).then(onChanged);
   };
-  // A row's change is its employee's, whose email it has; without them nothing can be asked again.
-  const target = row && employee && changeTargetOf({ id: row.id, employee, app }, change.action);
+  const target = row && rowTarget(row.id, change);
   const scan = (connectionId: string) => {
     setShown(null);
     scanNow({ variables: { connectionId } }).catch(() => toast.error(t("scans.scanNowFailed")));
@@ -189,6 +198,7 @@ export function CouldntChangeDialog({ change: changeRef, row, triggerClassName =
         change={change}
         person={{ name, firstName }}
         app={app.name}
+        onDone={onChanged}
       />
     </>
   );
@@ -219,6 +229,14 @@ const COPY = {
 } as const;
 
 type FailedChange = CouldntChangeDialog_AccountChangeFragment;
+
+/** What Try again asks for: an invite goes to an employee; an account without one goes by its email. */
+function rowTarget(rowId: string, { action, employee, email, app }: FailedChange) {
+  if (employee) {
+    return changeTargetOf({ id: rowId, employee, app }, action);
+  }
+  return action === "INVITE" ? undefined : { name: email, app: app.name, accountId: rowId };
+}
 
 /** "Asked by Mia Novak today at 10:14.", or on an earlier day. */
 function askedBy({ requestedBy, requestedAt }: FailedChange): string {

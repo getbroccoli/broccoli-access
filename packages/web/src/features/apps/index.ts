@@ -1,4 +1,11 @@
-export { AccountChangeCell, InviteCell, showsCouldntChange } from "./AccountChangeCell";
+export {
+  AccountChangeCell,
+  ChangeProgress,
+  CouldntChangeDialog,
+  InviteCell,
+  showsCouldntChange,
+  useChangeAccount,
+} from "./AccountChangeCell";
 export { ActivityPage } from "./ActivityPage";
 export {
   AppAccountStatusCell,

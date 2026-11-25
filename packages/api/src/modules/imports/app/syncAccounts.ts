@@ -29,11 +29,13 @@ export interface ScanFindings {
 // its next scan; read every source's records once that wait matters.
 /**
  * The sync after a scan, joining `tx`: the directory's own accounts create and update employees,
- * with their changed photos, except the integration user's, which is nobody's; another connector's link to the employee with the same email. They
+ * with their changed photos, except the integration user's, which is nobody's and a service account
+ * like its accounts in other apps; another connector's link to the employee with the same email. They
  * become the connection's app accounts, found via the connector's own-app finding kind; the
  * accounts in other apps go to their matched apps, found via its other-app finding kind. Every
  * change is found by the scan of `sourceId`. The pending invitations of a connector that lists
- * them replace the connection's stored ones.
+ * them replace the connection's stored ones. Returns how many accounts it set to the integration
+ * user's service kind.
  */
 export async function syncAccounts(
   ctx: SecurityContext,
@@ -44,7 +46,7 @@ export async function syncAccounts(
     directory,
     integrationUser,
   }: { apps: ScannedApps; directory: DirectoryPeople; integrationUser: IntegrationUser },
-): Promise<void> {
+): Promise<{ accountsSetToService: number }> {
   // Before the accounts: a new invitation waits for its connection's row, which a change failing
   // into Reconnect locks before its change rows; deleting an account locks its changes' rows.
   if (listsInvitations(connector)) {
@@ -52,50 +54,77 @@ export async function syncAccounts(
   }
   const cause = { kind: "FOUND_BY_SCAN" as const, ref: sourceId };
   const ownAccounts = accounts.filter(({ values }) => values.appExternalId === null);
-  const employeeIds = connector.isDirectory
-    ? await directory.syncDirectoryPeople(
-        ctx,
-        tx,
-        (await peopleAmong(ctx, tx, ownAccounts, integrationUser)).map((account) =>
-          directoryPerson(account, photos),
-        ),
-        cause,
-      )
-    : await directory.findEmployeeIdsByEmail(
-        ctx,
-        tx,
-        ownAccounts.map(({ values }) => values.email),
-      );
-  await apps.syncAccounts(ctx, tx, {
+  const { integrationEmail, employeeIds } = await matchPeople(
+    ctx,
+    tx,
+    { directory, integrationUser },
+    { ownAccounts, isDirectory: connector.isDirectory, photos, cause },
+  );
+  const own = await apps.syncAccounts(ctx, tx, {
     findingKind: connector.findingKinds.ownAppAccounts,
     connectionId: connection.id,
-    accounts: ownAccounts.map((account) => foundAccount(account, connection.appId, employeeIds)),
+    accounts: ownAccounts.map((account) =>
+      foundAccount(account, connection.appId, employeeIds, integrationEmail),
+    ),
     cause,
     readStartedAt,
   });
   const { otherAppAccounts } = connector.findingKinds;
-  if (otherAppAccounts) {
-    const otherAccounts = accounts.filter(({ values }) => values.appExternalId !== null);
-    await syncOtherAppAccounts(ctx, tx, apps, {
-      findingKind: otherAppAccounts,
-      connectionId: connection.id,
-      accounts: otherAccounts,
-      employeeIds,
-      cause,
-      readStartedAt,
-    });
+  if (!otherAppAccounts) {
+    return own;
   }
+  const otherAccounts = accounts.filter(({ values }) => values.appExternalId !== null);
+  const other = await syncOtherAppAccounts(ctx, tx, apps, {
+    findingKind: otherAppAccounts,
+    connectionId: connection.id,
+    accounts: otherAccounts,
+    integrationEmail,
+    employeeIds,
+    cause,
+    readStartedAt,
+  });
+  return { accountsSetToService: own.accountsSetToService + other.accountsSetToService };
 }
 
-/** The directory's accounts that are people: all but the integration user's, known by its id. */
-async function peopleAmong(
+/** Matches directory members by their stable id, and other apps' members by directory email. */
+async function matchPeople(
   ctx: SecurityContext,
   tx: Tx,
-  directoryAccounts: readonly ImportedAccount[],
-  integrationUser: IntegrationUser,
-): Promise<readonly ImportedAccount[]> {
-  const integrationUserId = await integrationUser.readGoogleUserId(ctx, tx);
-  return directoryAccounts.filter(({ sourceKey }) => sourceKey !== integrationUserId);
+  { directory, integrationUser }: { directory: DirectoryPeople; integrationUser: IntegrationUser },
+  {
+    ownAccounts,
+    isDirectory,
+    photos,
+    cause,
+  }: {
+    ownAccounts: ImportedAccount[];
+    isDirectory: boolean;
+    photos: ScanFindings["photos"];
+    cause: HistoryAppend["cause"];
+  },
+) {
+  if (!isDirectory) {
+    const employeeIds = await directory.findEmployeeIdsByEmail(
+      ctx,
+      tx,
+      ownAccounts.map(({ values }) => values.email),
+    );
+    return {
+      employeeIds,
+      integrationEmail: (await integrationUser.findIntegrationAccountEmail(tx)) ?? undefined,
+    };
+  }
+  const googleId = await integrationUser.readGoogleUserId(ctx, tx);
+  const people = ownAccounts.filter(({ sourceKey }) => sourceKey !== googleId);
+  return {
+    integrationEmail: ownAccounts.find(({ sourceKey }) => sourceKey === googleId)?.values.email,
+    employeeIds: await directory.syncDirectoryPeople(
+      ctx,
+      tx,
+      people.map((account) => directoryPerson(account, photos)),
+      cause,
+    ),
+  };
 }
 
 /** Matches the accounts' apps, creating the missing ones, then syncs the accounts into them. */
@@ -108,6 +137,7 @@ async function syncOtherAppAccounts(
     connectionId,
     accounts,
     employeeIds,
+    integrationEmail,
     cause,
     readStartedAt,
   }: {
@@ -115,10 +145,11 @@ async function syncOtherAppAccounts(
     connectionId: string;
     accounts: readonly ImportedAccount[];
     employeeIds: Map<string, string>;
+    integrationEmail: string | undefined;
     cause: HistoryAppend["cause"];
     readStartedAt: Date;
   },
-): Promise<void> {
+): Promise<{ accountsSetToService: number }> {
   const appIds = await apps.matchFoundApps(ctx, tx, {
     found: accounts.map(({ values }) => ({
       externalId: values.appExternalId!,
@@ -126,11 +157,16 @@ async function syncOtherAppAccounts(
     })),
     cause,
   });
-  await apps.syncAccounts(ctx, tx, {
+  return apps.syncAccounts(ctx, tx, {
     findingKind,
     connectionId,
     accounts: accounts.map((account) =>
-      foundAccount(account, appIds.get(account.values.appExternalId!)!, employeeIds),
+      foundAccount(
+        account,
+        appIds.get(account.values.appExternalId!)!,
+        employeeIds,
+        integrationEmail,
+      ),
     ),
     cause,
     readStartedAt,
@@ -141,10 +177,12 @@ function foundAccount(
   { values }: ImportedAccount,
   appId: string,
   employeeIds: Map<string, string>,
+  integrationEmail: string | undefined,
 ) {
   return {
     appId,
     email: values.email,
+    isIntegrationUser: values.email === integrationEmail,
     status: values.status,
     employeeId: employeeIds.get(values.email) ?? null,
     grantedAt: values.grantedAt === null ? null : new Date(values.grantedAt),

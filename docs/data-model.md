@@ -702,7 +702,8 @@ The one Google Workspace user that broccoli-access creates for itself and connec
 - `encrypted_secrets`: its password and its two-step secret (`totpSecret`), which broccoli-access makes and the owner never sees.
 - `created_by`, `created_at`.
 - broccoli-access sets up its two-step sign-in in Google itself, in the server's browser. Nobody else signs in as it.
-- Its directory account creates no employee. Its account in any other app has the kind `service`, set by the sync.
+- Its directory account creates no employee. Its accounts, the directory's included, have the kind `service`, set by the sync. Creating it queues a scan of the directory, which reads the email its accounts in other apps are known by.
+- No account of the integration user offers Disable, Enable or Remove, whatever the owner marked it as.
 
 ```json
 {
@@ -726,7 +727,7 @@ The one Google Workspace user that broccoli-access creates for itself and connec
   - `personal`: a person's own account. The default.
   - `service`: used by software, such as a bot or the integration user.
   - `external`: someone outside the company, such as a contractor or a client's guest.
-- `note` (new): the owner's words on what a `service` or `external` account is for. Null for `personal`.
+- `note` (new): the owner's words on what a `service` or `external` account is for, at most 500 characters. Null for `personal`.
 - `employee_linked_by` (new): `email`, `owner`, or null when `employee_id` is null. With `owner`, the owner linked the account to an employee whose email differs, and the sync keeps `employee_id`. A `service` or `external` account has no employee.
 - `found_via` adds `said_by_owner` (circle 3, part 2): the owner created the account by hand in an app without a connection and said so. The sync keeps an account that has it.
 - A remove that succeeds, or one done by hand, deletes the connection's import record for the member and syncs the account at once, so no later sync brings it back. The account is deleted unless another source still sees it; then it stays as "Not in <App>". Its history stays.

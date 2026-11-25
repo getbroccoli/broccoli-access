@@ -2,13 +2,15 @@ import type { ApolloCache } from "@apollo/client";
 import {
   AccountsWithoutPersonDocument,
   PersonPageDocument,
+  MarkedAccountsDocument,
+  type MarkedAccountsQuery,
   type AccountsWithoutPersonQuery,
   type PersonPageQuery,
 } from "@/__generated__/graphql";
 import { evictRecord } from "@/apollo";
 
-/** A linked account leaves every cached page of accounts without a person. */
-export function removeLinkedAccount(cache: ApolloCache, id: string): void {
+/** A linked or marked account leaves every cached page of accounts without a person. */
+export function removeAccountWithoutPerson(cache: ApolloCache, id: string): void {
   cache.modify({
     fields: { accountsWithoutPersonCount: (count: number) => Math.max(0, count - 1) },
   });
@@ -72,5 +74,31 @@ export function storePickedRole(
         },
       },
     };
+  });
+}
+
+export function readMarkedWindow(cache: ApolloCache) {
+  return cache.readQuery({ query: MarkedAccountsDocument })?.markedAccounts;
+}
+
+export function storeMarkedWindow(
+  cache: ApolloCache,
+  markedAccounts: MarkedAccountsQuery["markedAccounts"],
+  previous?: MarkedAccountsQuery["markedAccounts"],
+) {
+  const before = new Map(previous?.edges.map(({ node }) => [node.id, node.note]));
+  // An edit committed while a scan refresh was reading keeps its newer note.
+  const edited = new Map(
+    readMarkedWindow(cache)
+      ?.edges.filter(({ node }) => before.has(node.id) && before.get(node.id) !== node.note)
+      .map(({ node }) => [node.id, node]),
+  );
+  const edges = markedAccounts.edges.map((edge) => {
+    const live = edited.get(edge.node.id);
+    return live ? { ...edge, node: { ...edge.node, note: live.note } } : edge;
+  });
+  cache.writeQuery({
+    query: MarkedAccountsDocument,
+    data: { markedAccounts: { ...markedAccounts, edges } },
   });
 }

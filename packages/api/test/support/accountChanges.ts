@@ -14,7 +14,7 @@ import { createGoogleWorkspaceConnector } from "../../src/modules/google";
 import { createImportRecordService } from "../../src/modules/imports";
 import { connectLinear, containerConnectors, failLinearCall } from "./containerConnections";
 import { recordingJobQueue } from "./recordingJobQueue";
-import { apps } from "./services";
+import { apps, integrationUsers } from "./services";
 import { storedAppAccounts } from "./storedScan";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { SYSTEM } from "./testSecurityContext";
@@ -49,6 +49,8 @@ export function accountChanges(
     connectors,
     members: createImportRecordService(),
     employees: createEmployeeReadService({ orm, accounts: apps(orm) }),
+    // It reads the stored scan only, so no Google answers.
+    integrationUser: integrationUsers(orm, { googleUrl: "http://127.0.0.1:9" }),
     secretBox: TEST_SECRET_BOX,
     logger: createLogger("silent"),
     wait: () => Promise.resolve(),

@@ -26,8 +26,10 @@ export {
   countSuspendedWithAccess,
   type FoundAccount,
   type InAppFacts,
+  isAutomaticService,
   planAccountSync,
 } from "./appAccount";
+export { ACCOUNT_NOTE_MAX_LENGTH, parseAccountNote } from "./accountNote";
 export { type AccountDates, accountSince, appSince, type Since } from "./since";
 export {
   ACCOUNT_CHANGE_STATUSES,

@@ -1,6 +1,7 @@
 export {
   type AccountLinkService,
   type AccountWithoutPerson,
+  type MarkedAccount,
   createAccountLinkService,
 } from "./accountLinkService";
 export {

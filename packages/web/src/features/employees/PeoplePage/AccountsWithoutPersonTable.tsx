@@ -1,4 +1,6 @@
-import { CaretDown } from "@phosphor-icons/react";
+import { AccountNoteDialog } from "./AccountNoteDialog";
+import { DecideAccountMenu, type AccountDecision } from "./DecideAccountMenu";
+import { ChangeUnlinkedAccountDialog } from "./ChangeUnlinkedAccountDialog";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -16,8 +18,10 @@ import {
 } from "@/components/ui/table";
 import { t } from "@/i18n";
 
-import { removeLinkedAccount } from "../cache";
+import { removeAccountWithoutPerson } from "../cache";
 import { LinkAccountDialog } from "./LinkAccountDialog";
+import { UnlinkedAccountState } from "./UnlinkedAccountState";
+import { useRefreshWhileChanging } from "./useRefreshWhileChanging";
 
 type Accounts = NonNullable<AccountsWithoutPersonQuery["accountsWithoutPerson"]>;
 type Account = Accounts["edges"][number]["node"];
@@ -29,20 +33,26 @@ export function AccountsWithoutPersonTable({
   loading,
   loadMore,
   refresh,
-  refreshCounts,
+  onLinked,
+  onMarked,
 }: {
   accounts: Accounts;
   loading: boolean;
   loadMore: () => void;
   refresh: () => Promise<unknown>;
-  refreshCounts: () => void;
+  onLinked: () => void;
+  onMarked: () => Promise<unknown>;
 }) {
-  const [chosenId, setChoosing] = useState<string | null>(null);
-  const choosing = accounts.edges.find(({ node }) => node.id === chosenId)?.node;
+  const [decision, setChoosing] = useState<{ id: string; action: AccountDecision } | null>(null);
+  const choosing = accounts.edges.find(({ node }) => node.id === decision?.id)?.node;
+  useRefreshWhileChanging(
+    accounts.edges.some(({ node }) => node.latestChange?.status === "RUNNING"),
+    refresh,
+  );
   const [link, mutation] = usePayloadMutation(LinkAccountDocument, {
     update: (cache, { data }) => {
       const id = data?.apps.linkAccount.appUser?.id;
-      if (id) removeLinkedAccount(cache, id);
+      if (id) removeAccountWithoutPerson(cache, id);
     },
   });
 
@@ -50,7 +60,7 @@ export function AccountsWithoutPersonTable({
     try {
       await link({ variables: { input: { appAccountId: account.id, employeeId: person.id } } });
       setChoosing(null);
-      refreshCounts();
+      onLinked();
       toast.success(
         t("people.accounts.linked", { name: `${person.firstName} ${person.lastName}` }),
       );
@@ -101,7 +111,8 @@ export function AccountsWithoutPersonTable({
                   <SuggestedPerson person={person} />
                 </TableCell>
                 <TableCell className="pr-4 text-right">
-                  <span className="inline-flex gap-1.5">
+                  <span className="inline-flex items-center gap-1.5">
+                    <UnlinkedAccountState account={account} onChanged={() => void refresh()} />
                     {person && (
                       <Button
                         size="sm"
@@ -111,16 +122,11 @@ export function AccountsWithoutPersonTable({
                         {t("people.accounts.link")}
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      aria-haspopup="dialog"
+                    <DecideAccountMenu
                       disabled={mutation.loading || loading}
-                      onClick={() => setChoosing(account.id)}
-                    >
-                      {t("people.accounts.decide")}
-                      <CaretDown aria-hidden />
-                    </Button>
+                      offeredChange={account.offeredChange ?? null}
+                      onChoose={(action) => setChoosing({ id: account.id, action })}
+                    />
                   </span>
                 </TableCell>
               </TableRow>
@@ -133,7 +139,24 @@ export function AccountsWithoutPersonTable({
           {t("people.accounts.more")}
         </Button>
       )}
-      {choosing && (
+      {choosing && (decision?.action === "SERVICE" || decision?.action === "EXTERNAL") && (
+        <AccountNoteDialog
+          account={choosing}
+          kind={decision.action}
+          onMarked={onMarked}
+          onClose={() => setChoosing(null)}
+          refresh={refresh}
+        />
+      )}
+      {choosing && (decision?.action === "SUSPEND" || decision?.action === "REACTIVATE") && (
+        <ChangeUnlinkedAccountDialog
+          account={choosing}
+          action={decision.action}
+          onAsked={refresh}
+          onClose={() => setChoosing(null)}
+        />
+      )}
+      {choosing && decision?.action === "link" && (
         <LinkAccountDialog
           email={choosing.email}
           linking={mutation.loading}

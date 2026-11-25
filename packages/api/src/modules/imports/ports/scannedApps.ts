@@ -61,7 +61,8 @@ export interface ScannedApps {
   ): Promise<boolean>;
   /**
    * Makes the accounts `findingKind` saw exactly `accounts`, with history, joining `tx`; an account
-   * in an app that another connection than `connectionId` reads keeps its status.
+   * in an app that another connection than `connectionId` reads keeps its status. Returns how many
+   * it set to the integration user's service kind.
    */
   syncAccounts(
     ctx: SecurityContext,
@@ -73,6 +74,7 @@ export interface ScannedApps {
       accounts: readonly {
         appId: string;
         email: string;
+        isIntegrationUser?: boolean;
         status: AccountStatus;
         employeeId: string | null;
         grantedAt: Date | null;
@@ -82,7 +84,7 @@ export interface ScannedApps {
       /** When the scan began reading; an account changed since keeps its status. */
       readStartedAt: Date;
     },
-  ): Promise<void>;
+  ): Promise<{ accountsSetToService: number }>;
   /**
    * Makes the connection's stored pending invitations exactly `invitations`, joining `tx`; an
    * invitation is never an account.

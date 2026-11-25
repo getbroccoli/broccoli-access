@@ -1,4 +1,4 @@
-import { ApplicationError } from "../../../core/applicationError";
+import { ApplicationError, invalidInput } from "../../../core/applicationError";
 import type { Orm, Transact, Tx } from "../../../core/db";
 import type { Logger } from "../../../core/logger";
 import { type Connection, type PageArgs, paginate } from "../../../core/pagination";
@@ -12,18 +12,31 @@ import {
   type UnlinkedAccount,
   UNLINKED_SORT_VALUES,
 } from "../db";
-import { accountChanges, employeeMatcher } from "../domain";
+import {
+  type AppAccount,
+  accountChanges,
+  employeeMatcher,
+  isAutomaticService,
+  parseAccountNote,
+} from "../domain";
 import type { ConnectionMembers, EmployeesByName } from "../ports";
 import { type AppUser, toAppUser } from "./appUserService";
 import { findInAppFacts } from "./inAppFacts";
 import { type DirectoryConnectors, findEmployeesInDirectory } from "./directory";
+import { loggingRefusal } from "./loggingRefusal";
 
-/** Lists personal accounts without an employee and links them at the owner's request. */
+/** The owner's decisions on unlinked accounts in approved apps. */
 export interface AccountLinkService {
   listAccountsWithoutPerson: (
     ctx: SecurityContext,
     page: PageArgs,
   ) => Promise<Connection<AccountWithoutPerson>>;
+  listMarkedAccounts: (ctx: SecurityContext, page: PageArgs) => Promise<Connection<MarkedAccount>>;
+  markAccount: (
+    ctx: SecurityContext,
+    input: MarkInput & { kind: MarkKind },
+  ) => Promise<MarkedAccount>;
+  editAccountNote: (ctx: SecurityContext, input: MarkInput) => Promise<MarkedAccount>;
   countAccountsWithoutPerson: (ctx: SecurityContext) => Promise<number>;
   linkAccount: (
     ctx: SecurityContext,
@@ -36,8 +49,21 @@ export interface AccountWithoutPerson {
   app: App;
   appId: string;
   email: string;
+  status: AppAccount["status"];
   displayName: string | null;
   suggestedEmployeeId: string | null;
+}
+
+type MarkKind = Exclude<AppAccount["kind"], "personal">;
+type MarkInput = { appAccountId: string; note: string };
+
+export interface MarkedAccount {
+  id: string;
+  app: App;
+  email: string;
+  kind: MarkKind;
+  note: string | null;
+  canEdit: boolean;
 }
 
 interface AccountLinkDependencies {
@@ -56,12 +82,7 @@ export function createAccountLinkService(
   return {
     async listAccountsWithoutPerson(ctx, args) {
       requireOwner(ctx);
-      const facts = await findInAppFacts(orm, dependencies);
-      const page = await paginate(args, {
-        order: { field: "EMAIL", direction: "ASC" },
-        keysetValues: UNLINKED_SORT_VALUES,
-        fetch: (query) => appAccountRepository(orm).findWithoutPerson(query, facts),
-      });
+      const page = await listPage(dependencies, args, "personal");
       if (!page.edges.length) return { ...page, edges: [] };
       const [names, activeIds] = await Promise.all([
         readMemberNames(
@@ -73,7 +94,7 @@ export function createAccountLinkService(
       const suggest = employeeMatcher(await employees.readEmployees(ctx, activeIds));
       return {
         ...page,
-        edges: page.edges.map(({ cursor, node: { id, app, email, connectionId } }) => {
+        edges: page.edges.map(({ cursor, node: { id, app, email, status, connectionId } }) => {
           const displayName = names.get(`${connectionId} ${email}`) ?? null;
           return {
             cursor,
@@ -82,6 +103,7 @@ export function createAccountLinkService(
               app,
               appId: app.id,
               email,
+              status,
               displayName,
               suggestedEmployeeId: suggest({ email, displayName }),
             },
@@ -89,6 +111,26 @@ export function createAccountLinkService(
         }),
       };
     },
+    async listMarkedAccounts(ctx, args) {
+      requireOwner(ctx);
+      // shortcut: People shows the last scan’s attribution until another scan applies an identity change.
+      const page = await listPage(dependencies, args, "marked");
+      return {
+        ...page,
+        edges: page.edges.map(({ cursor, node }) => ({
+          cursor,
+          node: markedAccount(node),
+        })),
+      };
+    },
+    markAccount: (ctx, input) =>
+      loggingRefusal(logger, refusalOf("App account mark refused", input), () =>
+        saveMark(dependencies, ctx, input),
+      ),
+    editAccountNote: (ctx, input) =>
+      loggingRefusal(logger, refusalOf("App account note edit refused", input), () =>
+        saveMark(dependencies, ctx, input),
+      ),
     async countAccountsWithoutPerson(ctx) {
       requireOwner(ctx);
       return appAccountRepository(orm).countWithoutPerson(await findInAppFacts(orm, dependencies));
@@ -117,6 +159,20 @@ function requireOwner(ctx: SecurityContext): void {
     throw new ApplicationError("FORBIDDEN", "Only the owner can manage accounts without a person.");
 }
 
+async function listPage(
+  dependencies: AccountLinkDependencies,
+  args: PageArgs,
+  group: "personal" | "marked",
+) {
+  const { orm } = dependencies;
+  const facts = await findInAppFacts(orm, dependencies);
+  return paginate(args, {
+    order: { field: "EMAIL", direction: "ASC" },
+    keysetValues: UNLINKED_SORT_VALUES,
+    fetch: (query) => appAccountRepository(orm).findUnlinkedAccounts(query, facts, group),
+  });
+}
+
 async function readMemberNames(
   { orm, members }: AccountLinkDependencies,
   accounts: UnlinkedAccount[],
@@ -140,33 +196,92 @@ async function saveLink(
   ctx: SecurityContext,
   { appAccountId, employeeId }: { appAccountId: string; employeeId: string },
 ) {
-  const accounts = appAccountRepository(tx);
-  // Match the lock order of scans and account changes: sync, then account, then app.
-  await accounts.lockForSync();
-  const facts = await findInAppFacts(tx, dependencies);
-  const locked = await accounts.lockById(appAccountId, facts);
-  if (!locked) throw new ApplicationError("NOT_FOUND", "No app account has this id.");
-  const { inApp, ...before } = locked;
-  const app = await appRepository(tx).lockById(before.appId);
-  if (
-    app?.status !== "approved" ||
-    before.kind !== "personal" ||
-    before.employeeId !== null ||
-    inApp === false
-  ) {
+  const { before, inApp } = await lockUnlinkedAccount(dependencies, tx, appAccountId);
+  if (before.kind !== "personal")
     throw new ApplicationError("CONFLICT", "This account is no longer available to link.");
-  }
   const after = { ...before, employeeId, employeeLinkedBy: "owner" as const };
-  await accounts.update(after);
-  await history.append(ctx, tx, {
-    recordType: "app_account",
-    operation: "UPDATED",
-    cause: { kind: "EDITED_DIRECTLY" },
-    records: [{ recordId: after.id, changes: accountChanges(before, after) }],
-  });
+  await updateAccount(ctx, tx, before, after);
   const suspended = await findEmployeesInDirectory(tx, dependencies.connectors, {
     status: "suspended",
     among: [employeeId],
   });
   return toAppUser({ ...after, inApp }, new Set(suspended));
+}
+
+async function lockUnlinkedAccount(dependencies: AccountLinkDependencies, tx: Tx, id: string) {
+  const accounts = appAccountRepository(tx);
+  // Match scans' lock order so a concurrent scan cannot undo the decision.
+  await accounts.lockForSync();
+  const facts = await findInAppFacts(tx, dependencies);
+  const locked = await accounts.lockById(id, facts);
+  if (!locked) throw new ApplicationError("NOT_FOUND", "No app account has this id.");
+  const { inApp, ...before } = locked;
+  const app = await appRepository(tx).lockById(before.appId);
+  if (app?.status !== "approved" || before.employeeId !== null || inApp === false) {
+    throw new ApplicationError("CONFLICT", "This account is no longer available.");
+  }
+  return { before, inApp, app };
+}
+
+function refusalOf(message: string, { appAccountId, kind }: MarkInput & { kind?: MarkKind }) {
+  return { message, ids: { appAccountId: parseUuid(appAccountId), kind: kind ?? null } };
+}
+
+async function saveMark(
+  dependencies: AccountLinkDependencies,
+  ctx: SecurityContext,
+  input: MarkInput & { kind?: MarkKind },
+) {
+  requireOwner(ctx);
+  const id = parseUuid(input.appAccountId);
+  if (!id) throw new ApplicationError("NOT_FOUND", "No app account has this id.");
+  const parsed = parseAccountNote(input.note);
+  if ("problem" in parsed) throw invalidInput([{ field: "note", code: parsed.problem }]);
+  const { note } = parsed;
+  const account = await dependencies.transact(async (tx) => {
+    const { before, app } = await lockUnlinkedAccount(dependencies, tx, id);
+    const marking = input.kind !== undefined;
+    if (
+      marking
+        ? before.kind !== "personal"
+        : before.kind === "personal" || isAutomaticService(before)
+    ) {
+      throw new ApplicationError(
+        "CONFLICT",
+        "This account is no longer available to mark or edit.",
+      );
+    }
+    const after = { ...before, kind: input.kind ?? before.kind, note };
+    await updateAccount(ctx, tx, before, after);
+    return markedAccount({ ...after, app });
+  });
+  dependencies.logger.info(
+    { appAccountId: id, kind: account.kind },
+    input.kind ? "App account marked" : "App account note edited",
+  );
+  return account;
+}
+
+async function updateAccount(ctx: SecurityContext, tx: Tx, before: AppAccount, after: AppAccount) {
+  const changes = accountChanges(before, after);
+  if (!changes.length) return;
+  await appAccountRepository(tx).update(after);
+  await history.append(ctx, tx, {
+    recordType: "app_account",
+    operation: "UPDATED",
+    cause: { kind: "EDITED_DIRECTLY" },
+    records: [{ recordId: after.id, changes }],
+  });
+}
+
+function markedAccount({
+  id,
+  email,
+  app,
+  kind,
+  note,
+}: Pick<UnlinkedAccount, "id" | "email" | "app" | "kind" | "note">): MarkedAccount {
+  if (kind === "personal") throw new Error("Expected a marked account.");
+  const managed = isAutomaticService({ kind, note });
+  return { id, app, email, kind, note: managed ? "Integration user" : note, canEdit: !managed };
 }

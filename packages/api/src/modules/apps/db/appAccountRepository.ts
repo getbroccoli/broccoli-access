@@ -1,15 +1,4 @@
-import {
-  and,
-  arrayContains,
-  count,
-  countDistinct,
-  eq,
-  isNotNull,
-  isNull,
-  or,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import { and, arrayContains, count, countDistinct, eq, isNotNull, or, sql } from "drizzle-orm";
 
 import { z } from "zod";
 import type { KeysetQuery, KeysetRow } from "../../../core/pagination";
@@ -25,6 +14,7 @@ import {
   type Tx,
 } from "../../../core/db";
 import type { AppAccount, AppStatus, InAppFacts } from "../domain";
+import { inApp, isAccess, unlinkedAccounts } from "./inApp";
 import { appAccounts } from "./appAccountsTable";
 import { appConnections } from "./appConnectionsTable";
 import type { App } from "./appRepository";
@@ -46,10 +36,11 @@ export interface AppAccountRepository {
   ): Promise<(AppAccount & { inApp: boolean | null }) | null>;
   /** The accounts in `appIds`, and those `findingKind` saw, whatever their app. */
   findInAppsOrFoundVia(appIds: readonly string[], findingKind: string): Promise<AppAccount[]>;
-  /** One page of personal accounts in approved apps with no employee, by email and id. */
-  findWithoutPerson(
+  /** One page of unlinked personal or marked accounts in approved apps, by email and id. */
+  findUnlinkedAccounts(
     query: KeysetQuery<"EMAIL", unknown[]>,
     facts: InAppFacts,
+    group: "personal" | "marked",
   ): Promise<KeysetRow<UnlinkedAccount, unknown[]>[]>;
   /** The accounts the owner linked to these employees, including private email addresses. */
   findOwnerLinks(
@@ -65,7 +56,11 @@ export interface AppAccountRepository {
   /** How many apps hold an account `findingKind` saw. */
   countAppsFoundVia(findingKind: string): Promise<number>;
   /** The accounts with an employee in `appIds`, each in its app or not as `facts` say. */
-  findUsersOfApps(appIds: readonly string[], facts: InAppFacts): Promise<AppUserAccount[]>;
+  findUsersOfApps(
+    appIds: readonly string[],
+    facts: InAppFacts,
+    accountIds?: readonly string[],
+  ): Promise<AppUserAccount[]>;
   /**
    * The employees' accounts in approved apps that are access as `facts` say: the active ones, and
    * the suspended ones in apps with a connection; by app name.
@@ -93,7 +88,7 @@ export interface AppAccountRepository {
   ): Promise<EmployeeAppAccount[]>;
 }
 
-export type UnlinkedAccount = Pick<AppAccount, "id" | "email"> & {
+export type UnlinkedAccount = Pick<AppAccount, "id" | "email" | "status" | "kind" | "note"> & {
   app: App;
   connectionId: string | null;
 };
@@ -146,18 +141,23 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .where(
           or(anyOf(appAccounts.appId, appIds), arrayContains(appAccounts.foundVia, [findingKind])),
         ),
-    findWithoutPerson: async ({ after, limit }, facts) => {
+    findUnlinkedAccounts: async ({ after, limit }, facts, group) => {
       const rows = await orm()
         .select({
           id: appAccounts.id,
           email: appAccounts.email,
+          status: appAccounts.status,
+          kind: appAccounts.kind,
+          note: appAccounts.note,
           app: apps,
           connectionId: appConnections.id,
         })
         .from(appAccounts)
         .innerJoin(apps, eq(apps.id, appAccounts.appId))
         .leftJoin(appConnections, eq(appConnections.appId, apps.id))
-        .where(and(withoutPerson(facts), after ? afterKeyset(EMAIL_ORDER, after) : undefined))
+        .where(
+          and(unlinkedAccounts(facts, group), after ? afterKeyset(EMAIL_ORDER, after) : undefined),
+        )
         .orderBy(...orderByKeyset(EMAIL_ORDER))
         .limit(limit);
       return rows.map((node) => ({ node, values: [node.email, node.id] }));
@@ -182,7 +182,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .select({ total: count() })
         .from(appAccounts)
         .innerJoin(apps, eq(apps.id, appAccounts.appId))
-        .where(withoutPerson(facts));
+        .where(unlinkedAccounts(facts, "personal"));
       return row!.total;
     },
     insertMany: async (accounts) => {
@@ -221,11 +221,17 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .where(arrayContains(appAccounts.foundVia, [findingKind]));
       return row!.apps;
     },
-    findUsersOfApps: (appIds, facts) =>
+    findUsersOfApps: (appIds, facts, accountIds) =>
       orm()
         .select(userColumns(facts))
         .from(appAccounts)
-        .where(and(anyOf(appAccounts.appId, appIds), isNotNull(appAccounts.employeeId))),
+        .where(
+          and(
+            anyOf(appAccounts.appId, appIds),
+            isNotNull(appAccounts.employeeId),
+            accountIds && anyOf(appAccounts.id, accountIds),
+          ),
+        ),
     findCurrentAccountsOfEmployees: (employeeIds, facts) =>
       orm()
         .select(userColumns(facts))
@@ -284,30 +290,6 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
   };
 }
 
-/** Whether the account is access: an account not in its app is not. */
-export function isAccess(facts: InAppFacts): SQL {
-  return sql`(${inApp(facts)}) is not false`;
-}
-
-/**
- * Whether the account is in its app: in an app whose connection has finished a scan, whether a kind
- * other than the other-app ones found it; null elsewhere, where every account counts.
- */
-function inApp({ scannedAppIds, otherAppKinds }: InAppFacts): SQL<boolean | null> {
-  // The builder has no CASE, and its array operators refuse an empty list.
-  return sql<
-    boolean | null
-  >`case when ${anyOf(appAccounts.appId, scannedAppIds)} then not (${appAccounts.foundVia} <@ ${sql.param([...otherAppKinds])}::text[]) end`;
-}
-
-function withoutPerson(facts: InAppFacts) {
-  return and(
-    eq(apps.status, "approved"),
-    eq(appAccounts.kind, "personal"),
-    isNull(appAccounts.employeeId),
-    isAccess(facts),
-  );
-}
 const EMAIL_ORDER = keysetOrder(
   [{ expression: sql`${appAccounts.email}`, descending: false }],
   sql`${appAccounts.id}`,

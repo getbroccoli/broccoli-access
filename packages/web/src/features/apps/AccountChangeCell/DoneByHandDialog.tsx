@@ -24,6 +24,8 @@ type Props = {
   open: boolean;
   /** Closes it: "Not yet", or once the change is marked. */
   onClose: () => void;
+  /** Once the change is marked, for a row the answer does not carry. */
+  onDone?: () => void;
   /** The failed change the owner made in the app themselves. */
   change: { id: string; action: AccountChangeAction };
   person: { name: string; firstName: string };
@@ -34,7 +36,7 @@ type Props = {
  * "I did it by hand", confirmed: the change becomes done by hand and the account takes its new
  * status at once, which changes the "still have access" counts elsewhere; an invite shows Invited.
  */
-export function DoneByHandDialog({ open, onClose, change, person, app }: Props) {
+export function DoneByHandDialog({ open, onClose, onDone, change, person, app }: Props) {
   const cache = useCache();
   const [markDoneByHand, { loading }] = usePayloadMutation(MarkAccountChangeDoneByHandDocument, {
     refetch: [PersonPageDocument],
@@ -45,6 +47,7 @@ export function DoneByHandDialog({ open, onClose, change, person, app }: Props) 
       await markDoneByHand({ variables: { input: { id: change.id } } });
       forgetAccessCounts(cache);
       onClose();
+      onDone?.();
     } catch {
       toast.error(t(copy.refused, { name: person.name, app }));
     }
