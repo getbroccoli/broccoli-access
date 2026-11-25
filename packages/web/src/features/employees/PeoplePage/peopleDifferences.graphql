@@ -2,6 +2,7 @@ query PeopleDifferences($showDifferences: Boolean!) {
   accessDifferences {
     missingCount
     extraCount
+    runningChangeCount
     missing @include(if: $showDifferences) {
       app {
         id
@@ -16,8 +17,16 @@ query PeopleDifferences($showDifferences: Boolean!) {
         action
       }
       provisioning
+      roleNeedsAttention
+      latestProvisionChange {
+        id
+        status
+        failure
+        ...CouldntChangeDialog_accountChange
+      }
     }
     extra @include(if: $showDifferences) {
+      reason
       app {
         id
         name
@@ -29,11 +38,34 @@ query PeopleDifferences($showDifferences: Boolean!) {
       }
       activeAccounts {
         id
+        email
         latestChange {
           id
           status
         }
         ...AccountChangeCell_appUser
+        ...AppAccountStatusCell_appUser
+      }
+    }
+  }
+}
+
+query RunningAccountChangeCount {
+  runningAccountChangeCount
+}
+
+mutation ProvisionApp($input: AppProvisionInput!) {
+  apps {
+    provisionApp(input: $input) {
+      changes {
+        id
+      }
+      refusedEmployeeIds
+      error {
+        __typename
+        ... on Error {
+          message
+        }
       }
     }
   }

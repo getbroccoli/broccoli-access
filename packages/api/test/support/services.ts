@@ -240,6 +240,7 @@ function templateDependencies(
       ...apps(orm),
       readAppRoles: changes.readAppRoles,
       readAppInvites: changes.readAppInvites,
+      readRunningChangeCount: changes.readRunningChangeCount,
     },
     employees: employeeServices(orm),
   };

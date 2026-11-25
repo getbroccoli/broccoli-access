@@ -31,6 +31,7 @@ export interface AccountChangeRepository {
   findById(id: string): Promise<AccountChange | null>;
   /** The changes with these ids; an unknown id is left out. */
   findByIds(ids: readonly string[]): Promise<AccountChange[]>;
+  countRunning(): Promise<number>;
   /** Like `findById`, locking the row until the transaction ends. */
   lockById(id: string): Promise<AccountChange | null>;
   /** Ends a running change with its outcome; a change no longer running stays as it is. */
@@ -112,6 +113,7 @@ export function accountChangeRepository(db: Orm | Tx): AccountChangeRepository {
       const [row] = await orm().select().from(accountChanges).where(eq(accountChanges.id, id));
       return row ? toChange(row) : null;
     },
+    countRunning: () => orm().$count(accountChanges, eq(accountChanges.status, "running")),
     findByIds: async (ids) => {
       const rows = await orm().select().from(accountChanges).where(anyOf(accountChanges.id, ids));
       return rows.map(toChange);

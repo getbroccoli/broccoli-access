@@ -14,12 +14,32 @@ inviteTest(
     await service.runChange(SYSTEM, latestInvite!.id);
 
     // Ivan already uses Notion, which no template lists. Unassigned people already use Linear.
-    expect(await templates.readDifferences(ADMIN)).toEqual({
+    expect(await templates.readDifferences(ADMIN)).toMatchObject({
       missing: [{ employeeId: hannah.id, appId: input.appId }],
       extra: [],
       templateSummaries: new Map([
         [template.id, { missingCount: 1, extraCount: 0, missingAppId: input.appId }],
       ]),
+    });
+  },
+);
+
+inviteTest(
+  "a queued invite counts as running and stays Missing until the invite succeeds",
+  async ({ workspace: { owner, input, service, templates, assignLinearRole } }) => {
+    await assignLinearRole(null);
+    const { latestInvite } = await service.inviteEmployee(owner, input);
+
+    expect.soft(await templates.readDifferences(owner)).toMatchObject({
+      runningChangeCount: 1,
+      missing: [input],
+    });
+
+    await service.runChange(SYSTEM, latestInvite!.id);
+
+    expect(await templates.readDifferences(owner)).toMatchObject({
+      runningChangeCount: 0,
+      missing: [],
     });
   },
 );

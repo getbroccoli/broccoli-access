@@ -29,3 +29,4 @@ export { ReconnectButton } from "./ReconnectButton";
 export { SessionSourceBadge } from "./SessionSourceBadge";
 export { failsUntilLine, foundLine, reconnectCauseLine } from "./reconnectReason";
 export { useRefreshAfterChanges } from "./useRefreshAfterChanges";
+export { useRefreshDifferences } from "./useRefreshDifferences";

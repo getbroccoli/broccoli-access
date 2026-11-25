@@ -210,6 +210,7 @@ union ExtraAppKeepError = InvalidInputError | NotFoundError | ConflictError
 type AccessDifferences {
   missingCount: Int!
   extraCount: Int!
+  runningChangeCount: Int!
   missing: [AccessDifference!]!
   extra: [AccessDifference!]!
 }
@@ -217,6 +218,8 @@ type AccessDifferences {
 "One person's missing or extra app."
 type AccessDifference {
   employee: Employee!
+  "The source of this Extra difference, when the row is Extra."
+  reason: String
 }
 
 type TemplateSetAppRolePayload {

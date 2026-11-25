@@ -11,7 +11,8 @@ test("keeping the extra account after taking off the last template records the c
   seed,
   orm,
 }) => {
-  const employeeId = employee("chloe@acme.example").id;
+  const chloe = employee("chloe@acme.example");
+  const employeeId = chloe.id;
   const pair = { employeeId, appId: linear.appId };
   const template = await seed.assignedTemplateApp({
     ...pair,
@@ -19,16 +20,16 @@ test("keeping the extra account after taking off the last template records the c
     assignedBy: owner.user!.userId,
   });
   await templates.takeOff(owner, { employeeId, id: template.id });
-  expect(await templates.readDifferences(owner)).toEqual({
+  expect(await templates.readDifferences(owner)).toMatchObject({
     missing: [],
-    extra: [pair],
+    extra: [{ ...pair, reason: "review", accountIds: [linear.account(chloe.email).id] }],
     templateSummaries: new Map(),
   });
 
   expect(await templates.keepExtraApp(owner, pair)).toBe(employeeId);
   expect(await templates.keepExtraApp(owner, pair)).toBe(employeeId);
 
-  expect(await templates.readDifferences(owner)).toEqual({
+  expect(await templates.readDifferences(owner)).toMatchObject({
     missing: [],
     extra: [],
     templateSummaries: new Map(),
@@ -63,7 +64,7 @@ test("keeping a suspended person's extra account clears the mark on all their te
     await seed.employeeTemplate({ employeeId, templateId, assignedBy: owner.user!.userId });
   }
   const summary = { missingCount: 0, extraCount: 1, missingAppId: null };
-  expect(await templates.readDifferences(owner)).toEqual({
+  expect(await templates.readDifferences(owner)).toMatchObject({
     missing: [],
     extra: [pair],
     templateSummaries: new Map([
@@ -75,7 +76,7 @@ test("keeping a suspended person's extra account clears the mark on all their te
   await templates.keepExtraApp(owner, pair);
 
   expect(await storedEmployeeAppChoices(orm)).toEqual([{ ...pair, choice: "added", role: null }]);
-  expect(await templates.readDifferences(owner)).toEqual({
+  expect(await templates.readDifferences(owner)).toMatchObject({
     missing: [],
     extra: [],
     templateSummaries: new Map(),
@@ -94,7 +95,7 @@ test("keeping an account replaces a removal even when an assigned template gives
   await templates.keepExtraApp(owner, pair);
 
   expect(await storedEmployeeAppChoices(orm)).toEqual([{ ...pair, choice: "added", role: null }]);
-  expect(await templates.readDifferences(owner)).toEqual({
+  expect(await templates.readDifferences(owner)).toMatchObject({
     missing: [],
     extra: [],
     templateSummaries: new Map(),
@@ -128,4 +129,26 @@ test("an admin cannot keep an extra account", async ({
   expect(await storedEmployeeAppChoices(orm)).toEqual([
     { ...pair, choice: "to_review", role: null },
   ]);
+});
+
+test("a removal stays on the person page but cannot be kept once no template lists the app", async ({
+  workspace: { templates, employee, linear, owner },
+  seed,
+}) => {
+  const pair = { employeeId: employee("chloe@acme.example").id, appId: linear.appId };
+  const template = await seed.assignedTemplateApp({
+    ...pair,
+    role: null,
+    assignedBy: owner.user!.userId,
+  });
+  await seed.employeeAppChoice({ ...pair, choice: "removed" });
+  await templates.takeOutApp(owner, { id: template.id, appId: linear.appId });
+
+  const [apps] = await templates.readEmployeeApps(owner, [pair.employeeId]);
+  expect(apps!.find(({ appId }) => appId === pair.appId)?.choice).toBe("removed");
+  expect.soft((await templates.readDifferences(owner)).extra).toEqual([]);
+  await expect(templates.keepExtraApp(owner, pair)).rejects.toMatchObject({
+    code: "CONFLICT",
+    message: "This app is no longer extra for this person.",
+  });
 });

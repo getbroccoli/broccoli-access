@@ -16,12 +16,17 @@ import {
   provisionActionOf,
 } from "../domain";
 import type { PersonPage, ReadPersonPages } from "../ports";
-import type { AccountChangeDependencies } from "./accountChangeService";
+import {
+  type AccountChangeDependencies,
+  type LatestAccountChange,
+  withPlace,
+} from "./accountChangeService";
 import { type ChangingConnectors, changingConnectors } from "./accountFacts";
 import { askForInvite } from "./appInvite";
 import { askForChange } from "./askForChange";
 import { findEmployeesInDirectory } from "./directory";
 import { loggingRefusal } from "./loggingRefusal";
+import { type AppProvisionResult, provisionSelectedApp } from "./provisionSelectedApp";
 
 /** Provision: a person gets every app they are missing, in one step. */
 export interface ProvisionService {
@@ -49,6 +54,11 @@ export interface ProvisionService {
     ctx: SecurityContext,
     input: { employeeId: string; appIds: readonly string[] },
   ) => Promise<AccountChange[]>;
+  /** Provisions one app for the confirmed people and reports each expected refusal. */
+  provisionApp: (
+    ctx: SecurityContext,
+    input: { appId: string; employeeIds: readonly string[] },
+  ) => Promise<AppProvisionResult & { changes: LatestAccountChange[] }>;
 }
 
 /** What Provision does for one app of a person. */
@@ -63,41 +73,58 @@ export type ProvisionDependencies = AccountChangeDependencies & {
 };
 
 export function createProvisionService(dependencies: ProvisionDependencies): ProvisionService {
-  const { orm, logger, connectors } = dependencies;
   return {
-    readProvisionSteps: (ctx, employeeIds, pages, db = orm) =>
+    readProvisionSteps: (ctx, employeeIds, pages, db = dependencies.orm) =>
       readProvisionSteps(dependencies, ctx, { employeeIds, pages, db }),
-    async provisionEmployee(ctx, { employeeId, appIds }) {
-      const refusal = { message: "Provision refused", ids: { employeeId: parseUuid(employeeId) } };
-      const changes = await loggingRefusal(logger, refusal, async () => {
-        ctx.require("MANAGE_WORKSPACE");
-        if (!ctx.user) {
-          throw new ApplicationError("FORBIDDEN", "Only a signed-in user can provision a person.");
-        }
-        const [employee] = refusal.ids.employeeId
-          ? await dependencies.employees.readEmployees(ctx, [refusal.ids.employeeId])
-          : [];
-        if (!employee) {
-          throw new ApplicationError("NOT_FOUND", NO_EMPLOYEE);
-        }
-        // Read before the transaction: the container's list may take a while to answer.
-        return queueProvision(dependencies, {
-          ctx,
-          employee,
-          appIds: appIds.flatMap((appId) => parseUuid(appId) ?? []).toSorted(),
-          requestedBy: ctx.user.userId,
-          connectors: await connectors.list(),
-          changing: await changingConnectors(connectors),
-          start: { startedFrom: "provision", employeeId: employee.id },
-        });
-      });
-      logger.info(
-        { ...refusal.ids, changeIds: changes.map((change) => change.id) },
-        "Provision requested",
+    provisionEmployee: (ctx, input) => provisionOne(dependencies, ctx, input),
+    async provisionApp(ctx, input) {
+      let listed: Promise<readonly Connector[]> | undefined;
+      const connectors = { list: () => (listed ??= dependencies.connectors.list()) };
+      const result = await provisionSelectedApp(ctx, input, (ctx, person) =>
+        provisionOne({ ...dependencies, connectors }, ctx, person),
       );
-      return changes;
+      const ahead = await accountChangeRepository(dependencies.orm).countChangesAhead(
+        result.changes.filter(({ status }) => status === "running").map(({ id }) => id),
+      );
+      return { ...result, changes: result.changes.map((change) => withPlace(change, ahead)) };
     },
   };
+}
+
+async function provisionOne(
+  dependencies: ProvisionDependencies,
+  ctx: SecurityContext,
+  { employeeId, appIds }: { employeeId: string; appIds: readonly string[] },
+): Promise<AccountChange[]> {
+  const { logger, connectors } = dependencies;
+  const refusal = { message: "Provision refused", ids: { employeeId: parseUuid(employeeId) } };
+  const changes = await loggingRefusal(logger, refusal, async () => {
+    ctx.require("MANAGE_WORKSPACE");
+    if (!ctx.user) {
+      throw new ApplicationError("FORBIDDEN", "Only a signed-in user can provision a person.");
+    }
+    const [employee] = refusal.ids.employeeId
+      ? await dependencies.employees.readEmployees(ctx, [refusal.ids.employeeId])
+      : [];
+    if (!employee) {
+      throw new ApplicationError("NOT_FOUND", NO_EMPLOYEE);
+    }
+    // Read before the transaction: the container's list may take a while to answer.
+    return queueProvision(dependencies, {
+      ctx,
+      employee,
+      appIds: appIds.flatMap((appId) => parseUuid(appId) ?? []).toSorted(),
+      requestedBy: ctx.user.userId,
+      connectors: await connectors.list(),
+      changing: await changingConnectors(connectors),
+      start: { startedFrom: "provision", employeeId: employee.id },
+    });
+  });
+  logger.info(
+    { ...refusal.ids, changeIds: changes.map((change) => change.id) },
+    "Provision requested",
+  );
+  return changes;
 }
 
 const NO_EMPLOYEE = "No employee has this id.";

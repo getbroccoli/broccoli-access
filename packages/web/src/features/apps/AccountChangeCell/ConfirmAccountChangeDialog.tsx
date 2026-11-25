@@ -38,6 +38,7 @@ type Props = {
   >;
   accountEmail?: string;
   expectedRole?: string;
+  onlyIfExtra?: boolean;
   action: Exclude<AccountChangeAction, "REMOVE">;
 };
 
@@ -45,7 +46,13 @@ type Props = {
  * Disable, Enable or Invite, confirmed in a dialog naming the person, the app and the workspace;
  * the dialog closes on confirm and the row then follows the change.
  */
-export function ConfirmAccountChangeDialog({ row, action, accountEmail, expectedRole }: Props) {
+export function ConfirmAccountChangeDialog({
+  row,
+  action,
+  accountEmail,
+  expectedRole,
+  onlyIfExtra,
+}: Props) {
   const [open, setOpen] = useState(false);
   const { changeAccount, loading } = useChangeAccount();
   const { employee, app } = row;
@@ -62,7 +69,7 @@ export function ConfirmAccountChangeDialog({ row, action, accountEmail, expected
   const confirm = async () => {
     setOpen(false);
     if (!asksGoogle) {
-      await changeAccount(changeTargetOf(row, action), action);
+      await changeAccount(changeTargetOf(row, action, onlyIfExtra), action);
     } else if (!(await askGoogleForUserWrites(window.location.pathname))) {
       toast.error(t("apps.change.googleStartFailed"));
     }

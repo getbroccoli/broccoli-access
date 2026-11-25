@@ -240,3 +240,29 @@ test("the owner sees who is missing an app and keeps another person's extra acco
     data: { templates: { keepExtraApp: { employee: { id: formerMember.id }, error: null } } },
   });
 });
+
+test("refuses employee history nested under missing access differences", async ({ env }) => {
+  const { browser } = await env.signInAsOwner();
+  const employee = await env.seed.employee();
+  const app = await env.seed.app({
+    name: "Studio",
+    domain: "studio.example",
+    catalogKey: null,
+    status: "approved",
+  });
+  await env.seed.employeeAppChoice({ employeeId: employee.id, appId: app.id, choice: "added" });
+
+  const response = await browser.graphql(`{
+    accessDifferences { missing { employee { history(first: 1) { pageInfo { hasNextPage } } } } }
+  }`);
+
+  expect(await response.json()).toMatchObject({
+    errors: [
+      {
+        path: ["accessDifferences", "missing", 0, "employee", "history"],
+        extensions: { code: "INVALID_INPUT" },
+        message: "Read employee history from a person’s own query.",
+      },
+    ],
+  });
+});

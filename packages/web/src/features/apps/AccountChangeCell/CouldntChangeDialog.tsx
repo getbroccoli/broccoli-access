@@ -46,6 +46,7 @@ type Props = {
     roleConflict?: boolean;
     offeredChange?: AccountChangeAction | null;
     offersRemove?: boolean;
+    onlyIfExtra?: boolean;
   };
   /**
    * Called once Try again was asked or the change was marked done by hand, by a row of an account
@@ -107,7 +108,7 @@ export function CouldntChangeDialog({
       change.action === "REMOVE" ? change.id : undefined,
     ).then(onChanged);
   };
-  const target = row && rowTarget(row.id, change, name);
+  const target = row && rowTarget(row.id, change, name, row.onlyIfExtra);
   const scan = (connectionId: string) => {
     setShown(null);
     scanNow({ variables: { connectionId } }).catch(() => toast.error(t("scans.scanNowFailed")));
@@ -242,9 +243,14 @@ const COPY = {
 type FailedChange = CouldntChangeDialog_AccountChangeFragment;
 
 /** What Try again asks for: an invite goes to an employee; an account without one goes by its email. */
-function rowTarget(rowId: string, { action, employee, app }: FailedChange, name: string) {
+function rowTarget(
+  rowId: string,
+  { action, employee, app }: FailedChange,
+  name: string,
+  onlyIfExtra?: boolean,
+) {
   if (employee) {
-    return changeTargetOf({ id: rowId, employee, app }, action);
+    return changeTargetOf({ id: rowId, employee, app }, action, onlyIfExtra);
   }
   return action === "INVITE" ? undefined : { name, app: app.name, accountId: rowId };
 }

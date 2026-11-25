@@ -7,7 +7,7 @@ import {
 } from "@/__generated__/graphql";
 import { usePayloadMutation } from "@/apollo";
 import { Button } from "@/components/ui/button";
-import { AccountChangeCell } from "@/features/apps";
+import { AccountChangeCell, AppAccountStatusCell } from "@/features/apps";
 import { t } from "@/i18n";
 
 type Extra = NonNullable<PeopleDifferencesQuery["accessDifferences"]["extra"]>[number];
@@ -39,15 +39,28 @@ export function ExtraAppActions({ app, employee, accounts, isOwner }: Props) {
             app: app.name,
             name: `${employee.firstName} ${employee.lastName}`,
           })}
-          disabled={loading}
+          title={t("people.differences.keepEffect")}
+          disabled={
+            loading || accounts.some(({ latestChange }) => latestChange?.status === "RUNNING")
+          }
           onClick={() => void onKeep()}
         >
           {t("people.differences.keep")}
         </Button>
       )}
-      {accounts.map((account) => (
-        <AccountChangeCell key={account.id} appUser={account} />
-      ))}
+      <div className="flex flex-col items-end gap-2">
+        {accounts.map((account) => (
+          <div key={account.id} className="flex items-center gap-2">
+            {accounts.length > 1 && (
+              <span className="text-sm text-muted-foreground">{account.email}</span>
+            )}
+            {account.latestChange?.status === "FAILED" && (
+              <AppAccountStatusCell appUser={account} onlyIfExtra />
+            )}
+            <AccountChangeCell appUser={account} onlyIfExtra />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

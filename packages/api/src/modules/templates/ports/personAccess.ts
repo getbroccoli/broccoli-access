@@ -12,6 +12,7 @@ export interface PersonAccess {
     appIds?: readonly string[],
   ): Promise<
     {
+      id: string;
       employeeId: string;
       appId: string;
       status: AccountStatus;
@@ -21,6 +22,7 @@ export interface PersonAccess {
     ctx: SecurityContext,
     employeeIds: readonly string[],
     db?: Orm | Tx,
+    expected?: readonly { employeeId: string; appId: string }[],
   ): Promise<
     {
       employeeId: string;
@@ -28,6 +30,7 @@ export interface PersonAccess {
       invitedAt: Date | null;
     }[]
   >;
+  readRunningChangeCount(ctx: SecurityContext, db?: Orm | Tx): Promise<number>;
 }
 
 /** Used to distinguish a missing employee from an employee without a directory account. */

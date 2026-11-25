@@ -1,14 +1,22 @@
 import { type Orm, readSnapshot } from "../../../core/db";
 import type { SecurityContext } from "../../../core/security";
 import { assignmentRepository, type EmployeeAppPair } from "../db";
+import { appsOfPerson, extraAppReason, type PersonApp } from "../domain";
 import type { PersonAccess } from "../ports";
-import { employeeAppsOf } from "./employeeAppsOf";
-import { employeeTemplatesOf } from "./employeeTemplates";
+import { employeeAppFactsOf } from "./employeeAppFactsOf";
 
 export interface AccessDifferences {
   missing: EmployeeAppPair[];
-  extra: EmployeeAppPair[];
+  extra: ExtraAppDifference[];
+  runningChangeCount: number;
   templateSummaries: Map<string, TemplateDifferenceSummary>;
+}
+
+export type AccessDifference = EmployeeAppPair & Partial<ExtraAppDifference>;
+
+interface ExtraAppDifference extends EmployeeAppPair {
+  accountIds: string[];
+  reason: NonNullable<ReturnType<typeof extraAppReason>>;
 }
 
 export interface TemplateDifferenceSummary {
@@ -22,35 +30,89 @@ export function readDifferences(orm: Orm, apps: PersonAccess, ctx: SecurityConte
   ctx.require("MANAGE_WORKSPACE");
   return readSnapshot(orm, async (db): Promise<AccessDifferences> => {
     const employeeIds = await assignmentRepository(db).employeesWithAccessSources();
-    const templates = await employeeTemplatesOf(db, employeeIds);
-    const rowsByPerson = await employeeAppsOf({ db, apps, ctx, employeeIds, templates });
-    const differences: AccessDifferences = { missing: [], extra: [], templateSummaries: new Map() };
-    for (const [index, rows] of rowsByPerson.entries()) {
-      for (const { appId, state } of rows) {
-        if (state !== "missing" && state !== "extra") continue;
-        differences[state].push({ employeeId: employeeIds[index]!, appId });
-        for (const { id } of templates[index]!) {
-          const summary = differences.templateSummaries.get(id) ?? {
-            missingCount: 0,
-            extraCount: 0,
-            missingAppId: null,
-          };
-          addDifference(summary, state, appId);
-          differences.templateSummaries.set(id, summary);
-        }
-      }
-    }
+    const runningChangeCount = await apps.readRunningChangeCount(ctx, db);
+    const factsByPerson = await employeeAppFactsOf({ db, apps, ctx, employeeIds, invites: [] });
+    const appsByPerson = factsByPerson.map(appsOfPerson);
+    const expected = appsByPerson.flatMap((rows, index) =>
+      rows.flatMap(({ appId, state }) =>
+        state === "missing" ? [{ employeeId: employeeIds[index]!, appId }] : [],
+      ),
+    );
+    const invites = await apps.readAppInvites(
+      ctx,
+      [...new Set(expected.map(({ employeeId }) => employeeId))],
+      db,
+      expected,
+    );
+    const invited = new Set(invites.map(({ employeeId, appId }) => employeeId + "/" + appId));
+    const differences: AccessDifferences = {
+      missing: [],
+      extra: [],
+      runningChangeCount,
+      templateSummaries: new Map(),
+    };
+    for (const [index, facts] of factsByPerson.entries())
+      collectDifferences(differences, employeeIds[index]!, {
+        facts,
+        rows: appsByPerson[index]!,
+        invited,
+      });
     return differences;
   });
 }
 
+function collectDifferences(
+  differences: AccessDifferences,
+  employeeId: string,
+  {
+    facts,
+    rows,
+    invited,
+  }: {
+    facts: Awaited<ReturnType<typeof employeeAppFactsOf>>[number];
+    rows: PersonApp[];
+    invited: ReadonlySet<string>;
+  },
+) {
+  const choices = new Map(facts.choices.map(({ appId, choice }) => [appId, choice]));
+  const active = Map.groupBy(
+    facts.accounts.filter(({ status }) => status === "active"),
+    ({ appId }) => appId,
+  );
+  for (const { appId, state } of rows) {
+    const pair = { employeeId, appId };
+    let extraCount = 0;
+    if (state === "missing") {
+      if (invited.has(employeeId + "/" + appId)) continue;
+      differences.missing.push(pair);
+    } else if (state === "extra") {
+      const reason = extraAppReason(
+        choices.get(appId),
+        facts.templates.length > 0 && facts.listedApps.has(appId),
+      );
+      if (!reason) continue;
+      const accountIds = (active.get(appId) ?? []).map(({ id }) => id);
+      differences.extra.push({ ...pair, reason, accountIds });
+      extraCount = accountIds.length;
+    } else continue;
+    for (const { id } of facts.templates) {
+      const summary = differences.templateSummaries.get(id) ?? {
+        missingCount: 0,
+        extraCount: 0,
+        missingAppId: null,
+      };
+      addDifference(summary, { appId, extraCount });
+      differences.templateSummaries.set(id, summary);
+    }
+  }
+}
+
 function addDifference(
   summary: TemplateDifferenceSummary,
-  state: "missing" | "extra",
-  appId: string,
+  { appId, extraCount }: { appId: string; extraCount: number },
 ) {
-  if (state === "extra") {
-    summary.extraCount++;
+  if (extraCount) {
+    summary.extraCount += extraCount;
     return;
   }
   if (summary.missingCount === 0) summary.missingAppId = appId;

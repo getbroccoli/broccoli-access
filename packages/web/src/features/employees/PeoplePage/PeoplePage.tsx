@@ -11,6 +11,7 @@ import {
 import { TableSearchField } from "@/components/dataTable";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRefreshDifferences } from "@/features/apps";
 import { t } from "@/i18n";
 import { cn } from "@/lib/class-names";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
@@ -32,7 +33,12 @@ export function PeoplePage() {
   const { view: requestedView = "all", q } = useSearch({ from: "/_authenticated/people" });
   const navigate = useNavigate({ from: "/people" });
   const router = useRouter();
-  const view = !me.isOwner && requestedView === "accountsWithoutPerson" ? "all" : requestedView;
+  const canManage = me.operations.includes("MANAGE_WORKSPACE");
+  const canOpenView =
+    requestedView === "differences"
+      ? canManage
+      : requestedView !== "accountsWithoutPerson" || me.isOwner;
+  const view = canOpenView ? requestedView : "all";
   const showAccounts = view === "accountsWithoutPerson";
   const showDifferences = view === "differences";
   const suspendedOnly = view === "suspendedWithAccess";
@@ -46,17 +52,17 @@ export function PeoplePage() {
   });
   const directory = useQuery(DirectoryScanDocument, { fetchPolicy: "cache-and-network" });
   const differences = useQuery(PeopleDifferencesDocument, {
+    skip: !canManage,
     variables: { showDifferences },
     fetchPolicy: "cache-and-network",
   });
   const access = differences.data?.accessDifferences;
-  const isChanging = Boolean(
-    access?.missing?.some(({ provisioning }) => provisioning) ||
+  const justRequested = Boolean(
     access?.extra?.some(({ activeAccounts }) =>
       activeAccounts.some(({ latestChange }) => latestChange?.status === "RUNNING"),
     ),
   );
-  usePollWhileScanning(showDifferences && isChanging, differences);
+  useRefreshDifferences(access?.runningChangeCount || Number(justRequested), differences.refetch);
   const badge = useQuery(AccountsWithoutPersonCountDocument, {
     skip: !me.isOwner,
     fetchPolicy: "cache-and-network",
@@ -73,7 +79,7 @@ export function PeoplePage() {
   const refresh = () =>
     Promise.allSettled([
       refetch(),
-      differences.refetch(),
+      ...(canManage ? [differences.refetch()] : []),
       ...(me.isOwner ? [badge.refetch()] : []),
       ...(showAccounts ? [accounts.refresh(), marked.refresh()] : []),
     ]);
@@ -97,6 +103,7 @@ export function PeoplePage() {
         <PeopleTabs
           view={view}
           isOwner={me.isOwner}
+          canReadDifferences={canManage}
           accountCount={badge.data?.accountsWithoutPersonCount}
           differenceCount={access && access.missingCount + access.extraCount}
           counts={data?.employeeCounts}
@@ -124,19 +131,24 @@ export function PeoplePage() {
           {t("people.suspendedWithAccess.description")}
         </p>
       )}
-      {error && !data && <LoadError message={t("people.error.title")} retry={refetch} />}
+      {!showDifferences && error && !data && (
+        <LoadError message={t("people.error.title")} retry={refetch} />
+      )}
       {showAccounts && accounts.error && !accounts.data && (
         <LoadError message={t("people.accounts.loadFailed")} retry={accounts.refetch} />
       )}
-      {((!data && !error) || (showAccounts && accounts.loading && !accounts.data)) && (
-        <Skeleton className="h-[300px] rounded-xl" />
-      )}
+      {!showDifferences &&
+        ((!data && !error) || (showAccounts && accounts.loading && !accounts.data)) && (
+          <Skeleton className="h-[300px] rounded-xl" />
+        )}
       {showAccounts && accounts.data && (
         <AccountsWithoutPersonTable
           accounts={accounts.data.accountsWithoutPerson}
           loading={accounts.loading}
           refresh={refreshAccounts}
-          onLinked={() => void Promise.allSettled([refetch(), accounts.refill()])}
+          onLinked={() =>
+            void Promise.allSettled([refetch(), accounts.refill(), differences.refetch()])
+          }
           onMarked={() => Promise.allSettled([accounts.refill(), marked.refresh()])}
           loadMore={() => void accounts.loadMore()}
         />

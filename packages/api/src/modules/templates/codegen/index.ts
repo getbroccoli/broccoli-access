@@ -7,7 +7,8 @@ export const codegenMappers = {
   TemplateApp: "../../modules/templates/domain#TemplateApp as TemplateAppModel",
   AccessDifferences:
     "../../modules/templates/app/readDifferences#AccessDifferences as AccessDifferencesModel",
-  AccessDifference: "../../modules/templates/db#EmployeeAppPair as AccessDifferenceModel",
+  AccessDifference:
+    "../../modules/templates/app/readDifferences#AccessDifference as AccessDifferenceModel",
   TemplateDifferenceSummary:
     "../../modules/templates/app/readDifferences#TemplateDifferenceSummary as TemplateDifferenceSummaryModel",
 };

@@ -9,6 +9,7 @@ import { templateApps } from "./templateAppsTable";
 export interface AssignmentRepository {
   forEmployees(ids: readonly string[]): Promise<Assignment[]>;
   employeesWithAccessSources(): Promise<string[]>;
+  hasAssignment(employeeId: string): Promise<boolean>;
   employeeIds(templateId: string): Promise<string[]>;
   assign(assignment: Assignment, assignedBy: string): Promise<boolean>;
   takeOff(assignment: Assignment): Promise<boolean>;
@@ -58,6 +59,12 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
   return {
     forEmployees: (ids) =>
       assignments().where(anyOf(employeeTemplates.employeeId, ids)).orderBy(employeeTemplates.id),
+    async hasAssignment(employeeId) {
+      return (
+        (await assignments().where(eq(employeeTemplates.employeeId, employeeId)).limit(1)).length >
+        0
+      );
+    },
     async employeesWithAccessSources() {
       const rows = await orm
         .select({ employeeId: employeeTemplates.employeeId })

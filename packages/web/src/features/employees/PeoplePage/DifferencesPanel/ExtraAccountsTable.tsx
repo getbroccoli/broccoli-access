@@ -39,7 +39,7 @@ export function ExtraAccountsTable({ differences, isOwner }: Props) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map(({ employee, app, activeAccounts }) => (
+          {rows.map(({ employee, app, activeAccounts, reason }) => (
             <TableRow key={employee.id + "/" + app.id}>
               <TableCell className="py-3 pl-4">
                 <Link
@@ -51,9 +51,7 @@ export function ExtraAccountsTable({ differences, isOwner }: Props) {
                 </Link>
               </TableCell>
               <TableCell className="font-medium">{app.name}</TableCell>
-              <TableCell className="text-foreground/80">
-                {t("people.differences.extraReason")}
-              </TableCell>
+              <TableCell className="text-foreground/80">{extraReason(reason)}</TableCell>
               <TableCell className="pr-4 text-right">
                 <ExtraAppActions
                   employee={employee}
@@ -72,4 +70,10 @@ export function ExtraAccountsTable({ differences, isOwner }: Props) {
 
 function nameOf({ firstName, lastName }: Extra["employee"]) {
   return `${firstName} ${lastName}`;
+}
+
+function extraReason(reason: Extra["reason"]) {
+  if (reason === "review") return t("people.differences.accessChanged");
+  if (reason === "removed") return t("people.differences.accessRemoved");
+  return t("people.differences.outsideTemplates");
 }

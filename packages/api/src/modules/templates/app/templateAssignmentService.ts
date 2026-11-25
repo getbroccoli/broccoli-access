@@ -6,10 +6,10 @@ import type { ModuleDependencies } from "../../../core/moduleManifest";
 import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { assignmentRepository } from "../db";
-import type { PersonApp, Template } from "../domain";
+import { appsOfPerson, type PersonApp, type Template } from "../domain";
 import type { EmployeeById, PersonAccess } from "../ports";
 import { clearOffboarded } from "./clearOffboarded";
-import { employeeAppsOf } from "./employeeAppsOf";
+import { employeeAppFactsOf } from "./employeeAppFactsOf";
 import { employeeTemplatesOf } from "./employeeTemplates";
 import { lockTemplate } from "./lockTemplate";
 import { clearInactiveReviews, reviewLostApps } from "./reviewLostApps";
@@ -83,9 +83,10 @@ export function createTemplateAssignmentService(deps: Dependencies): TemplateAss
           ),
       });
     },
-    readEmployeeApps(ctx, employeeIds, shared, db: Orm | Tx = orm) {
+    async readEmployeeApps(ctx, employeeIds, shared, db: Orm | Tx = orm) {
       ctx.require("MANAGE_WORKSPACE");
-      return employeeAppsOf({ db, apps, ctx, employeeIds, ...shared });
+      const facts = await employeeAppFactsOf({ db, apps, ctx, employeeIds, ...shared });
+      return facts.map(appsOfPerson);
     },
   };
 }

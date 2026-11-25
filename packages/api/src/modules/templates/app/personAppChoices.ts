@@ -5,9 +5,8 @@ import { createRecordHistoryService } from "../../../core/records";
 import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
 import { assignmentRepository, type EmployeeAppPair } from "../db";
-import type { EmployeeAppChoice } from "../domain";
+import { type EmployeeAppChoice, expectsApp, extraAppReason } from "../domain";
 import type { AppsById, EmployeeById, PersonAccess } from "../ports";
-import { employeeAppsOf } from "./employeeAppsOf";
 import { reviewLostApps } from "./reviewLostApps";
 import { checkedAppId, checkedRole } from "./templateRoles";
 
@@ -27,6 +26,8 @@ export interface PersonAppChoices {
   ) => Promise<string>;
   /** Accepts a current extra account as an app for this person, with no account change. */
   keepExtraApp: (ctx: SecurityContext, input: EmployeeAppPair) => Promise<string>;
+  /** Checks a pair while the caller holds its app's review lock. */
+  isExtraApp: (ctx: SecurityContext, pair: EmployeeAppPair, tx: Tx) => Promise<boolean>;
   /** Keeps an app their templates give from the person; refuses any other app with CONFLICT. */
   removePersonApp: (ctx: SecurityContext, input: EmployeeAppPair) => Promise<string>;
   /**
@@ -73,6 +74,10 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
       return pair.employeeId;
     },
     keepExtraApp: (ctx, input) => keepExtraApp(deps, ctx, input),
+    async isExtraApp(ctx, pair, tx) {
+      ctx.require("MANAGE_WORKSPACE");
+      return hasExtraAccess(apps, tx, pair, await choiceFacts(tx, pair));
+    },
     async removePersonApp(ctx, input) {
       const pair = await ownersPair(deps, ctx, input);
       const changed = await transact(async (tx) => {
@@ -111,17 +116,10 @@ async function keepExtraApp(deps: Dependencies, ctx: SecurityContext, input: Emp
   try {
     const pair = await ownersPair(deps, ctx, input);
     const changed = await transact(async (db) => {
-      const { choice, appName } = await lockedFacts(deps, db, pair);
+      const facts = await lockedFacts(deps, db, pair);
+      const { choice, appName } = facts;
       if (choice?.choice === "added") return false;
-      // An extra app has an active account, so invitations cannot change this decision.
-      const [rows] = await employeeAppsOf({
-        db,
-        apps,
-        ctx,
-        employeeIds: [pair.employeeId],
-        invites: [],
-      });
-      if (!rows?.some(({ appId, state }) => appId === pair.appId && state === "extra"))
+      if (!(await hasExtraAccess(apps, db, pair, facts)))
         throw new ApplicationError("CONFLICT", "This app is no longer extra for this person.");
       await saveAddedChoice(ctx, db, pair, { appName, before: choice, role: null });
       return true;
@@ -173,10 +171,31 @@ async function ownersPair(
 async function lockedFacts({ apps, employees }: Dependencies, tx: Tx, pair: EmployeeAppPair) {
   await employees.holdForReference(tx, [pair.employeeId]);
   const [app] = await apps.lockAppsForReview(tx, [pair.appId]);
+  return { ...(await choiceFacts(tx, pair)), appName: app?.name };
+}
+
+async function choiceFacts(tx: Tx, pair: EmployeeAppPair) {
   const repo = assignmentRepository(tx);
   const sources = await repo.sources([pair]);
   const [choice] = await repo.choicesFor([pair.employeeId], [pair.appId]);
-  return { given: sources.length > 0, choice, appName: app?.name };
+  return { given: sources.length > 0, choice };
+}
+
+async function hasExtraAccess(
+  apps: PersonAccess,
+  tx: Tx,
+  { employeeId, appId }: EmployeeAppPair,
+  { given, choice }: Awaited<ReturnType<typeof choiceFacts>>,
+) {
+  if (expectsApp(given, choice?.choice)) return false;
+  const repo = assignmentRepository(tx);
+  const listed =
+    choice?.choice !== "to_review" &&
+    (await repo.hasAssignment(employeeId)) &&
+    (await repo.listedApps([appId])).has(appId);
+  if (!extraAppReason(choice?.choice, listed)) return false;
+  const accounts = await apps.findEmployeeAccounts(tx, [employeeId], [appId]);
+  return accounts.some(({ status }) => status === "active");
 }
 
 function isOwnChoice(

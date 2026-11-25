@@ -1,5 +1,4 @@
 import { ApplicationError } from "../../../core/applicationError";
-import DataLoader from "dataloader";
 import type { GraphQLResolveInfo } from "graphql";
 import { z } from "zod";
 import { paginate } from "../../../core/pagination";
@@ -32,7 +31,7 @@ export function createResolvers(
   const changedEmployee = async (context: GraphqlContext, employeeId: string) => ({
     employee: (await readEmployees(context.getActor(), [employeeId]))[0] ?? null,
   });
-  const differences = differenceResolvers(services, readEmployees);
+  const differences = differenceResolvers(services);
   const rosters = perRequest(() => ({
     remaining: 10000,
     cache: new Map<string, ReturnType<typeof readRoster>>(),
@@ -215,24 +214,13 @@ async function readRoster(
 
 function differenceResolvers(
   services: Pick<TemplateService, "readDifferences">,
-  readEmployees: ReadTemplateEmployees,
-): Pick<Resolvers, "AccessDifferences" | "AccessDifference" | "Query" | "Template"> {
+): Pick<Resolvers, "AccessDifferences" | "Query" | "Template"> {
   const differences = perRequest((ctx) => services.readDifferences(ctx.getActor()));
-  const employees = perRequest(
-    (ctx) =>
-      new DataLoader(async (ids: readonly string[]) => {
-        const found = await readEmployees(ctx.getActor(), ids);
-        const byId = new Map(found.map((employee) => [employee.id, employee]));
-        return ids.map((id) => byId.get(id) ?? new Error("No readable employee has this id."));
-      }),
-  );
   return {
     AccessDifferences: {
       missingCount: ({ missing }) => missing.length,
-      extraCount: ({ extra }) => extra.length,
-    },
-    AccessDifference: {
-      employee: ({ employeeId }, _args, ctx) => employees(ctx).load(employeeId),
+      extraCount: ({ extra }) =>
+        extra.reduce((count, { accountIds }) => count + accountIds.length, 0),
     },
     Template: {
       differenceSummary: async ({ id }, _args, ctx) =>

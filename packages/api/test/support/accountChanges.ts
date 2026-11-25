@@ -8,13 +8,13 @@ import type { Orm, Transact } from "../../src/core/db";
 import type { JobQueue } from "../../src/core/jobs";
 import { createLogger } from "../../src/core/logger";
 import { createAccountChangeService } from "../../src/modules/apps";
-import { readInviteRole } from "../../src/modules/templates";
+import { readInviteRole, type TemplateService } from "../../src/modules/templates";
 import { createEmployeeReadService } from "../../src/modules/employees";
 import { createGoogleWorkspaceConnector } from "../../src/modules/google";
 import { createImportRecordService } from "../../src/modules/imports";
 import { connectLinear, containerConnectors, failLinearCall } from "./containerConnections";
 import { recordingJobQueue } from "./recordingJobQueue";
-import { apps, integrationUsers } from "./services";
+import { apps, integrationUsers, templates } from "./services";
 import { storedAppAccounts } from "./storedScan";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { SYSTEM } from "./testSecurityContext";
@@ -50,7 +50,10 @@ export function accountChangeDependencies(
     adminApiUrl: googleUrl,
   });
   const connectors = { list: async () => [google, ...(await container.list())] };
+  const isExtraApp: TemplateService["isExtraApp"] = (ctx, pair, tx) =>
+    templates(orm, { connectors: container, transact }).isExtraApp(ctx, pair, tx);
   return {
+    isExtraApp,
     readInviteRole,
     directoryConnectors: [google],
     orm,

@@ -1,8 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { toast } from "sonner";
 
-import { type PeopleDifferencesQuery, ProvisionEmployeeDocument } from "@/__generated__/graphql";
+import { type PeopleDifferencesQuery, ProvisionAppDocument } from "@/__generated__/graphql";
 import { usePayloadMutation } from "@/apollo";
 import {
   AlertDialog,
@@ -16,6 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { CouldntChangeDialog } from "@/features/apps";
 import { t } from "@/i18n";
 
 type Missing = NonNullable<PeopleDifferencesQuery["accessDifferences"]["missing"]>[number];
@@ -27,27 +27,27 @@ type Props = {
 
 /** One Provision for the people missing this app, with each person's current action. */
 export function MissingAppCard({ differences, refresh }: Props) {
-  const [provision] = usePayloadMutation(ProvisionEmployeeDocument);
-  const [submitting, setSubmitting] = useState(false);
+  const [provision, { loading: submitting }] = usePayloadMutation(ProvisionAppDocument);
   const { app, employee } = differences[0]!;
   const count = String(differences.length);
-  const ready = differences.filter((row) => row.provisionStep && !row.provisioning);
-  const isProvisioning = submitting || differences.some(({ provisioning }) => provisioning);
+  const ready = differences.filter(
+    (row) => row.provisionStep && !row.provisioning && !row.roleNeedsAttention,
+  );
+  const isProvisioning =
+    submitting || (!ready.length && differences.some(({ provisioning }) => provisioning));
   const confirm = async () => {
-    setSubmitting(true);
-    let refused = false;
     try {
-      for (const { employee } of ready) {
-        await provision({
-          variables: { input: { employeeId: employee.id, appIds: [app.id] } },
-        }).catch(() => {
-          refused = true;
-        });
-      }
-      if (refused) toast.error(t("people.differences.provisionFailed", { app: app.name }));
-      await refresh().catch(() => undefined);
+      const result = await provision({
+        variables: {
+          input: { appId: app.id, employeeIds: ready.map(({ employee }) => employee.id) },
+        },
+      });
+      if (result.refusedEmployeeIds?.length)
+        toast.error(t("people.differences.provisionFailed", { app: app.name }));
+    } catch {
+      toast.error(t("people.differences.provisionFailed", { app: app.name }));
     } finally {
-      setSubmitting(false);
+      await refresh().catch(() => undefined);
     }
   };
 
@@ -69,7 +69,7 @@ export function MissingAppCard({ differences, refresh }: Props) {
       </p>
       <AlertDialog>
         <AlertDialogTrigger
-          render={<Button type="button" size="lg" className="px-4" disabled={isProvisioning} />}
+          render={<Button type="button" size="lg" className="px-4" disabled={submitting} />}
         >
           {t(isProvisioning ? "people.differences.provisioning" : "people.provision.button")}
         </AlertDialogTrigger>
@@ -97,7 +97,13 @@ export function MissingAppCard({ differences, refresh }: Props) {
                   >
                     {personName(row.employee)}
                   </Link>
-                  <span className="text-muted-foreground">{provisionLabel(row)}</span>
+                  <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                    {row.latestProvisionChange?.status === "FAILED" &&
+                      row.latestProvisionChange.failure !== "NO_CONNECTION" && (
+                        <CouldntChangeDialog change={row.latestProvisionChange} />
+                      )}
+                    {provisionLabel(row)}
+                  </div>
                 </li>
               ))}
           </ul>
@@ -105,7 +111,7 @@ export function MissingAppCard({ differences, refresh }: Props) {
             <AlertDialogCancel>{t("apps.change.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               type="button"
-              disabled={!ready.length || isProvisioning}
+              disabled={!ready.length || submitting}
               onClick={() => void confirm()}
             >
               {t("people.provision.button")}
@@ -121,10 +127,18 @@ function personName(employee: Missing["employee"]) {
   return `${employee.firstName} ${employee.lastName}`;
 }
 
-function provisionLabel({ provisionStep, provisioning }: Missing) {
+function provisionLabel({
+  provisionStep,
+  provisioning,
+  roleNeedsAttention,
+  latestProvisionChange,
+}: Missing) {
   if (provisioning) return t("people.differences.provisioning");
+  if (roleNeedsAttention) return t("people.differences.fixRole");
   if (provisionStep?.action === "INVITE") return t("people.differences.invites");
   if (provisionStep?.action === "REACTIVATE") return t("people.provision.enable");
-  if (provisionStep?.action === "GIVE_BY_HAND") return t("people.provision.byHand");
+  if (provisionStep?.action === "GIVE_BY_HAND") return t("people.differences.byHand");
+  if (latestProvisionChange?.failure === "NO_CONNECTION")
+    return t("people.differences.finishByHand");
   return t("people.differences.provisionUnavailable");
 }

@@ -1,6 +1,9 @@
 # shortcut: reads up to 10,000 templates at once, by name; page with `after` once an instance
 # keeps more.
 query TemplatesPage {
+  accessDifferences {
+    runningChangeCount
+  }
   templates(first: 10000) {
     edges {
       node {

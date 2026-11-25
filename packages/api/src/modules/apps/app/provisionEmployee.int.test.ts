@@ -1,6 +1,53 @@
 import { expect, failLinearCall, inviteTest as test, SYSTEM } from "#test/support";
 import { accountChanges } from "../db";
 
+test("provisions one app once per selected person and continues past a refused employee", async ({
+  workspace: {
+    assignLinearRole,
+    assignAppWithoutConnection,
+    provision,
+    owner,
+    ivan,
+    employee,
+    linear,
+    sent,
+  },
+  seed,
+}) => {
+  const template = await assignLinearRole(null);
+  await assignAppWithoutConnection();
+  const elif = employee("elif@acme.example");
+  await seed.employeeTemplate({
+    employeeId: elif.id,
+    templateId: template.id,
+    assignedBy: owner.user!.userId,
+  });
+  const unknown = "00000000-0000-4000-8000-000000000001";
+
+  const { changes, refusedEmployeeIds } = await provision.provisionApp(owner, {
+    appId: linear.appId,
+    employeeIds: [ivan.id, unknown, elif.id, ivan.id, unknown],
+  });
+
+  expect(refusedEmployeeIds).toEqual([unknown]);
+  expect(changes).toHaveLength(2);
+  for (const employeeId of [ivan.id, elif.id]) {
+    expect(changes).toContainEqual(
+      expect.objectContaining({
+        appId: linear.appId,
+        employeeId,
+        action: "invite",
+        startedFrom: "provision",
+        status: "running",
+      }),
+    );
+  }
+  expect(sent).toHaveLength(2);
+  for (const { id } of changes) {
+    expect(sent).toContainEqual(expect.objectContaining({ payload: { changeId: id } }));
+  }
+});
+
 test("invites Ivan to his missing app with his template's role, started from Provision", async ({
   workspace: { assignLinearRole, ivan, linear, sent, provisionShown },
 }) => {

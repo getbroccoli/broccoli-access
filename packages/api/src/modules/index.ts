@@ -32,7 +32,12 @@ import {
 import { createImportRecordService, createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
 import { createPersonPageReader, personPageLoader, readPersonPages } from "./personPageReader";
-import { readInviteRole, createTemplateService, templatesModule } from "./templates";
+import {
+  readInviteRole,
+  createTemplateService,
+  templatesModule,
+  type TemplateService,
+} from "./templates";
 
 /** Settings that only some modules need, read from the environment by `main.ts`. */
 export interface ModuleSettings {
@@ -105,6 +110,8 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   const employees = createEmployeeReadService({ ...core, accounts: apps });
   const changeDependencies = {
     readInviteRole,
+    isExtraApp: (...args: Parameters<TemplateService["isExtraApp"]>) =>
+      templates.isExtraApp(...args),
     directoryConnectors,
     ...core,
     connectors,
@@ -121,7 +128,12 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
   });
   const templates = createTemplateService({
     ...core,
-    apps: { ...apps, readAppRoles: changes.readAppRoles, readAppInvites: changes.readAppInvites },
+    apps: {
+      ...apps,
+      readAppRoles: changes.readAppRoles,
+      readAppInvites: changes.readAppInvites,
+      readRunningChangeCount: changes.readRunningChangeCount,
+    },
     employees,
   });
   const pageReads = { ...users, ...changes, ...templates };

@@ -1,7 +1,8 @@
 import { ApplicationError } from "../../../core/applicationError";
 import type { Tx } from "../../../core/db";
+import type { SecurityContext } from "../../../core/security";
 import { parseUuid } from "../../../utils";
-import { accountChangeRepository, appAccountRepository } from "../db";
+import { accountChangeRepository, appAccountRepository, appRepository } from "../db";
 import { type AccountChangeAction, type ChangeStart, startOfChange } from "../domain";
 import {
   type AccountChangeDependencies,
@@ -15,7 +16,7 @@ import { type ChangingConnectors, ensureSameRetry, readAccountFacts } from "./ac
 export async function askForChange(
   dependencies: AccountChangeDependencies,
   tx: Tx,
-  { appAccountId, action, requestedBy, changing, retryOf, start }: AskedChange,
+  { appAccountId, action, requestedBy, changing, retryOf, start, onlyIfExtra }: AskedChange,
 ): Promise<LatestAccountChange> {
   const id = parseUuid(appAccountId);
   // Locked, so a change finishing meanwhile commits first and its outcome is read below.
@@ -23,6 +24,7 @@ export async function askForChange(
   if (!account) {
     throw new ApplicationError("NOT_FOUND", "No app account has this id.");
   }
+  if (onlyIfExtra) await requireExtraAccount(dependencies, tx, onlyIfExtra, account, action);
   const facts = await readAccountFacts(dependencies, tx, [account], changing);
   const { offered, offersRemove, connection, member } = facts.get(account.id)!;
   if (retryOf != null) ensureSameRetry(facts.get(account.id)!, action, retryOf);
@@ -64,7 +66,25 @@ interface AskedChange {
   changing: ChangingConnectors;
   /** The failed change a Try again repeats. */
   retryOf?: string | null;
+  onlyIfExtra?: SecurityContext;
   start: ChangeStart;
+}
+
+async function requireExtraAccount(
+  dependencies: AccountChangeDependencies,
+  tx: Tx,
+  ctx: SecurityContext,
+  { employeeId, appId }: { employeeId: string | null; appId: string },
+  action: AccountChangeAction,
+) {
+  // Do not wait while holding the account: another change can hold this app and need the account.
+  const stillExtra =
+    action === "suspend" &&
+    employeeId &&
+    (await appRepository(tx).tryLockForReview(appId)) &&
+    (await dependencies.isExtraApp(ctx, { employeeId, appId }, tx));
+  if (!stillExtra)
+    throw new ApplicationError("CONFLICT", "This account is no longer extra for this person.");
 }
 
 const NOT_OFFERED = "This change is not offered on this account now.";

@@ -99,7 +99,7 @@ export const UNLINKED_SORT_VALUES: Record<"EMAIL", z.ZodType<unknown[]>> = {
 /** An employee's account with its app's name and status, as People and a person's page read it. */
 export interface EmployeeAppAccount extends Pick<
   AppAccount,
-  "appId" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
+  "id" | "appId" | "status" | "foundVia" | "grantedAt" | "grantedBefore" | "firstSeenAt"
 > {
   employeeId: string;
   appName: string;
@@ -259,6 +259,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
     findEmployeeAccounts: (facts, employeeIds, appIds) =>
       orm()
         .select({
+          id: appAccounts.id,
           employeeId: sql<string>`${appAccounts.employeeId}`,
           appId: appAccounts.appId,
           appName: apps.name,
