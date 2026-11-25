@@ -27,14 +27,16 @@ export async function findDirectoryConnection(db: Orm | Tx, connectors: Director
   return directory ? appConnectionRepository(db).findByConnector(directory.key) : null;
 }
 
-/** The employees whose account in the directory's app has `status`; only those of `among` when given. */
+/** Employees with a directory account, filtered by status or employee id when given. */
 export async function findEmployeesInDirectory(
   db: Orm | Tx,
   connectors: DirectoryConnectors,
-  { status, among }: { status: AccountStatus; among?: readonly string[] },
+  { status, among }: { status?: AccountStatus; among?: readonly string[] } = {},
 ): Promise<string[]> {
   const appId = await findDirectoryAppId(db, connectors);
-  return appId ? appAccountRepository(db).findEmployeeIdsWithStatus(appId, status, among) : [];
+  return appId
+    ? appAccountRepository(db).findEmployeeIdsWithStatus(appId, status ?? null, among)
+    : [];
 }
 
 /** Whether this person has an active directory account, using the directory's membership index. */

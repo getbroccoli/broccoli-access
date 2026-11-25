@@ -5,7 +5,7 @@ interface Person {
   email: string;
 }
 
-/** Index the active directory once for a page. A key shared by two employees stays ambiguous. */
+/** Index directory employees once for a page. A key shared by two employees stays ambiguous. */
 export function employeeMatcher(employees: readonly Person[]) {
   const exact = new Map<string, string | null>();
   const missingLetter = new Map<string, string | null>();
