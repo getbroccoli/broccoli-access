@@ -11,6 +11,7 @@ query AppPage($id: ID!) {
     suspendedWithAccessCount
     managingConnector {
       id
+      canDisableAccounts
       connection {
         id
       }

@@ -55,6 +55,8 @@ export const appsEn = {
   "apps.page.canDisableTitle": "Broccoli Access can disable and enable accounts in this app",
   "apps.page.connectHint":
     "Connect {app} to see every member and disable or enable their accounts from here. Until then, Broccoli Access sees only who signs in to {app} with Google.",
+  "apps.page.connectReadHint":
+    "Connect {app} to see every member. Until then, Broccoli Access sees only who signs in to {app} with Google.",
   "apps.page.openAdmin": "Open {app} admin",
   "apps.page.showMore": "Show {count} more",
   "apps.page.noUsers": "No app accounts linked to people yet.",

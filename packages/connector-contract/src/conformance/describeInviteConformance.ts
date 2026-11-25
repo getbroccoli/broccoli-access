@@ -4,6 +4,7 @@ import { ACTION_RUN_ANSWER, type ActionRunAnswer, type Invitation } from "../con
 import type { ConnectorFixture } from "./describeConnectorConformance.js";
 import {
   capabilitiesOf,
+  listAll,
   listAllInvitations,
   post,
   requestOf,
@@ -87,11 +88,13 @@ async function checkListedInvitation(
 
 async function checkInviteOfMember(url: string, fixture: ConnectorFixture): Promise<void> {
   const [flow] = await startFlow(url, fixture);
+  const listed = (await listAll(flow)).find(({ values }) => values.status === "active");
+  expect(listed, "an active member for the invite to read back").toBeDefined();
 
-  const answer = await invite(flow, { email: fixture.member.email });
+  const answer = await invite(flow, { email: listed!.values.email });
 
   expect(answer.changed).toBe(false);
-  expect(answer.account?.sourceKey).toBe(fixture.member.sourceKey);
+  expect(answer.account?.sourceKey).toBe(listed!.sourceKey);
   expect(answer.account?.values.status).toBe("active");
 }
 
@@ -105,7 +108,7 @@ async function checkInviteOnUnlistedRuntimes(
   const [flow] = await startFlow(url, fixture);
 
   for (const runtime of unlistedRuntimes(listed)) {
-    const body = { ...requestOf(flow, "connections/test"), ...inviteFields(invitee), runtime };
+    const body = { ...requestOf(flow), ...inviteFields(invitee), runtime };
     expect((await post(url, "actions/run", body)).status, `invite on ${runtime.kind}`).toBe(400);
   }
 
@@ -121,7 +124,7 @@ async function checkInviteWithUnlistedRole(
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
   const account = { ...invitee, role: UNLISTED_ROLE };
-  const body = { ...requestOf(flow, "connections/test"), action: "invite", account };
+  const body = { ...requestOf(flow), action: "invite", account };
 
   expect((await post(url, "actions/run", body)).status).toBe(400);
 

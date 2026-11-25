@@ -4,10 +4,9 @@ import {
   ACTION_RUN_ANSWER,
   CONNECTOR_ERROR_ANSWER,
   CONNECTOR_ERROR_CODES,
-  CONNECTOR_CALLS,
-  type AccountAction,
   type AccountStatus,
   type Connection,
+  type ConnectorCall,
   type ConnectorErrorCode,
 } from "../connectorCalls.js";
 import { CONNECTOR_MANIFEST } from "../connectorManifest.js";
@@ -16,6 +15,7 @@ import { describeRemoveConformance } from "./describeRemoveConformance.js";
 import { describeSignInConformance, SIGN_IN_ERROR_CODES } from "./describeSignInConformance.js";
 import {
   actionFields,
+  capabilitiesOf,
   getManifest,
   listAll,
   listPages,
@@ -23,6 +23,7 @@ import {
   requestOf,
   runtimesOf,
   send,
+  skipUnlessListed,
   startFlow,
   withinDeadline,
   unlistedRuntimes,
@@ -44,8 +45,8 @@ export interface ConnectorFixture {
   connector: string;
   /** A connection to the connector's fake app, for calls to the container at `url`. */
   connection: (url: string) => Promise<Connection>;
-  /** An active member that the suite suspends and reactivates. */
-  member: { sourceKey: string; email: string };
+  /** An active member that the suite suspends and reactivates, required when it lists those actions. */
+  member?: { sourceKey: string; email: string };
   /**
    * An email with no member and no pending invitation, which the suite invites; a connector that
    * lists `invite` needs it.
@@ -63,7 +64,7 @@ export interface ConnectorFixture {
     /** Makes the next `connections/sign-in` through the container at `url` answer with `code`. */
     causeError: (url: string, code: (typeof SIGN_IN_ERROR_CODES)[number]) => Promise<void>;
   };
-  /** Makes the next `actions/run` call through the container at `url` fail with `code`. */
+  /** Makes the next `suspend`, `invite` or `remove` call (the first listed), or `accounts/list` without one, fail with `code`. */
   causeError: (url: string, code: ActionErrorCode) => Promise<void>;
   /**
    * Puts the fake app behind the container at `url` back to its seed before each check: the
@@ -101,10 +102,14 @@ export function describeConnectorConformance({ urls, fixtures }: ConformanceOpti
       () => {
         beforeEach(() => withinDeadline(fixture.reset(url), "the fixture's reset"));
         it("answers a connection test that matches its schema", () => startFlow(url, fixture));
-        it("lists members on pages that match their schema, the fixture's member among them", () =>
+        it("lists members with unique keys on pages that match their schema", () =>
           checkList(url, fixture));
-        it("changes the member once when an action repeats, and reports the status read afterwards", () =>
-          checkRepeatedActions(url, fixture));
+        it("changes the member once when suspend and reactivate repeat, and reports the status read afterwards", async ({
+          skip,
+        }) => {
+          await skipUnlessListed(url, fixture, "suspend", skip);
+          await checkRepeatedActions(url, fixture);
+        });
         describeInviteConformance(url, fixture);
         describeRemoveConformance(url, fixture);
         describeSignInConformance(url, fixture);
@@ -155,13 +160,15 @@ async function checkList(url: string, fixture: ConnectorFixture): Promise<void> 
   const sourceKeys = (await listAll(flow)).map(({ sourceKey }) => sourceKey);
 
   expect(new Set(sourceKeys).size).toBe(sourceKeys.length);
-  expect(sourceKeys).toContain(fixture.member.sourceKey);
+  if (fixture.member) expect(sourceKeys).toContain(fixture.member.sourceKey);
 }
 
 async function checkRepeatedActions(url: string, fixture: ConnectorFixture): Promise<void> {
   const [flow] = await startFlow(url, fixture);
-  const run = (action: AccountAction, changed: boolean, status: AccountStatus) =>
-    expectAction(flow, action, { changed, status });
+  const member = fixture.member;
+  expect(member, `${fixture.connector} lists suspend, so its fixture needs a member`).toBeDefined();
+  const run = (action: "suspend" | "reactivate", changed: boolean, status: AccountStatus) =>
+    expectAction(flow, { action, account: member! }, { changed, status });
 
   await run("suspend", true, "suspended");
   await run("suspend", false, "suspended");
@@ -175,11 +182,22 @@ async function checkError(
   code: ActionErrorCode,
 ): Promise<void> {
   const [flow] = await startFlow(url, fixture);
+  const action = await firstActionOf(url, fixture);
   await withinDeadline(fixture.causeError(url, code), "the fixture's causeError");
 
-  const answer = await send(flow, "actions/run", actionFields(fixture, "suspend"));
+  const answer = action
+    ? await send(flow, "actions/run", action)
+    : await send(flow, "accounts/list", { cursor: null });
 
   expect(CONNECTOR_ERROR_ANSWER.parse(answer).error.code).toBe(code);
+}
+
+async function firstActionOf(url: string, fixture: ConnectorFixture) {
+  const capabilities = await capabilitiesOf(url, fixture.connector);
+  const action = (["suspend", "invite", "remove"] as const).find((candidate) =>
+    capabilities.includes(candidate),
+  );
+  return action && actionFields(fixture, action);
 }
 
 /**
@@ -214,10 +232,16 @@ function isOneLineText(text: unknown): text is string {
 async function checkUnlistedRuntimes(url: string, fixture: ConnectorFixture): Promise<void> {
   const listed = await runtimesOf(url, fixture.connector);
   const [flow] = await startFlow(url, fixture);
+  const action = await firstActionOf(url, fixture);
+  const calls: [ConnectorCall, object][] = [
+    ["connections/test", {}],
+    ["accounts/list", { cursor: null }],
+  ];
+  if (action) calls.push(["actions/run", action]);
 
   for (const runtime of unlistedRuntimes(listed)) {
-    for (const path of CONNECTOR_CALLS) {
-      const body = { ...requestOf(flow, path), runtime };
+    for (const [path, fields] of calls) {
+      const body = { ...requestOf(flow), ...fields, runtime };
       expect((await post(url, path, body)).status, `${path} on ${runtime.kind}`).toBe(400);
     }
   }
@@ -225,18 +249,16 @@ async function checkUnlistedRuntimes(url: string, fixture: ConnectorFixture): Pr
 
 async function expectAction(
   flow: Flow,
-  action: AccountAction,
+  fields: { action: "suspend" | "reactivate"; account: { sourceKey: string; email: string } },
   expected: { changed: boolean; status: AccountStatus },
 ): Promise<void> {
-  const answer = ACTION_RUN_ANSWER.parse(
-    await send(flow, "actions/run", actionFields(flow.fixture, action)),
-  );
+  const answer = ACTION_RUN_ANSWER.parse(await send(flow, "actions/run", fields));
   const listed = (await listAll(flow)).find(
-    ({ sourceKey }) => sourceKey === flow.fixture.member.sourceKey,
+    ({ sourceKey }) => sourceKey === fields.account.sourceKey,
   );
 
   expect({ changed: answer.changed, status: answer.account?.values.status }).toEqual(expected);
-  expect(answer.account?.sourceKey).toBe(flow.fixture.member.sourceKey);
+  expect(answer.account?.sourceKey).toBe(fields.account.sourceKey);
   expect(listed?.values.status).toBe(expected.status);
 }
 
@@ -244,11 +266,17 @@ async function expectAction(
 async function answersOf(url: string, fixture: ConnectorFixture): Promise<unknown[]> {
   await withinDeadline(fixture.reset(url), "the fixture's reset");
   const manifest = await getManifest(url);
+  const connector = CONNECTOR_MANIFEST.parse(manifest).connectors.find(
+    ({ key }) => key === fixture.connector,
+  );
   const [flow, testAnswer] = await startFlow(url, fixture);
-  const pages = await listPages(flow);
-  const action = await send(flow, "actions/run", actionFields(fixture, "suspend"));
-  expect(ACTION_RUN_ANSWER.safeParse(action).error, "the action's answer").toBeUndefined();
-  return [manifest, testAnswer, ...pages, action].map(withoutRenewedSecrets);
+  const answers = [manifest, testAnswer, ...(await listPages(flow))];
+  if (connector?.capabilities.includes("suspend")) {
+    const action = await send(flow, "actions/run", actionFields(fixture, "suspend"));
+    expect(ACTION_RUN_ANSWER.safeParse(action).error, "the action's answer").toBeUndefined();
+    answers.push(action);
+  }
+  return answers.map(withoutRenewedSecrets);
 }
 
 /** Two containers may renew a session differently; the answers about the app must still agree. */

@@ -90,7 +90,7 @@ export interface AccountChangeAttempt {
   at: Date;
 }
 
-/** What decides whether Disable or Enable is offered on an app account. */
+/** What decides whether Disable, Enable or Remove is offered on an app account. */
 export interface AccountChangeFacts {
   status: AccountStatus;
   /** The connection of the account's app; null without one. */
@@ -101,7 +101,7 @@ export interface AccountChangeFacts {
     removesAccounts?: boolean;
   } | null;
   /** The connection's record for the account's email from its last scan; null when it lists none. */
-  record: { isConnectionUser: boolean } | null;
+  record: { isConnectionUser: boolean; confirmedDisabled?: boolean } | null;
   /** Whether a change of the account is running. */
   changeRunning: boolean;
 }
@@ -117,10 +117,13 @@ export function offeredChange(facts: AccountChangeFacts): AccountAction | null {
   return facts.status === "active" ? "suspend" : "reactivate";
 }
 
-/** A disabled member can also be removed when its connector offers that action. */
+/** A connector that can Disable requires a confirmed disabled member before Remove. */
 export function offersRemove(facts: AccountChangeFacts): boolean {
+  const { connection, record, status } = facts;
   return (
-    facts.status === "suspended" && !!facts.connection?.removesAccounts && canActOnMember(facts)
+    !!connection?.removesAccounts &&
+    canActOnMember(facts) &&
+    (!connection.changesAccounts || (status === "suspended" && record?.confirmedDisabled === true))
   );
 }
 

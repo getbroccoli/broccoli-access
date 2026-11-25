@@ -12,20 +12,21 @@ import { reconnectCauseLine } from "../reconnectReason";
 /**
  * Whether an account shows "Couldn't disable", "Couldn't enable" or "Couldn't remove": its latest
  * change failed, and its status is not yet what that change asked for, which a scan since may have
- * read; a failed Remove shows while the account is still disabled.
+ * read; a failed Remove shows while the account is disabled or still offers Remove.
  */
 export function showsCouldntChange({
   status,
+  offersRemove,
   latestChange,
 }: {
   status: AppAccountStatus;
+  offersRemove?: boolean;
   latestChange?: { status: AccountChangeStatus; action: AccountChangeAction } | null;
 }): boolean {
   if (latestChange?.status !== "FAILED") {
     return false;
   }
-  // A member a scan read active again is not removable, so nothing is left to say.
-  if (latestChange.action === "REMOVE") return status === "SUSPENDED";
+  if (latestChange.action === "REMOVE") return status === "SUSPENDED" || offersRemove === true;
   return status !== (latestChange.action === "SUSPEND" ? "SUSPENDED" : "ACTIVE");
 }
 
@@ -109,8 +110,8 @@ function scannedSince(app: FailedChangeFacts["app"], finishedAt: string): boolea
 
 /**
  * Whether the row offers Remove with a new confirmation: as the server offers it, unless the row
- * shows a failed Remove. After a refusal it is back once a scan since read the member still
- * disabled; the other failures offer Try again.
+ * shows a failed Remove. After a refusal it is back once a later scan confirms the member can
+ * still be removed; the other failures offer Try again.
  */
 export function offersFreshRemove({
   status,
@@ -124,7 +125,10 @@ export function offersFreshRemove({
     (NonNullable<FailedChangeFacts["latestChange"]> & { status: AccountChangeStatus }) | null;
 }): boolean {
   if (!offersRemove) return false;
-  if (latestChange?.action !== "REMOVE" || !showsCouldntChange({ status, latestChange })) {
+  if (
+    latestChange?.action !== "REMOVE" ||
+    !showsCouldntChange({ status, offersRemove, latestChange })
+  ) {
     return true;
   }
   return (

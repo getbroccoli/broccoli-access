@@ -7,6 +7,9 @@ import {
   connectorTest as test,
   finishSetupWithPreselectedApps,
   LINEAR_INPUT,
+  NOTION_INPUT,
+  testNotion,
+  scannedApps,
   TestEnv,
 } from "#test/support";
 
@@ -15,13 +18,23 @@ test("the owner connects Linear and reads its seven employees with their status"
 }) => {
   const { browser } = await env.signInAsOwner();
   const list = await browser.graphql(
-    "{ containerConnectors { id connectionFields { kind } connection { id } } }",
+    "{ containerConnectors { id canDisableAccounts connectionFields { kind } connection { id } } }",
   );
   const listed = (await list.json()) as { data: { containerConnectors: { id: string }[] } };
   expect(listed).not.toHaveProperty("errors");
   expect(listed.data.containerConnectors.toSorted((a, b) => a.id.localeCompare(b.id))).toEqual([
-    { id: "linear", connectionFields: [{ kind: "TEXT" }], connection: null },
-    { id: "slack", connectionFields: [{ kind: "APP_SESSION" }], connection: null },
+    {
+      id: "linear",
+      canDisableAccounts: true,
+      connectionFields: [{ kind: "TEXT" }],
+      connection: null,
+    },
+    {
+      id: "slack",
+      canDisableAccounts: true,
+      connectionFields: [{ kind: "APP_SESSION" }],
+      connection: null,
+    },
   ]);
 
   await finishSetupWithPreselectedApps(browser);
@@ -207,6 +220,41 @@ test("connecting Linear requires a session", async ({ env }) => {
     errors: [{ extensions: { code: "UNAUTHENTICATED" } }],
   });
 });
+
+baseTest.for([
+  { name: "list only", actions: [] as const, canChangeAccounts: false },
+  { name: "remove only", actions: ["remove"] as const, canChangeAccounts: true },
+])(
+  "reads the connected app and its connector's capabilities over GraphQL ($name)",
+  { timeout: 90_000 },
+  async ({ actions, canChangeAccounts }, { fakeGoogle }) => {
+    const { url } = await testNotion(actions);
+    const env = await TestEnv.start({ connectorsUrl: url, googleUrl: fakeGoogle.url });
+    onTestFinished(() => env.stop());
+    const { browser } = await env.signInAsOwner();
+    const notion = (await scannedApps(browser)).find(({ name }) => name === "Notion")!;
+    const connected = await browser.graphql(CONNECT, { input: NOTION_INPUT });
+    expect(await connected.json()).toMatchObject({
+      data: { connectors: { connect: { error: null } } },
+    });
+
+    const app = await browser.graphql(
+      `query ($id: ID!) {
+    app(id: $id) { canChangeAccounts managingConnector { id canDisableAccounts } }
+  }`,
+      { id: notion.id },
+    );
+
+    expect(await app.json()).toEqual({
+      data: {
+        app: {
+          canChangeAccounts,
+          managingConnector: { id: "notion", canDisableAccounts: false },
+        },
+      },
+    });
+  },
+);
 
 baseTest(
   "the server starts and lists no connectors when the container is unavailable",

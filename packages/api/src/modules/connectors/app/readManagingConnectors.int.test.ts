@@ -27,19 +27,19 @@ test("only Slack and Linear have managing connectors among the requested apps", 
   }
 });
 
-test("leaves out Linear when its connector can suspend but cannot reactivate", async ({
+test("offers Connect on the app page for a list-only connector", async ({
   orm,
   fakeConnectors,
 }) => {
   const server = await serveManifest(fakeConnectors.url, ({ connectors }) => {
     const linear = connectors.find(({ key }) => key === "linear")!;
-    linear.capabilities = ["list_accounts", "suspend"];
+    linear.capabilities = ["list_accounts"];
   });
   const { service } = containerConnections(orm, server.url);
 
   const managing = await service.readManagingConnectors(OWNER, ["slack", "linear"]);
 
-  expect([...managing.keys()]).toEqual(["slack"]);
+  expect(managing.get("linear")).toMatchObject({ connector: { key: "linear" }, connection: null });
 });
 
 test("returns Linear's saved connection with its managing connector", async ({

@@ -19,11 +19,24 @@ function refusedRemove(readAt: string | null, failure: "NOT_ALLOWED" | "UNEXPECT
   } as const;
 }
 
-it("shows “Couldn’t remove” only while the account is still disabled", () => {
+it("hides “Couldn’t remove” when a scan finds the account active and it has no Remove offer", () => {
   const latestChange = { status: "FAILED", action: "REMOVE" } as const;
   expect(showsCouldntChange({ status: "SUSPENDED", latestChange })).toBe(true);
   // A scan since read the member active: nothing is left to remove.
   expect(showsCouldntChange({ status: "ACTIVE", latestChange })).toBe(false);
+});
+
+it("keeps a refused Remove visible on a removable active member until a scan allows a fresh Remove", () => {
+  const active = { ...refusedRemove(null, "NOT_ALLOWED"), status: "ACTIVE" } as const;
+  const scanned = {
+    ...refusedRemove("2026-11-22T10:00:01Z", "NOT_ALLOWED"),
+    status: "ACTIVE",
+  } as const;
+
+  expect.soft(showsCouldntChange(active)).toBe(true);
+  expect.soft(offersFreshRemove(active)).toBe(false);
+  expect(failedChangeOptions(active).tryAgain).toBe(false);
+  expect(offersFreshRemove(scanned)).toBe(true);
 });
 
 it.for([

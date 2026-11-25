@@ -46,13 +46,14 @@ export function AccountChangeCell({ appUser, onlyIfExtra }: Props) {
   if (!user || (onlyIfExtra && user.status !== "ACTIVE")) {
     return null;
   }
-  if (!user.app.canChangeAccounts || user.isConnectionUser) {
+  if (user.isConnectionUser)
+    return <span className={MUTED}>{t("apps.change.connectionUser")}</span>;
+  if (!user.app.canChangeAccounts)
     return (
       <span className={MUTED}>
-        {t(user.isConnectionUser ? "apps.change.connectionUser" : "apps.change.noConnection")}
+        {user.app.containerConnection ? "—" : t("apps.change.noConnection")}
       </span>
     );
-  }
   const connector = user.app.containerConnection?.connector;
   if (user.offersReconnect && connector) {
     return (

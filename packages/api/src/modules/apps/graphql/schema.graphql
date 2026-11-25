@@ -25,7 +25,7 @@ type App {
   connected: Boolean!
   "The accounts in it that belong to an employee: its users, those whose employee the directory suspended first, then by name; then those not in it (`inApp` false), which are not its users."
   users("Keeps only the first this many, at least 1; all when null." first: Int): [AppUser!]!
-  "Whether it is connected through a connector that can change or remove its accounts (`managingConnector` names one, connected or not); whether an account offers Disable or Enable now is its `offeredChange`."
+  "Whether it is connected through a connector that can disable, enable or remove its accounts. Each account has its own `offeredChange` and `offersRemove`."
   canChangeAccounts: Boolean!
 }
 

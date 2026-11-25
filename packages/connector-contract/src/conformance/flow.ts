@@ -78,27 +78,34 @@ export async function skipUnlessListed(
 
 /** Calls on the server runtime and keeps the connection update a successful answer carries. */
 export async function send(flow: Flow, path: ConnectorCall, fields: object): Promise<unknown> {
-  const answer = await call(flow.url, path, { ...requestOf(flow, "connections/test"), ...fields });
+  const answer = await call(flow.url, path, { ...requestOf(flow), ...fields });
   const update = isError(answer) ? undefined : UPDATING_ANSWER.safeParse(answer).data?.connection;
   // Each object an update carries replaces the stored one (contract "The connection").
   if (update !== undefined) flow.connection = { ...flow.connection, ...update };
   return answer;
 }
 
-/** A request for `path` that the connector would answer. */
-export function requestOf(flow: Flow, path: ConnectorCall): object {
-  const request = {
+/** The fields common to all calls made on this connection. */
+export function requestOf(flow: Flow): object {
+  return {
     connector: flow.fixture.connector,
     connection: flow.connection,
     runtime: SERVER,
   };
-  if (path === "accounts/list") return { ...request, cursor: null };
-  if (path === "actions/run") return { ...request, ...actionFields(flow.fixture, "suspend") };
-  return request;
 }
 
 export function actionFields(fixture: ConnectorFixture, action: AccountAction) {
-  return { action, account: fixture.member };
+  const account =
+    action === "invite"
+      ? fixture.invitee
+      : action === "remove"
+        ? fixture.memberToRemove
+        : fixture.member;
+  expect(
+    account,
+    `${fixture.connector} lists ${action}, so its fixture needs its target`,
+  ).toBeDefined();
+  return { action, account: account! };
 }
 
 /** Fails a fixture step that never settles, as a call past its deadline fails. */
