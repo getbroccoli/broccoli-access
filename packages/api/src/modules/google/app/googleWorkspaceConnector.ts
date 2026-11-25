@@ -87,7 +87,7 @@ export function createGoogleWorkspaceConnector(addresses: {
           }),
         readPhoto: (userId) =>
           asConnectorError(directoryError, async () => google.readPhoto(accessToken, userId)),
-        createDirectoryAccount: ({ key, sentBefore, email, firstName, lastName, password }) =>
+        createDirectoryAccount: ({ key, email, firstName, lastName, password }) =>
           asConnectorError(
             (status) => (status === CONFLICT_STATUS ? "not_allowed" : directoryError(status)),
             async () => {
@@ -95,12 +95,13 @@ export function createGoogleWorkspaceConnector(addresses: {
                 throw new ConnectorError("permission_missing");
               if (email.split("@").at(-1) !== domain.toLowerCase())
                 throw new ConnectorError("wrong_workspace");
-              const user = await createOrRecogniseUser(
-                google,
-                accessToken,
-                { email, givenName: firstName, familyName: lastName, password, creationKey: key },
-                sentBefore,
-              );
+              const user = await createOrRecogniseUser(google, accessToken, {
+                email,
+                givenName: firstName,
+                familyName: lastName,
+                password,
+                creationKey: key,
+              });
               if (user.email !== email || user.suspended)
                 throw new ConnectorError("unexpected_response");
             },

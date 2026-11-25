@@ -87,15 +87,12 @@ export interface ConnectorSession {
    */
   invite?(email: string, role?: string): Promise<InviteResult>;
   /**
-   * Creates a directory account with a first password that the person must change. After an
-   * earlier try sent the same password, an account that try created with the same `key` counts as
-   * created; nothing is written to it.
+   * Creates a directory account with a first password that the person must change. An account an
+   * earlier try created with the same `key` counts as created; nothing is written to it.
    */
   createDirectoryAccount?(person: {
-    /** The same on every try for this person. */
+    /** Derived from the password, so only a try that sent it can have created an account with it. */
     key: string;
-    /** Whether an earlier try for this person sent this password, so their account may exist. */
-    sentBefore: boolean;
     email: string;
     firstName: string;
     lastName: string;

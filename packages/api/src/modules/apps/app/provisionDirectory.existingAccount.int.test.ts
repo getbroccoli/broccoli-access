@@ -10,6 +10,7 @@ import {
   NEW_PERSON,
 } from "#test/support";
 import { accountChanges, directoryChangeRepository } from "../db";
+import { creationKeyOf } from "../domain";
 
 test("a Google account created independently causes a duplicate refusal and releases no apps or password", async ({
   provisionPerson,
@@ -55,7 +56,9 @@ test("a redelivered job recognises the account its first delivery created and re
   // The first delivery stored its password and Google created the account; the answer was lost.
   const stored = TEST_SECRET_BOX.encrypt("first-try-password", changeId);
   await directoryChangeRepository(orm).saveFirstPassword(changeId, stored);
-  await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, { creationKey: employeeId });
+  await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, {
+    creationKey: creationKeyOf("first-try-password"),
+  });
 
   await run();
 
@@ -91,7 +94,9 @@ test("the owner's retry recognises the account an unanswered try created and rev
     .where(eq(accountChanges.id, firstTry));
   const firstPassword = TEST_SECRET_BOX.decrypt(stored!.encrypted!, firstTry);
   // Google created it after all, as when its answer was lost.
-  await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, { creationKey: employeeId });
+  await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, {
+    creationKey: creationKeyOf(firstPassword),
+  });
 
   const [retry] = await provision.provisionEmployee(owner, { employeeId, appIds: [] });
   await provision.runDirectoryProvision(SYSTEM, { changeId: retry!.id, appIds: [] });
@@ -102,25 +107,51 @@ test("the owner's retry recognises the account an unanswered try created and rev
   });
 });
 
-test.for([
-  ["carries another person's key", "another-employee"],
-  ["carries this person's key but no earlier try of theirs is known", undefined],
-] as const)(
-  "a try refuses an account with the address that %s",
-  async (
-    [, otherKey],
-    { provisionPerson, workspace: { owner, google, provision }, orm, fakeGoogle },
-  ) => {
-    const { employeeId, run } = await provisionPerson();
-    await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, {
-      creationKey: otherKey ?? employeeId,
-    });
+test("a try refuses an account with the address that another try or someone else created", async ({
+  provisionPerson,
+  workspace: { owner, google, provision },
+  orm,
+  fakeGoogle,
+}) => {
+  const { employeeId, run } = await provisionPerson();
+  await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, {
+    creationKey: creationKeyOf("another-password"),
+  });
 
-    await run();
+  await run();
 
-    expect(await orm.select().from(accountChanges)).toMatchObject([
-      { employeeId, connectionId: google.connectionId, status: "failed", error: "not_allowed" },
-    ]);
-    expect(await provision.takeFirstPassword(owner, employeeId)).toBeNull();
-  },
-);
+  expect(await orm.select().from(accountChanges)).toMatchObject([
+    { employeeId, connectionId: google.connectionId, status: "failed", error: "not_allowed" },
+  ]);
+  expect(await provision.takeFirstPassword(owner, employeeId)).toBeNull();
+});
+
+test("retries after the first password expired keep refusing the account its try created", async ({
+  provisionPerson,
+  workspace: { owner, provision },
+  orm,
+  fakeGoogle,
+}) => {
+  const { employeeId, changeId: firstTry } = await provisionPerson();
+  // The first try's account exists, but its password expired with the try.
+  await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, {
+    creationKey: creationKeyOf("expired-password"),
+  });
+  await orm
+    .update(accountChanges)
+    .set({ status: "failed", error: "unexpected_response", finishedAt: new Date() })
+    .where(eq(accountChanges.id, firstTry));
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const [retry] = await provision.provisionEmployee(owner, { employeeId, appIds: [] });
+    await provision.runDirectoryProvision(SYSTEM, { changeId: retry!.id, appIds: [] });
+  }
+
+  const tries = await orm.select().from(accountChanges);
+  expect(tries.map(({ status, error }) => ({ status, error }))).toEqual([
+    { status: "failed", error: "unexpected_response" },
+    { status: "failed", error: "not_allowed" },
+    { status: "failed", error: "not_allowed" },
+  ]);
+  expect(await provision.takeFirstPassword(owner, employeeId)).toBeNull();
+});
