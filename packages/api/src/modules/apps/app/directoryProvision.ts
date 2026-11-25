@@ -88,7 +88,7 @@ export async function runDirectoryProvision(
   ) => Promise<void>,
 ): Promise<void> {
   ctx.requireSystem();
-  const { orm, logger, transact, secretBox } = dependencies;
+  const { orm, logger, transact } = dependencies;
   const change = await accountChangeRepository(orm).findById(changeId);
   if (!change?.connectionId || !change.employeeId) return;
   if (change.status !== "running" && change.status !== "succeeded") return;
@@ -96,7 +96,7 @@ export async function runDirectoryProvision(
   // A retried job can release the remaining apps after the directory outcome committed.
   if (change.status === "succeeded") return release(change, connectors);
 
-  const password = randomBytes(32).toString("base64url");
+  const password = await storedFirstPassword(dependencies, changeId);
   const failure = await createDirectoryAccount(dependencies, ctx, connectors, change, password);
   const finishedAt = new Date();
   const save: SaveDirectoryOutcome = async (tx) => {
@@ -108,10 +108,8 @@ export async function runDirectoryProvision(
       error: failure,
       finishedAt,
     });
-    if (!failure) {
-      const encrypted = secretBox.encrypt(password, changeId);
-      await directoryChangeRepository(tx).saveFirstPassword(changeId, encrypted);
-    }
+    // Only a created account keeps the password the owner may reveal.
+    if (failure) await directoryChangeRepository(tx).saveFirstPassword(changeId, null);
     return true;
   };
   const ids = {
@@ -127,6 +125,27 @@ export async function runDirectoryProvision(
   await releaseCreatedDirectoryAccount(transact, save, () => release(change, connectors, save));
   logger.info(ids, "Directory account created");
 }
+
+/**
+ * The change's first password, made once and stored encrypted before Google sees it, so a job
+ * delivered again while the first delivery still runs sends Google the same password.
+ */
+async function storedFirstPassword(
+  { transact, secretBox }: AccountChangeDependencies,
+  changeId: string,
+): Promise<string> {
+  return transact(async (tx) => {
+    const changes = directoryChangeRepository(tx);
+    const stored = await changes.lockFirstPassword(changeId);
+    if (stored) return secretBox.decrypt(stored, changeId);
+    const password = randomBytes(FIRST_PASSWORD_BYTES).toString("base64url");
+    await changes.saveFirstPassword(changeId, secretBox.encrypt(password, changeId));
+    return password;
+  });
+}
+
+/** 256 bits: no one guesses the first password before the person changes it. */
+const FIRST_PASSWORD_BYTES = 32;
 
 /** Keep the job retryable before asking Google to create the account. */
 async function requireProvisionConnectors(

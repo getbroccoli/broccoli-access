@@ -5,6 +5,7 @@ import reportsDiscovery from "./discovery/reportsV1.json" with { type: "json" };
 export const ADMIN_METHODS = [
   "directory.customers.get",
   "directory.users.list",
+  "directory.users.get",
   "directory.users.insert",
   "directory.users.update",
   "directory.users.photos.get",
@@ -42,6 +43,7 @@ const directory = directoryDiscovery.resources;
 const METHOD_RULES: Record<AdminMethod, AdminMethodRules> = {
   "directory.customers.get": rulesOf(directory.customers.methods.get),
   "directory.users.list": rulesOf(directory.users.methods.list),
+  "directory.users.get": rulesOf(directory.users.methods.get),
   "directory.users.insert": rulesOf(directory.users.methods.insert),
   "directory.users.update": rulesOf(directory.users.methods.update),
   "directory.users.photos.get": rulesOf(directory.users.resources.photos.methods.get),

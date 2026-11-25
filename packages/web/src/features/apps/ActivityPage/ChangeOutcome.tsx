@@ -28,7 +28,7 @@ type Props = {
 /**
  * How a change ended: on the server, by hand after a failure, or not at all with its reason, which
  * opens why it failed and what helps; or its progress. A failed Google account creation leads to
- * the person's page, where trying it again asks which apps follow.
+ * the person's page, which offers trying it again while it can.
  */
 export function ChangeOutcome({ change }: Props) {
   const { status, app } = change;
@@ -69,10 +69,9 @@ export function ChangeOutcome({ change }: Props) {
           <Link
             to="/people/$employeeId"
             params={{ employeeId: change.employee.id }}
-            search={{ provision: true }}
             className="text-sm font-medium underline underline-offset-2"
           >
-            {t("apps.couldnt.tryAgain")}
+            {t("apps.activity.retryOnPersonPage", { name: change.employee.firstName })}
           </Link>
         )}
       </span>

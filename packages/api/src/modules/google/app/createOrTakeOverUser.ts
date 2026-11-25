@@ -3,8 +3,8 @@ import { UnsuccessfulAnswerError } from "../../../utils";
 
 /**
  * Creates the user with a first password they must change, or takes over the one an earlier try
- * with the same key created, whose first password was never shown; any other user with the
- * address stays Google's duplicate refusal.
+ * with the same key created while it still waits for that first sign-in; any other user with the
+ * address, or one someone has since used, suspended or made an admin, stays Google's refusal.
  */
 export async function createOrTakeOverUser(
   google: GoogleClient,
@@ -17,11 +17,15 @@ export async function createOrTakeOverUser(
     if (!(error instanceof UnsuccessfulAnswerError) || error.status !== CONFLICT_STATUS)
       throw error;
     const existing = await google.findUser(accessToken, user.email);
-    if (!existing || existing.creationKey !== user.creationKey) throw error;
+    if (existing?.creationKey !== user.creationKey || !awaitsFirstSignIn(existing)) throw error;
     const takenOver = await google.setPassword(accessToken, existing.id, user.password);
     if (!takenOver) throw error;
     return takenOver;
   }
+}
+
+function awaitsFirstSignIn(user: GoogleUser): boolean {
+  return !user.suspended && !user.isAdmin && user.mustChangePassword && user.signedInAt === null;
 }
 
 /** Google's answer to a new user whose address is taken. */

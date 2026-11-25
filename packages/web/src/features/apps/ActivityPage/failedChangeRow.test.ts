@@ -2,49 +2,80 @@ import { expect, it } from "vitest";
 
 import { failedChangeRow } from "./failedChangeRow";
 
-const APP = { id: "linear" };
+const APP = { id: "linear", roles: [{ key: "member" }] };
 const ACCOUNT = {
   id: "account-1",
-  email: "ana@acme.example",
-  app: APP,
+  status: "ACTIVE" as const,
   offeredChange: "SUSPEND" as const,
   offersRemove: false,
   latestChange: { id: "change-1" },
+  app: { id: APP.id, containerConnection: null },
 };
-const INVITE = { id: "invite-1", app: APP, offered: true, latestInvite: { id: "change-1" } };
+const INVITE = {
+  id: "invite-1",
+  app: { id: APP.id },
+  offered: true,
+  invitedAt: null,
+  latestInvite: { id: "change-1" },
+};
+const PERSON_APP = { role: null, roleConflict: false, app: APP };
 const EMPLOYEE = {
   id: "ana",
-  appAccounts: [ACCOUNT],
-  directoryAccount: null,
   appInvites: [INVITE],
+  personApps: { edges: [{ node: PERSON_APP }] },
 };
-const DISABLE = { id: "change-1", action: "SUSPEND" as const, email: ACCOUNT.email, app: APP };
+const DISABLE = {
+  id: "change-1",
+  action: "SUSPEND" as const,
+  app: { id: APP.id },
+  appUser: ACCOUNT,
+  employee: null,
+};
+const INVITE_CHANGE = { ...DISABLE, action: "INVITE" as const, appUser: null, employee: EMPLOYEE };
 
-it("finds the account a failed Disable was the latest change of", () => {
-  expect(failedChangeRow({ ...DISABLE, employee: EMPLOYEE })).toEqual({
+it("acts on the account a failed Disable was the latest change of, also without a person", () => {
+  expect(failedChangeRow(DISABLE)).toEqual({
     id: "account-1",
     offeredChange: "SUSPEND",
     offersRemove: false,
   });
 });
 
-it("finds the invite row a failed Invite was the latest invite of", () => {
-  const invite = { ...DISABLE, action: "INVITE" as const };
-
-  expect(failedChangeRow({ ...invite, employee: EMPLOYEE })).toEqual({
-    id: "invite-1",
-    offeredChange: "INVITE",
-  });
+it("acts on nothing once a later change replaced the failed one", () => {
+  expect(
+    failedChangeRow({ ...DISABLE, appUser: { ...ACCOUNT, latestChange: { id: "change-2" } } }),
+  ).toBe(undefined);
 });
 
-it("finds no row once a later change replaced the failed one", () => {
-  const later = { ...ACCOUNT, latestChange: { id: "change-2" } };
-
-  expect(failedChangeRow({ ...DISABLE, employee: { ...EMPLOYEE, appAccounts: [later] } })).toBe(
+it("acts on nothing once a scan found the account disabled after all", () => {
+  expect(failedChangeRow({ ...DISABLE, appUser: { ...ACCOUNT, status: "SUSPENDED" } })).toBe(
     undefined,
   );
 });
 
-it("finds no row for a change without a person", () => {
-  expect(failedChangeRow({ ...DISABLE, employee: null })).toBe(undefined);
+it("acts on the invite row a failed Invite was the latest invite of", () => {
+  expect(failedChangeRow(INVITE_CHANGE)).toEqual({
+    id: "invite-1",
+    roleConflict: false,
+    offeredChange: "INVITE",
+  });
+});
+
+it("withholds Invite while the person's role in the app needs the owner first", () => {
+  const conflict = { ...PERSON_APP, roleConflict: true };
+  const employee = { ...EMPLOYEE, personApps: { edges: [{ node: conflict }] } };
+
+  expect(failedChangeRow({ ...INVITE_CHANGE, employee })).toEqual({
+    id: "invite-1",
+    roleConflict: true,
+    offeredChange: null,
+  });
+});
+
+it("acts on nothing once a scan read the person's pending invitation", () => {
+  const invited = { ...INVITE, invitedAt: "2026-11-25T10:00:00.000Z" };
+
+  expect(
+    failedChangeRow({ ...INVITE_CHANGE, employee: { ...EMPLOYEE, appInvites: [invited] } }),
+  ).toBe(undefined);
 });

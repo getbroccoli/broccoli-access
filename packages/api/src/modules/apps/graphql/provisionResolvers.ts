@@ -20,6 +20,7 @@ import type {
   ProvisionService,
   ProvisionStep,
 } from "../app";
+import { accountsById } from "./accountsById";
 
 /** The employees module reads the people this caller may see. */
 export type ReadEmployees = (
@@ -155,24 +156,6 @@ export function accessDifferenceResolvers(
       },
     },
   };
-}
-
-function accountsById(readUsers: AppUserService["readUsersOfApps"]) {
-  return perRequest(
-    (ctx) =>
-      new DataLoader<{ id: string; appId: string }, AppUser | null, string>(
-        async (keys) => {
-          const found = await readUsers(
-            ctx.getActor(),
-            [...new Set(keys.map(({ appId }) => appId))],
-            keys.map(({ id }) => id),
-          );
-          const users = new Map(found.map((user) => [user.id, user]));
-          return keys.map(({ id }) => users.get(id) ?? null);
-        },
-        { cacheKeyFn: ({ id }) => id },
-      ),
-  );
 }
 
 function latestProvisionChange({ appAccounts, appInvites }: ProvisionRead, appId: string) {

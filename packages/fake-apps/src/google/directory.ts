@@ -19,6 +19,7 @@ export function directoryRoutes(context: FakeGoogleContext): Router {
       showCustomer(context),
     )
     .get(`${base}/users`, adminAccess(context, "directory.users.list"), listUsers(context))
+    .get(`${base}/users/:userKey`, adminAccess(context, "directory.users.get"), showUser(context))
     .get(
       `${base}/users/:userKey/photos/thumbnail`,
       adminAccess(context, "directory.users.photos.get"),
@@ -29,6 +30,14 @@ export function directoryRoutes(context: FakeGoogleContext): Router {
       adminAccess(context, "directory.tokens.list"),
       listTokens(context),
     );
+}
+
+function showUser(context: FakeGoogleContext): RequestHandler<{ userKey: string }> {
+  return (request, response) => {
+    const person = findPerson(context.state, request.params.userKey);
+    if (person === undefined) return sendGoogleError(response, "notFound");
+    response.json(directoryUser(context.state, person));
+  };
 }
 
 function showCustomer(context: FakeGoogleContext): RequestHandler<{ customerKey: string }> {
@@ -136,6 +145,7 @@ export function directoryUser(state: GoogleState, person: DirectoryPerson) {
     }),
     customerId: state.customer.id,
     creationTime: person.creationTime,
+    lastLoginTime: person.lastLoginTime ?? NEVER_SIGNED_IN,
     ...(person.externalIds && { externalIds: person.externalIds }),
     ...(person.photo && { thumbnailPhotoEtag: photoEtag(person.photo) }),
   };
@@ -148,3 +158,6 @@ function photoEtag(photo: Buffer): string {
 
 /** Long enough that two photos never share an etag. */
 const ETAG_LENGTH = 16;
+
+/** Google's `lastLoginTime` for a user who never signed in. */
+const NEVER_SIGNED_IN = "1970-01-01T00:00:00.000Z";

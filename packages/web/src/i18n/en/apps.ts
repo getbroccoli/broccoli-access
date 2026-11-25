@@ -102,6 +102,7 @@ export const appsEn = {
   "apps.activity.fromProvision": "Provision",
   "apps.activity.createDirectory": "Create Google account",
   "apps.activity.onServer": "On the server",
+  "apps.activity.retryOnPersonPage": "Try again on {name}’s page",
   "apps.activity.byHand": "By hand",
   "apps.activity.byHandToday": "At {time}, after it couldn’t run",
   "apps.activity.byHandOn": "{day} at {time}, after it couldn’t run",

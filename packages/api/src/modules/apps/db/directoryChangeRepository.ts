@@ -9,7 +9,10 @@ export interface DirectoryChangeRepository {
     employeeIds: readonly string[],
     connectionId: string,
   ): Promise<Map<string, DirectoryInvite>>;
-  saveFirstPassword(changeId: string, encryptedFirstPassword: string): Promise<void>;
+  /** The change's stored first password, locked until the transaction ends; null without one. */
+  lockFirstPassword(changeId: string): Promise<string | null>;
+  /** Stores the change's encrypted first password, or clears it with null. */
+  saveFirstPassword(changeId: string, encryptedFirstPassword: string | null): Promise<void>;
   takeFirstPassword(
     employeeId: string,
     connectionId: string,
@@ -51,6 +54,14 @@ export function directoryChangeRepository(db: Orm | Tx): DirectoryChangeReposito
           },
         ]),
       );
+    },
+    async lockFirstPassword(id) {
+      const [row] = await orm
+        .select({ encrypted: firstPasswordColumn })
+        .from(changes)
+        .where(eq(changes.id, id))
+        .for("update");
+      return row?.encrypted ?? null;
     },
     async saveFirstPassword(id, encryptedFirstPassword) {
       await orm.update(changes).set({ encryptedFirstPassword }).where(eq(changes.id, id));

@@ -59,6 +59,8 @@ type Props = {
   triggerClassName?: string;
   /** Opens the reason after the row loads it on click. */
   initiallyOpen?: boolean;
+  /** Called once the dialog closes, so a row that loaded it can read it afresh next time. */
+  onClose?: () => void;
 };
 
 /**
@@ -72,6 +74,7 @@ export function CouldntChangeDialog({
   onChanged,
   triggerClassName = couldntChangeChipClassName,
   initiallyOpen = false,
+  onClose,
 }: Props) {
   const fragment = useFragment({
     fragment: CouldntChangeDialog_AccountChangeFragmentDoc,
@@ -80,6 +83,10 @@ export function CouldntChangeDialog({
     from: changeRef,
   });
   const [shown, setShown] = useState<"reason" | "byHand" | null>(initiallyOpen ? "reason" : null);
+  const close = () => {
+    setShown(null);
+    onClose?.();
+  };
   const { changeAccount } = useChangeAccount();
   const [scanNow] = usePayloadMutation(ScanNowDocument);
   const change = fragment.complete ? fragment.data : null;
@@ -108,7 +115,7 @@ export function CouldntChangeDialog({
     historical: !row,
   });
   const tryAgain = (target: ChangeTarget) => {
-    setShown(null);
+    close();
     void changeAccount(
       target,
       change.action,
@@ -117,13 +124,16 @@ export function CouldntChangeDialog({
   };
   const target = row && rowTarget(row.id, change, name, row.onlyIfExtra);
   const scan = (connectionId: string) => {
-    setShown(null);
+    close();
     scanNow({ variables: { connectionId } }).catch(() => toast.error(t("scans.scanNowFailed")));
   };
 
   return (
     <>
-      <Dialog open={shown === "reason"} onOpenChange={(open) => setShown(open ? "reason" : null)}>
+      <Dialog
+        open={shown === "reason"}
+        onOpenChange={(open) => (open ? setShown("reason") : close())}
+      >
         <DialogTrigger
           render={<button type="button" className={triggerClassName} />}
           aria-label={t(copy.title, { name, app: app.name })}
@@ -214,10 +224,12 @@ export function CouldntChangeDialog({
       </Dialog>
       <DoneByHandDialog
         open={shown === "byHand"}
-        onClose={() => setShown(null)}
+        onClose={close}
         change={change}
         person={{ name, firstName }}
         app={app.name}
+        // An app without a connection is never scanned for the account made by hand.
+        connected={change.failure !== "NO_CONNECTION"}
         onDone={onChanged}
       />
     </>

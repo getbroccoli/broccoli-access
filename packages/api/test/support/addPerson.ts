@@ -69,13 +69,16 @@ export const directoryProvisionTest = inviteTest.extend<{
   },
 });
 
-/** Creates the account independently of Provision, as a Google administrator would. */
+/**
+ * Creates the account independently of Provision, as a Google administrator would, or, with the
+ * person's `creationKey`, as an earlier try of Provision whose answer was lost.
+ */
 export async function createPersonAtGoogle(
   orm: Orm,
   googleUrl: string,
   owner: SecurityContext,
   { email, firstName, lastName }: typeof NEW_PERSON,
-  creationKey?: string,
+  created: { creationKey?: string; changePasswordAtNextLogin?: boolean; suspended?: boolean } = {},
 ) {
   await allowDirectoryWrites(orm, googleUrl, owner);
   const row = (await storedAppConnections(orm)).find(
@@ -87,13 +90,15 @@ export async function createPersonAtGoogle(
     openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
     adminApiUrl: googleUrl,
   });
-  await google.createUser(token.access_token, {
+  const user = await google.createUser(token.access_token, {
     email,
     givenName: firstName,
     familyName: lastName,
     password: "external-test-password",
-    creationKey,
+    creationKey: created.creationKey,
+    changePasswordAtNextLogin: created.changePasswordAtNextLogin,
   });
+  if (created.suspended) await google.setUserSuspended(token.access_token, user.id, true);
 }
 
 async function allowDirectoryWrites(orm: Orm, googleUrl: string, owner: SecurityContext) {

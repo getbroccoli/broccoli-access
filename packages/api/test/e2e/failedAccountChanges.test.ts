@@ -31,6 +31,7 @@ test("the owner sees why Ana's Linear Disable failed and marks it done by hand",
               latestChange {
                 id status failure requestedAt requestedBy { id name }
                 attempts { at runtime failure }
+                appUser { id }
               }
             }
           }
@@ -61,6 +62,7 @@ test("the owner sees why Ana's Linear Disable failed and marks it done by hand",
                     failure: "UNEXPECTED_RESPONSE",
                   },
                 ],
+                appUser: { id: ana.id },
               },
             },
           ]) as unknown,

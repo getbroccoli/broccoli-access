@@ -2,7 +2,8 @@ import type { PersonPageQuery } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 
 import { ProvisionDialog } from "./ProvisionDialog";
-import { hasRoleToPick, isRoleBlocked } from "./roleBlocked";
+import { isRoleBlocked } from "@/features/apps";
+import { hasRoleToPick } from "./roleBlocked";
 
 type Props = { person: NonNullable<PersonPageQuery["employee"]> };
 

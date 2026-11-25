@@ -74,6 +74,8 @@ type AccountChange {
   startedFrom: AccountChangeStart!
   "Each way it was tried, in order: when, where it ran, and its error; null for the one that worked."
   attempts: [AccountChangeAttempt!]!
+  "The account it changed while its app still lists it; null for an invite and once a scan deleted the account."
+  appUser: AppUser
 }
 
 "One way an account change was tried."

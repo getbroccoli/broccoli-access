@@ -1,31 +1,33 @@
 import type { AccountChangeAction, ActivityFailedChangeQuery } from "@/__generated__/graphql";
 
+import { showsCouldntChange } from "../AccountChangeCell";
+import { isRoleBlocked } from "../isRoleBlocked";
+
 type FailedChange = Pick<
   NonNullable<ActivityFailedChangeQuery["accountChange"]>,
-  "id" | "action" | "email" | "employee"
-> & { app: { id: string } };
+  "id" | "action" | "app" | "appUser" | "employee"
+>;
 
 /**
- * The row whose latest change this is, which Try again and I did it by hand act on: the person's
- * account with the change's email, or their invite row; undefined once a later change replaced it.
+ * The row Try again and I did it by hand act on, while this change is its latest and the row still
+ * shows it failed, as on the row itself: the account it changed, or the person's invite row.
  */
-export function failedChangeRow({ id, action, email, app, employee }: FailedChange) {
-  if (!employee) return undefined;
-  if (action === "INVITE") {
-    const invite = employee.appInvites.find((row) => row.app.id === app.id);
-    if (invite?.latestInvite?.id !== id) return undefined;
-    const offeredChange: AccountChangeAction | null = invite.offered ? "INVITE" : null;
-    return { id: invite.id, offeredChange };
+export function failedChangeRow({ id, action, app, appUser, employee }: FailedChange) {
+  if (action !== "INVITE") {
+    if (appUser?.latestChange?.id !== id) return undefined;
+    const latestChange = { status: "FAILED" as const, action };
+    if (!showsCouldntChange({ ...appUser, latestChange })) return undefined;
+    return {
+      id: appUser.id,
+      offeredChange: appUser.offeredChange ?? null,
+      offersRemove: appUser.offersRemove,
+    };
   }
-  const accounts = [
-    ...employee.appAccounts,
-    ...(employee.directoryAccount ? [employee.directoryAccount] : []),
-  ];
-  const account = accounts.find((row) => row.app.id === app.id && row.email === email);
-  if (account?.latestChange?.id !== id) return undefined;
-  return {
-    id: account.id,
-    offeredChange: account.offeredChange ?? null,
-    offersRemove: account.offersRemove,
-  };
+  const invite = employee?.appInvites.find((row) => row.app.id === app.id);
+  if (!invite || invite.latestInvite?.id !== id || invite.invitedAt) return undefined;
+  const personApp = employee?.personApps.edges.find(({ node }) => node.app.id === app.id)?.node;
+  const roleConflict = personApp ? isRoleBlocked(personApp) : false;
+  const offeredChange: AccountChangeAction | null =
+    invite.offered && !roleConflict ? "INVITE" : null;
+  return { id: invite.id, roleConflict, offeredChange };
 }

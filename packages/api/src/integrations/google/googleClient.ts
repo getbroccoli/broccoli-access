@@ -19,7 +19,7 @@ export interface GoogleClient {
   readSigningKeys(openId: OpenIdConfiguration): Promise<JWTVerifyGetKey>;
   /** The Workspace customer of the access token's admin. */
   readCustomer(accessToken: string): Promise<GoogleCustomer>;
-  /** The customer's user whose Google id or primary email is `userKey`, paging the Directory; null when absent. */
+  /** The customer's user whose Google id or primary email is `userKey`; null when absent. */
   findUser(accessToken: string, userKey: string): Promise<GoogleUser | null>;
   /** Creates a user who keeps the password given; Google refuses a taken address with a 409. */
   createUser(accessToken: string, user: NewGoogleUser): Promise<GoogleUser>;
@@ -173,21 +173,10 @@ export function createGoogleClient({
         organizationName: customer.postalAddress?.organizationName ?? customer.customerDomain,
       };
     },
-    // shortcut: pages the user list because the fake Google has no `users.get`; read the one user
-    // with `users.get` once the fake serves it, so a large directory takes one request.
     findUser: async (accessToken, userKey) => {
-      let pageToken: string | null = null;
-      do {
-        const page: GoogleUserPage = await readUserPage(directoryUrl, accessToken, pageToken);
-        const user = page.users.find(
-          ({ id, email }) => id === userKey || email === userKey.toLowerCase(),
-        );
-        if (user) {
-          return user;
-        }
-        pageToken = page.nextPageToken;
-      } while (pageToken !== null);
-      return null;
+      const url = directoryUrl(`users/${encodeURIComponent(userKey)}`);
+      const user = await fetchGoogleJson(url, RAW_RECORD, bearer(accessToken));
+      return user && parseGoogleUser(user);
     },
     createUser: async (
       accessToken,

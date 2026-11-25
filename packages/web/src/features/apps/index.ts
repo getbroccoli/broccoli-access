@@ -38,3 +38,4 @@ export {
 } from "./reconnectReason";
 export { useRefreshAfterChanges } from "./useRefreshAfterChanges";
 export { useRefreshDifferences } from "./useRefreshDifferences";
+export { isRoleBlocked } from "./isRoleBlocked";

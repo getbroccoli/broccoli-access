@@ -1,44 +1,56 @@
-# The failed change with its person's rows, read when the owner opens it, for Try again.
+# The failed change with the row it may act on, read each time the owner opens it.
 query ActivityFailedChange($id: ID!) {
   accountChange(id: $id) {
     id
     action
-    email
     ...CouldntChangeDialog_accountChange
+    app {
+      id
+    }
+    appUser {
+      id
+      status
+      offeredChange
+      offersRemove
+      latestChange {
+        id
+      }
+      app {
+        id
+        containerConnection {
+          id
+          connector {
+            id
+            canDisableAccounts
+          }
+        }
+      }
+    }
     employee {
       id
-      appAccounts {
-        id
-        email
-        app {
-          id
-        }
-        offeredChange
-        offersRemove
-        latestChange {
-          id
-        }
-      }
-      directoryAccount {
-        id
-        email
-        app {
-          id
-        }
-        offeredChange
-        offersRemove
-        latestChange {
-          id
-        }
-      }
       appInvites {
         id
         app {
           id
         }
         offered
+        invitedAt
         latestInvite {
           id
+        }
+      }
+      personApps(first: 10000) {
+        edges {
+          node {
+            role
+            roleConflict
+            app {
+              id
+              roles {
+                key
+              }
+            }
+          }
         }
       }
     }
