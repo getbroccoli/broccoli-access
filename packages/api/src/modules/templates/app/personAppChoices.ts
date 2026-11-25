@@ -39,6 +39,9 @@ type Dependencies = Pick<ModuleDependencies, "transact" | "logger"> & {
 
 const history = createRecordHistoryService();
 
+/** The choices whose end an addition's history line names: an earlier addition, or a review. */
+const REPLACED_BY_ADDING: ReadonlySet<string | undefined> = new Set(["added", "to_review"]);
+
 export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
   const { apps, employees, transact, logger } = deps;
   return {
@@ -57,8 +60,8 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
           );
         if (given)
           throw new ApplicationError("CONFLICT", "A template already gives this person the app.");
-        const before = choice?.choice === "added" ? choice : undefined;
-        if (before?.role === role) return false;
+        if (choice?.choice === "added" && choice.role === role) return false;
+        const before = REPLACED_BY_ADDING.has(choice?.choice) ? choice : undefined;
         await assignmentRepository(tx).saveChoice({ ...pair, choice: "added", role });
         await recordChoice(ctx, tx, pair, {
           oldLabel: before && choiceLabel(appName, before),
@@ -88,12 +91,12 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
     async undoPersonAppChoice(ctx, input) {
       const pair = await ownersPair(deps, ctx, input);
       const changed = await transact(async (tx) => {
-        const { choice, appName } = await lockedFacts(deps, tx, pair);
+        const { given, choice, appName } = await lockedFacts(deps, tx, pair);
         if (!isOwnChoice(choice)) return false;
         await assignmentRepository(tx).clearChoices([pair], choice.choice);
         await recordChoice(ctx, tx, pair, { oldLabel: choiceLabel(appName, choice) });
-        // Without the addition, an active account in the app may be one that nothing gives.
-        await reviewLostApps(ctx, tx, apps, employees, [pair.employeeId], [pair.appId]);
+        // Without the choice, an active account in an app that nothing gives is one to review.
+        if (!given) await reviewLostApps(ctx, tx, apps, employees, [pair.employeeId], [pair.appId]);
         return true;
       });
       if (changed) logger.info(pair, "Employee app choice undone");
@@ -136,7 +139,7 @@ function choiceLabel(
   appName: string | undefined,
   { choice, role }: Pick<EmployeeAppChoice, "choice" | "role">,
 ) {
-  return `${appName} — ${choice}` + (role ? ` as ${role}` : "");
+  return `${appName} — ${choice.replace("_", " ")}` + (role ? ` as ${role}` : "");
 }
 
 /** A new label records a choice made, an old one a choice undone, and both a changed choice. */

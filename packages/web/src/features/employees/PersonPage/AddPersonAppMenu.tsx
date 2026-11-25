@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { AddPersonAppDocument, PersonPageDocument } from "@/__generated__/graphql";
-import { usePayloadMutation } from "@/apollo";
+import { PayloadFailure, usePayloadMutation } from "@/apollo";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -31,13 +31,29 @@ export function AddPersonAppMenu({ employeeId }: Props) {
           <AddPersonAppOptions
             employeeId={employeeId}
             onAdd={(app, role) =>
-              void add({ variables: { input: { employeeId, appId: app.id, role } } }).catch(() =>
-                toast.error(t("people.person.addApp.failed", { app: app.name })),
+              void add({ variables: { input: { employeeId, appId: app.id, role } } }).catch(
+                (error: unknown) =>
+                  // Refused input: the person or the app stopped qualifying after the menu was read.
+                  toast.error(
+                    t(
+                      isRefusedInput(error)
+                        ? "people.person.addApp.unavailable"
+                        : "people.person.addApp.failed",
+                      { app: app.name },
+                    ),
+                  ),
               )
             }
           />
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function isRefusedInput(error: unknown): boolean {
+  return (
+    error instanceof PayloadFailure &&
+    (error.payloadError as { __typename?: string }).__typename === "InvalidInputError"
   );
 }

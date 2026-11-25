@@ -19,11 +19,11 @@ const NOTHING = {
   invites: [],
   listedApps: new Set<string>(),
 };
-const choice = (made: "added" | "removed") => ({
+const choice = (made: "added" | "removed", role: string | null = null) => ({
   employeeId: EMPLOYEE,
   appId: APP,
   choice: made,
-  role: null,
+  role,
 });
 
 test("keeps a removed template app listed, as not given", () => {
@@ -44,14 +44,14 @@ test("an active account in a removed template app is extra", () => {
   expect(rows).toMatchObject([{ choice: "removed", state: "extra" }]);
 });
 
-test("an active account in a removed app stays extra once no template gives the app", () => {
+test("an active account in a removed app stays extra, and its removal can be undone, once no template gives the app", () => {
   const rows = appsOfPerson({
     ...NOTHING,
     choices: [choice("removed")],
     accounts: [{ appId: APP, status: "active" }],
   });
 
-  expect(rows).toMatchObject([{ choice: null, state: "extra", templates: [] }]);
+  expect(rows).toMatchObject([{ choice: "removed", state: "extra", templates: [] }]);
 });
 
 test("a removal has no effect once no template gives the app", () => {
@@ -60,8 +60,14 @@ test("a removal has no effect once no template gives the app", () => {
   expect(rows).toEqual([]);
 });
 
-test("an added app that a template now gives comes from the template", () => {
-  const rows = appsOfPerson({ ...NOTHING, templates: [ENGINEER], choices: [choice("added")] });
+test("an added app that a template now gives comes from the template, with the template's role", () => {
+  const rows = appsOfPerson({
+    ...NOTHING,
+    templates: [ENGINEER],
+    choices: [choice("added", "admin")],
+  });
 
-  expect(rows).toMatchObject([{ choice: null, state: "missing", templates: [ENGINEER] }]);
+  expect(rows).toMatchObject([
+    { choice: null, role: null, state: "missing", templates: [ENGINEER] },
+  ]);
 });

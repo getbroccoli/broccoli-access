@@ -7,7 +7,7 @@ export interface PersonApp {
   templates: Template[];
   roleConflict: boolean;
   role: string | null;
-  /** The owner's own choice for this person, while it changes what their templates give. */
+  /** The owner's own choice for this person, while it changes what they get or marks an account. */
   choice: "added" | "removed" | null;
   accountStatus: AccountStatus | null;
   state: "active" | "suspended" | "missing" | "invited" | "extra" | null;
@@ -56,9 +56,9 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
     const source = sources.get(appId);
     const templates = source?.templates ?? [];
     const choice = choices.get(appId);
-    const ownChoice = effectiveChoice(templates, choice);
-    const expected = ownChoice === "added" || (templates.length > 0 && ownChoice !== "removed");
     const account = accounts.get(appId);
+    const ownChoice = effectiveChoice(templates, choice, account);
+    const expected = ownChoice === "added" || (templates.length > 0 && ownChoice !== "removed");
     const invite = invites.get(appId);
     if (!expected && !account && !invite && !ownChoice) continue;
     // A removal whose template is gone still says the owner did not want this app for them.
@@ -95,10 +95,17 @@ export function pickStillApplies(roles: ReadonlySet<string | null>, role: string
   return roles.size > 1 && roles.has(role);
 }
 
-/** An addition counts only while no template gives the app, and a removal only while one does. */
-function effectiveChoice(templates: readonly Template[], choice?: EmployeeAppChoice) {
+/**
+ * An addition counts only while no template gives the app. A removal counts while one does, or
+ * while it keeps an active account extra, so the owner can still undo it there.
+ */
+function effectiveChoice(
+  templates: readonly Template[],
+  choice: EmployeeAppChoice | undefined,
+  account: AccountStatus | undefined,
+) {
   if (choice?.choice === "added" && !templates.length) return "added";
-  if (choice?.choice === "removed" && templates.length) return "removed";
+  if (choice?.choice === "removed" && (templates.length || account === "active")) return "removed";
   return null;
 }
 

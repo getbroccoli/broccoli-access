@@ -87,7 +87,7 @@ type PersonApp {
   roleSources: [TemplateRoleSource!]!
   "The role given by the templates or picked by the owner, or null for the default or a conflict."
   role: String
-  "The owner's own choice for this person, while it changes what their templates give; null otherwise."
+  "The owner's own choice for this person, while it changes what they should have or keeps an active account Extra; null otherwise."
   choice: PersonAppChoice
   "Expected access compared with the held account: active access is Active or Extra, a pending invitation is Invited, and an expected app without either is Missing, even for a disabled account. Other disabled accounts are Suspended. Null for invitation controls alone, and for an app removed for this person that they have no account or pending invitation in. Employee.appAccounts supplies the underlying account status and actions."
   state: PersonAppState
@@ -166,21 +166,21 @@ input PersonAppUndoChoiceInput {
   appId: ID!
 }
 
-"The person with the app added, or why it was refused."
+"The person, who should now have the app, or why it was refused. No account changes."
 type PersonAppAddPayload {
   employee: Employee
   error: PersonAppAddError
 }
 union PersonAppAddError = InvalidInputError | NotFoundError | ConflictError
 
-"The person without the app, or why it was refused."
+"The person, who should no longer have the app, or why it was refused. Their account in it stays."
 type PersonAppRemovePayload {
   employee: Employee
   error: PersonAppRemoveError
 }
 union PersonAppRemoveError = InvalidInputError | NotFoundError | ConflictError
 
-"The person with their templates' apps again, or why it was refused."
+"The person, with the choice for this one app cleared, or why it was refused. No account changes."
 type PersonAppUndoChoicePayload {
   employee: Employee
   error: PersonAppUndoChoiceError
@@ -205,11 +205,11 @@ type TemplatesMutations {
   setAppRole(input: TemplateSetAppRoleInput!): TemplateSetAppRolePayload!
   "Settles a role conflict for this person and app. Owner only."
   pickRole(input: TemplatePickRoleInput!): TemplatePickRolePayload!
-  "Gives one person an app that none of their templates gives; the templates do not change. Owner only."
+  "Says one person should have an app that none of their templates gives; no template or account changes. Owner only."
   addPersonApp(input: PersonAppAddInput!): PersonAppAddPayload!
-  "Keeps an app a template gives from one person; the templates do not change. Owner only."
+  "Says one person should not have an app a template of theirs gives; no template or account changes. Owner only."
   removePersonApp(input: PersonAppRemoveInput!): PersonAppRemovePayload!
-  "Undoes the app added or removed for one person; without such a choice it changes nothing. Owner only."
+  "Clears the addition or removal of one app for one person; without such a choice it changes nothing. Owner only."
   undoPersonAppChoice(input: PersonAppUndoChoiceInput!): PersonAppUndoChoicePayload!
   "Gives this template to a person active in the directory. Owner only."
   assign(input: TemplateAssignInput!): TemplateAssignPayload!

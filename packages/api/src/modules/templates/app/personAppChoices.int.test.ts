@@ -186,6 +186,28 @@ test("adding the app again with another role records the role change", async ({
   ]);
 });
 
+test("adding an app marked for review records the review it ends", async ({
+  workspace: { templates, owner, input, employee },
+  seed,
+  orm,
+}) => {
+  const chloe = { employeeId: employee("chloe@acme.example").id, appId: input.appId };
+  await seed.employeeAppChoice({ ...chloe, choice: "to_review" });
+
+  await templates.addPersonApp(owner, { ...chloe, role: null });
+
+  const history = await recordHistory.read(orm, "employee", chloe.employeeId, { first: 1 });
+  expect(history.edges[0]!.node.changes).toMatchObject([
+    {
+      field: "appChoice",
+      oldValue: chloe.appId,
+      oldLabel: "Linear — to review",
+      newValue: chloe.appId,
+      newLabel: "Linear — added",
+    },
+  ]);
+});
+
 test("undoing an added app marks Chloé's active account in it for review", async ({
   workspace: { templates, owner, input, employee },
   orm,

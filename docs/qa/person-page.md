@@ -78,6 +78,7 @@ A run of its own: start from [Setup](#setup), and also select Zoom before "Appro
 - [ ] **+ Add app** lists the approved apps that none of Ivan's templates gives. Choosing Zoom adds a Zoom row with **Added by you**, **Missing** and **Undo**. With Linear connected as in [Connections settings](connections-settings.md#apps), Linear opens its roles; choosing Admin adds it with the role Admin, and **Invite** stays offered.
 - [ ] Lena's page still lists Notion and Slack from Everyone, without Zoom, and Everyone's page lists the same two apps.
 - [ ] **Undo** on Notion brings back Everyone in **From** and the row's earlier status. **Undo** on Zoom takes its row away.
+- [ ] Remove Notion for Ivan again, then take Everyone off him: Notion stays listed with **Removed by you**, **Extra** and **Undo**. **Undo** leaves it **Extra**, from **No template**.
 - [ ] Ana's page (suspended in Google) offers no **+ Add app**.
 
 ## No delete
