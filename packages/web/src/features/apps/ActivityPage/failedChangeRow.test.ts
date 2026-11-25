@@ -27,18 +27,23 @@ const EMPLOYEE = {
 const DISABLE = {
   id: "change-1",
   action: "SUSPEND" as const,
+  status: "FAILED" as const,
   app: { id: APP.id },
   appUser: ACCOUNT,
   employee: null,
 };
 const INVITE_CHANGE = { ...DISABLE, action: "INVITE" as const, appUser: null, employee: EMPLOYEE };
 
-it("acts on the account a failed Disable was the latest change of, also without a person", () => {
+it("acts on the account a failed Disable was the latest change of", () => {
   expect(failedChangeRow(DISABLE)).toEqual({
     id: "account-1",
     offeredChange: "SUSPEND",
     offersRemove: false,
   });
+});
+
+it("acts on nothing once the owner marked the change done by hand", () => {
+  expect(failedChangeRow({ ...DISABLE, status: "DONE_BY_HAND" })).toBe(undefined);
 });
 
 it("acts on nothing once a later change replaced the failed one", () => {

@@ -770,7 +770,7 @@ The one Google Workspace user that broccoli-access creates for itself and connec
 - `employee_id` (new, circle 3, part 2): the person a provision or an offboarding is for. Null when `started_from` is `account`.
 - `role` (new, circle 3, part 2): the role key an invite asked for. Null for the app's default.
 - An invite on the Google Workspace connection (circle 3, part 3) creates the directory account, with the names from the employee.
-- `encrypted_first_password` (new, circle 3, part 3): the first password of a directory account broccoli-access created. The person must change it at their first sign-in. It is cleared when the owner has seen it once, or after 7 days. It is never in history or logs.
+- `encrypted_first_password` (new, circle 3, part 3): the first password of a directory account broccoli-access creates, stored before Google sees it. A failed creation keeps it for the person's next try, which sends the same one; only a succeeded creation's can be revealed. The person must change it at their first sign-in. It is cleared when the owner has seen it once, or 7 days after its creation ended. It is never in history or logs.
 - **One at a time:** a change without a connection is one `running` at most per app and email.
 - **Provision** writes an `invite` where the person has no account, and a `reactivate` where their account is suspended. The other apps wait until the directory account's invite has succeeded.
 - **Offboarding** (circle 3, part 3) writes a `suspend` for every active account, the directory account included, and clears the person's templates and app choices. A pending invitation, and an account in an app without a connection, show as work to do by hand.

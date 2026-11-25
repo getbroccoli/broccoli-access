@@ -3,6 +3,7 @@ query ActivityFailedChange($id: ID!) {
   accountChange(id: $id) {
     id
     action
+    status
     ...CouldntChangeDialog_accountChange
     app {
       id

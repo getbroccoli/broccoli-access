@@ -145,7 +145,6 @@ export function directoryUser(state: GoogleState, person: DirectoryPerson) {
     }),
     customerId: state.customer.id,
     creationTime: person.creationTime,
-    lastLoginTime: person.lastLoginTime ?? NEVER_SIGNED_IN,
     ...(person.externalIds && { externalIds: person.externalIds }),
     ...(person.photo && { thumbnailPhotoEtag: photoEtag(person.photo) }),
   };
@@ -158,6 +157,3 @@ function photoEtag(photo: Buffer): string {
 
 /** Long enough that two photos never share an etag. */
 const ETAG_LENGTH = 16;
-
-/** Google's `lastLoginTime` for a user who never signed in. */
-const NEVER_SIGNED_IN = "1970-01-01T00:00:00.000Z";

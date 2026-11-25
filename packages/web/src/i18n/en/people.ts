@@ -52,7 +52,7 @@ export const peopleEn = {
   "people.add.noAccount": "This person has no Google account yet.",
   "people.add.creating": "Creating the Google account…",
   "people.add.notCreated":
-    "Couldn’t confirm the Google account. Try again: an account Broccoli Access created before Google’s answer was lost, still unused, gets this first password.",
+    "Couldn’t confirm whether Google created the account. Try again: Broccoli Access recognises an account an earlier try created.",
   "people.add.reconnectToCreate":
     "Google refused access. Reconnect Google Workspace before retrying.",
   "people.add.scanDirectory": "Scan Google Workspace to match this person to their new account.",

@@ -91,25 +91,6 @@ it("keeps a created user's external ids and lists them", async ({ fake }) => {
   });
 });
 
-it("sets a user's password and asks for a change at the next sign-in", async ({ fake }) => {
-  const { access_token } = await signIn(fake.url, { scope: USER_WRITE_SCOPE });
-  const password = "a-new-first-password";
-
-  const response = await fetch(`${fake.url}/admin/directory/v1/users/chloe%40acme.example`, {
-    method: "PUT",
-    headers: { authorization: `Bearer ${access_token}`, "content-type": "application/json" },
-    body: JSON.stringify({ password, changePasswordAtNextLogin: true }),
-  });
-
-  expect(response.status).toBe(200);
-  const user = (await response.json()) as DirectoryUser;
-  expect(user).toMatchObject({
-    primaryEmail: "chloe@acme.example",
-    changePasswordAtNextLogin: true,
-  });
-  expect(JSON.stringify(user)).not.toContain(password);
-});
-
 it("suspends a user by id and restores the same user by email", async ({ fake }) => {
   const { access_token } = await signIn(fake.url, { scope: `${ADMIN_SCOPES} ${USER_WRITE_SCOPE}` });
   const person = ACME.people.find(({ email }) => email === "chloe@acme.example")!;

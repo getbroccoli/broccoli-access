@@ -38,14 +38,7 @@ const NEW_USER = z.object({
     .optional(),
 });
 
-// The password is checked and dropped, as on creation.
-const USER_UPDATE = z
-  .object({
-    suspended: z.boolean().optional(),
-    password: z.string().min(PASSWORD_LENGTH.min).max(PASSWORD_LENGTH.max).optional(),
-    changePasswordAtNextLogin: z.boolean().optional(),
-  })
-  .refine((update) => Object.values(update).some((value) => value !== undefined));
+const USER_UPDATE = z.object({ suspended: z.boolean() });
 
 /** The id Google's own example of a created user has; each later one counts up from it. */
 const FIRST_CREATED_USER_ID = 118204455667788990011n;
@@ -87,11 +80,7 @@ function updateUser(context: FakeGoogleContext): RequestHandler<{ userKey: strin
     if (person === undefined) return sendGoogleError(response, "notFound");
     const body = USER_UPDATE.safeParse(request.body);
     if (!body.success) return sendGoogleError(response, "invalid");
-    const { suspended, changePasswordAtNextLogin } = body.data;
-    if (suspended !== undefined) person.suspended = suspended;
-    if (changePasswordAtNextLogin !== undefined) {
-      person.changePasswordAtNextLogin = changePasswordAtNextLogin;
-    }
+    person.suspended = body.data.suspended;
     response.json(directoryUser(context.state, person));
   };
 }

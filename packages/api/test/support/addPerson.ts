@@ -78,7 +78,7 @@ export async function createPersonAtGoogle(
   googleUrl: string,
   owner: SecurityContext,
   { email, firstName, lastName }: typeof NEW_PERSON,
-  created: { creationKey?: string; changePasswordAtNextLogin?: boolean; suspended?: boolean } = {},
+  created: { creationKey?: string } = {},
 ) {
   await allowDirectoryWrites(orm, googleUrl, owner);
   const row = (await storedAppConnections(orm)).find(
@@ -90,15 +90,13 @@ export async function createPersonAtGoogle(
     openIdConfigurationUrl: `${googleUrl}/.well-known/openid-configuration`,
     adminApiUrl: googleUrl,
   });
-  const user = await google.createUser(token.access_token, {
+  await google.createUser(token.access_token, {
     email,
     givenName: firstName,
     familyName: lastName,
     password: "external-test-password",
     creationKey: created.creationKey,
-    changePasswordAtNextLogin: created.changePasswordAtNextLogin,
   });
-  if (created.suspended) await google.setUserSuspended(token.access_token, user.id, true);
 }
 
 async function allowDirectoryWrites(orm: Orm, googleUrl: string, owner: SecurityContext) {

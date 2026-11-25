@@ -96,8 +96,10 @@ export async function runDirectoryProvision(
   // A retried job can release the remaining apps after the directory outcome committed.
   if (change.status === "succeeded") return release(change, connectors);
 
-  const password = await storedFirstPassword(dependencies, changeId);
-  const failure = await createDirectoryAccount(dependencies, ctx, connectors, change, password);
+  const first = await firstPasswordFor(dependencies, change);
+  // Another delivery has finished the change.
+  if (!first) return;
+  const failure = await createDirectoryAccount(dependencies, ctx, connectors, change, first);
   const finishedAt = new Date();
   const save: SaveDirectoryOutcome = async (tx) => {
     const changes = accountChangeRepository(tx);
@@ -108,8 +110,6 @@ export async function runDirectoryProvision(
       error: failure,
       finishedAt,
     });
-    // Only a created account keeps the password the owner may reveal.
-    if (failure) await directoryChangeRepository(tx).saveFirstPassword(changeId, null);
     return true;
   };
   const ids = {
@@ -127,21 +127,37 @@ export async function runDirectoryProvision(
 }
 
 /**
- * The change's first password, made once and stored encrypted before Google sees it, so a job
- * delivered again while the first delivery still runs sends Google the same password.
+ * The person's first password and whether an earlier try sent it: this change's own, stored before
+ * Google saw it, else the one an earlier try of theirs stored, else a new one. A failed try keeps
+ * its password for the next, and only a created account's can be revealed. Null once this change
+ * no longer runs, as after another delivery finished it.
  */
-async function storedFirstPassword(
+async function firstPasswordFor(
   { transact, secretBox }: AccountChangeDependencies,
-  changeId: string,
-): Promise<string> {
+  change: AccountChange,
+): Promise<FirstPassword | null> {
   return transact(async (tx) => {
-    const changes = directoryChangeRepository(tx);
-    const stored = await changes.lockFirstPassword(changeId);
-    if (stored) return secretBox.decrypt(stored, changeId);
-    const password = randomBytes(FIRST_PASSWORD_BYTES).toString("base64url");
-    await changes.saveFirstPassword(changeId, secretBox.encrypt(password, changeId));
-    return password;
+    if ((await accountChangeRepository(tx).lockById(change.id))?.status !== "running") return null;
+    const passwords = directoryChangeRepository(tx);
+    const own = await passwords.readFirstPassword(change.id);
+    if (own) return { password: secretBox.decrypt(own, change.id), sentBefore: true };
+    const earlier = await passwords.findEarlierFirstPassword(
+      change.employeeId!,
+      change.connectionId!,
+      change.id,
+    );
+    const password = earlier
+      ? secretBox.decrypt(earlier.encrypted, earlier.id)
+      : randomBytes(FIRST_PASSWORD_BYTES).toString("base64url");
+    await passwords.saveFirstPassword(change.id, secretBox.encrypt(password, change.id));
+    return { password, sentBefore: earlier !== null };
   });
+}
+
+interface FirstPassword {
+  password: string;
+  /** Whether an earlier try sent it, so the account that try created may exist already. */
+  sentBefore: boolean;
 }
 
 /** 256 bits: no one guesses the first password before the person changes it. */
@@ -217,7 +233,7 @@ async function createDirectoryAccount(
   ctx: SecurityContext,
   connectors: readonly Connector[],
   change: AccountChange,
-  password: string,
+  first: FirstPassword,
 ): Promise<ConnectorErrorCode | null> {
   const [person] = await employees.readEmployees(ctx, [change.employeeId!]);
   if (!person || person.email !== change.email) return "account_not_found";
@@ -235,17 +251,21 @@ async function createDirectoryAccount(
     if (!session.createDirectoryAccount) return "app_unavailable";
     // A duplicate address can belong to an account created elsewhere; the person's id as the key
     // tells an earlier try's account apart. Only a confirmed creation releases the other apps.
-    await withConnectorRetries(
-      () => session.createDirectoryAccount!({ ...person, key: change.employeeId!, password }),
-      {
-        wait,
-        onRetry: (failure, attempt) =>
-          logger.info(
-            { changeId: change.id, failure, attempt },
-            "Directory account creation will retry",
-          ),
-      },
-    );
+    let { sentBefore } = first;
+    const create = () => {
+      const attempt = { ...person, key: change.employeeId!, password: first.password, sentBefore };
+      // A retried call may follow one whose answer was lost after Google created the account.
+      sentBefore = true;
+      return session.createDirectoryAccount!(attempt);
+    };
+    await withConnectorRetries(create, {
+      wait,
+      onRetry: (failure, attempt) =>
+        logger.info(
+          { changeId: change.id, failure, attempt },
+          "Directory account creation will retry",
+        ),
+    });
     return null;
   } catch (error) {
     if (error instanceof ConnectorError) return error.code;

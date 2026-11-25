@@ -144,7 +144,6 @@ it.for(["id", "email"] as const)("shows one user by %s as the list does", async 
   expect(await response.json()).toMatchObject({
     id: chloe.id,
     primaryEmail: chloe.email,
-    lastLoginTime: expect.any(String) as unknown,
   });
 });
 

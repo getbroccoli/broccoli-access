@@ -1,6 +1,9 @@
+import { eq } from "drizzle-orm";
 import {
   createPersonAtGoogle,
   expect,
+  failFakeGoogle,
+  SYSTEM,
   TEST_SECRET_BOX,
   directoryProvisionTest as test,
   linearInvitations,
@@ -31,14 +34,13 @@ test("a Google account created independently causes a duplicate refusal and rele
       connectionId: google.connectionId,
       status: "failed",
       error: "not_allowed",
-      encryptedFirstPassword: null,
     },
   ]);
   expect(await provision.takeFirstPassword(owner, employeeId)).toBeNull();
   expect(await linearInvitations(fakeConnectors.url, NEW_PERSON.email)).toEqual([]);
 });
 
-test("a retry takes over the account an earlier try created and gives it the password that try stored", async ({
+test("a redelivered job recognises the account its first delivery created and reveals that password", async ({
   provisionPerson,
   workspace: { owner, google, linear, provision },
   seed,
@@ -50,13 +52,10 @@ test("a retry takes over the account an earlier try created and gives it the pas
     templateIds: [template.id],
     appIds: [linear.appId],
   });
-  // The earlier delivery stored its password and created the account; Google's answer was lost.
+  // The first delivery stored its password and Google created the account; the answer was lost.
   const stored = TEST_SECRET_BOX.encrypt("first-try-password", changeId);
   await directoryChangeRepository(orm).saveFirstPassword(changeId, stored);
-  await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, {
-    creationKey: employeeId,
-    changePasswordAtNextLogin: true,
-  });
+  await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, { creationKey: employeeId });
 
   await run();
 
@@ -73,39 +72,54 @@ test("a retry takes over the account an earlier try created and gives it the pas
   });
 });
 
+test("the owner's retry recognises the account an unanswered try created and reveals its password", async ({
+  provisionPerson,
+  workspace: { owner, provision },
+  orm,
+  fakeGoogle,
+}) => {
+  const { employeeId, changeId: firstTry, run } = await provisionPerson();
+  await failFakeGoogle(fakeGoogle.url, {
+    endpoint: "directory.users.insert",
+    error: "authentication_failed",
+    count: 1,
+  });
+  await run();
+  const [stored] = await orm
+    .select({ encrypted: accountChanges.encryptedFirstPassword })
+    .from(accountChanges)
+    .where(eq(accountChanges.id, firstTry));
+  const firstPassword = TEST_SECRET_BOX.decrypt(stored!.encrypted!, firstTry);
+  // Google created it after all, as when its answer was lost.
+  await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, { creationKey: employeeId });
+
+  const [retry] = await provision.provisionEmployee(owner, { employeeId, appIds: [] });
+  await provision.runDirectoryProvision(SYSTEM, { changeId: retry!.id, appIds: [] });
+
+  expect(await provision.takeFirstPassword(owner, employeeId)).toEqual({
+    email: NEW_PERSON.email,
+    password: firstPassword,
+  });
+});
+
 test.for([
-  [
-    "carries another person's key",
-    { creationKey: "another-employee", changePasswordAtNextLogin: true },
-  ],
-  ["is suspended", { changePasswordAtNextLogin: true, suspended: true }],
-  ["no longer waits for its first password change", { changePasswordAtNextLogin: false }],
+  ["carries another person's key", "another-employee"],
+  ["carries this person's key but no earlier try of theirs is known", undefined],
 ] as const)(
-  "a retry refuses an account with the address that %s",
+  "a try refuses an account with the address that %s",
   async (
-    [, created],
-    { provisionPerson, workspace: { owner, google, linear, provision }, seed, orm, fakeGoogle },
+    [, otherKey],
+    { provisionPerson, workspace: { owner, google, provision }, orm, fakeGoogle },
   ) => {
-    const template = await seed.template({ appIds: [linear.appId] });
-    const { employeeId, run } = await provisionPerson({
-      templateIds: [template.id],
-      appIds: [linear.appId],
-    });
+    const { employeeId, run } = await provisionPerson();
     await createPersonAtGoogle(orm, fakeGoogle.url, owner, NEW_PERSON, {
-      creationKey: employeeId,
-      ...created,
+      creationKey: otherKey ?? employeeId,
     });
 
     await run();
 
     expect(await orm.select().from(accountChanges)).toMatchObject([
-      {
-        employeeId,
-        connectionId: google.connectionId,
-        status: "failed",
-        error: "not_allowed",
-        encryptedFirstPassword: null,
-      },
+      { employeeId, connectionId: google.connectionId, status: "failed", error: "not_allowed" },
     ]);
     expect(await provision.takeFirstPassword(owner, employeeId)).toBeNull();
   },

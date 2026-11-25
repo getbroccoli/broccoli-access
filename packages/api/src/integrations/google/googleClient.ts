@@ -23,8 +23,6 @@ export interface GoogleClient {
   findUser(accessToken: string, userKey: string): Promise<GoogleUser | null>;
   /** Creates a user who keeps the password given; Google refuses a taken address with a 409. */
   createUser(accessToken: string, user: NewGoogleUser): Promise<GoogleUser>;
-  /** Gives the user a password they must change at their next sign-in; null for an unknown user. */
-  setPassword(accessToken: string, userId: string, password: string): Promise<GoogleUser | null>;
   /** Suspends or restores the user and answers the user as Google then has it; null for an unknown one. */
   setUserSuspended(
     accessToken: string,
@@ -196,11 +194,6 @@ export function createGoogleClient({
       }
       return user;
     },
-    setPassword: (accessToken, userId, password) =>
-      writeUser(directoryUrl(`users/${encodeURIComponent(userId)}`), accessToken, "PUT", {
-        password,
-        changePasswordAtNextLogin: true,
-      }),
     setUserSuspended: (accessToken, userId, suspended) =>
       writeUser(directoryUrl(`users/${encodeURIComponent(userId)}`), accessToken, "PUT", {
         suspended,

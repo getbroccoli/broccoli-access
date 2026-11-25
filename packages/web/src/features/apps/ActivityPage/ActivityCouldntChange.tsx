@@ -1,6 +1,6 @@
 import { useLazyQuery } from "@apollo/client/react";
 import { WarningCircle } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ActivityFailedChangeDocument } from "@/__generated__/graphql";
@@ -28,7 +28,13 @@ export function ActivityCouldntChange({ change, triggerClassName }: Props) {
     fetchPolicy: "network-only",
   });
   const [opened, setOpened] = useState(false);
+  const [closedTimes, setClosedTimes] = useState(0);
+  const chip = useRef<HTMLButtonElement>(null);
   const details = loaded.data?.accountChange;
+  // The chip replaces the closed dialog, so it takes back the focus the dialog would return.
+  useEffect(() => {
+    if (closedTimes) chip.current?.focus();
+  }, [closedTimes]);
 
   async function open() {
     try {
@@ -47,6 +53,7 @@ export function ActivityCouldntChange({ change, triggerClassName }: Props) {
       : change.email;
     return (
       <button
+        ref={chip}
         type="button"
         className={triggerClassName}
         disabled={loaded.loading}
@@ -64,7 +71,10 @@ export function ActivityCouldntChange({ change, triggerClassName }: Props) {
       change={details}
       row={failedChangeRow(details)}
       triggerClassName={triggerClassName}
-      onClose={() => setOpened(false)}
+      onClose={() => {
+        setOpened(false);
+        setClosedTimes((times) => times + 1);
+      }}
       // A new change only the server places in the list, which may already have moved the counts.
       onChanged={() => {
         forgetAccountChanges(cache);

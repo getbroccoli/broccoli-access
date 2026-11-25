@@ -22,8 +22,6 @@ export interface GoogleState {
 /** A directory user: a seeded person, or one the Directory API created. */
 export interface DirectoryPerson extends SeedPerson {
   changePasswordAtNextLogin: boolean;
-  /** When the user last signed in; never without one. */
-  lastLoginTime?: string;
   /** The ids another system gave the user when creating it, as Google keeps them. */
   externalIds?: ExternalId[];
   /** Created through the Directory API since the last reset, which `/_fake/state` lists. */

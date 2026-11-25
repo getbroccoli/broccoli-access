@@ -13,10 +13,6 @@ export interface GoogleUser {
   managerEmail: string | null;
   /** The `creationKey` Broccoli Access created the user with; null for any other user. */
   creationKey: string | null;
-  /** Whether their next sign-in must change the password, as after a first password. */
-  mustChangePassword: boolean;
-  /** When they last signed in; null if never. */
-  signedInAt: Date | null;
   /** The user as Google sent it. */
   raw: Record<string, unknown>;
 }
@@ -37,17 +33,8 @@ export function parseGoogleUser(raw: Record<string, unknown>): GoogleUser {
     managerEmail: manager ? manager.value.toLowerCase() : null,
     creationKey:
       user.externalIds?.find(({ customType }) => customType === CREATION_KEY_TYPE)?.value ?? null,
-    mustChangePassword: user.changePasswordAtNextLogin ?? false,
-    signedInAt: signedInAt(user.lastLoginTime),
     raw,
   };
-}
-
-/** Google gives a user who never signed in the epoch as `lastLoginTime`. */
-function signedInAt(lastLoginTime: string | undefined): Date | null {
-  if (!lastLoginTime) return null;
-  const at = new Date(lastLoginTime);
-  return at.getTime() > 0 ? at : null;
 }
 
 /** The external ids that keep a `creationKey` on a new user. */
@@ -72,6 +59,4 @@ const DIRECTORY_USER = z.object({
   externalIds: z
     .array(z.object({ customType: z.string().optional(), value: z.string() }))
     .optional(),
-  changePasswordAtNextLogin: z.boolean().optional(),
-  lastLoginTime: z.string().optional(),
 });
