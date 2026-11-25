@@ -89,13 +89,14 @@ function isConnectorError(failure: SignInFailure["failure"]): failure is Connect
   return (CONNECTOR_ERROR_CODES as readonly string[]).includes(failure);
 }
 
-/** Whether the answer's secrets hold the app session the connector's manifest names. */
+/** Whether the answer's secrets hold, under the key the connector's manifest names, a session that is not empty. */
 function holdsAppSession(
   connector: ContainerConnector,
   { connection }: SignedInConnection,
 ): boolean {
   const field = appSessionFieldOf(connector);
-  return field !== undefined && parseAppSession(connection.secrets[field.key], field) !== null;
+  const session = field && parseAppSession(connection.secrets[field.key], field);
+  return !!session && (session.cookies.length > 0 || Object.keys(session.storage ?? {}).length > 0);
 }
 
 function refusalOf(failure: SignInFailure["failure"]): ApplicationError {

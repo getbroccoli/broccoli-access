@@ -1,4 +1,4 @@
-import { invalidInput } from "../../../core/applicationError";
+import { type ApplicationError, invalidInput } from "../../../core/applicationError";
 import type { AppSessionSource, ConnectionDetails } from "../../../core/connectors";
 import type { SecurityContext } from "../../../core/security";
 import { adminUrlOf } from "../domain";
@@ -56,9 +56,9 @@ export async function saveConnection(
 }
 
 /**
- * Replaces a connection's secrets and queues its scan together, then logs the outcome. With
- * `refusesRunningScan`, for secrets of another member than the stored ones, a scan already running
- * refuses it with INVALID_INPUT: its results would name the old member as the connection's.
+ * Replaces a connection's secrets and queues its scan together, then logs the outcome. Secrets
+ * whose session another member made than the stored one are refused with `scanRunning` while a
+ * scan already runs: its results would name the old member as the connection's.
  */
 export async function replaceSecrets(
   { transact, connectedApps, scans, logger }: ContainerConnectionDependencies,
@@ -68,13 +68,11 @@ export async function replaceSecrets(
     stored,
     secrets,
     sessionFrom,
-    refusesRunningScan = false,
   }: {
     connector: ContainerConnector;
     stored: StoredConnection;
     secrets: Record<string, unknown>;
     sessionFrom: AppSessionSource | undefined;
-    refusesRunningScan?: boolean;
   },
 ): Promise<ConnectorWithConnection> {
   const connectionId = stored.id;
@@ -82,12 +80,12 @@ export async function replaceSecrets(
     // The source first, then the connection, as a failing scan locks them, so they never deadlock.
     // The source exists since the first scan, which named it.
     const scan = await scans.scanConnection(ctx, tx, { connectionId, sourceName: connector.name });
-    if (refusesRunningScan && !scan.queued) {
+    if (sessionFrom && sessionFrom !== stored.sessionFrom && !scan.queued) {
       logger.warn(
-        { connector: connector.key, connectionId },
-        "Switch refused: the connection's scan is running",
+        { connector: connector.key, connectionId, sessionFrom },
+        "New session refused: the connection's scan is running",
       );
-      throw invalidInput([{ field: "integrationUser", code: "scan_running" }]);
+      throw scanRunning(sessionFrom);
     }
     await connectedApps.reconnect(ctx, tx, { connectionId, secrets, sessionFrom });
     return scan;
@@ -101,6 +99,15 @@ export async function replaceSecrets(
     sessionFrom: sessionFrom ?? stored.sessionFrom,
   });
   return { connector, connection: summary };
+}
+
+/**
+ * The refusal of a session from another member while the connection's scan runs: INVALID_INPUT
+ * with `scan_running` on what the owner gave, the integration user or their own app session.
+ */
+export function scanRunning(sessionFrom: AppSessionSource): ApplicationError {
+  const field = sessionFrom === "server_sign_in" ? "integrationUser" : "appSession";
+  return invalidInput([{ field, code: "scan_running" }]);
 }
 
 /** The connection as Settings and its app's page show it. */

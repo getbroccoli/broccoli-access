@@ -231,7 +231,7 @@ test("refuses to switch to a session that opens another workspace, keeping the o
       details: { organizationName: "Other", domain: "other.slack.com" },
       connection: {
         settings: { teamId: "T09OTHER", teamDomain: "other", teamName: "Other" },
-        secrets: { appSession: { cookies: [], storage: {} } },
+        secrets: { appSession: { cookies: [OTHER_WORKSPACE_COOKIE], storage: {} } },
       },
     });
   });
@@ -253,10 +253,18 @@ test("refuses to switch the owner's session while the connection's scan is runni
   seed,
   fakeConnectors,
 }) => {
-  const { service, scans, connectionId } = await slackOnOwnSession(orm, seed, fakeConnectors);
+  const { scans, connectionId } = await slackOnOwnSession(orm, seed, fakeConnectors);
   await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
   await scans.scanNow(OWNER, connectionId);
   const before = await storedAppConnections(orm);
+  let signIns = 0;
+  const container = express();
+  container.post("/v1/connections/sign-in", (_request, _response, next) => {
+    signIns += 1;
+    next();
+  });
+  const server = await serveConnectorRoutes(fakeConnectors.url, container);
+  const { service } = containerConnections(orm, server.url);
 
   await expect(
     service.connectWithIntegrationUser(OWNER, { connector: "slack" }),
@@ -266,7 +274,18 @@ test("refuses to switch the owner's session while the connection's scan is runni
   });
   expect(await storedAppConnections(orm)).toEqual(before);
   expect(before).toMatchObject([{ id: connectionId, sessionFrom: "extension" }]);
+  expect(signIns).toBe(0);
 });
+
+const OTHER_WORKSPACE_COOKIE = {
+  name: "d",
+  value: "other-workspace",
+  domain: "slack.localhost",
+  path: "/",
+  httpOnly: true,
+  secure: false,
+  sameSite: "Lax",
+};
 
 /** Slack connected with the owner's handed-over session and scanned, with a ready integration user. */
 async function slackOnOwnSession(

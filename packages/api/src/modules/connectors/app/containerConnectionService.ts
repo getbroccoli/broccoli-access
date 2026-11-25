@@ -9,7 +9,7 @@ import type { ConnectedApps, IntegrationUserSignIn, Scans } from "../ports";
 import { type AppSessionHandOver, createAppSessionHandOvers } from "./appSessionHandOvers";
 import { connectionOf, isOtherWorkspace, refuseOtherWorkspace } from "./connectionOf";
 import { integrationUserSession } from "./integrationUserSession";
-import { replaceSecrets, saveConnection, summaryOf } from "./saveConnection";
+import { replaceSecrets, saveConnection, scanRunning, summaryOf } from "./saveConnection";
 import { testedConnection } from "./testedConnection";
 import {
   appSessionFieldOf,
@@ -183,6 +183,8 @@ export function createContainerConnectionService(
   const { orm, containerConnectors, connectedApps, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
   const handOvers = createAppSessionHandOvers({ secretBox: dependencies.secretBox, now });
+  const isScanning = async (ctx: SecurityContext, connectionId: string) =>
+    (await dependencies.scans.readScan(ctx, connectionId))?.status === "scanning";
   return {
     async connect(ctx, input) {
       ctx.require("MANAGE_WORKSPACE");
@@ -238,6 +240,10 @@ export function createContainerConnectionService(
       if (connector.notice !== null && !stored && input.noticeAccepted !== true) {
         throw invalidInput([{ field: "noticeAccepted", code: "required" }]);
       }
+      // Before signing in, which accepts the invitation in the app; checked again when it saves.
+      if (stored && stored.sessionFrom !== "server_sign_in" && (await isScanning(ctx, stored.id))) {
+        throw scanRunning("server_sign_in");
+      }
       const { details, connection } = await integrationUserSession(
         dependencies,
         ctx,
@@ -246,13 +252,8 @@ export function createContainerConnectionService(
       );
       const sessionFrom = "server_sign_in";
       if (stored) {
-        return replaceSecrets(dependencies, ctx, {
-          connector,
-          stored,
-          secrets: connection.secrets,
-          sessionFrom,
-          refusesRunningScan: stored.sessionFrom !== sessionFrom,
-        });
+        const { secrets } = connection;
+        return replaceSecrets(dependencies, ctx, { connector, stored, secrets, sessionFrom });
       }
       const noticeAcceptedAt = connector.notice === null ? undefined : now();
       return saveConnection(dependencies, ctx, {

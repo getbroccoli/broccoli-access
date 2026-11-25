@@ -12,4 +12,6 @@ export interface Scans {
     tx: Tx,
     scan: { connectionId: string; sourceName: string },
   ): Promise<{ sourceId: string; queued: boolean }>;
+  /** The connection's scan; null before the first. `scanning` while one is queued or running. */
+  readScan(ctx: SecurityContext, connectionId: string): Promise<{ status: string } | null>;
 }

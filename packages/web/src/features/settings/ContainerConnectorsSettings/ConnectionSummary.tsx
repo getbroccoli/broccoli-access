@@ -37,19 +37,17 @@ export function ConnectionSummary({ connector, connection }: Props) {
 /** Which workspace is connected, with whose key or app session. */
 function summaryOf(
   connector: Props["connector"],
-  { connectionUserEmail: email, sessionFrom, scan }: Props["connection"],
+  { connectionUserEmail: email, sessionFrom }: Props["connection"],
   workspace: string,
 ): string {
   if (connector.connectionFields.some(({ kind }) => kind === "APP_SESSION")) {
     const app = connector.name;
-    const actsAsIntegrationUser = sessionFrom === "SERVER_SIGN_IN";
-    // After Switch, the last scan's member is the owner until the running scan saves.
-    const isEmailCurrent = !(actsAsIntegrationUser && scan?.status === "SCANNING");
-    if (email && isEmailCurrent) {
-      return t("settings.apps.summaryAppSession", { workspace, app, email });
+    // The last scan's member may be the owner's, from before a switch: the session's source says whose it is.
+    if (sessionFrom === "SERVER_SIGN_IN") {
+      return t("settings.apps.summaryIntegrationUser", { workspace, app });
     }
-    return actsAsIntegrationUser
-      ? t("settings.apps.summaryIntegrationUserBeforeScan", { workspace, app })
+    return email
+      ? t("settings.apps.summaryAppSession", { workspace, app, email })
       : t("settings.apps.summaryAppSessionBeforeScan", { workspace, app });
   }
   const field = connectingFieldName(connector.connectionFields);

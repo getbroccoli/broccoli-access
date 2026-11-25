@@ -39,8 +39,9 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
     from,
   });
   const [open, setOpen] = useState(false);
-  // What the owner chose; "notice" is the integration user's way before its notice is accepted.
-  const [way, setWay] = useState<ConnectWay | "notice" | null>(null);
+  // What the owner chose; "notice" is the integration user's way before its notice is accepted,
+  // and "switch" its way for an app already connected.
+  const [way, setWay] = useState<ConnectWay | "notice" | "switch" | null>(null);
   const connection = useConnectAppSession();
   const signIn = useConnectWithIntegrationUser();
   const cache = useCache();
@@ -65,7 +66,7 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
     }
   };
   const connectAsIntegrationUser = () => {
-    setWay("integrationUser");
+    setWay(isSwitching ? "switch" : "integrationUser");
     const input = { connector: connector.id, noticeAccepted: true };
     const approvesApp = !isSwitching;
     // `usePayloadMutation` keeps a failure for display, so the rejection needs no handling here.
@@ -114,10 +115,11 @@ export function ConnectAppSessionDialog({ connector: from, trigger, onConnected 
             <NoticeStep app={app} notice={connector.notice} onAccept={connectAsIntegrationUser} />
           </>
         )}
-        {open && way === "integrationUser" && (
+        {open && (way === "integrationUser" || way === "switch") && (
           <IntegrationUserConnectStep
             connector={connector}
             signIn={signIn}
+            isSwitch={way === "switch"}
             onTryAgain={connectAsIntegrationUser}
           />
         )}

@@ -12,30 +12,32 @@ import {
   storedAppConnections,
 } from "#test/support";
 
-test("refuses a sign-in answer missing Slack's app session and stores no connection", async ({
-  orm,
-  seed,
-  fakeConnectors,
-}) => {
-  await readyIntegrationUser(orm, seed, fakeConnectors);
-  const container = express();
-  container.post("/v1/connections/sign-in", (_request, response) => {
-    response.json({
-      details: { organizationName: "Acme", domain: "acme.slack.com" },
-      connection: {
-        settings: { teamId: "T04ACME", teamDomain: "acme", teamName: "Acme" },
-        secrets: {},
-      },
+test.for([
+  { description: "missing", secrets: {} },
+  { description: "empty", secrets: { appSession: { cookies: [], storage: {} } } },
+])(
+  "refuses to store a connection when the Slack app session is $description",
+  async ({ secrets }, { orm, seed, fakeConnectors }) => {
+    await readyIntegrationUser(orm, seed, fakeConnectors);
+    const container = express();
+    container.post("/v1/connections/sign-in", (_request, response) => {
+      response.json({
+        details: { organizationName: "Acme", domain: "acme.slack.com" },
+        connection: {
+          settings: { teamId: "T04ACME", teamDomain: "acme", teamName: "Acme" },
+          secrets,
+        },
+      });
     });
-  });
-  const server = await serveConnectorRoutes(fakeConnectors.url, container);
-  const { service } = containerConnections(orm, server.url);
+    const server = await serveConnectorRoutes(fakeConnectors.url, container);
+    const { service } = containerConnections(orm, server.url);
 
-  await expect(service.connectWithIntegrationUser(OWNER, SLACK)).rejects.toMatchObject({
-    code: "UNAVAILABLE",
-  });
-  expect(await storedAppConnections(orm)).toEqual([]);
-});
+    await expect(service.connectWithIntegrationUser(OWNER, SLACK)).rejects.toMatchObject({
+      code: "UNAVAILABLE",
+    });
+    expect(await storedAppConnections(orm)).toEqual([]);
+  },
+);
 
 test.for(["rate_limited", "app_unavailable"] as const)(
   "connects on the third sign-in after two %s answers",

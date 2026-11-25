@@ -10,10 +10,12 @@ import {
   createAppConnectionService,
   EMPLOYEE,
   expect,
+  inviteIntegrationUserToFakeSlack,
   LINEAR_INPUT,
   OWNER,
   ownerHandOver,
   postFakeControl,
+  readyIntegrationUser,
   serveConnectorRoutes,
   signInToFakeSlack,
   slackWithExpiredSession,
@@ -132,6 +134,27 @@ test("reconnects Slack with the owner's new hand-over", async ({ orm, seed, fake
   expect(
     JSON.parse(TEST_SECRET_BOX.decrypt(connection!.encryptedSecrets, slack.connectionId)),
   ).toEqual({ appSession: session });
+});
+
+test("refuses to reconnect with the owner's session while the integration user's scan is running", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const { service } = await readyIntegrationUser(orm, seed, fakeConnectors);
+  await inviteIntegrationUserToFakeSlack(fakeConnectors, "admin");
+  await service.connectWithIntegrationUser(OWNER, { connector: "slack", noticeAccepted: true });
+  const before = await storedAppConnections(orm);
+  const owner = await ownerHandOver(orm, fakeConnectors);
+
+  await expect(
+    owner.service.reconnect(OWNER, { connector: "slack", appSession: owner.handOver.appSession }),
+  ).rejects.toMatchObject({
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "appSession", code: "scan_running" }],
+  });
+  expect(await storedAppConnections(orm)).toEqual(before);
+  expect(before).toMatchObject([{ sessionFrom: "server_sign_in" }]);
 });
 
 test("refuses to reconnect Slack when the final test names another workspace without new settings", async ({

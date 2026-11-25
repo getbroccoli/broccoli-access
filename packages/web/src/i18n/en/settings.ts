@@ -116,7 +116,7 @@ export const settingsEn = {
     "The {workspace} workspace, connected with the {app} session of {email}.",
   "settings.apps.summaryAppSessionBeforeScan":
     "The {workspace} workspace, connected with your {app} session.",
-  "settings.apps.summaryIntegrationUserBeforeScan":
+  "settings.apps.summaryIntegrationUser":
     "The {workspace} workspace, connected with the integration user’s {app} session.",
   "settings.apps.noticeAccepted": "You accepted {app}’s notice on {day}.",
   "settings.apps.actsAsIntegrationUser": "Acts as the integration user",
@@ -140,10 +140,14 @@ export const settingsEn = {
   "settings.connectWay.loadFailed": "Couldn’t load the integration user. Close this and try again.",
   "settings.integrationUserConnect.failedStep": "Failed",
   "settings.integrationUserConnect.membersNotRead":
-    "{app} is connected, but its members couldn’t be read. Close this and try Scan now.",
+    "{app} is connected, but its members couldn’t be read. Close this and look at {app} under Connections.",
   "settings.integrationUserConnect.scanRunning":
     "{app} is being scanned. Try again when the scan ends.",
   "settings.integrationUserConnect.title": "Connecting {app}",
+  "settings.integrationUserConnect.switchTitle": "Switching {app} to the integration user",
+  "settings.integrationUserConnect.canCloseSwitch":
+    "You can close this. {app} shows “Acts as the integration user” when it is done.",
+  "settings.integrationUserConnect.switched": "{app} now acts as the integration user.",
   "settings.integrationUserConnect.stepInvitation": "Accept the invitation",
   "settings.integrationUserConnect.stepSignIn": "Sign in to {app}",
   "settings.integrationUserConnect.stepMembers": "Read the members",
@@ -160,11 +164,11 @@ export const settingsEn = {
   "settings.integrationUserConnect.notAdmin":
     "The integration user isn’t an admin in {app}. Make it an admin in {app}, then try again.",
   "settings.integrationUserConnect.blockedByCheck":
-    "Google or {app} showed a check, which Broccoli Access never gets around. Nothing changed. Try again later.",
+    "Google or {app} showed a check, which Broccoli Access never gets around. Try again later.",
   "settings.integrationUserConnect.authenticationFailed":
     "Google refused the integration user’s sign-in. Check the integration user under Connections, then try again.",
   "settings.integrationUserConnect.otherWorkspace":
-    "The integration user signed in to another {app} workspace than the connected one. Nothing changed. Make it an admin in the connected workspace, then try again.",
+    "The integration user signed in to another {app} workspace than the connected one, so the connection stays as it was. Make it an admin in the connected workspace, then try again.",
   "settings.integrationUserConnect.notSetUp":
     "The integration user’s sign-in to Google isn’t set up yet. Finish it under Connections, then try again.",
   "settings.integrationUserConnect.failed": "Couldn’t sign in to {app}. Try again.",
