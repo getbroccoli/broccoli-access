@@ -1,5 +1,6 @@
 import { ApplicationError, invalidInput } from "../../../core/applicationError";
 import type { SecurityContext } from "../../../core/security";
+import type { Logger } from "../../../core/logger";
 import { parseUuid } from "../../../utils";
 import type { AccountChange } from "../domain";
 import type { ProvisionService } from "./provisionService";
@@ -14,6 +15,7 @@ export async function provisionSelectedApp(
   ctx: SecurityContext,
   { appId: inputApp, employeeIds }: { appId: string; employeeIds: readonly string[] },
   provisionEmployee: ProvisionService["provisionEmployee"],
+  logger: Logger,
 ): Promise<AppProvisionResult> {
   ctx.require("MANAGE_WORKSPACE");
   if (!ctx.user)
@@ -28,8 +30,12 @@ export async function provisionSelectedApp(
       const changes = await provisionEmployee(ctx, { employeeId, appIds: [appId] });
       result.changes.push(...changes);
     } catch (error) {
-      if (!(error instanceof ApplicationError) || !["CONFLICT", "NOT_FOUND"].includes(error.code))
-        throw error;
+      if (error instanceof ApplicationError && error.code === "FORBIDDEN") throw error;
+      if (!(error instanceof ApplicationError))
+        logger.error(
+          { appId, employeeId: parseUuid(employeeId) },
+          "Provision failed for one employee",
+        );
       result.refusedEmployeeIds.push(employeeId);
     }
   }

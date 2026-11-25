@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { type PeopleDifferencesQuery, ProvisionAppDocument } from "@/__generated__/graphql";
@@ -27,23 +28,23 @@ type Props = {
 
 /** One Provision for the people missing this app, with each person's current action. */
 export function MissingAppCard({ differences, refresh }: Props) {
+  const [open, setOpen] = useState(false);
   const [provision, { loading: submitting }] = usePayloadMutation(ProvisionAppDocument);
   const { app, employee } = differences[0]!;
   const count = String(differences.length);
   const ready = differences.filter(
-    (row) => row.provisionStep && !row.provisioning && !row.roleNeedsAttention,
+    (row) => row.provisionStep && !isRunning(row) && !row.roleNeedsAttention,
   );
-  const isProvisioning =
-    submitting || (!ready.length && differences.some(({ provisioning }) => provisioning));
+  const isProvisioning = submitting || (!ready.length && differences.some(isRunning));
   const confirm = async () => {
+    setOpen(false);
     try {
       const result = await provision({
         variables: {
           input: { appId: app.id, employeeIds: ready.map(({ employee }) => employee.id) },
         },
       });
-      if (result.refusedEmployeeIds?.length)
-        toast.error(t("people.differences.provisionFailed", { app: app.name }));
+      showRefusedPeople(ready, result.refusedEmployeeIds ?? []);
     } catch {
       toast.error(t("people.differences.provisionFailed", { app: app.name }));
     } finally {
@@ -67,7 +68,7 @@ export function MissingAppCard({ differences, refresh }: Props) {
           t("people.differences.peopleCount", { count })
         )}
       </p>
-      <AlertDialog>
+      <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogTrigger
           render={<Button type="button" size="lg" className="px-4" disabled={submitting} />}
         >
@@ -83,29 +84,40 @@ export function MissingAppCard({ differences, refresh }: Props) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <ul className="max-h-[50vh] divide-y divide-border overflow-y-auto rounded-xl border border-border text-sm">
-            {differences
-              .toSorted((a, b) => personName(a.employee).localeCompare(personName(b.employee)))
-              .map((row) => (
-                <li
-                  key={row.employee.id}
-                  className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5"
-                >
-                  <Link
-                    to="/people/$employeeId"
-                    params={{ employeeId: row.employee.id }}
-                    className="font-semibold hover:underline"
+            {open &&
+              differences
+                .toSorted((a, b) => personName(a.employee).localeCompare(personName(b.employee)))
+                .map((row) => (
+                  <li
+                    key={row.employee.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5"
                   >
-                    {personName(row.employee)}
-                  </Link>
-                  <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
-                    {row.latestProvisionChange?.status === "FAILED" &&
-                      row.latestProvisionChange.failure !== "NO_CONNECTION" && (
-                        <CouldntChangeDialog change={row.latestProvisionChange} />
+                    <Link
+                      to="/people/$employeeId"
+                      params={{ employeeId: row.employee.id }}
+                      className="font-semibold hover:underline"
+                    >
+                      {personName(row.employee)}
+                    </Link>
+                    <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                      {row.latestProvisionChange?.status === "FAILED" &&
+                        row.latestProvisionChange.failure !== "NO_CONNECTION" && (
+                          <CouldntChangeDialog change={row.latestProvisionChange} />
+                        )}
+                      {needsPersonPage(row) ? (
+                        <Link
+                          to="/people/$employeeId"
+                          params={{ employeeId: row.employee.id }}
+                          className="underline"
+                        >
+                          {provisionLabel(row)}
+                        </Link>
+                      ) : (
+                        provisionLabel(row)
                       )}
-                    {provisionLabel(row)}
-                  </div>
-                </li>
-              ))}
+                    </div>
+                  </li>
+                ))}
           </ul>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("apps.change.cancel")}</AlertDialogCancel>
@@ -123,17 +135,36 @@ export function MissingAppCard({ differences, refresh }: Props) {
   );
 }
 
+function showRefusedPeople(people: readonly Missing[], ids: readonly string[]) {
+  if (!ids.length) return;
+  const refused = new Set(ids);
+  const first = people.find(({ employee }) => refused.has(employee.id));
+  if (!first) return;
+  toast.error(
+    t(
+      ids.length === 1
+        ? "people.differences.provisionRefusedOne"
+        : "people.differences.provisionRefused",
+      { name: personName(first.employee), count: String(ids.length) },
+    ),
+  );
+}
+
+function needsPersonPage(row: Missing) {
+  return !isRunning(row) && (row.roleNeedsAttention || !row.provisionStep);
+}
+
+function isRunning(row: Missing) {
+  return row.latestProvisionChange?.status === "RUNNING";
+}
+
 function personName(employee: Missing["employee"]) {
   return `${employee.firstName} ${employee.lastName}`;
 }
 
-function provisionLabel({
-  provisionStep,
-  provisioning,
-  roleNeedsAttention,
-  latestProvisionChange,
-}: Missing) {
-  if (provisioning) return t("people.differences.provisioning");
+function provisionLabel(row: Missing) {
+  const { provisionStep, roleNeedsAttention, latestProvisionChange } = row;
+  if (isRunning(row)) return t("people.differences.provisioning");
   if (roleNeedsAttention) return t("people.differences.fixRole");
   if (provisionStep?.action === "INVITE") return t("people.differences.invites");
   if (provisionStep?.action === "REACTIVATE") return t("people.provision.enable");

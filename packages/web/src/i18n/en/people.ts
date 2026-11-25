@@ -9,13 +9,17 @@ export const peopleEn = {
   "people.differences.provisionDescription": "Review how each person gets access.",
   "people.differences.provisioning": "Provisioning…",
   "people.differences.invites": "Send invitation",
-  "people.differences.fixRole": "Settle the role on their person page",
+  "people.differences.fixRole": "Review their expected role",
   "people.differences.byHand": "Invite by hand after confirming",
   "people.differences.finishByHand":
     "Send the invitation in the app and confirm on their person page",
-  "people.differences.provisionUnavailable": "Check their person page",
+  "people.differences.provisionUnavailable": "Open their person page",
   "people.differences.provisionFailed":
     "Couldn’t provision everyone in {app}. Check the people still missing access.",
+  "people.differences.provisionRefused": "Couldn’t provision {count} people, including {name}.",
+  "people.differences.provisionRefusedOne": "Couldn’t provision {name}.",
+  "people.differences.disableRefused":
+    "Couldn’t disable the account. Refresh Differences and try again.",
   "people.differences.why": "Why",
   "people.differences.accessChanged": "Their expected access changed",
   "people.differences.accessRemoved": "Removed for this person",

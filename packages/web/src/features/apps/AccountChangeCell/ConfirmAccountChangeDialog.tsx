@@ -70,7 +70,11 @@ export function ConfirmAccountChangeDialog({
     setOpen(false);
     if (!asksGoogle) {
       await changeAccount(changeTargetOf(row, action, onlyIfExtra), action);
-    } else if (!(await askGoogleForUserWrites(window.location.pathname))) {
+    } else if (
+      !(await askGoogleForUserWrites(
+        onlyIfExtra ? "/people?view=differences" : window.location.pathname,
+      ))
+    ) {
       toast.error(t("apps.change.googleStartFailed"));
     }
   };

@@ -78,7 +78,7 @@ test("the owner disables an extra Linear account from Differences", async ({ env
   await env.seed.employeeAppChoice({ appId, employeeId: chloe.employee.id, choice: "to_review" });
 
   const response = await browser.graphql(CHANGE_ACCOUNT, {
-    input: { id: chloe.id, action: "SUSPEND", onlyIfExtra: true },
+    input: { id: chloe.id, action: "SUSPEND", extraEmployeeId: chloe.employee.id },
   });
 
   expect(await response.json()).toMatchObject({

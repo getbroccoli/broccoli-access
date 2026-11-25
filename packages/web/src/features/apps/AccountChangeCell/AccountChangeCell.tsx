@@ -43,7 +43,7 @@ export function AccountChangeCell({ appUser, onlyIfExtra }: Props) {
   useToastWhenChangeSucceeds(user);
   const succeeded = user?.latestChange?.status === "SUCCEEDED" ? user.latestChange : null;
   const justNow = useJustNow(succeeded?.finishedAt ?? null);
-  if (!user) {
+  if (!user || (onlyIfExtra && user.status !== "ACTIVE")) {
     return null;
   }
   if (!user.app.canChangeAccounts || user.isConnectionUser) {

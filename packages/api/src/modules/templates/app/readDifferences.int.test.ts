@@ -1,4 +1,15 @@
-import { ADMIN, EMPLOYEE, expect, inviteTest, SYSTEM, templates, test } from "#test/support";
+import {
+  ADMIN,
+  containerConnectors,
+  EMPLOYEE,
+  expect,
+  inviteTest,
+  postFakeControl,
+  startFakeHttpServer,
+  SYSTEM,
+  templates,
+  test,
+} from "#test/support";
 
 inviteTest(
   "Missing includes Hannah's disabled account and clears Ivan after his invitation",
@@ -25,22 +36,45 @@ inviteTest(
 );
 
 inviteTest(
-  "a queued invite counts as running and stays Missing until the invite succeeds",
+  "a queued invite appears by ID and stays Missing until the invite succeeds",
   async ({ workspace: { owner, input, service, templates, assignLinearRole } }) => {
     await assignLinearRole(null);
     const { latestInvite } = await service.inviteEmployee(owner, input);
 
     expect.soft(await templates.readDifferences(owner)).toMatchObject({
-      runningChangeCount: 1,
+      runningChangeIds: [latestInvite!.id],
       missing: [input],
     });
 
     await service.runChange(SYSTEM, latestInvite!.id);
 
     expect(await templates.readDifferences(owner)).toMatchObject({
-      runningChangeCount: 0,
+      runningChangeIds: [],
       missing: [],
     });
+  },
+);
+
+inviteTest(
+  "a scanned pending invitation stays out of Missing when the connector manifest is unavailable",
+  async ({
+    workspace: { owner, ivan, linear, assignLinearRole, templates: online },
+    fakeConnectors,
+    orm,
+  }) => {
+    await assignLinearRole(null);
+    await postFakeControl(fakeConnectors.url, "linear/invitations", { email: ivan.email });
+    await linear.scans.scanNow(owner, linear.connectionId);
+    await linear.scans.runScan(SYSTEM, linear.sourceId);
+    expect((await online.readDifferences(owner)).missing).toEqual([]);
+
+    const unavailable = await startFakeHttpServer(() => ({ status: 503 }));
+    try {
+      const offline = templates(orm, { connectors: containerConnectors(unavailable.url) });
+      expect((await offline.readDifferences(owner)).missing).toEqual([]);
+    } finally {
+      await unavailable.stop();
+    }
   },
 );
 

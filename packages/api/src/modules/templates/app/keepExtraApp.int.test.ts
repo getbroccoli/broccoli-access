@@ -152,3 +152,25 @@ test("a removal stays on the person page but cannot be kept once no template lis
     message: "This app is no longer extra for this person.",
   });
 });
+
+test("Keep refuses an extra account while its Disable is running", async ({
+  workspace: { owner, employee, linear, service, templates },
+  seed,
+  orm,
+}) => {
+  const chloe = employee("chloe@acme.example");
+  const pair = { employeeId: chloe.id, appId: linear.appId };
+  await seed.employeeAppChoice({ ...pair, choice: "to_review" });
+  await service.changeAccount(owner, {
+    appAccountId: linear.account(chloe.email).id,
+    action: "suspend",
+  });
+
+  await expect(templates.keepExtraApp(owner, pair)).rejects.toMatchObject({
+    code: "CONFLICT",
+    message: "A Disable is still running for this app.",
+  });
+  expect(await storedEmployeeAppChoices(orm)).toEqual([
+    { ...pair, choice: "to_review", role: null },
+  ]);
+});

@@ -48,6 +48,7 @@ interface StoredInviteFacts {
   /** By key (`inviteKey`). */
   latestInvites: Map<string, AccountChange>;
   invitingConnectors: Set<string>;
+  knownConnectors: Set<string>;
   /** The keys of the connectors whose scans read the pending invitations. */
   invitationListingConnectors: Set<string>;
 }
@@ -59,14 +60,17 @@ export async function readInviteFacts(
     employees,
     connections,
     connectors,
+    expected,
   }: {
     employees: readonly InvitedEmployee[];
     connections: readonly AppConnection[];
     connectors: readonly Connector[];
+    expected?: readonly { employeeId: string; appId: string }[];
   },
 ): Promise<StoredInviteFacts> {
   const connectionIds = connections.map(({ id }) => id);
   const emails = employees.map(({ email }) => email);
+  const targets = expected && invitationTargets(expected, employees, connections);
   const [active, lastScans, memberKeys, pending, latest] = await Promise.all([
     findEmployeesInDirectory(db, connectors, {
       status: "active",
@@ -74,8 +78,8 @@ export async function readInviteFacts(
     }),
     members.findLastScans(db),
     readMemberKeys(db, members, employees, connections),
-    appInvitationRepository(db).findByEmails({ connectionIds, emails }),
-    accountChangeRepository(db).findLatestInvites(connectionIds, emails),
+    appInvitationRepository(db).findByEmails({ connectionIds, emails, targets }),
+    accountChangeRepository(db).findLatestInvites(connectionIds, emails, targets),
   ]);
   return {
     activeInDirectory: new Set(active),
@@ -91,8 +95,23 @@ export async function readInviteFacts(
       latest.map((change) => [inviteKey(change.connectionId!, change.email), change]),
     ),
     invitingConnectors: new Set(connectors.filter(canInvite).map(({ key }) => key)),
+    knownConnectors: new Set(connectors.map(({ key }) => key)),
     invitationListingConnectors: new Set(connectors.filter(listsInvitations).map(({ key }) => key)),
   };
+}
+
+function invitationTargets(
+  expected: readonly { employeeId: string; appId: string }[],
+  employees: readonly InvitedEmployee[],
+  connections: readonly AppConnection[],
+) {
+  const emailOf = new Map(employees.map(({ id, email }) => [id, email]));
+  const connectionOf = new Map(connections.map(({ id, appId }) => [appId, id]));
+  return expected.flatMap(({ employeeId, appId }) => {
+    const email = emailOf.get(employeeId);
+    const connectionId = connectionOf.get(appId);
+    return email && connectionId ? [{ email, connectionId }] : [];
+  });
 }
 
 /** Keys the scanned members by the employee's work email, including a member the owner linked. */
@@ -138,7 +157,9 @@ export function appInviteOf(
     connection: {
       status: connection.status,
       invites: facts.invitingConnectors.has(connection.connector),
-      listsInvitations: facts.invitationListingConnectors.has(connection.connector),
+      listsInvitations: facts.knownConnectors.has(connection.connector)
+        ? facts.invitationListingConnectors.has(connection.connector)
+        : null,
       scannedAt: facts.scannedAt.get(connection.id) ?? null,
     },
     hasMember: facts.memberKeys.has(key),

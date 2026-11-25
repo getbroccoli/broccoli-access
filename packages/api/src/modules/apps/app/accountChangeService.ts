@@ -18,7 +18,7 @@ import type { ConnectionMembers, EmployeesByName, IntegrationUser } from "../por
 import { changingConnectors, readChangeFacts } from "./accountFacts";
 import { createAppConnectionService } from "./appConnectionService";
 import { askForChange } from "./askForChange";
-import { type AppInvite, inviteEmployee, readAppInvites } from "./appInvite";
+import { type AppInvite, type AppInviteScope, inviteEmployee, readAppInvites } from "./appInvite";
 import { loggingRefusal } from "./loggingRefusal";
 import { markChangeDoneByHand } from "./markChangeDoneByHand";
 import type { DirectoryConnectors } from "./directory";
@@ -46,7 +46,7 @@ export interface AccountChangeService {
       appAccountId: string;
       action: AccountChangeAction;
       retryOf?: string | null;
-      onlyIfExtra?: boolean | null;
+      extraEmployeeId?: string | null;
     },
   ) => Promise<LatestAccountChange>;
   /**
@@ -71,10 +71,12 @@ export interface AccountChangeService {
     ctx: SecurityContext,
     employeeIds: readonly string[],
     db?: Orm | Tx,
-    expected?: readonly { employeeId: string; appId: string }[],
+    scope?: AppInviteScope,
   ) => Promise<AppInvite[]>;
-  /** How many account changes are running. Needs MANAGE_WORKSPACE. */
-  readRunningChangeCount: (ctx: SecurityContext, db?: Orm | Tx) => Promise<number>;
+  /** The running account changes. Needs MANAGE_WORKSPACE. */
+  readRunningChangeIds: (ctx: SecurityContext, db?: Orm | Tx) => Promise<string[]>;
+  /** Whether an account has a running Disable. Needs MANAGE_WORKSPACE. */
+  hasRunningDisable: (ctx: SecurityContext, ids: readonly string[], tx: Tx) => Promise<boolean>;
   /**
    * The run's job: makes the change through the connector, trying a rate-limited or unavailable
    * call again; saves a renewed connection first. When the member reads back with the new status,
@@ -117,6 +119,7 @@ export interface AccountChangeService {
     ctx: SecurityContext,
     appAccountIds: readonly string[],
     db?: Orm | Tx,
+    connectors?: readonly Connector[],
   ) => Promise<Map<string, AccountChangeState>>;
   /**
    * Each of the connections' app, status and, while it needs reconnecting, why, by connection id;
@@ -221,7 +224,7 @@ export function createAccountChangeService(
     connections: createAppConnectionService({ secretBox: dependencies.secretBox }),
   };
   return {
-    async changeAccount(ctx, { appAccountId, action, retryOf, onlyIfExtra }) {
+    async changeAccount(ctx, { appAccountId, action, retryOf, extraEmployeeId }) {
       const refusal = {
         message: "Account change refused",
         ids: { appAccountId: parseUuid(appAccountId), action },
@@ -239,7 +242,8 @@ export function createAccountChangeService(
             appAccountId,
             action,
             retryOf,
-            onlyIfExtra: onlyIfExtra ? ctx : undefined,
+            extraConfirmation:
+              extraEmployeeId == null ? undefined : { ctx, employeeId: extraEmployeeId },
             requestedBy,
             changing,
             start: FROM_ACCOUNT,
@@ -253,11 +257,16 @@ export function createAccountChangeService(
       return change;
     },
     inviteEmployee: (ctx, input) => inviteEmployee(dependencies, ctx, input),
-    readAppInvites: (ctx, employeeIds, db, expected) =>
-      readAppInvites(dependencies, ctx, employeeIds, db, expected),
-    async readRunningChangeCount(ctx, db = orm) {
+    readAppInvites: (ctx, employeeIds, db, scope) =>
+      readAppInvites(dependencies, ctx, employeeIds, db, scope),
+    async readRunningChangeIds(ctx, db = orm) {
       ctx.require("MANAGE_WORKSPACE");
-      return accountChangeRepository(db).countRunning();
+      return accountChangeRepository(db).runningIds();
+    },
+    async hasRunningDisable(ctx, ids, tx) {
+      ctx.require("MANAGE_WORKSPACE");
+      const changes = await accountChangeRepository(tx).findLatestOfAccounts(ids);
+      return changes.some(({ action, status }) => action === "suspend" && status === "running");
     },
     runChange: (ctx, changeId) => runAccountChange(run, ctx, changeId),
     failChange: (ctx, changeId) => failRunningChange(dependencies, ctx, changeId),
@@ -265,8 +274,11 @@ export function createAccountChangeService(
     offboardEmployee: (ctx, input) => offboardEmployee(dependencies, ctx, input),
     readOffboardings: (ctx, employeeIds, db) =>
       readOffboardings(dependencies, ctx, employeeIds, db),
-    async readChangeStates(ctx, appAccountIds, db: Orm | Tx = orm) {
-      return changeStatesOf(db, await readChangeFacts(dependencies, ctx, db, appAccountIds));
+    async readChangeStates(ctx, appAccountIds, db: Orm | Tx = orm, connectors) {
+      return changeStatesOf(
+        db,
+        await readChangeFacts(dependencies, ctx, db, appAccountIds, connectors),
+      );
     },
     async readConnectionStates(ctx, connectionIds) {
       ctx.require("MANAGE_WORKSPACE");

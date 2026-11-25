@@ -11,6 +11,7 @@ interface EmployeeAppRead {
   ctx: SecurityContext;
   employeeIds: readonly string[];
   templates?: Template[][];
+  appIds?: readonly string[];
   invites?: Awaited<ReturnType<PersonAccess["readAppInvites"]>>;
 }
 
@@ -21,16 +22,22 @@ export async function employeeAppFactsOf(read: EmployeeAppRead): Promise<Employe
   const repo = assignmentRepository(db);
   const [templates, choices, accounts, invites] = await Promise.all([
     read.templates ?? employeeTemplatesOf(db, employeeIds),
-    repo.choicesFor(employeeIds),
-    apps.findEmployeeAccounts(db, employeeIds),
+    repo.choicesFor(employeeIds, read.appIds),
+    apps.findEmployeeAccounts(db, employeeIds, read.appIds),
     read.invites ?? apps.readAppInvites(ctx, employeeIds, db),
   ]);
   const listedApps = await repo.listedApps([...new Set(accounts.map(({ appId }) => appId))]);
   const choicesByPerson = Map.groupBy(choices, (choice) => choice.employeeId);
   const accountsByPerson = Map.groupBy(accounts, (account) => account.employeeId);
   const invitesByPerson = Map.groupBy(invites, (invite) => invite.employeeId);
+  const scoped = read.appIds && new Set(read.appIds);
   return employeeIds.map((id, index) => ({
-    templates: templates[index]!,
+    templates: scoped
+      ? templates[index]!.map((template) => ({
+          ...template,
+          apps: template.apps.filter(({ appId }) => scoped.has(appId)),
+        }))
+      : templates[index]!,
     choices: choicesByPerson.get(id) ?? [],
     accounts: accountsByPerson.get(id) ?? [],
     invites: invitesByPerson.get(id) ?? [],

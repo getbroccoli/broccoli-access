@@ -8,7 +8,7 @@ import { employeeAppFactsOf } from "./employeeAppFactsOf";
 export interface AccessDifferences {
   missing: EmployeeAppPair[];
   extra: ExtraAppDifference[];
-  runningChangeCount: number;
+  runningChangeIds: string[];
   templateSummaries: Map<string, TemplateDifferenceSummary>;
 }
 
@@ -30,7 +30,7 @@ export function readDifferences(orm: Orm, apps: PersonAccess, ctx: SecurityConte
   ctx.require("MANAGE_WORKSPACE");
   return readSnapshot(orm, async (db): Promise<AccessDifferences> => {
     const employeeIds = await assignmentRepository(db).employeesWithAccessSources();
-    const runningChangeCount = await apps.readRunningChangeCount(ctx, db);
+    const runningChangeIds = await apps.readRunningChangeIds(ctx, db);
     const factsByPerson = await employeeAppFactsOf({ db, apps, ctx, employeeIds, invites: [] });
     const appsByPerson = factsByPerson.map(appsOfPerson);
     const expected = appsByPerson.flatMap((rows, index) =>
@@ -42,13 +42,13 @@ export function readDifferences(orm: Orm, apps: PersonAccess, ctx: SecurityConte
       ctx,
       [...new Set(expected.map(({ employeeId }) => employeeId))],
       db,
-      expected,
+      { expected },
     );
     const invited = new Set(invites.map(({ employeeId, appId }) => employeeId + "/" + appId));
     const differences: AccessDifferences = {
       missing: [],
       extra: [],
-      runningChangeCount,
+      runningChangeIds,
       templateSummaries: new Map(),
     };
     for (const [index, facts] of factsByPerson.entries())

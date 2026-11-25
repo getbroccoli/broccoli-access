@@ -2,7 +2,7 @@
 # keeps more.
 query TemplatesPage {
   accessDifferences {
-    runningChangeCount
+    runningChangeIds
   }
   templates(first: 10000) {
     edges {

@@ -9,7 +9,7 @@ export interface AppInviteFacts {
     /** Whether its connector lists `invite`. */
     invites: boolean;
     /** Whether its connector lists `list_invitations`, so its scans read the pending invitations. */
-    listsInvitations: boolean;
+    listsInvitations: boolean | null;
     /** When its last scan finished; null before the first. */
     scannedAt: Date | null;
   };
@@ -88,11 +88,12 @@ export function byHandInviteStateOf(
 function invitedAtOf({ connection, invitation, latestInvite }: AppInviteFacts): Date | null {
   const done = latestInvite?.status === "succeeded" || latestInvite?.status === "done_by_hand";
   const doneAt = done ? latestInvite.finishedAt : null;
-  if (!connection.listsInvitations) {
+  if (connection.listsInvitations === false) {
     return doneAt;
   }
   if (invitation) {
     return invitation.invitedAt ?? invitation.firstSeenAt;
   }
+  if (connection.listsInvitations === null) return doneAt;
   return doneAt && connection.scannedAt && doneAt > connection.scannedAt ? doneAt : null;
 }

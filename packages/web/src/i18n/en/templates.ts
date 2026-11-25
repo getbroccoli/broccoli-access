@@ -24,7 +24,7 @@ export const templatesEn = {
   "templates.noDifferences": "None",
   "templates.differences.total": "{count} differences",
   "templates.differences.missingApp": "{count} missing {app}",
-  "templates.differences.missing": "{count} missing apps",
+  "templates.differences.missing": "{count} missing access differences",
   "templates.differences.extra": "{count} extra accounts",
   "templates.role.expected": "Expected role",
   "templates.role.nextInvite": "This choice applies to future invites.",

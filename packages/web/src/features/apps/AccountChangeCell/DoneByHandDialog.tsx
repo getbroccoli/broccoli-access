@@ -5,6 +5,8 @@ import {
   MarkAccountChangeDoneByHandDocument,
   PersonPageDocument,
   AppPageDocument,
+  PeopleDifferencesDocument,
+  TemplatesPageDocument,
 } from "@/__generated__/graphql";
 import { useCache, usePayloadMutation } from "@/apollo";
 import {
@@ -50,8 +52,12 @@ export function DoneByHandDialog({
 }: Props) {
   const cache = useCache();
   const [markDoneByHand, { loading }] = usePayloadMutation(MarkAccountChangeDoneByHandDocument, {
-    refetch:
-      change.action === "REMOVE" ? [PersonPageDocument, AppPageDocument] : [PersonPageDocument],
+    refetch: [
+      PersonPageDocument,
+      PeopleDifferencesDocument,
+      TemplatesPageDocument,
+      ...(change.action === "REMOVE" ? [AppPageDocument] : []),
+    ],
   });
   const copy = COPY[change.action];
   const confirm = async () => {

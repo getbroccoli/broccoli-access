@@ -14,7 +14,7 @@ inviteTest(
     const change = await service.changeAccount(owner, {
       appAccountId: account.id,
       action: "suspend",
-      onlyIfExtra: true,
+      extraEmployeeId: chloe.id,
     });
 
     expect(change).toMatchObject({
@@ -39,7 +39,7 @@ inviteTest(
       service.changeAccount(owner, {
         appAccountId: account.id,
         action: "suspend",
-        onlyIfExtra: true,
+        extraEmployeeId: chloe.id,
       }),
     ).rejects.toMatchObject({
       code: "CONFLICT",
@@ -51,14 +51,39 @@ inviteTest(
 
 inviteTest(
   "Disable from Differences refuses an account without a person",
-  async ({ workspace: { service, owner, linear, sent } }) => {
+  async ({ workspace: { service, owner, linear, ivan, sent } }) => {
     const account = linear.account("deploys@acme.example");
 
     await expect(
       service.changeAccount(owner, {
         appAccountId: account.id,
         action: "suspend",
-        onlyIfExtra: true,
+        extraEmployeeId: ivan.id,
+      }),
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "This account is no longer extra for this person.",
+    });
+    expect(sent).toEqual([]);
+  },
+);
+
+inviteTest(
+  "Disable refuses a confirmation for another person even when the current account is Extra",
+  async ({ workspace: { service, owner, linear, employee, sent }, seed }) => {
+    const chloe = employee("chloe@acme.example");
+    const david = employee("david@acme.example");
+    await seed.employeeAppChoice({
+      employeeId: chloe.id,
+      appId: linear.appId,
+      choice: "to_review",
+    });
+
+    await expect(
+      service.changeAccount(owner, {
+        appAccountId: linear.account(chloe.email).id,
+        action: "suspend",
+        extraEmployeeId: david.id,
       }),
     ).rejects.toMatchObject({
       code: "CONFLICT",

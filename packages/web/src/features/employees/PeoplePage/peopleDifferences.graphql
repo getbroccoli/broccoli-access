@@ -2,7 +2,7 @@ query PeopleDifferences($showDifferences: Boolean!) {
   accessDifferences {
     missingCount
     extraCount
-    runningChangeCount
+    runningChangeIds
     missing @include(if: $showDifferences) {
       app {
         id
@@ -16,7 +16,6 @@ query PeopleDifferences($showDifferences: Boolean!) {
       provisionStep {
         action
       }
-      provisioning
       roleNeedsAttention
       latestProvisionChange {
         id
@@ -50,8 +49,8 @@ query PeopleDifferences($showDifferences: Boolean!) {
   }
 }
 
-query RunningAccountChangeCount {
-  runningAccountChangeCount
+query RunningAccountChangeIds {
+  runningAccountChangeIds
 }
 
 mutation ProvisionApp($input: AppProvisionInput!) {

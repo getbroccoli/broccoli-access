@@ -16,7 +16,7 @@ import { type ChangingConnectors, ensureSameRetry, readAccountFacts } from "./ac
 export async function askForChange(
   dependencies: AccountChangeDependencies,
   tx: Tx,
-  { appAccountId, action, requestedBy, changing, retryOf, start, onlyIfExtra }: AskedChange,
+  { appAccountId, action, requestedBy, changing, retryOf, start, extraConfirmation }: AskedChange,
 ): Promise<LatestAccountChange> {
   const id = parseUuid(appAccountId);
   // Locked, so a change finishing meanwhile commits first and its outcome is read below.
@@ -24,7 +24,8 @@ export async function askForChange(
   if (!account) {
     throw new ApplicationError("NOT_FOUND", "No app account has this id.");
   }
-  if (onlyIfExtra) await requireExtraAccount(dependencies, tx, onlyIfExtra, account, action);
+  if (extraConfirmation)
+    await requireExtraAccount(dependencies, tx, extraConfirmation, account, action);
   const facts = await readAccountFacts(dependencies, tx, [account], changing);
   const { offered, offersRemove, connection, member } = facts.get(account.id)!;
   if (retryOf != null) ensureSameRetry(facts.get(account.id)!, action, retryOf);
@@ -55,7 +56,12 @@ export async function askForChange(
     throw new ApplicationError("CONFLICT", NOT_OFFERED);
   }
   await dependencies.jobs.send(tx, RUN_JOB, { changeId: change.id }, { group: connection.id });
-  return withPlace(change, await changes.countChangesAhead([change.id]));
+  return withPlace(
+    change,
+    start.startedFrom === "provision"
+      ? new Map<string, number>()
+      : await changes.countChangesAhead([change.id]),
+  );
 }
 
 /** What the owner asks of one account, and where they asked. */
@@ -66,23 +72,27 @@ interface AskedChange {
   changing: ChangingConnectors;
   /** The failed change a Try again repeats. */
   retryOf?: string | null;
-  onlyIfExtra?: SecurityContext;
+  extraConfirmation?: { ctx: SecurityContext; employeeId: string };
   start: ChangeStart;
 }
 
 async function requireExtraAccount(
   dependencies: AccountChangeDependencies,
   tx: Tx,
-  ctx: SecurityContext,
+  confirmation: NonNullable<AskedChange["extraConfirmation"]>,
   { employeeId, appId }: { employeeId: string | null; appId: string },
   action: AccountChangeAction,
 ) {
   // Do not wait while holding the account: another change can hold this app and need the account.
+  const matches =
+    action === "suspend" && employeeId && parseUuid(confirmation.employeeId) === employeeId;
+  if (matches && !(await appRepository(tx).tryLockForReview(appId)))
+    throw new ApplicationError(
+      "CONFLICT",
+      "This app’s expected access is changing. Try Disable again.",
+    );
   const stillExtra =
-    action === "suspend" &&
-    employeeId &&
-    (await appRepository(tx).tryLockForReview(appId)) &&
-    (await dependencies.isExtraApp(ctx, { employeeId, appId }, tx));
+    matches && (await dependencies.isExtraApp(confirmation.ctx, { employeeId, appId }, tx));
   if (!stillExtra)
     throw new ApplicationError("CONFLICT", "This account is no longer extra for this person.");
 }

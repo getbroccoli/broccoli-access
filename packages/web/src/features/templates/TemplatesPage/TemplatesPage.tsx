@@ -20,7 +20,7 @@ export function TemplatesPage() {
     fetchPolicy: "cache-and-network",
   });
   const templates = data?.templates.edges.map(({ node }) => node);
-  useRefreshDifferences(data?.accessDifferences.runningChangeCount ?? 0, refetch);
+  useRefreshDifferences(data?.accessDifferences.runningChangeIds ?? [], refetch);
 
   return (
     <div className="flex flex-col">

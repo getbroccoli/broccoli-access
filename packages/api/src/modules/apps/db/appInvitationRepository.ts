@@ -1,4 +1,4 @@
-import { and, eq, not, sql } from "drizzle-orm";
+import { and, type Column, eq, not, sql } from "drizzle-orm";
 
 import { anyOf, insertBatches, type Orm, ormOf, type Tx } from "../../../core/db";
 import { appInvitations } from "./appInvitationsTable";
@@ -32,7 +32,13 @@ export interface AppInvitationRepository {
   findByEmails(invitations: {
     connectionIds: readonly string[];
     emails: readonly string[];
+    targets?: readonly InviteTarget[];
   }): Promise<AppInvitation[]>;
+}
+
+export interface InviteTarget {
+  connectionId: string;
+  email: string;
 }
 
 export function appInvitationRepository(db: Orm | Tx): AppInvitationRepository {
@@ -68,7 +74,7 @@ export function appInvitationRepository(db: Orm | Tx): AppInvitationRepository {
           });
       }
     },
-    findByEmails: ({ connectionIds, emails }) =>
+    findByEmails: ({ connectionIds, emails, targets }) =>
       orm()
         .select()
         .from(appInvitations)
@@ -76,7 +82,17 @@ export function appInvitationRepository(db: Orm | Tx): AppInvitationRepository {
           and(
             anyOf(appInvitations.connectionId, connectionIds),
             anyOf(appInvitations.email, emails),
+            targets &&
+              matchesInviteTargets(appInvitations.connectionId, appInvitations.email, targets),
           ),
         ),
   };
+}
+
+export function matchesInviteTargets(
+  connection: Column,
+  email: Column,
+  targets: readonly InviteTarget[],
+) {
+  return sql`(${connection},${email}) in (select * from unnest(${sql.param(targets.map((target) => target.connectionId))}::uuid[],${sql.param(targets.map((target) => target.email))}::text[]))`;
 }

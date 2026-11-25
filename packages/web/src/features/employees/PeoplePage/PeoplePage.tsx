@@ -57,12 +57,20 @@ export function PeoplePage() {
     fetchPolicy: "cache-and-network",
   });
   const access = differences.data?.accessDifferences;
-  const justRequested = Boolean(
-    access?.extra?.some(({ activeAccounts }) =>
-      activeAccounts.some(({ latestChange }) => latestChange?.status === "RUNNING"),
-    ),
+  useRefreshDifferences(
+    [
+      ...(access?.runningChangeIds ?? []),
+      ...(access?.missing?.flatMap(({ latestProvisionChange }) =>
+        latestProvisionChange?.status === "RUNNING" ? [latestProvisionChange.id] : [],
+      ) ?? []),
+      ...(access?.extra?.flatMap(({ activeAccounts }) =>
+        activeAccounts.flatMap(({ latestChange }) =>
+          latestChange?.status === "RUNNING" ? [latestChange.id] : [],
+        ),
+      ) ?? []),
+    ],
+    differences.refetch,
   );
-  useRefreshDifferences(access?.runningChangeCount || Number(justRequested), differences.refetch);
   const badge = useQuery(AccountsWithoutPersonCountDocument, {
     skip: !me.isOwner,
     fetchPolicy: "cache-and-network",

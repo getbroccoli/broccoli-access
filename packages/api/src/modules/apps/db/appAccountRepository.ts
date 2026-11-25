@@ -68,6 +68,7 @@ export interface AppAccountRepository {
   findCurrentAccountsOfEmployees(
     employeeIds: readonly string[],
     facts: InAppFacts,
+    appIds?: readonly string[],
   ): Promise<AppUserAccount[]>;
   /** How many employees hold an account in any app. */
   countEmployeesWithAccounts(): Promise<number>;
@@ -222,7 +223,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
             accountIds && anyOf(appAccounts.id, accountIds),
           ),
         ),
-    findCurrentAccountsOfEmployees: (employeeIds, facts) =>
+    findCurrentAccountsOfEmployees: (employeeIds, facts, appIds) =>
       orm()
         .select(userColumns(facts))
         .from(appAccounts)
@@ -231,6 +232,7 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
         .where(
           and(
             anyOf(appAccounts.employeeId, employeeIds),
+            appIds && anyOf(appAccounts.appId, appIds),
             eq(apps.status, "approved"),
             or(eq(appAccounts.status, "active"), isNotNull(appConnections.id)),
             isAccess(facts),

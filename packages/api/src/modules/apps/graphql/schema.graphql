@@ -320,7 +320,7 @@ input AppUserChangeInput {
   "For a Remove retry, the latest retryable failed Remove for this member and connection. A replacement member requires fresh confirmation."
   retryOf: ID
   "When disabling from Differences, refuse if the account no longer belongs in Extra."
-  onlyIfExtra: Boolean
+  extraEmployeeId: ID
 }
 
 input AppInviteInput {
@@ -512,9 +512,14 @@ input AppProvisionInput {
 }
 
 type AppProvisionPayload {
-  changes: [AccountChange!]
+  "The work Provision requested."
+  changes: [ProvisionChange!]
   refusedEmployeeIds: [ID!]
   error: AppProvisionError
+}
+
+type ProvisionChange {
+  id: ID!
 }
 
 union AppProvisionError = InvalidInputError
@@ -558,8 +563,6 @@ type AccessDifference {
   activeAccounts: [AppUser!]!
   "What Provision currently offers for this person and app."
   provisionStep: ProvisionStep
-  "Whether an Invite or Enable for this app is still running."
-  provisioning: Boolean!
   roleNeedsAttention: Boolean!
   latestProvisionChange: AccountChange
 }
@@ -575,8 +578,8 @@ type TemplateApp {
 }
 
 type Query {
-  "How many account changes are still running. Admins only."
-  runningAccountChangeCount: Int!
+  "The ids of account changes still running. Admins only."
+  runningAccountChangeIds: [ID!]!
   "Eligible accounts without a person, by email. After an app’s first completed scan, its last scan must have returned the account. Owner only."
   accountsWithoutPerson(first: Int = 100, after: String): AccountWithoutPersonConnection!
   "How many accounts qualify for accountsWithoutPerson. Owner only."

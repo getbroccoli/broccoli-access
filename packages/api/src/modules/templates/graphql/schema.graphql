@@ -210,7 +210,7 @@ union ExtraAppKeepError = InvalidInputError | NotFoundError | ConflictError
 type AccessDifferences {
   missingCount: Int!
   extraCount: Int!
-  runningChangeCount: Int!
+  runningChangeIds: [ID!]!
   missing: [AccessDifference!]!
   extra: [AccessDifference!]!
 }

@@ -31,7 +31,12 @@ import {
 } from "./google";
 import { createImportRecordService, createScanService, importsModule } from "./imports";
 import { systemModule } from "./system";
-import { createPersonPageReader, personPageLoader, readPersonPages } from "./personPageReader";
+import {
+  createPersonPageReader,
+  differencePageLoader,
+  personPageLoader,
+  readPersonPages,
+} from "./personPageReader";
 import {
   readInviteRole,
   createTemplateService,
@@ -132,16 +137,21 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
       ...apps,
       readAppRoles: changes.readAppRoles,
       readAppInvites: changes.readAppInvites,
-      readRunningChangeCount: changes.readRunningChangeCount,
+      readRunningChangeIds: changes.readRunningChangeIds,
+      hasRunningDisable: changes.hasRunningDisable,
     },
     employees,
   });
   const pageReads = { ...users, ...changes, ...templates };
   const provision = createProvisionService({
     ...changeDependencies,
-    readPersonPages: (ctx, ids, db) => readPersonPages(db, pageReads, ctx, ids),
+    readPersonPages: (ctx, ids, db, scope) => readPersonPages(db, pageReads, ctx, ids, scope),
   });
-  const people = personPageLoader(createPersonPageReader(core.orm, { ...pageReads, ...provision }));
+  const readPersonPagesInSnapshot = createPersonPageReader(core.orm, {
+    ...pageReads,
+    ...provision,
+  });
+  const people = personPageLoader(readPersonPagesInSnapshot);
   const manifests = [
     systemModule({
       ...core,
@@ -173,6 +183,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
         }),
       },
       people,
+      differencePageLoader(readPersonPagesInSnapshot, connectors.list),
       employees.readEmployees,
     ),
     extensionModule({ ...core, appSessions: containerConnections }),

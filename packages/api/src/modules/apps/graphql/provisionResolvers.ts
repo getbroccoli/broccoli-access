@@ -2,6 +2,7 @@ import DataLoader from "dataloader";
 import { type Connector, offersInviteRole } from "../../../core/connectors";
 import {
   mutationPayload,
+  type GraphqlContext,
   perRequest,
   type RequestLoader,
   type Resolvers,
@@ -58,7 +59,9 @@ export type ProvisionRead = {
 
 /** Provision and Disable share the available actions of the person and app pages. */
 export function accessDifferenceResolvers(
-  people: RequestLoader<ProvisionRead>,
+  people: (
+    ctx: GraphqlContext,
+  ) => DataLoader<{ employeeId: string; appId: string }, ProvisionRead, string>,
   {
     appsById,
     roles,
@@ -86,19 +89,14 @@ export function accessDifferenceResolvers(
         );
       },
       async provisionStep({ employeeId, appId }, _args, ctx) {
-        const { provisionSteps } = await people(ctx).load(employeeId);
+        const { provisionSteps } = await people(ctx).load({ employeeId, appId });
         return provisionSteps.find((step) => step.appId === appId) ?? null;
       },
-      async provisioning({ employeeId, appId }, _args, ctx) {
-        return (
-          latestProvisionChange(await people(ctx).load(employeeId), appId)?.status === "running"
-        );
-      },
       async latestProvisionChange({ employeeId, appId }, _args, ctx) {
-        return latestProvisionChange(await people(ctx).load(employeeId), appId);
+        return latestProvisionChange(await people(ctx).load({ employeeId, appId }), appId);
       },
       async roleNeedsAttention({ employeeId, appId }, _args, ctx) {
-        const page = await people(ctx).load(employeeId);
+        const page = await people(ctx).load({ employeeId, appId });
         const row = page.personApps.find((app) => app.appId === appId);
         if (!row) return false;
         if (row.roleConflict) return true;

@@ -39,6 +39,12 @@ export interface AppInvite extends AppInviteState {
   latestInvite: LatestAccountChange | null;
 }
 
+export interface AppInviteScope {
+  appIds?: readonly string[];
+  connectors?: readonly Connector[];
+  expected?: readonly { employeeId: string; appId: string }[];
+}
+
 /**
  * Writes the employee's running invite to the app and queues its run in the connection's group, in
  * one transaction, refusing what is not offered; returns the employee's row with it.
@@ -71,17 +77,24 @@ export async function readAppInvites(
   ctx: SecurityContext,
   employeeIds: readonly string[],
   db: Orm | Tx = dependencies.orm,
-  expected?: readonly { employeeId: string; appId: string }[],
+  scope: AppInviteScope = {},
 ): Promise<AppInvite[]> {
   ctx.require("MANAGE_WORKSPACE");
+  const { expected } = scope;
   if (expected?.length === 0) return [];
+  const appIds = scope.appIds ?? (expected && [...new Set(expected.map(({ appId }) => appId))]);
   const employees = await dependencies.employees.readEmployees(ctx, employeeIds, db);
   const repo = appConnectionRepository(db);
   const [connectors, connections] = await Promise.all([
-    dependencies.connectors.list(),
-    expected ? repo.findByApps([...new Set(expected.map(({ appId }) => appId))]) : repo.findAll(),
+    scope.connectors ?? dependencies.connectors.list(),
+    appIds ? repo.findByApps(appIds) : repo.findAll(),
   ]);
-  const facts = await readInviteFacts(dependencies, db, { employees, connections, connectors });
+  const facts = await readInviteFacts(dependencies, db, {
+    employees,
+    connections,
+    connectors,
+    expected,
+  });
   const connected = expected
     ? expectedInviteRows(expected, employees, connections, facts)
     : employees.flatMap((employee) =>
@@ -92,8 +105,11 @@ export async function readAppInvites(
     db,
     employees.map(({ id }) => id),
     connections,
+    appIds,
+    expected,
   );
   if (expected) return [...connected, ...byHand].filter(({ invitedAt }) => invitedAt !== null);
+  if (scope.connectors) return [...connected, ...byHand];
   const rows = await sortByAppName(db, employees, [...connected, ...byHand]);
   const running = rows.flatMap(({ latestInvite }) =>
     latestInvite?.status === "running" ? [latestInvite.id] : [],
@@ -170,14 +186,16 @@ export async function askForInvite(
     ),
   });
   // A concurrent invite of the same email committed first.
-  if (!change) {
-    throw new ApplicationError("CONFLICT", NOT_OFFERED);
-  }
+  if (!change) throw new ApplicationError("CONFLICT", NOT_OFFERED);
   await dependencies.jobs.send(tx, RUN_JOB, { changeId: change.id }, { group: connection.id });
   const latestInvites = new Map([[inviteKey(connection.id, employee.email), change]]);
   // A row with an invite always shows.
   const row = appInviteOf(employee, connection, { ...facts, latestInvites })!;
-  return { ...row, latestInvite: withPlace(change, await changes.countChangesAhead([change.id])) };
+  const ahead =
+    start.startedFrom === "provision"
+      ? new Map<string, number>()
+      : await changes.countChangesAhead([change.id]);
+  return { ...row, latestInvite: withPlace(change, ahead) };
 }
 
 /** The app's connection; refuses an unknown app with NOT_FOUND, and one without a connection with CONFLICT. */

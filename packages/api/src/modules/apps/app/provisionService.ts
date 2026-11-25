@@ -16,11 +16,7 @@ import {
   provisionActionOf,
 } from "../domain";
 import type { PersonPage, ReadPersonPages } from "../ports";
-import {
-  type AccountChangeDependencies,
-  type LatestAccountChange,
-  withPlace,
-} from "./accountChangeService";
+import { type AccountChangeDependencies } from "./accountChangeService";
 import { type ChangingConnectors, changingConnectors } from "./accountFacts";
 import { askForInvite } from "./appInvite";
 import { askForChange } from "./askForChange";
@@ -58,7 +54,7 @@ export interface ProvisionService {
   provisionApp: (
     ctx: SecurityContext,
     input: { appId: string; employeeIds: readonly string[] },
-  ) => Promise<AppProvisionResult & { changes: LatestAccountChange[] }>;
+  ) => Promise<AppProvisionResult>;
 }
 
 /** What Provision does for one app of a person. */
@@ -77,16 +73,15 @@ export function createProvisionService(dependencies: ProvisionDependencies): Pro
     readProvisionSteps: (ctx, employeeIds, pages, db = dependencies.orm) =>
       readProvisionSteps(dependencies, ctx, { employeeIds, pages, db }),
     provisionEmployee: (ctx, input) => provisionOne(dependencies, ctx, input),
-    async provisionApp(ctx, input) {
+    provisionApp(ctx, input) {
       let listed: Promise<readonly Connector[]> | undefined;
       const connectors = { list: () => (listed ??= dependencies.connectors.list()) };
-      const result = await provisionSelectedApp(ctx, input, (ctx, person) =>
-        provisionOne({ ...dependencies, connectors }, ctx, person),
+      return provisionSelectedApp(
+        ctx,
+        input,
+        (ctx, person) => provisionOne({ ...dependencies, connectors }, ctx, person, true),
+        dependencies.logger,
       );
-      const ahead = await accountChangeRepository(dependencies.orm).countChangesAhead(
-        result.changes.filter(({ status }) => status === "running").map(({ id }) => id),
-      );
-      return { ...result, changes: result.changes.map((change) => withPlace(change, ahead)) };
     },
   };
 }
@@ -95,6 +90,7 @@ async function provisionOne(
   dependencies: ProvisionDependencies,
   ctx: SecurityContext,
   { employeeId, appIds }: { employeeId: string; appIds: readonly string[] },
+  reportBlocked = false,
 ): Promise<AccountChange[]> {
   const { logger, connectors } = dependencies;
   const refusal = { message: "Provision refused", ids: { employeeId: parseUuid(employeeId) } };
@@ -117,6 +113,7 @@ async function provisionOne(
       requestedBy: ctx.user.userId,
       connectors: await connectors.list(),
       changing: await changingConnectors(connectors),
+      reportBlocked,
       start: { startedFrom: "provision", employeeId: employee.id },
     });
   });
@@ -141,6 +138,7 @@ interface ProvisionRequest {
   connectors: readonly Connector[];
   /** The connectors that change accounts. */
   changing: ChangingConnectors;
+  reportBlocked: boolean;
   start: ChangeStart;
 }
 
@@ -164,8 +162,6 @@ async function startSteps(
 ): Promise<AccountChange[] | null> {
   const { appIds } = request;
   // The lock scans take first, as an invite's own transaction does.
-  // shortcut: the person's page is read under this lock, and while the connectors container is
-  // down each of its reads waits for it again; pass one connector list down if that ever matters.
   await appAccountRepository(tx).lockForSync();
   for (const appId of appIds) {
     if (!(await appRepository(tx).tryLockForReview(appId))) return null;
@@ -183,12 +179,29 @@ async function startSteps(
   if (confirmed.some((app) => app.state === "missing" && app.roleConflict)) {
     throw new ApplicationError("CONFLICT", PICK_ROLE_FIRST);
   }
+  const chosenSteps = steps.filter(({ appId }) => appIds.includes(appId));
+  if (
+    request.reportBlocked &&
+    !chosenSteps.length &&
+    confirmed.some(({ appId, state }) => state === "missing" && !hasRunningStep(page, appId))
+  )
+    throw new ApplicationError("CONFLICT", "This app cannot be provisioned for this person now.");
   const changes: AccountChange[] = [];
   // One after the other, in the order the connections' queues keep.
-  for (const step of steps.filter(({ appId }) => appIds.includes(appId))) {
+  for (const step of chosenSteps) {
     changes.push(await startStep(dependencies, tx, request, { step, page }));
   }
   return changes;
+}
+
+function hasRunningStep(page: PersonPage, appId: string) {
+  return (
+    page.appInvites.some((row) => row.appId === appId && row.latestInvite?.status === "running") ||
+    page.appAccounts.some((row) => {
+      const change = row.changeState?.latestChange;
+      return row.appId === appId && change?.action === "reactivate" && change.status === "running";
+    })
+  );
 }
 
 /** Writes the step's change: an Invite or an Enable as the owner's own, or the invite to make by hand. */
@@ -225,11 +238,11 @@ async function startStep(
 /** The person's page with the steps Provision offers them now. */
 async function readSteps(
   dependencies: ProvisionDependencies,
-  { ctx, employee }: ProvisionRequest,
+  { ctx, employee, appIds, connectors }: ProvisionRequest,
   db: Orm | Tx,
 ): Promise<{ page: PersonPage; steps: ProvisionStep[] }> {
   const employeeIds = [employee.id];
-  const pages = await dependencies.readPersonPages(ctx, employeeIds, db);
+  const pages = await dependencies.readPersonPages(ctx, employeeIds, db, { appIds, connectors });
   const [steps] = await readProvisionSteps(dependencies, ctx, { employeeIds, pages, db });
   return { page: pages[0]!, steps: steps! };
 }

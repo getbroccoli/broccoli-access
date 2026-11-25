@@ -76,7 +76,7 @@ export function createPersonAppChoices(deps: Dependencies): PersonAppChoices {
     keepExtraApp: (ctx, input) => keepExtraApp(deps, ctx, input),
     async isExtraApp(ctx, pair, tx) {
       ctx.require("MANAGE_WORKSPACE");
-      return hasExtraAccess(apps, tx, pair, await choiceFacts(tx, pair));
+      return (await extraAccountIds(apps, tx, pair, await choiceFacts(tx, pair))).length > 0;
     },
     async removePersonApp(ctx, input) {
       const pair = await ownersPair(deps, ctx, input);
@@ -119,8 +119,11 @@ async function keepExtraApp(deps: Dependencies, ctx: SecurityContext, input: Emp
       const facts = await lockedFacts(deps, db, pair);
       const { choice, appName } = facts;
       if (choice?.choice === "added") return false;
-      if (!(await hasExtraAccess(apps, db, pair, facts)))
+      const ids = await extraAccountIds(apps, db, pair, facts);
+      if (!ids.length)
         throw new ApplicationError("CONFLICT", "This app is no longer extra for this person.");
+      if (await apps.hasRunningDisable(ctx, ids, db))
+        throw new ApplicationError("CONFLICT", "A Disable is still running for this app.");
       await saveAddedChoice(ctx, db, pair, { appName, before: choice, role: null });
       return true;
     });
@@ -181,21 +184,21 @@ async function choiceFacts(tx: Tx, pair: EmployeeAppPair) {
   return { given: sources.length > 0, choice };
 }
 
-async function hasExtraAccess(
+async function extraAccountIds(
   apps: PersonAccess,
   tx: Tx,
   { employeeId, appId }: EmployeeAppPair,
   { given, choice }: Awaited<ReturnType<typeof choiceFacts>>,
 ) {
-  if (expectsApp(given, choice?.choice)) return false;
+  if (expectsApp(given, choice?.choice)) return [];
   const repo = assignmentRepository(tx);
   const listed =
     choice?.choice !== "to_review" &&
     (await repo.hasAssignment(employeeId)) &&
     (await repo.listedApps([appId])).has(appId);
-  if (!extraAppReason(choice?.choice, listed)) return false;
+  if (!extraAppReason(choice?.choice, listed)) return [];
   const accounts = await apps.findEmployeeAccounts(tx, [employeeId], [appId]);
-  return accounts.some(({ status }) => status === "active");
+  return accounts.flatMap(({ id, status }) => (status === "active" ? [id] : []));
 }
 
 function isOwnChoice(

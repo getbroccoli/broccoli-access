@@ -45,6 +45,7 @@ export interface TemplateAssignmentService {
     shared?: {
       templates: Template[][];
       invites: Awaited<ReturnType<PersonAccess["readAppInvites"]>>;
+      appIds?: readonly string[];
     },
     db?: Orm | Tx,
   ) => Promise<PersonApp[][]>;

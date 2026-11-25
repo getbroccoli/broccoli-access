@@ -32,6 +32,7 @@ export interface AppUserService {
     ctx: SecurityContext,
     employeeIds: readonly string[],
     db?: Orm | Tx,
+    appIds?: readonly string[],
   ) => Promise<AppUser[]>;
 }
 
@@ -98,11 +99,11 @@ export function createAppUserService(dependencies: AppUserDependencies): AppUser
             nameRank(one) - nameRank(other),
         );
     },
-    async readUsersOfEmployees(ctx, employeeIds, db: Orm | Tx = orm) {
+    async readUsersOfEmployees(ctx, employeeIds, db: Orm | Tx = orm, appIds) {
       ctx.require("MANAGE_WORKSPACE");
       const inAppFacts = await findInAppFacts(db, dependencies);
       const [accounts, suspended, directoryAppId] = await Promise.all([
-        appAccountRepository(db).findCurrentAccountsOfEmployees(employeeIds, inAppFacts),
+        appAccountRepository(db).findCurrentAccountsOfEmployees(employeeIds, inAppFacts, appIds),
         findEmployeesInDirectory(db, connectors, { status: "suspended" }),
         findDirectoryAppId(db, connectors),
       ]);

@@ -219,7 +219,7 @@ export function provisioning(orm: Orm, options: AccountChangeOptions = {}) {
   const reads = pageReads(orm, options);
   return createProvisionService({
     ...accountChangeDependencies(orm, options),
-    readPersonPages: (ctx, ids, db) => readPersonPages(db, reads, ctx, ids),
+    readPersonPages: (ctx, ids, db, scope) => readPersonPages(db, reads, ctx, ids, scope),
   });
 }
 
@@ -240,7 +240,8 @@ function templateDependencies(
       ...apps(orm),
       readAppRoles: changes.readAppRoles,
       readAppInvites: changes.readAppInvites,
-      readRunningChangeCount: changes.readRunningChangeCount,
+      readRunningChangeIds: changes.readRunningChangeIds,
+      hasRunningDisable: changes.hasRunningDisable,
     },
     employees: employeeServices(orm),
   };
