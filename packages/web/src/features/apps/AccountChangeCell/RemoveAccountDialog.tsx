@@ -10,12 +10,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { t } from "@/i18n";
+import { accountChangeActor } from "./accountChangeActor";
 import { useChangeAccount } from "./useChangeAccount";
 
 type Props = {
   account: Pick<AccountChangeCell_AppUserFragment, "id" | "email"> & {
-    app: {
-      name: string;
+    app: Parameters<typeof accountChangeActor>[0] & {
       containerConnection: {
         adminUrl: string | null;
         scan: { sourceName: string } | null;
@@ -41,6 +41,7 @@ export function RemoveAccountDialog({
   const { changeAccount, loading } = useChangeAccount();
   const app = account.app.name;
   const connection = account.app.containerConnection;
+  const actor = accountChangeActor(account.app);
   const host = connection?.adminUrl && URL.parse(connection.adminUrl)?.hostname;
   const target = { accountId: account.id, name: name ?? account.email, app };
   const confirm = async () => {
@@ -72,8 +73,11 @@ export function RemoveAccountDialog({
             {host && <span className="font-normal text-muted-foreground">{host}</span>}
           </dd>
         </dl>
-        <AlertDialogDescription className="rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 font-bold text-red-900">
-          {t("apps.change.removeWarning")}
+        <AlertDialogDescription className="flex flex-col gap-3">
+          {actor && <span>{t("apps.change.actorLine", { actor })}</span>}
+          <span className="rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 font-bold text-red-900">
+            {t("apps.change.removeWarning")}
+          </span>
         </AlertDialogDescription>
         <AlertDialogFooter className="m-0 border-0 bg-transparent p-0">
           <AlertDialogCancel disabled={loading}>{t("apps.change.cancel")}</AlertDialogCancel>

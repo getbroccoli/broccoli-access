@@ -39,6 +39,10 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
             name
             catalogKey
             connected
+            containerConnection {
+              id
+              ...AccountChangeActor_connection @unmask
+            }
             roles {
               key
               name
@@ -156,6 +160,10 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
         app {
           id
           name
+          containerConnection {
+            id
+            ...AccountChangeActor_connection @unmask
+          }
         }
       }
     }

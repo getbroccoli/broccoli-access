@@ -1,4 +1,5 @@
 export {
+  accountChangeActor,
   AccountChangeCell,
   ChangeProgress,
   CouldntChangeDialog,

@@ -20,7 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { forgetPersonApps, StatusBadge } from "@/features/apps";
+import { accountChangeActor, forgetPersonApps, StatusBadge } from "@/features/apps";
 import { t } from "@/i18n";
 
 type Person = NonNullable<PersonPageQuery["employee"]>;
@@ -68,22 +68,27 @@ export function ProvisionDialog({ person, steps, disabled }: Props) {
           <AlertDialogDescription>{person.email}</AlertDialogDescription>
         </AlertDialogHeader>
         <ul className="max-h-[50vh] divide-y divide-border overflow-y-auto rounded-xl border border-border text-sm">
-          {steps.map(({ action, row }) => (
-            <li
-              key={row.app.id}
-              className="grid grid-cols-[7rem_1fr_auto] items-center gap-3 px-4 py-2.5"
-            >
-              <span className="truncate font-semibold">{row.app.name}</span>
-              <span className="truncate text-foreground/80">{whatOf(action, row)}</span>
-              <StatusBadge tone={action === "GIVE_BY_HAND" ? "warning" : "active"}>
-                {t(
-                  action === "GIVE_BY_HAND"
-                    ? "people.provision.byHand"
-                    : "people.provision.byBroccoli",
+          {steps.map(({ action, row }) => {
+            const byHand = action === "GIVE_BY_HAND";
+            const actor = byHand ? null : accountChangeActor(row.app);
+            return (
+              <li
+                key={row.app.id}
+                className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-2.5"
+              >
+                <span className="break-words font-semibold">{row.app.name}</span>
+                <span className="break-words text-foreground/80">{whatOf(action, row)}</span>
+                <StatusBadge tone={byHand ? "warning" : "active"}>
+                  {t(byHand ? "people.provision.byHand" : "people.provision.byBroccoli")}
+                </StatusBadge>
+                {actor && (
+                  <span className="col-span-full text-xs text-muted-foreground">
+                    {t("apps.change.actorLine", { actor })}
+                  </span>
                 )}
-              </StatusBadge>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
         {invited > 0 && (
           <p className="text-sm text-foreground/80">

@@ -1,0 +1,12 @@
+fragment AccountChangeActor_connection on ContainerConnection {
+  id
+  sessionFrom
+  connector {
+    id
+    connectionFields {
+      kind
+      label
+      secret
+    }
+  }
+}

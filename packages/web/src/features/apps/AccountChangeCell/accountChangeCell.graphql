@@ -29,6 +29,7 @@ fragment AccountChangeCell_appUser on AppUser {
     containerConnection {
       adminUrl
       id
+      ...AccountChangeActor_connection @unmask
       scan {
         id
         sourceName
@@ -37,11 +38,6 @@ fragment AccountChangeCell_appUser on AppUser {
       connector {
         id
         canDisableAccounts
-        connectionFields {
-          key
-          label
-          secret
-        }
         ...ReconnectButton_connector
       }
     }

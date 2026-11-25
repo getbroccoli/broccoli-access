@@ -1,4 +1,4 @@
-import { useChangeAccount } from "@/features/apps";
+import { accountChangeActor, useChangeAccount } from "@/features/apps";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -12,7 +12,7 @@ import {
 import { t } from "@/i18n";
 
 type Props = {
-  account: { id: string; email: string; app: { name: string } };
+  account: { id: string; email: string; app: Parameters<typeof accountChangeActor>[0] };
   action: "SUSPEND" | "REACTIVATE";
   /** Reads the row again: the answer carries no account without an employee. */
   onAsked: () => Promise<unknown>;
@@ -23,6 +23,7 @@ type Props = {
 export function ChangeUnlinkedAccountDialog({ account, action, onAsked, onClose }: Props) {
   const { changeAccount, loading } = useChangeAccount("people.accounts.changeRefused");
   const target = { name: account.email, app: account.app.name };
+  const actor = accountChangeActor(account.app);
   const copy = COPY[action];
   async function ask() {
     await changeAccount({ ...target, accountId: account.id }, action);
@@ -40,7 +41,14 @@ export function ChangeUnlinkedAccountDialog({ account, action, onAsked, onClose 
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t(copy.title, target)}</AlertDialogTitle>
-          <AlertDialogDescription>{t(copy.effect)}</AlertDialogDescription>
+          <AlertDialogDescription className="flex flex-col gap-3">
+            <span>{t(copy.effect)}</span>
+            {actor && (
+              <span className="text-xs">
+                {t("apps.change.howItWorks", { actor, app: target.app })}
+              </span>
+            )}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>{t("apps.change.cancel")}</AlertDialogCancel>

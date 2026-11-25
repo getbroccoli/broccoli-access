@@ -6,3 +6,4 @@ export { couldntChangeChipClassName, couldntChangeCopy } from "./couldntChangeCo
 export { RemoveAccountDialog } from "./RemoveAccountDialog";
 export { InviteCell } from "./InviteCell";
 export { useChangeAccount } from "./useChangeAccount";
+export { accountChangeActor } from "./accountChangeActor";
