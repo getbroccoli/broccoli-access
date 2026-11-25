@@ -210,6 +210,8 @@ type EmployeeOffboarding {
   accountsToDisable: [AppUser!]!
   "What the owner does by hand, since Broccoli Access cannot: their other active accounts and the accounts being enabled, then their pending invitations, then their running invites, each group by app name."
   byHandWork: [OffboardingByHandWork!]!
+  "Their disabled accounts that offer Remove now, never the directory's, by app name."
+  accountsToRemove: [AppUser!]!
 }
 
 "One app the owner takes away from an offboarded person by hand."
@@ -342,6 +344,14 @@ input EmployeeProvisionInput {
   employeeId: ID!
   "The apps of the provision steps the owner confirmed; an app without a step now gets nothing."
   appIds: [ID!]!
+  appIds: [ID!]!
+}
+
+input EmployeeRemoveAccountsInput {
+  "The employee whose accounts to remove."
+  employeeId: ID!
+  "The accounts the owner confirmed, as `accountsToRemove` listed them: only these are removed. Any other account stays as it is, also one disabled after the owner looked."
+  accountIds: [ID!]!
 }
 
 input AccountChangeMarkDoneByHandInput {
@@ -462,6 +472,8 @@ type AppsMutations {
   provisionEmployee(input: EmployeeProvisionInput!): EmployeeProvisionPayload!
   "Provision one app for the people confirmed in Differences. Each person's access is rechecked."
   provisionApp(input: AppProvisionInput!): AppProvisionPayload!
+  "Removes an employee's disabled accounts: queues a Remove for each of `accountIds` that is still in their `accountsToRemove`, as a Remove of the account's own row does; an account that became removable since the owner looked is left alone. Refused with a NotFoundError for an unknown employee. Admins only."
+  removeEmployeeAccounts(input: EmployeeRemoveAccountsInput!): EmployeeRemoveAccountsPayload!
   "I did it by hand: the owner reports making a failed change in the app themselves; Broccoli Access calls no app. The change becomes DONE_BY_HAND and the status Broccoli Access records for the account takes the new value at once, with a history line unless it already had that status; the next scan checks it. A removal immediately deletes the local account unless another source still finds it, in which case it remains listed as outside the app. A failed invite becomes DONE_BY_HAND, which shows the employee Invited. Refused with a NotFoundError for an unknown change, and with a ConflictError unless the change failed and is the latest: its account's latest change, or for an invite, the latest invite of its connection and email, or in an app that still has no connection, of its app and person. Admins only."
   markAccountChangeDoneByHand(
     input: AccountChangeMarkDoneByHandInput!
@@ -525,6 +537,14 @@ type ProvisionChange {
 union AppProvisionError = InvalidInputError
 
 union EmployeeProvisionError = NotFoundError | ConflictError
+
+"The employee whose accounts' removal was queued, or why it was refused."
+type EmployeeRemoveAccountsPayload {
+  employee: Employee
+  error: EmployeeRemoveAccountsError
+}
+
+union EmployeeRemoveAccountsError = NotFoundError
 
 "The account with its change done by hand, or why it was refused; appUser is null for an unlinked or deleted account and for an invite."
 type AccountChangeMarkDoneByHandPayload {

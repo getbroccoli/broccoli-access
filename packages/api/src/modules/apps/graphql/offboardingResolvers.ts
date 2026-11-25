@@ -13,7 +13,7 @@ import type { AccountChangeService, AppSummary, EmployeeOffboarding } from "../a
 
 export type OffboardingServices = Pick<
   AccountChangeService,
-  "offboardEmployee" | "readOffboardings"
+  "offboardEmployee" | "removeEmployeeAccounts" | "readOffboardings"
 >;
 
 /** The employees module reads the people this caller may see. */
@@ -49,12 +49,19 @@ export function offboardingResolvers(
 export function offboardingMutations(
   services: OffboardingServices,
   readEmployees: ReadEmployees,
-): Pick<NonNullable<Resolvers["AppsMutations"]>, "offboardEmployee"> {
+): Pick<NonNullable<Resolvers["AppsMutations"]>, "offboardEmployee" | "removeEmployeeAccounts"> {
   return {
     offboardEmployee: (_parent, { input }, context) =>
       mutationPayload<ResolversTypes["EmployeeOffboardPayload"]>(async () => {
         const ctx = context.getActor();
         await services.offboardEmployee(ctx, input);
+        const [employee] = await readEmployees(ctx, [input.employeeId]);
+        return { employee: employee ?? null };
+      }, ["NOT_FOUND"]),
+    removeEmployeeAccounts: (_parent, { input }, context) =>
+      mutationPayload<ResolversTypes["EmployeeRemoveAccountsPayload"]>(async () => {
+        const ctx = context.getActor();
+        await services.removeEmployeeAccounts(ctx, input);
         const [employee] = await readEmployees(ctx, [input.employeeId]);
         return { employee: employee ?? null };
       }, ["NOT_FOUND"]),

@@ -23,7 +23,12 @@ import { loggingRefusal } from "./loggingRefusal";
 import { markChangeDoneByHand } from "./markChangeDoneByHand";
 import type { DirectoryConnectors } from "./directory";
 import { changeStatesOf } from "./changeStates";
-import { type EmployeeOffboarding, offboardEmployee, readOffboardings } from "./offboarding";
+import {
+  type EmployeeOffboarding,
+  offboardEmployee,
+  readOffboardings,
+  removeEmployeeAccounts,
+} from "./offboarding";
 import type { ReconnectReason } from "./connectionReconnects";
 import { failRunningChange, runAccountChange } from "./runAccountChange";
 
@@ -107,6 +112,17 @@ export interface AccountChangeService {
   offboardEmployee: (
     ctx: SecurityContext,
     input: { employeeId: string; appIds: readonly string[] },
+  ) => Promise<EmployeeOffboarding>;
+  /**
+   * Remove all: in one transaction writes a running Remove, started from the account like a single
+   * Remove, for each of `accountIds` that is still among the employee's disabled accounts that offer one
+   * (`accountsToRemove`), and queues each like a Remove. Never the directory account. Returns
+   * their offboarding as it is afterwards. Needs MANAGE_WORKSPACE and a signed-in user; refuses an
+   * unknown employee with NOT_FOUND.
+   */
+  removeEmployeeAccounts: (
+    ctx: SecurityContext,
+    input: { employeeId: string; accountIds: readonly string[] },
   ) => Promise<EmployeeOffboarding>;
   /** What Offboard would do for each employee now, in the ids' order. Needs MANAGE_WORKSPACE. */
   readOffboardings: (
@@ -272,6 +288,7 @@ export function createAccountChangeService(
     failChange: (ctx, changeId) => failRunningChange(dependencies, ctx, changeId),
     markChangeDoneByHand: (ctx, changeId) => markChangeDoneByHand(dependencies, ctx, changeId),
     offboardEmployee: (ctx, input) => offboardEmployee(dependencies, ctx, input),
+    removeEmployeeAccounts: (ctx, input) => removeEmployeeAccounts(dependencies, ctx, input),
     readOffboardings: (ctx, employeeIds, db) =>
       readOffboardings(dependencies, ctx, employeeIds, db),
     async readChangeStates(ctx, appAccountIds, db: Orm | Tx = orm, connectors) {

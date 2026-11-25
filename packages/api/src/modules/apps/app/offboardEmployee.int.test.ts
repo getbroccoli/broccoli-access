@@ -1,4 +1,5 @@
 import { ACME, ACME_LINEAR } from "@broccoli-access/fake-apps";
+import { eq } from "drizzle-orm";
 
 import {
   accountChanges,
@@ -15,20 +16,25 @@ import {
   templateReviewTransactor,
   templates,
 } from "#test/support";
-import { accountChanges as changesTable } from "../db";
+import { appAccounts, accountChanges as changesTable } from "../db";
 
 test("queues the directory Disable first and each running change in its own connection's group", async ({
   workspace: { service, owner, employee, linear, google, sent },
   orm,
 }) => {
   const { id: employeeId, email } = employee("chloe@acme.example");
+  const linearAccountId = "00000000-0000-7000-8000-000000000001";
+  await orm
+    .update(appAccounts)
+    .set({ id: linearAccountId })
+    .where(eq(appAccounts.id, linear.account(email).id));
   const [before] = await service.readOffboardings(owner, [employeeId]);
   const directory = before!.directoryAccount!;
-  const member = linear.account(email);
+  expect(linearAccountId.localeCompare(directory.id)).toBeLessThan(0);
   expect(before).toMatchObject({
     offboardedAt: null,
     directoryAccount: { email, status: "active" },
-    accountsToDisable: [{ id: directory.id }, { id: member.id }],
+    accountsToDisable: [{ id: directory.id }, { id: linearAccountId }],
   });
 
   const result = await service.offboardEmployee(owner, {
@@ -46,8 +52,8 @@ test("queues the directory Disable first and each running change in its own conn
     status: "running",
     requestedBy: owner.user!.userId,
   };
-  const ordered = [directory, member].map((account) =>
-    changes.find((change) => change.appAccountId === account.id)!,
+  const ordered = [directory.id, linearAccountId].map((id) =>
+    changes.find((change) => change.appAccountId === id)!,
   );
   expect(ordered).toMatchObject([
     {

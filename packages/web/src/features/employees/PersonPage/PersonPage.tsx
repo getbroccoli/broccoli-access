@@ -14,6 +14,7 @@ import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterCon
 import { AddPersonAppMenu } from "./AddPersonAppMenu";
 import { OffboardDialog } from "./OffboardDialog";
 import { OffboardedNotice } from "./OffboardedNotice";
+import { RemoveAllDialog } from "./RemoveAllDialog";
 import { PersonTemplates } from "./PersonTemplates";
 import { CurrentAccessTable } from "./CurrentAccessTable";
 import { ProvisionBar } from "./ProvisionBar";
@@ -156,6 +157,9 @@ export function PersonPage() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-semibold tracking-tight">{t("templates.apps.title")}</h2>
           {me.isOwner && person.status === "ACTIVE" && <AddPersonAppMenu employeeId={person.id} />}
+          {offboardedAt && person.offboarding.accountsToRemove.length > 0 && (
+            <RemoveAllDialog person={person} />
+          )}
         </div>
         <CurrentAccessTable person={person} />
         {person.personApps.pageInfo.hasNextPage && (

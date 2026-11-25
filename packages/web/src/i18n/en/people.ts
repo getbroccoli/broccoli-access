@@ -156,6 +156,11 @@ export const peopleEn = {
   "people.offboard.offboardedOn": "Offboarded {day}",
   "people.offboard.oneAppNeedsYou": "1 app needs you:",
   "people.offboard.appsNeedYou": "{count} apps need you:",
+  "people.offboard.removeAll": "Remove all…",
+  "people.offboard.removeAllTitle": "Remove {name} from these apps?",
+  "people.offboard.removeAllConfirm": "Remove all",
+  "people.offboard.removeAllFailed":
+    "Couldn’t confirm the removal. Reload to check the accounts before trying again.",
   "people.offboard.couldntDisable": "Couldn’t disable",
   "people.provision.missing": "{count} apps missing.",
   "people.provision.missingOne": "1 app missing.",
