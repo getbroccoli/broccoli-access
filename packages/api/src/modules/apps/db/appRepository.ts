@@ -13,7 +13,7 @@ import {
 } from "../../../core/db";
 import type { KeysetQuery, KeysetRow } from "../../../core/pagination";
 import { APP_STATUSES, type AppStatus, type NewApp, type InAppFacts } from "../domain";
-import { isAccess } from "./appAccountRepository";
+import { isAccess } from "./inApp";
 import { appAccounts } from "./appAccountsTable";
 import { apps } from "./appsTable";
 

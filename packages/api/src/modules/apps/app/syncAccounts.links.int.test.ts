@@ -54,6 +54,34 @@ test("deletes an owner-linked account when its last source stops finding it", as
   expect(await storedAppAccounts(orm)).toEqual([]);
 });
 
+test.for(["service", "external"] as const)(
+  "a scan keeps the owner's %s mark when an employee's email now matches",
+  async (kind, { orm, seed, fakeConnectors }) => {
+    const linear = await connectLinear(orm, fakeConnectors.url);
+    const email = "deploys@acme.example";
+    const marked = await seed.appAccount({
+      appId: linear.appId,
+      email,
+      kind,
+      note: "Release engineering",
+      status: "suspended",
+      foundVia: ["linear_members"],
+    });
+    await seed.employee({ email });
+
+    await linear.scans.runScan(SYSTEM, linear.sourceId);
+
+    const account = (await storedAppAccounts(orm)).find(({ id }) => id === marked.id);
+    expect(account).toMatchObject({
+      kind,
+      note: marked.note,
+      status: "active",
+      employeeId: null,
+      employeeLinkedBy: null,
+    });
+  },
+);
+
 async function ownerLinkedAccount(seed: TestSeed, appId: string) {
   const person = await seed.employee();
   const account = await seed.appAccount({

@@ -35,5 +35,14 @@ A manual check of the People page against a development stack: everyone in Googl
 - [ ] Start from the setup above with Slack approved. Use the fake Google's unsuspend control for Ana, then scan Google Workspace. Connect Slack and Linear and let their scans finish. The tab shows four accounts. Ana’s private Slack address suggests Ana Ruiz. The other three show "Nobody".
 - [ ] Choose "Link" beside Ana’s suggestion. The count drops to three. Open Ana from All. Her Slack work account and the account labelled `ana.ruiz@gmail.example` both appear under Current access.
 - [ ] In Settings → Connections, choose "Scan now" on Slack. Once the scan finishes, reopen Ana’s page and the tab. The private account stays on Ana’s page and the tab still shows three.
-- [ ] Choose "Decide" beside another account. Search by work email, select the employee and choose "Link". The account appears on that person’s page.
+- [ ] Choose "Decide", then "Link to a person" beside a different account, leaving Linear’s `deploys@acme.example` for Disable. Search by work email, select the employee and choose "Link". The account appears on that person’s page.
 - If the member changes their app email, the new unmatched address needs a new link.
+
+- [ ] Open "Decide" on Linear’s active `deploys@acme.example` account. Choose Disable and confirm. The row shows "Disabling in Linear…", then "Disabled" without a reload, and "Decide" now offers Enable. In Activity, its Disable shows "On the server" under "How it ended".
+- [ ] Choose Enable from "Decide" and confirm: the row shows "Enabling in Linear…", then no status, and "Decide" offers Disable again.
+- [ ] Make the next change fail (`POST <fake connectors>/_fake/failures` with `{"connector": "linear", "call": "actions/run", "code": "not_allowed", "count": 1}`) and choose Disable again. The row shows "Couldn’t disable". It opens the reason with "I did it by hand"; confirming it shows "Disabled" on the row. After a failure that trying again can help (`unexpected_response`), the dialog offers "Try again", and the row follows the new change.
+- [ ] From "Decide", mark two unlinked accounts, one as a service account and one as external. Save a note for each. The tab count drops by two and both move to Marked accounts with the right labels and notes.
+- [ ] Save stays disabled for a note of spaces only. A note over 500 characters shows "Keep the note to 500 characters or fewer." and Save stays disabled.
+- [ ] Edit an owner's note, reload, and scan the app again. The edited note and both marks stay.
+- [ ] Create the integration user in Settings → Connections. People shows "Scanning…" by itself; once it ends, the integration user's Google Workspace account is under Marked accounts as "Integration user" with no Edit button, and never in the list above or its count.
+- [ ] Invite the integration user to the fake Linear workspace and accept the invitation. Scan Linear. Its Linear account also shows under Marked accounts as "Integration user" with no Edit button.

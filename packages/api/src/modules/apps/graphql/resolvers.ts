@@ -1,3 +1,5 @@
+import { accountLinkMutations } from "./accountLinkMutations";
+import { accountWithoutPersonResolvers } from "./accountWithoutPersonResolvers";
 import DataLoader from "dataloader";
 
 import { invalidInput } from "../../../core/applicationError";
@@ -25,29 +27,28 @@ import type {
 } from "../app";
 import type { AccountChange } from "../domain";
 
-type AppResolverServices = Pick<
-  AppService & AppUserService & AccountChangeService & AccountLinkService,
-  | "linkAccount"
-  | "listAccountsWithoutPerson"
-  | "countAccountsWithoutPerson"
-  | "listApps"
-  | "readApp"
-  | "readApps"
-  | "readAppRoles"
-  | "readUsersOfApps"
-  | "countApps"
-  | "approveApp"
-  | "ignoreApp"
-  | "finishSetup"
-  | "changeAccount"
-  | "readChangeStates"
-  | "findAppsWithChangeableAccounts"
-  | "readConnectionStates"
-  | "listAccountChanges"
-  | "readRequesterNames"
-  | "markChangeDoneByHand"
-  | "inviteEmployee"
->;
+type AppResolverServices = AccountLinkService &
+  Pick<
+    AppService & AppUserService & AccountChangeService,
+    | "listApps"
+    | "readApp"
+    | "readApps"
+    | "readAppRoles"
+    | "readUsersOfApps"
+    | "countApps"
+    | "approveApp"
+    | "ignoreApp"
+    | "finishSetup"
+    | "changeAccount"
+    | "readChangeStates"
+    | "findAppsWithChangeableAccounts"
+    | "readConnectionStates"
+    | "listAccountChanges"
+    | "readAccountChange"
+    | "readRequesterNames"
+    | "markChangeDoneByHand"
+    | "inviteEmployee"
+  >;
 
 export function createResolvers(
   services: AppResolverServices,
@@ -65,6 +66,8 @@ export function createResolvers(
           first: first ?? undefined,
           after,
         }),
+      markedAccounts: (_parent, { first, after }, context) =>
+        services.listMarkedAccounts(context.getActor(), { first: first ?? undefined, after }),
       accountsWithoutPersonCount: (_parent, _args, context) =>
         services.countAccountsWithoutPerson(context.getActor()),
       app: (_parent, { id }, context) => services.readApp(context.getActor(), id),
@@ -75,6 +78,8 @@ export function createResolvers(
           after,
         }),
       appCounts: (_parent, _args, context) => services.countApps(context.getActor()),
+      accountChange: (_parent, { id }, context) =>
+        services.readAccountChange(context.getActor(), id),
       accountChanges: (_parent, { first, after }, context) =>
         services.listAccountChanges(context.getActor(), { first: first ?? undefined, after }),
     },
@@ -82,8 +87,9 @@ export function createResolvers(
       apps: () => ({}),
     },
     AppsMutations: appsMutations(services, loaders),
-    AccountWithoutPerson: {
-      app: (account) => account.app,
+    AccountWithoutPerson: accountWithoutPersonResolvers(loaders.changeStates),
+    MarkedAccount: {
+      kind: ({ kind }) => toEnum(kind),
     },
     AppUser: {
       status: ({ status }) => toEnum(status),
@@ -171,11 +177,7 @@ function appsMutations(
   loaders: ReturnType<typeof createLoaders>,
 ): Resolvers["AppsMutations"] {
   return {
-    linkAccount: (_parent, { input }, context) =>
-      mutationPayload<ResolversTypes["AppAccountLinkPayload"]>(
-        async () => ({ appUser: await services.linkAccount(context.getActor(), input) }),
-        ["NOT_FOUND", "CONFLICT"],
-      ),
+    ...accountLinkMutations(services),
     approve: (_parent, { input }, context) =>
       mutationPayload<ResolversTypes["AppApprovePayload"]>(
         async () => ({ app: await services.approveApp(context.getActor(), input.id) }),
@@ -235,7 +237,7 @@ async function appUserOf(
   if (!change.appAccountId) {
     return null;
   }
-  const users = await services.readUsersOfApps(ctx, [change.appId]);
+  const users = await services.readUsersOfApps(ctx, [change.appId], [change.appAccountId]);
   return users.find(({ id }) => id === change.appAccountId) ?? null;
 }
 

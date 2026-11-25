@@ -119,10 +119,14 @@ export function integrationUsers(
     googleUrl,
     connectorsUrl,
     logger = createLogger("silent"),
-  }: { googleUrl: string; connectorsUrl?: string; logger?: Logger },
+    jobs,
+  }: { googleUrl: string; connectorsUrl?: string; logger?: Logger; jobs?: JobQueue },
 ) {
   return createIntegrationUserService({
     connectorsUrl,
+    // The scans read the integration user, so they are built when its creation queues one.
+    scans: { scanConnection: (...scan) => scans(orm, { googleUrl, jobs }).scanConnection(...scan) },
+    records: createImportRecordService(),
     orm,
     transact: testTransactor(orm),
     secretBox: TEST_SECRET_BOX,

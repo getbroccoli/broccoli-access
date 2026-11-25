@@ -35,6 +35,7 @@ export interface InAppFacts {
 
 /** An account a finding kind saw in its last scan. */
 export interface FoundAccount {
+  isIntegrationUser?: boolean;
   appId: string;
   email: string;
   status: AccountStatus;
@@ -114,6 +115,8 @@ export function accountChanges(
   after: Omit<AppAccount, "id"> | null,
 ): FieldChange[] {
   const fields = (account: Omit<AppAccount, "id"> | null) => ({
+    kind: account?.kind ?? null,
+    note: account?.note ?? null,
     email: account?.email ?? null,
     employee: account?.employeeId ?? null,
     status: account?.status ?? null,
@@ -156,13 +159,19 @@ const HISTORY_FIELDS = [
   "foundVia",
   "grantedAt",
   "grantedBefore",
+  "kind",
+  "note",
 ] as const;
 
-function firstSeen(account: FoundAccount, findingKind: string, now: Date): Omit<AppAccount, "id"> {
+function firstSeen(
+  { isIntegrationUser, ...account }: FoundAccount,
+  findingKind: string,
+  now: Date,
+): Omit<AppAccount, "id"> {
   return {
     ...account,
-    ...emailLink(account.employeeId),
-    kind: "personal",
+    ...emailLink(isIntegrationUser ? null : account.employeeId),
+    kind: isIntegrationUser ? "service" : "personal",
     note: null,
     foundVia: [findingKind],
     firstSeenAt: now,
@@ -188,14 +197,29 @@ function foundAgain(
   return {
     ...before,
     status: keepsStatus ? before.status : account.status,
-    ...(before.employeeLinkedBy === "owner"
-      ? {}
-      : emailLink(before.kind === "personal" ? account.employeeId : null)),
+    ...scannedAttribution(before, account),
     foundVia: before.foundVia.includes(findingKind)
       ? before.foundVia
       : [...before.foundVia, findingKind],
     grantedAt: earlierGrant(before.grantedAt, account.grantedAt),
   };
+}
+
+/** Only the sync sets service without an owner note. */
+export function isAutomaticService(account: Pick<AppAccount, "kind" | "note">) {
+  return account.kind === "service" && account.note === null;
+}
+
+function scannedAttribution(before: AppAccount, found: FoundAccount) {
+  // shortcut: a rename can collide with an owner's mark or link. Keep their decision until the owner changes it.
+  if (
+    before.employeeLinkedBy === "owner" ||
+    (before.kind !== "personal" && !isAutomaticService(before))
+  )
+    return {};
+  if (found.isIntegrationUser && before.employeeId === null)
+    return { kind: "service" as const, ...emailLink(null) };
+  return { kind: "personal" as const, ...emailLink(found.employeeId) };
 }
 
 function emailLink(employeeId: string | null) {

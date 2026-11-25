@@ -64,14 +64,17 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     settings.connectorsUrl,
   );
   const connectedApps = createAppConnectionService(core);
+  const importRecords = createImportRecordService();
   // One service for Settings and the scans, which skip the integration user.
   const integrationUsers = createIntegrationUserService({
     ...core,
     ...googleAddresses,
     connectedApps,
     connectorsUrl: settings.connectorsUrl,
+    records: importRecords,
+    // The scans read the integration user, so its creation reaches them once both exist.
+    scans: { scanConnection: (...scan) => scans.scanConnection(...scan) },
   });
-  const importRecords = createImportRecordService();
   const apps = createAppService({
     ...core,
     connectors: directoryConnectors,
@@ -104,6 +107,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     connectors,
     members: importRecords,
     employees,
+    integrationUser: integrationUsers,
   });
   const users = createAppUserService({
     ...core,

@@ -6,6 +6,7 @@ import {
   type AccountSyncPlan,
   accountChanges,
   type FoundAccount,
+  isAutomaticService,
   planAccountSync,
 } from "../domain";
 
@@ -20,7 +21,7 @@ export interface AppAccountService {
    * history of each change with `cause`. A known account in an app another connection reads keeps
    * its status, which that connection's records decide, and so does one whose account change runs
    * or succeeded since `readStartedAt`, which the scan may have read before. Syncs run one at a
-   * time. System only.
+   * time. Returns how many accounts it set to the integration user's service kind. System only.
    */
   syncAccounts: (
     ctx: SecurityContext,
@@ -33,7 +34,7 @@ export interface AppAccountService {
       /** When the scan began reading its connection. */
       readStartedAt: Date;
     },
-  ) => Promise<void>;
+  ) => Promise<{ accountsSetToService: number }>;
   /**
    * Holds off other account syncs and connects until `tx` ends, waiting for one running now. A
    * scan's save takes it before anything else, so two saves never deadlock over employees.
@@ -70,6 +71,7 @@ export function createAppAccountService(): AppAccountService {
         statusKeptFor: new Set(changed),
       });
       await applyPlan(ctx, tx, plan, cause);
+      return { accountsSetToService: countSetToService(plan) };
     },
     async holdAccountSyncs(ctx, tx) {
       ctx.requireSystem();
@@ -78,6 +80,14 @@ export function createAppAccountService(): AppAccountService {
     countAccounts: (db, appId) => appAccountRepository(db).countPeople(appId),
     countAppsFoundVia: (db, findingKind) => appAccountRepository(db).countAppsFoundVia(findingKind),
   };
+}
+
+function countSetToService({ created, updated }: AccountSyncPlan): number {
+  return (
+    created.filter(isAutomaticService).length +
+    updated.filter(({ before, after }) => !isAutomaticService(before) && isAutomaticService(after))
+      .length
+  );
 }
 
 /** Writes the plan's accounts, then their history: one line per created, updated or deleted account. */

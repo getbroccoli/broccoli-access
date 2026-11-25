@@ -3,6 +3,8 @@ import { type ConnectionMember, importSourceRepository } from "../db";
 
 /** What other modules read of the records the scans saved. */
 export interface ImportRecordService {
+  /** The email of the connection’s member with this stable id, from its last saved scan. */
+  findMemberEmail(db: Orm | Tx, connectionId: string, sourceKey: string): Promise<string | null>;
   /**
    * The members with one of `emails` that the last saved scan of one of `connectionIds` found.
    * Trusted read: no `ctx`.
@@ -20,6 +22,8 @@ export interface ImportRecordService {
 
 export function createImportRecordService(): ImportRecordService {
   return {
+    findMemberEmail: (db, connectionId, sourceKey) =>
+      importSourceRepository(db).findMemberEmail(connectionId, sourceKey),
     findConnectionMembers: (db, members) =>
       importSourceRepository(db).findConnectionMembers(members),
     findLastScans: async (db) =>

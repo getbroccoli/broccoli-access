@@ -18,7 +18,8 @@ import {
   parseIntegrationUserEmail,
 } from "../domain";
 import { openConsentState, randomConsentToken, sealConsentState } from "../helpers";
-import type { ConnectedApps } from "../ports";
+import { findIntegrationAccountEmail } from "./findIntegrationAccountEmail";
+import type { ConnectedApps, ScannedMembers } from "../ports";
 import { consentUrl } from "./consentUrl";
 import type { GoogleConnectionDependencies } from "./googleConnectionService";
 import { createDirectoryUser, verifyWriteGrant, type WriteGrant } from "./integrationUserDirectory";
@@ -48,8 +49,8 @@ export interface IntegrationUserService {
   ) => Promise<{ authorizationUrl: string; browserToken: string }>;
   /**
    * Google's answer to that consent: creates the user in the directory with a random password,
-   * then stores it, with the password encrypted, and the connection's grown grant in one
-   * transaction. Refuses a consent without the scope with `UserWriteRefusedError`, a taken address
+   * then stores it, with the password encrypted, and the connection's grown grant, and queues a
+   * scan of the directory, in one transaction. Refuses a consent without the scope with `UserWriteRefusedError`, a taken address
    * with `EmailTakenError`, a consent from elsewhere like a Google app change does, an answer it
    * cannot trust with INVALID_INPUT, and with CONFLICT once the integration user exists or while
    * another answer creates it; nothing is created or stored then. Once stored, it starts signing
@@ -67,6 +68,8 @@ export interface IntegrationUserService {
   readIntegrationUser: (
     ctx: SecurityContext,
   ) => Promise<{ id: string; email: string; signIn: IntegrationUserSignIn } | null>;
+  /** The email to recognise in other apps, from the directory member with Google's stable id. Trusted read. */
+  findIntegrationAccountEmail: (db: Orm | Tx) => Promise<string | null>;
   /** The directory's id of the integration user, which the sync skips; null before it exists. System only. */
   readGoogleUserId: (ctx: SecurityContext, db: Orm | Tx) => Promise<string | null>;
 }
@@ -100,9 +103,11 @@ export type IntegrationUserDependencies = Pick<
   | "openIdConfigurationUrl"
   | "adminApiUrl"
   | "connectedApps"
+  | "scans"
 > & {
   /** `CONNECTORS_URL`: the connectors container, whose browser signs in; unset means none. */
   connectorsUrl?: string;
+  records: ScannedMembers;
 };
 
 export function createIntegrationUserService(
@@ -192,6 +197,7 @@ export function createIntegrationUserService(
       const found = await integrationUserRepository(orm).find();
       return found && { id: found.googleUserId, email: found.email, signIn: await signIn.read() };
     },
+    findIntegrationAccountEmail: (db) => findIntegrationAccountEmail(db, dependencies),
     async readGoogleUserId(ctx, db) {
       ctx.requireSystem();
       return (await integrationUserRepository(db).find())?.googleUserId ?? null;
@@ -306,7 +312,7 @@ function integrationUserExists(): ApplicationError {
 // connector can.
 /** Stores the created user and the connection's grown grant together, then logs the outcome. */
 async function saveIntegrationUser(
-  { transact, secretBox, connectedApps, logger }: IntegrationUserDependencies,
+  { transact, secretBox, connectedApps, scans, logger }: IntegrationUserDependencies,
   ctx: SecurityContext,
   {
     googleApp: { connectionId, settings, clientSecret, revision },
@@ -334,6 +340,8 @@ async function saveIntegrationUser(
       if (!saved) {
         throw googleAppChanged();
       }
+      // Its accounts in other apps are known by the email the directory's next scan reads.
+      await scans.scanConnection(ctx, tx, { connectionId, sourceName: settings.domain });
     });
   } catch (error) {
     logger.error(

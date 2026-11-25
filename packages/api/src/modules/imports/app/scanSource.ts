@@ -141,13 +141,13 @@ async function saveScan(
   ctx: SecurityContext,
   dependencies: ScanDependencies,
   findings: ScanFindings & { revision: string },
-): Promise<{ saved: boolean; finishedSetupScan: boolean }> {
+): Promise<{ saved: boolean; finishedSetupScan: boolean; accountsSetToService: number }> {
   const { sourceId, accounts } = findings;
   return dependencies.transact(async (tx) => {
     const sources = importSourceRepository(tx);
     const source = await sources.lockById(sourceId);
     if (source?.status !== "scanning") {
-      return { saved: false, finishedSetupScan: false };
+      return { saved: false, finishedSetupScan: false, accountsSetToService: 0 };
     }
     // Before the directory locks any employee, so two saves wait for each other, never deadlock.
     await dependencies.apps.holdAccountSyncs(ctx, tx);
@@ -163,14 +163,14 @@ async function saveScan(
       throw new ApplicationError("CONFLICT", "The directory connection changed during the scan.");
     }
     await sources.replaceRecords(sourceId, accounts);
-    await syncAccounts(ctx, tx, findings, dependencies);
+    const { accountsSetToService } = await syncAccounts(ctx, tx, findings, dependencies);
     await sources.markScanned(sourceId, new Date());
     if (!source.readAt)
       tx.publish("imports.appScanned", { appId: findings.connection.appId, sourceId });
     // Setup waits for the directory's people; another app's scan never ends its scan step.
     const finishedSetupScan =
       findings.connector.isDirectory && (await setupSteps.finishScanStep(ctx, tx));
-    return { saved: true, finishedSetupScan };
+    return { saved: true, finishedSetupScan, accountsSetToService };
   });
 }
 

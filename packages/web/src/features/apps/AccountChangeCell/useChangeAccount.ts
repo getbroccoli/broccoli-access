@@ -23,8 +23,10 @@ export type ChangeTarget = { name: string; app: string } & (
  * shows a toast. A refused Disable or Enable leaves the row as it was; a refused Invite reads the
  * page again, since what the row offered no longer holds.
  */
-export function useChangeAccount(): {
-  changeAccount: (target: ChangeTarget, action: AccountChangeAction) => Promise<void>;
+export function useChangeAccount(
+  refusedMessage: "apps.change.refused" | "people.accounts.changeRefused" = "apps.change.refused",
+): {
+  changeAccount: (target: ChangeTarget, action: AccountChangeAction) => Promise<boolean>;
   loading: boolean;
 } {
   const cache = useCache();
@@ -39,10 +41,12 @@ export function useChangeAccount(): {
           variables: { input: { employeeId: target.employeeId, appId: target.appId } },
         });
       }
+      return true;
     } catch {
-      const refused = "accountId" in target ? "apps.change.refused" : "apps.change.inviteRefused";
+      const refused = "accountId" in target ? refusedMessage : "apps.change.inviteRefused";
       toast.error(t(refused, { name: target.name, app: target.app }));
       if (!("accountId" in target)) forgetPersonApps(cache, target.employeeId);
+      return false;
     }
   };
   return { changeAccount, loading: changing.loading || inviting.loading };

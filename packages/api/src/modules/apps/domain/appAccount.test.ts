@@ -50,7 +50,17 @@ it("deletes an account when its only finding kind no longer sees it", () => {
     { field: "employee", oldValue: "employee-ana", newValue: null },
     { field: "status", oldValue: "active", newValue: null },
     { field: "foundVia", oldValue: "google_directory", newValue: null },
+    { field: "kind", oldValue: "personal", newValue: null },
   ]);
+});
+
+it("records null for the missing account's kind on creation and deletion", () => {
+  const unlinked = { ...ACCOUNT, employeeId: null, employeeLinkedBy: null };
+  const created = accountChanges(null, { ...unlinked, kind: "service" });
+  const deleted = accountChanges({ ...unlinked, kind: "external", note: "Design agency" }, null);
+
+  expect(created).toContainEqual({ field: "kind", oldValue: null, newValue: "service" });
+  expect(deleted).toContainEqual({ field: "kind", oldValue: "external", newValue: null });
 });
 
 it("keeps an account another finding kind sees and removes only the missing kind", () => {

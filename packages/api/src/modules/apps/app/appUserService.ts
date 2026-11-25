@@ -18,7 +18,11 @@ export interface AppUserService {
    * The apps' users whose employee the caller may read, each app's users suspended in the
    * directory first, then by name, then those not in the app. Needs MANAGE_WORKSPACE.
    */
-  readUsersOfApps: (ctx: SecurityContext, appIds: readonly string[]) => Promise<AppUser[]>;
+  readUsersOfApps: (
+    ctx: SecurityContext,
+    appIds: readonly string[],
+    accountIds?: readonly string[],
+  ) => Promise<AppUser[]>;
   /**
    * The employees' accounts in approved apps other than the directory that are in their app: the
    * active ones, and the suspended ones in apps with a connection; by app name. Needs
@@ -71,11 +75,11 @@ export function createAppUserService(dependencies: AppUserDependencies): AppUser
     // shortcut: reads every user of the apps unpaged, since their order needs the employees'
     // names, even when the app list keeps only its first four avatars per app; page them, or read
     // only the first few per app, once a directory can be very large (left out of circle 1).
-    async readUsersOfApps(ctx, appIds) {
+    async readUsersOfApps(ctx, appIds, accountIds) {
       ctx.require("MANAGE_WORKSPACE");
       const inAppFacts = await findInAppFacts(orm, dependencies);
       const [accounts, suspended] = await Promise.all([
-        appAccountRepository(orm).findUsersOfApps(appIds, inAppFacts),
+        appAccountRepository(orm).findUsersOfApps(appIds, inAppFacts, accountIds),
         findEmployeesInDirectory(orm, connectors, { status: "suspended" }),
       ]);
       const byName = await employees.readEmployees(ctx, [

@@ -66,6 +66,9 @@ test("stops offering a Google-only account when the first app scan finds no memb
   await expect(
     links.linkAccount(owner, { appAccountId: account.id, employeeId: person.id }),
   ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    links.markAccount(owner, { appAccountId: account.id, kind: "external", note: "Agency" }),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
 });
 
 test("suggests only active directory employees from the scanned account's display name", async ({

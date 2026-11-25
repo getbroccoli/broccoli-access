@@ -35,6 +35,8 @@ export interface ImportSourceRepository {
   replaceRecords(id: string, accounts: readonly ImportedAccount[]): Promise<void>;
   /** The accounts the source's last saved scan found. */
   findRecords(id: string): Promise<Pick<ImportedAccount, "sourceKey" | "raw">[]>;
+  /** The email of the member with this stable source key, or null if absent from the scan. */
+  findMemberEmail(connectionId: string, sourceKey: string): Promise<string | null>;
   /**
    * The source's account of the member whose key or session the connection uses; null without
    * one, as a version 1 record, which predates the flag, reads.
@@ -109,6 +111,16 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
         })
         .from(importRecords)
         .where(eq(importRecords.sourceId, id)),
+    findMemberEmail: async (connectionId, sourceKey) => {
+      const [record] = await orm()
+        .select({ email: sql<string>`${importRecords.values} ->> 'email'` })
+        .from(importRecords)
+        .innerJoin(importSources, eq(importSources.id, importRecords.sourceId))
+        .where(
+          and(eq(importSources.connectionId, connectionId), eq(importRecords.sourceKey, sourceKey)),
+        );
+      return record?.email ?? null;
+    },
     findConnectionUserEmail: async (connectionId) => {
       const [record] = await orm()
         .select({

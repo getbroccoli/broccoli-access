@@ -3,15 +3,22 @@ import express from "express";
 
 import {
   accountChanges,
+  accountLinks,
+  CREATION_START,
   expect,
+  failedDisable,
   googleScanWithLinearGrant,
   googleScanSetup,
+  integrationUserTest,
   OWNER,
+  postFakeControl,
+  scans,
   scannedLinear,
   listedLinearChloe,
   serveAccountList,
   serveConnectorRoutes,
   storedAppConnections,
+  storedImportSources,
   test,
   EMPLOYEE,
   SYSTEM,
@@ -51,6 +58,71 @@ test("offers Disable or Enable only for another member in the last Linear scan",
     { isConnectionUser: false, offeredChange: null, offersReconnect: false, latestChange: null },
   ]);
 });
+
+test.for(["service", "external"] as const)(
+  "still offers and accepts Disable on an owner-marked %s account",
+  async (kind, { orm, seed, fakeConnectors }) => {
+    const owner = await seed.owner();
+    const linear = await scannedLinear(orm, fakeConnectors.url);
+    const { id } = linear.account("deploys@acme.example");
+    await accountLinks(orm).markAccount(owner, {
+      appAccountId: id,
+      kind,
+      note: "Release engineering",
+    });
+    const changes = accountChanges(orm, { connectorsUrl: fakeConnectors.url });
+
+    expect((await changes.readChangeStates(owner, [id])).get(id)?.offeredChange).toBe("suspend");
+    await expect(
+      changes.changeAccount(owner, { appAccountId: id, action: "suspend" }),
+    ).resolves.toMatchObject({ appAccountId: id, status: "running" });
+  },
+);
+
+test("reads one account change by its id, and none for an unknown id", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const { service, owner, change } = await failedDisable(orm, seed, fakeConnectors.url);
+
+  expect(await service.readAccountChange(owner, change.id)).toMatchObject({
+    id: change.id,
+    status: "failed",
+    error: "unexpected_response",
+    changesAhead: null,
+  });
+  expect(await service.readAccountChange(owner, "00000000-0000-4000-8000-000000000001")).toBeNull();
+  await expect(service.readAccountChange(EMPLOYEE, change.id)).rejects.toMatchObject({
+    code: "FORBIDDEN",
+  });
+});
+
+integrationUserTest(
+  "never offers or accepts Disable on the integration user's account, even one the owner marked",
+  async ({ orm, workspace, fakeGoogle, fakeConnectors }) => {
+    const { owner, users } = workspace;
+    const { email } = CREATION_START;
+    await users.finishCreation(owner, await workspace.allowCreation());
+    await postFakeControl(fakeConnectors.url, "linear/invitations", { email });
+    await postFakeControl(fakeConnectors.url, `linear/invitations/${email}/accept`);
+    // Scanned before the directory, the account is nobody's yet, so the owner can mark it.
+    const { id } = (await scannedLinear(orm, fakeConnectors.url)).account(email);
+    await accountLinks(orm).markAccount(owner, {
+      appAccountId: id,
+      kind: "external",
+      note: "Agency",
+    });
+    const [googleSource] = await storedImportSources(orm);
+    await scans(orm, { googleUrl: fakeGoogle.url }).runScan(SYSTEM, googleSource!.id);
+    const changes = accountChanges(orm, { connectorsUrl: fakeConnectors.url });
+
+    expect((await changes.readChangeStates(owner, [id])).get(id)?.offeredChange).toBeNull();
+    await expect(
+      changes.changeAccount(owner, { appAccountId: id, action: "suspend" }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  },
+);
 
 test("offers Reconnect instead of Disable to a Linear member but not to the connection's user", async ({
   orm,
