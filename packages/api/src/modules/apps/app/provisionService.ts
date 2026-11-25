@@ -348,5 +348,5 @@ function offersEnable(account: PersonPage["appAccounts"][number], appId: string)
 
 /** Missing, or possibly missing in an app without a connection, which Provision gives by hand. */
 function isLacking(state: PersonPage["personApps"][number]["state"]) {
-  return state === "missing" || state === "not_connected";
+  return state === "missing" || state === "app_not_connected";
 }

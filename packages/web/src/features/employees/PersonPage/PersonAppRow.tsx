@@ -78,7 +78,7 @@ export function PersonAppRow({
         {first && row.state === "MISSING" && (
           <StatusBadge tone="warning">{t("people.person.missing")}</StatusBadge>
         )}
-        {first && row.state === "NOT_CONNECTED" && (
+        {first && row.state === "APP_NOT_CONNECTED" && (
           <Link
             to="/apps/$appId"
             params={{ appId: row.app.id }}

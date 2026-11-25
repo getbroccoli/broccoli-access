@@ -138,7 +138,8 @@ function ConfirmDirectoryProvision({ person, open, canProvision, onClose, refetc
     ?.map(({ node }) => node)
     .filter(
       ({ state, app }) =>
-        (state === "MISSING" || state === "NOT_CONNECTED") && app.catalogKey !== GOOGLE_WORKSPACE,
+        (state === "MISSING" || state === "APP_NOT_CONNECTED") &&
+        app.catalogKey !== GOOGLE_WORKSPACE,
     );
   const conflict = apps?.find(({ roleConflict }) => roleConflict);
 

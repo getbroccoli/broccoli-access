@@ -30,7 +30,7 @@ import {
   findDirectoryAppId,
   findEmployeesInDirectory,
 } from "./directory";
-import { findConnectedAppIds, summarize } from "./appSummaries";
+import { findConnectedAppIds, summarizeApps } from "./summarizeApps";
 import { findInAppFacts } from "./inAppFacts";
 
 const recordHistory = createRecordHistoryService();
@@ -160,7 +160,7 @@ export function createAppService(dependencies: AppDependencies): AppService {
         keysetValues: APP_SORT_VALUES,
         fetch: (query) => appRepository(orm).findPage({ ...query, status, inAppFacts }),
       });
-      const summaries = await summarize(
+      const summaries = await summarizeApps(
         dependencies,
         page.edges.map(({ node }) => node),
       );
@@ -173,11 +173,11 @@ export function createAppService(dependencies: AppDependencies): AppService {
       ctx.require("MANAGE_WORKSPACE");
       const id = parseUuid(appId);
       const app = id && (await appRepository(orm).findById(id));
-      return app ? (await summarize(dependencies, [app]))[0]! : null;
+      return app ? (await summarizeApps(dependencies, [app]))[0]! : null;
     },
     async readApps(ctx, appIds) {
       ctx.require("MANAGE_WORKSPACE");
-      return summarize(dependencies, await appRepository(orm).findByIds(appIds));
+      return summarizeApps(dependencies, await appRepository(orm).findByIds(appIds));
     },
     async countApps(ctx) {
       ctx.require("MANAGE_WORKSPACE");
@@ -227,7 +227,7 @@ async function changeStatus(
   if (changed) {
     logger.info({ appId, status }, "App status changed");
   }
-  const [summary] = await summarize(dependencies, [app]);
+  const [summary] = await summarizeApps(dependencies, [app]);
   return summary!;
 }
 

@@ -10,7 +10,7 @@ test("an app without a connection waits for I did it by hand, then shows Ivan in
   await service.markChangeDoneByHand(owner, change!.id);
 
   expect(waiting).toMatchObject({
-    personApps: including({ appId: app.id, state: "not_connected" }),
+    personApps: including({ appId: app.id, state: "app_not_connected" }),
     appInvites: including({ appId: app.id, offered: false, invitedAt: null }),
     provisionSteps: [],
   });

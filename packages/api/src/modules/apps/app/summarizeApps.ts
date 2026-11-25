@@ -18,7 +18,7 @@ interface SummaryDependencies {
  * The apps with their people, how those were found, since when, who keeps access though suspended,
  * and whether they are connected.
  */
-export async function summarize(
+export async function summarizeApps(
   dependencies: SummaryDependencies,
   apps: readonly App[],
 ): Promise<AppSummary[]> {

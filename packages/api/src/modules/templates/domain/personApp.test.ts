@@ -76,7 +76,7 @@ test("an added app that a template now gives comes from the template, with the t
 test("a template app without a connection is not connected while no account of theirs is known", () => {
   const rows = appsOfPerson({ ...NOTHING, templates: [ENGINEER], connectedApps: new Set() });
 
-  expect(rows).toMatchObject([{ appId: APP, state: "not_connected" }]);
+  expect(rows).toMatchObject([{ appId: APP, state: "app_not_connected" }]);
 });
 
 test("a template app is missing once its connection finds no account of theirs", () => {

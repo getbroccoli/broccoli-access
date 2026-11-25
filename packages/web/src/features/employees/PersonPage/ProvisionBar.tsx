@@ -13,7 +13,7 @@ type Props = { person: NonNullable<PersonPageQuery["employee"]> };
 export function ProvisionBar({ person }: Props) {
   const apps = person.personApps.edges.map(({ node }) => node);
   const missing = apps.filter(({ state }) => state === "MISSING");
-  const notConnected = apps.filter(({ state }) => state === "NOT_CONNECTED");
+  const notConnected = apps.filter(({ state }) => state === "APP_NOT_CONNECTED");
   const lacking = [...missing, ...notConnected];
   // Counted once every app is loaded, so the number and the list to confirm are whole.
   if (!lacking.length || person.personApps.pageInfo.hasNextPage) {

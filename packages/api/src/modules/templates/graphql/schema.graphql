@@ -117,7 +117,7 @@ enum PersonAppState {
   SUSPENDED
   MISSING
   "They should have it, but the app has no connection and no account of theirs is known."
-  NOT_CONNECTED
+  APP_NOT_CONNECTED
   INVITED
   EXTRA
 }

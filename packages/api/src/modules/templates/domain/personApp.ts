@@ -11,10 +11,10 @@ export interface PersonApp {
   choice: "added" | "removed" | null;
   accountStatus: AccountStatus | null;
   /**
-   * `not_connected`: they should have it, but the app has no connection and no account of theirs is
+   * `app_not_connected`: they should have it, but the app has no connection and no account of theirs is
    * known, so whether they lack it is unknown.
    */
-  state: "active" | "suspended" | "missing" | "not_connected" | "invited" | "extra" | null;
+  state: "active" | "suspended" | "missing" | "app_not_connected" | "invited" | "extra" | null;
 }
 
 export interface EmployeeAppChoice {
@@ -94,20 +94,6 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
   return rows;
 }
 
-/** Each app the templates give, with those templates and the roles they give it with. */
-function sourcesOf(templates: readonly Template[]) {
-  const sources = new Map<string, { templates: Template[]; roles: Set<string | null> }>();
-  for (const template of templates) {
-    for (const { appId, role } of template.apps) {
-      const giving = sources.get(appId) ?? { templates: [], roles: new Set<string | null>() };
-      giving.templates.push(template);
-      giving.roles.add(role);
-      sources.set(appId, giving);
-    }
-  }
-  return sources;
-}
-
 /** A choice of default is as explicit as any other picked role. */
 export function personAppRole(roles: ReadonlySet<string | null>, choice?: EmployeeAppChoice) {
   if (choice?.choice === "added" && !roles.size) return { role: choice.role, roleConflict: false };
@@ -122,6 +108,20 @@ export function personAppRole(roles: ReadonlySet<string | null>, choice?: Employ
 /** A saved choice lasts only while its role belongs to a disagreement. */
 export function pickStillApplies(roles: ReadonlySet<string | null>, role: string | null) {
   return roles.size > 1 && roles.has(role);
+}
+
+/** Each app the templates give, with those templates and the roles they give it with. */
+function sourcesOf(templates: readonly Template[]) {
+  const sources = new Map<string, { templates: Template[]; roles: Set<string | null> }>();
+  for (const template of templates) {
+    for (const { appId, role } of template.apps) {
+      const giving = sources.get(appId) ?? { templates: [], roles: new Set<string | null>() };
+      giving.templates.push(template);
+      giving.roles.add(role);
+      sources.set(appId, giving);
+    }
+  }
+  return sources;
 }
 
 /**
@@ -153,6 +153,6 @@ function appState({
 }): PersonApp["state"] {
   if (account === "active") return !expected && extra ? "extra" : "active";
   if (invited) return "invited";
-  if (expected) return connected || account ? "missing" : "not_connected";
+  if (expected) return connected || account ? "missing" : "app_not_connected";
   return account ?? null;
 }
