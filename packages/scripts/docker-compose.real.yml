@@ -1,0 +1,27 @@
+# `pnpm real`: local source and hot reload, with the same integrations as self-hosting.
+services:
+  api:
+    environment:
+      DATA_DIR: /repo/.data/real
+      SELF_HOSTED_PUBLIC_URL: ${SELF_HOSTED_PUBLIC_URL:-}
+      # Blank lets the API use Google's real endpoints from its environment schema.
+      GOOGLE_OPENID_CONFIGURATION_URL: ""
+      GOOGLE_ADMIN_API_URL: ""
+      GOOGLE_RELAY_URL: ${GOOGLE_RELAY_URL-https://integrations.dev.getbroccoli.com}
+      CONNECTORS_URL: http://connectors:4000
+    networks: [default, connectors]
+    depends_on:
+      connectors:
+        condition: service_healthy
+
+  connectors:
+    profiles: !reset []
+
+  fake-google:
+    profiles: [fake]
+
+  fake-connectors:
+    profiles: [fake]
+
+  mailpit:
+    profiles: [fake]

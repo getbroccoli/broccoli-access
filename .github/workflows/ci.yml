@@ -106,7 +106,8 @@ jobs:
           # No push unless docker-compose.yml's service becomes ready on this image. Postgres only:
           # readiness waits for the migrations, not for the connectors, another repository's image.
           docker compose up --detach --wait postgres
-          docker compose up --detach --wait --no-deps broccoli-access || { docker compose logs broccoli-access; exit 1; }
+          # Test the image just built: pulling would replace its latest tag with the old release.
+          docker compose up --detach --wait --no-deps --pull never broccoli-access || { docker compose logs broccoli-access; exit 1; }
           docker compose down --volumes
           # The commit's tag first, so `latest` never points at an image that cannot be pinned.
           docker push "$image:sha-${GITHUB_SHA::7}"

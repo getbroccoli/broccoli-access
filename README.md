@@ -38,6 +38,17 @@ Open http://localhost:8080.
 
 [Self-hosted setup guide](docs/guides/setup-guide.md)
 
+## Run from source
+
+Use `pnpm real` for hot reload with real Google and app connectors at
+http://localhost:8081. Docker is required; cached images are reused. Set
+`HOST_WEB_PORT` to choose another port. This mode keeps its own database and
+secrets, separate from fake development and the installed Compose stack. Configure
+email in Settings as with self-hosting.
+
+Use `pnpm dev` for the fake Google and demo apps instead. Ctrl-C stops either mode
+and keeps its data. Add `--drop-db` to reset only the selected mode's database.
+
 ## Licence
 
 Copyright (C) 2026 Minari Limited.
@@ -47,9 +58,10 @@ The Broccoli Access name and logo are covered by our [trademark policy](.github/
 
 ### Shared Google app
 
-By default, connect with your own Google app. To enable a configured shared app,
-pass `GOOGLE_RELAY_URL` to the API container. The published Compose file leaves
-it unset until the shared app is verified by Google. Its client secret stays on
+The published Compose file enables the Broccoli app through the development relay
+at `https://integrations.dev.getbroccoli.com`. Set `GOOGLE_RELAY_URL` to use another
+relay, or set it to an empty value to disable the Broccoli app and use your own
+Google app. Google verification of the shared app is still pending. Its client secret stays on
 the relay; tokens pass through it during consent and refresh, while directory
 data goes directly from Google to your server. Protected setup remembers your
 instance’s public address for shared Google sign-in; no extra URL setting is

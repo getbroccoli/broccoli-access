@@ -19,7 +19,7 @@ A manual check of setup held by one browser, which connects Google Workspace wit
 ## Connect Google Workspace with the fake Google
 
 - [ ] Start shared Google setup through the intended public HTTPS address without `SELF_HOSTED_PUBLIC_URL`, including behind TLS termination. Later sign-in uses that same callback address. An explicit `SELF_HOSTED_PUBLIC_URL` override uses the configured address instead.
-- [ ] Without `GOOGLE_RELAY_URL`, "Use the Broccoli app" is disabled and marked "Coming soon", and "Use your own Google app" is selected.
+- [ ] With `GOOGLE_RELAY_URL` explicitly empty, "Use the Broccoli app" is disabled and marked "Coming soon", and "Use your own Google app" is selected.
 - [ ] With a configured relay, the Broccoli app is selected. Its copy explains that Google’s keys pass through the relay while directory data goes directly to this server. Credential fields appear only after choosing your own app.
 - [ ] The redirect address is `<URL>/api/google/callback`; "Copy" shows "Copied", and the copied text equals the address the fake Google redirects to after consent.
 - [ ] The five Google Cloud steps are listed; each link opens Google Cloud in a new tab.
