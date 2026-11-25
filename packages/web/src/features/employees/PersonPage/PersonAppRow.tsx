@@ -1,3 +1,5 @@
+import { Link } from "@tanstack/react-router";
+
 import { PersonAppChoiceButton } from "./PersonAppChoiceButton";
 import { PersonAppRole } from "./PersonAppRole";
 import type { PersonPageQuery } from "@/__generated__/graphql";
@@ -75,6 +77,15 @@ export function PersonAppRow({
         )}
         {first && row.state === "MISSING" && (
           <StatusBadge tone="warning">{t("people.person.missing")}</StatusBadge>
+        )}
+        {first && row.state === "NOT_CONNECTED" && (
+          <Link
+            to="/apps/$appId"
+            params={{ appId: row.app.id }}
+            className="rounded-full hover:opacity-80"
+          >
+            <StatusBadge tone="muted">{t("people.person.notConnected")}</StatusBadge>
+          </Link>
         )}
         {first && row.state === "EXTRA" && (
           <StatusBadge tone="extra">{t("people.person.extra")}</StatusBadge>

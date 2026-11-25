@@ -18,9 +18,7 @@ import {
   type AccountDates,
   accountSince,
   appChanges,
-  appSince,
   type AppStatus,
-  countSuspendedWithAccess,
   type FoundApp,
   planAppMatches,
   type Since,
@@ -32,6 +30,7 @@ import {
   findDirectoryAppId,
   findEmployeesInDirectory,
 } from "./directory";
+import { findConnectedAppIds, summarize } from "./appSummaries";
 import { findInAppFacts } from "./inAppFacts";
 
 const recordHistory = createRecordHistoryService();
@@ -88,6 +87,8 @@ export interface AppService {
    * it is connected. Trusted read: no `ctx`.
    */
   directoryAppId: (db: Orm | Tx) => Promise<string | null>;
+  /** The apps among these that a connection reads. Trusted read: no `ctx`. */
+  connectedAppIds: (db: Orm | Tx, appIds: readonly string[]) => Promise<Set<string>>;
   /** The employees whose account in the directory's app is suspended. Trusted read: no `ctx`. */
   findEmployeesSuspendedInDirectory: (db: Orm | Tx) => Promise<string[]>;
   /** The employee ids attached to the selected app accounts. Trusted read. */
@@ -195,6 +196,7 @@ export function createAppService(dependencies: AppDependencies): AppService {
     lockAppsForReview: (tx, ids) => appRepository(tx).lockForReview(ids),
     activeInDirectory: (db, employeeId) => activeInDirectory(db, connectors, employeeId),
     directoryAppId: (db) => findDirectoryAppId(db, connectors),
+    connectedAppIds: findConnectedAppIds,
     findEmployeesSuspendedInDirectory: (db) =>
       findEmployeesInDirectory(db, connectors, { status: "suspended" }),
     findAccountOwners: (db, ids) => appAccountRepository(db).findByIds(ids),
@@ -277,41 +279,6 @@ async function settleDiscoveredApps(
   await repository.updateStatus(idsWith("ignored"), "ignored");
   await appendUpdates(ctx, tx, changes, EDITED_DIRECTLY);
   return { approved: idsWith("approved").length, ignored: idsWith("ignored").length };
-}
-
-/**
- * The apps with their people, how those were found, since when, who keeps access though suspended,
- * and whether they are connected.
- */
-async function summarize(
-  dependencies: Pick<AppDependencies, "orm" | "connectors" | "members">,
-  apps: readonly App[],
-): Promise<AppSummary[]> {
-  const { orm, connectors } = dependencies;
-  const accounts = appAccountRepository(orm);
-  const appIds = apps.map(({ id }) => id);
-  const inAppFacts = await findInAppFacts(orm, dependencies);
-  const [accountsOfUsers, connections, suspended] = await Promise.all([
-    accounts.findUsersOfApps(appIds, inAppFacts),
-    appConnectionRepository(orm).findByApps(appIds),
-    findEmployeesInDirectory(orm, connectors, { status: "suspended" }),
-  ]);
-  const users = accountsOfUsers.filter(({ inApp }) => inApp !== false);
-  const usersByApp = Map.groupBy(users, ({ appId }) => appId);
-  const connectedAppIds = new Set(connections.map(({ appId }) => appId));
-  const suspendedInDirectory = new Set(suspended);
-  return apps.map((app) => {
-    const appUsers = usersByApp.get(app.id) ?? [];
-    const peopleCount = new Set(appUsers.map(({ employeeId }) => employeeId)).size;
-    return {
-      ...app,
-      peopleCount,
-      foundVia: [...new Set(appUsers.flatMap(({ foundVia }) => foundVia))].sort(),
-      since: appSince(appUsers),
-      suspendedWithAccessCount: countSuspendedWithAccess(appUsers, suspendedInDirectory),
-      connected: connectedAppIds.has(app.id),
-    };
-  });
 }
 
 /** One history line per created app and per app that gained external ids. */

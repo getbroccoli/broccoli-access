@@ -10,7 +10,11 @@ export interface PersonApp {
   /** The owner's own choice for this person, while it changes what they get or marks an account. */
   choice: "added" | "removed" | null;
   accountStatus: AccountStatus | null;
-  state: "active" | "suspended" | "missing" | "invited" | "extra" | null;
+  /**
+   * `not_connected`: they should have it, but the app has no connection and no account of theirs is
+   * known, so whether they lack it is unknown.
+   */
+  state: "active" | "suspended" | "missing" | "not_connected" | "invited" | "extra" | null;
 }
 
 export interface EmployeeAppChoice {
@@ -26,6 +30,8 @@ export interface PersonAppFacts {
   accounts: readonly { appId: string; status: AccountStatus }[];
   invites: readonly { appId: string; invitedAt: Date | null }[];
   listedApps: ReadonlySet<string>;
+  /** The apps a connection reads, among those the person should have. */
+  connectedApps: ReadonlySet<string>;
 }
 
 export function expectsApp(templateGivesIt: boolean, choice?: EmployeeAppChoice["choice"]) {
@@ -41,15 +47,7 @@ export function extraAppReason(choice: EmployeeAppChoice["choice"] | undefined, 
 
 /** Combines assignments, choices and actual access once per app, including apps only offering Invite. */
 export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
-  const sources = new Map<string, { templates: Template[]; roles: Set<string | null> }>();
-  for (const template of facts.templates) {
-    for (const { appId, role } of template.apps) {
-      const giving = sources.get(appId) ?? { templates: [], roles: new Set<string | null>() };
-      giving.templates.push(template);
-      giving.roles.add(role);
-      sources.set(appId, giving);
-    }
-  }
+  const sources = sourcesOf(facts.templates);
   const choices = new Map(facts.choices.map((choice) => [choice.appId, choice]));
   const accounts = new Map<string, AccountStatus>();
   for (const { appId, status } of facts.accounts) {
@@ -77,7 +75,13 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
       choice?.choice === "removed" ||
       extraAppReason(choice?.choice, facts.templates.length > 0 && facts.listedApps.has(appId)) !==
         null;
-    const state = appState({ expected, account, invited: !!invite?.invitedAt, extra });
+    const state = appState({
+      expected,
+      account,
+      invited: !!invite?.invitedAt,
+      extra,
+      connected: facts.connectedApps.has(appId),
+    });
     rows.push({
       appId,
       templates,
@@ -88,6 +92,20 @@ export function appsOfPerson(facts: PersonAppFacts): PersonApp[] {
     });
   }
   return rows;
+}
+
+/** Each app the templates give, with those templates and the roles they give it with. */
+function sourcesOf(templates: readonly Template[]) {
+  const sources = new Map<string, { templates: Template[]; roles: Set<string | null> }>();
+  for (const template of templates) {
+    for (const { appId, role } of template.apps) {
+      const giving = sources.get(appId) ?? { templates: [], roles: new Set<string | null>() };
+      giving.templates.push(template);
+      giving.roles.add(role);
+      sources.set(appId, giving);
+    }
+  }
+  return sources;
 }
 
 /** A choice of default is as explicit as any other picked role. */
@@ -125,14 +143,16 @@ function appState({
   account,
   invited,
   extra,
+  connected,
 }: {
   expected: boolean;
   account: AccountStatus | undefined;
   invited: boolean;
   extra: boolean;
+  connected: boolean;
 }): PersonApp["state"] {
   if (account === "active") return !expected && extra ? "extra" : "active";
   if (invited) return "invited";
-  if (expected) return "missing";
+  if (expected) return connected || account ? "missing" : "not_connected";
   return account ?? null;
 }

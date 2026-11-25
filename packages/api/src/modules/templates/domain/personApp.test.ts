@@ -18,6 +18,7 @@ const NOTHING = {
   accounts: [],
   invites: [],
   listedApps: new Set<string>(),
+  connectedApps: new Set([APP]),
 };
 const choice = (made: "added" | "removed", role: string | null = null) => ({
   employeeId: EMPLOYEE,
@@ -70,4 +71,27 @@ test("an added app that a template now gives comes from the template, with the t
   expect(rows).toMatchObject([
     { choice: null, role: null, state: "missing", templates: [ENGINEER] },
   ]);
+});
+
+test("a template app without a connection is not connected while no account of theirs is known", () => {
+  const rows = appsOfPerson({ ...NOTHING, templates: [ENGINEER], connectedApps: new Set() });
+
+  expect(rows).toMatchObject([{ appId: APP, state: "not_connected" }]);
+});
+
+test("a template app is missing once its connection finds no account of theirs", () => {
+  const rows = appsOfPerson({ ...NOTHING, templates: [ENGINEER] });
+
+  expect(rows).toMatchObject([{ appId: APP, state: "missing" }]);
+});
+
+test("a suspended account found in an app without a connection is missing", () => {
+  const rows = appsOfPerson({
+    ...NOTHING,
+    templates: [ENGINEER],
+    accounts: [{ appId: APP, status: "suspended" }],
+    connectedApps: new Set(),
+  });
+
+  expect(rows).toMatchObject([{ appId: APP, state: "missing", accountStatus: "suspended" }]);
 });

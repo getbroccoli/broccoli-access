@@ -26,7 +26,14 @@ export async function employeeAppFactsOf(read: EmployeeAppRead): Promise<Employe
     apps.findEmployeeAccounts(db, employeeIds, read.appIds),
     read.invites ?? apps.readAppInvites(ctx, employeeIds, db),
   ]);
-  const listedApps = await repo.listedApps([...new Set(accounts.map(({ appId }) => appId))]);
+  const expectedApps = [
+    ...templates.flat().flatMap((template) => template.apps.map(({ appId }) => appId)),
+    ...choices.map(({ appId }) => appId),
+  ];
+  const [listedApps, connectedApps] = await Promise.all([
+    repo.listedApps([...new Set(accounts.map(({ appId }) => appId))]),
+    apps.connectedAppIds(db, [...new Set(expectedApps)]),
+  ]);
   const choicesByPerson = Map.groupBy(choices, (choice) => choice.employeeId);
   const accountsByPerson = Map.groupBy(accounts, (account) => account.employeeId);
   const invitesByPerson = Map.groupBy(invites, (invite) => invite.employeeId);
@@ -42,6 +49,7 @@ export async function employeeAppFactsOf(read: EmployeeAppRead): Promise<Employe
     accounts: accountsByPerson.get(id) ?? [],
     invites: invitesByPerson.get(id) ?? [],
     listedApps,
+    connectedApps,
   }));
 }
 

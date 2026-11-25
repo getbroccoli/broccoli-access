@@ -159,6 +159,7 @@ export const peopleEn = {
   "people.person.from": "From",
   "people.person.noTemplate": "No template",
   "people.person.missing": "Missing",
+  "people.person.notConnected": "App not connected",
   "people.person.extra": "Extra",
   "people.person.addApp": "+ Add app",
   "people.person.addApp.loading": "Loading apps…",
@@ -214,6 +215,8 @@ export const peopleEn = {
   "people.offboard.couldntDisable": "Couldn’t disable",
   "people.provision.missing": "{count} apps missing.",
   "people.provision.missingOne": "1 app missing.",
+  "people.provision.notConnected": "{count} apps not connected.",
+  "people.provision.notConnectedOne": "1 app not connected.",
   "people.provision.pickRoleFirst": "Pick {app}’s role first.",
   "people.provision.updateRoleFirst": "Update {app}’s role in its template first.",
   "people.provision.byHandIsYours":
