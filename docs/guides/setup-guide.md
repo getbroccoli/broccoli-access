@@ -1,6 +1,6 @@
 # Setup
 
-Start Broccoli Access with `docker compose up -d --wait` and, once it returns, open http://localhost:8080, or the port `HOST_WEB_PORT` sets in `.env`. The first browser to open it holds setup: it connects Google Workspace with your own Google app, following the steps the page shows, and registers the redirect address it shows for that app. The Google super admin who consents becomes the owner and is signed in. Any other browser sees that setup is in progress until the owner exists.
+Start Broccoli Access with `docker compose up -d --wait` and, once it returns, open http://localhost:8080, or the port `HOST_WEB_PORT` sets in `.env`. The first browser to open it holds setup: it connects Google Workspace with the Broccoli app through the development relay by default. You can also choose your own Google app, following the steps the page shows, and register the redirect address it shows for that app. The Google super admin who consents becomes the owner and is signed in. Any other browser sees that setup is in progress until the owner exists.
 
 Set `SELF_HOSTED_PUBLIC_URL` in a `.env` file beside `docker-compose.yml`, such as `SELF_HOSTED_PUBLIC_URL=https://access.example.com`, when Broccoli Access has a domain: only that origin may sign in, and an https address gives Secure session cookies.
 

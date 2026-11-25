@@ -10,6 +10,8 @@ services:
     environment:
       DATABASE_URL: postgres://broccoli_access@postgres:5432/broccoli_access
       CONNECTORS_URL: http://connectors:4000
+      # Use the shared development Google app; set an empty value to disable it.
+      GOOGLE_RELAY_URL: ${GOOGLE_RELAY_URL-https://integrations.dev.getbroccoli.com}
       LOG_LEVEL: ${LOG_LEVEL:-}
       # Set it when Broccoli Access has a domain; unset trusts the address each request uses.
       SELF_HOSTED_PUBLIC_URL: ${SELF_HOSTED_PUBLIC_URL:-}

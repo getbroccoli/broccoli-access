@@ -58,9 +58,10 @@ The Broccoli Access name and logo are covered by our [trademark policy](.github/
 
 ### Shared Google app
 
-By default, connect with your own Google app. To enable a configured shared app,
-pass `GOOGLE_RELAY_URL` to the API container. The published Compose file leaves
-it unset until the shared app is verified by Google. Its client secret stays on
+The published Compose file enables the Broccoli app through the development relay
+at `https://integrations.dev.getbroccoli.com`. Set `GOOGLE_RELAY_URL` to use another
+relay, or set it to an empty value to disable the Broccoli app and use your own
+Google app. Google verification of the shared app is still pending. Its client secret stays on
 the relay; tokens pass through it during consent and refresh, while directory
 data goes directly from Google to your server. Protected setup remembers your
 instance’s public address for shared Google sign-in; no extra URL setting is
