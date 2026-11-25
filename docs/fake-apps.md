@@ -363,13 +363,13 @@ Google's paths and bodies, as for the reads. Each needs the scope `https://www.g
 
 ### Fake Google: asking for the write permission
 
-- Authorization accepts `include_granted_scopes=true`, as Google does: the token it gives then holds the scopes granted before plus the new one. The consent page lists only the new permission, "See, create and change users in your organisation".
+- Authorization accepts `include_granted_scopes=true`, as Google does: the token it gives then holds the scopes granted before plus the new one. The consent page then lists only the API permissions asked for, such as "See, create and change users in your organisation", never the sign-in scopes.
 - Cancel redirects with `error=access_denied`, and the stored connection keeps its old scopes.
 - `POST /_fake/consent/refuse-scope` with a scope: the next consent grants every scope asked for but that one, as when an admin unticks it.
 
 ### Fake Google: control endpoints added
 
-- `GET /_fake/state` also counts created users, and lists the users created since the last reset with `primaryEmail`, `suspended` and `changePasswordAtNextLogin`. It never returns a password.
+- `GET /_fake/state` also lists, under `createdUsers`, the users created since the last reset, each with `primaryEmail`, `suspended` and `changePasswordAtNextLogin`. It never returns a password.
 - `POST /_fake/users/{email}/delete`: the user is gone from the directory, as when an admin deletes them in Google.
 - `POST /_fake/failures` takes the two write endpoints too.
 
