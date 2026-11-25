@@ -11,6 +11,7 @@ import { t } from "@/i18n";
 import { ConnectContainerConnectorDialog } from "../ConnectContainerConnectorDialog";
 import { connectsWithText } from "../connectsWithText";
 import { ReconnectAppSessionButton } from "./ReconnectAppSessionButton";
+import { ReconnectIntegrationUserButton } from "./ReconnectIntegrationUserButton";
 
 type Props = {
   /** The connected connector whose connection needs reconnecting. */
@@ -53,6 +54,10 @@ export function ReconnectButton({
         }
       />
     );
+  }
+  // Signed in as the integration user, it signs in as it again: never silently as the owner.
+  if (connector.connection?.sessionFrom === "SERVER_SIGN_IN") {
+    return <ReconnectIntegrationUserButton connector={connector} button={button} />;
   }
   return <ReconnectAppSessionButton connector={connector} button={button} />;
 }

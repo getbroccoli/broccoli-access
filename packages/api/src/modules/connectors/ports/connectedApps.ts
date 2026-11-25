@@ -50,4 +50,27 @@ export interface ConnectedApps {
       sessionFrom: AppSessionSource | null;
     }[]
   >;
+  /** The connection with its secrets from one stored version, or null. Never for a client. */
+  readConnectionWithSecrets(
+    db: Orm | Tx,
+    connectionId: string,
+  ): Promise<{
+    connection: {
+      id: string;
+      connector: string;
+      settings: Record<string, unknown>;
+      sessionFrom: AppSessionSource | null;
+    };
+    secrets: Record<string, unknown>;
+  } | null>;
+  /**
+   * Replaces the connection's secrets, joining `tx`, unless they are no longer `replacing`; returns
+   * whether it saved.
+   */
+  changeConnection(
+    ctx: SecurityContext,
+    tx: Tx,
+    connectionId: string,
+    update: { secrets: Record<string, unknown>; replacing: Record<string, unknown> },
+  ): Promise<boolean>;
 }

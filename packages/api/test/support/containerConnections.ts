@@ -16,6 +16,7 @@ import { createAppConnectionService } from "../../src/modules/apps";
 import {
   createContainerConnectionService,
   createContainerConnectors,
+  createSessionRenewals,
 } from "../../src/modules/connectors";
 import { recordingJobQueue } from "./recordingJobQueue";
 import { signInToFakeSlack } from "./signInToFakeSlack";
@@ -36,6 +37,25 @@ export function containerConnectors(url?: string) {
   return createContainerConnectors({ url, logger: createLogger("silent") });
 }
 
+/** Real services shared by connecting, scanning and changing accounts, as in a running API. */
+export function containerDependencies(
+  orm: Orm,
+  transact: Transact,
+  connectorsUrl?: string,
+  googleUrl = "http://127.0.0.1:9",
+) {
+  return {
+    orm,
+    transact,
+    secretBox: TEST_SECRET_BOX,
+    wait: () => Promise.resolve(),
+    logger: createLogger("silent"),
+    containerConnectors: containerConnectors(connectorsUrl),
+    connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
+    integrationUser: integrationUsers(orm, { googleUrl, connectorsUrl }),
+  };
+}
+
 /** Connects and scans through the container, recording the jobs for the test to run. */
 export function containerConnections(
   orm: Orm,
@@ -44,22 +64,11 @@ export function containerConnections(
   now?: () => Date,
 ) {
   const { jobs, sent } = recordingJobQueue();
-  const connectors = containerConnectors(url);
-  const scanService = scans(orm, { jobs, connectors });
-  const service = createContainerConnectionService({
-    orm,
-    transact,
-    secretBox: TEST_SECRET_BOX,
-    now,
-    wait: () => Promise.resolve(),
-    logger: createLogger("silent"),
-    containerConnectors: connectors,
-    connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
-    scans: scanService,
-    // No test of these creates the user, so no Google is called.
-    integrationUser: integrationUsers(orm, { googleUrl: "http://127.0.0.1:9", connectorsUrl: url }),
-  });
-  return { service, scans: scanService, sent };
+  const dependencies = containerDependencies(orm, transact, url);
+  const renewals = createSessionRenewals(dependencies);
+  const scanService = scans(orm, { jobs, connectors: dependencies.containerConnectors, renewals });
+  const service = createContainerConnectionService({ ...dependencies, scans: scanService, now });
+  return { service, scans: scanService, sent, renewals };
 }
 
 /** Leaves the first Linear scan queued and returns its stored app, connection and source. */

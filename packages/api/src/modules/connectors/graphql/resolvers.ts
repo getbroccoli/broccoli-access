@@ -77,6 +77,9 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
     ContainerConnection: {
       sessionFrom: ({ sessionFrom }) => sessionFrom && toEnum(sessionFrom),
       connector: (connection) => ({ connector: connection.connector, connection }),
+      integrationUserSuspended: async ({ id, sessionFrom }, _args, context) =>
+        sessionFrom === "server_sign_in" &&
+        (await connections.readIntegrationUserSuspended(context.getActor(), id)),
     },
     AppSessionHandOver: {
       id: ({ requestId }) => requestId,

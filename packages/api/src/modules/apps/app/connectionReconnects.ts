@@ -3,7 +3,11 @@ import { isDeepStrictEqual } from "node:util";
 import { ApplicationError } from "../../../core/applicationError";
 import type { AppSessionSource, ConnectorErrorCode } from "../../../core/connectors";
 import type { Orm, Tx } from "../../../core/db";
-import { createRecordHistoryService, type HistoryAppend } from "../../../core/records";
+import {
+  createRecordHistoryService,
+  type HistoryAppend,
+  type HistoryLine,
+} from "../../../core/records";
 import type { SecretBox } from "../../../core/secrets";
 import type { SecurityContext } from "../../../core/security";
 import { accountChangeRepository, type AppConnection, appConnectionRepository } from "../db";
@@ -30,15 +34,17 @@ export async function turnToReconnect(
     error,
     ref,
     secretsUsed,
+    afterRenewal,
   }: {
     connectionId: string;
     error: ConnectorErrorCode;
     ref: string;
     secretsUsed: Record<string, unknown> | null;
+    afterRenewal?: boolean;
   },
 ): Promise<boolean> {
   ctx.requireSystem();
-  const cause = reconnectCauseOf(error);
+  const cause = reconnectCauseOf(error, { afterRenewal });
   const connections = appConnectionRepository(tx);
   const connection = await connections.lockById(connectionId);
   const stillUsed = await holdsSecrets(secretBox, tx, connectionId, secretsUsed);
@@ -52,6 +58,53 @@ export async function turnToReconnect(
   });
   await accountChangeRepository(tx).failRunningOfConnection(connectionId, cause, new Date());
   return true;
+}
+
+/**
+ * Makes the connections made by the integration user's sign-in follow its status in the directory's
+ * scan `ref`, as `AppConnectionService.syncIntegrationUserStops` says.
+ */
+export async function syncIntegrationUserStops(
+  ctx: SecurityContext,
+  tx: Tx,
+  { suspended, ref }: { suspended: boolean; ref: string },
+): Promise<void> {
+  ctx.requireSystem();
+  const connections = appConnectionRepository(tx);
+  const signedIn = (await connections.findAll()).filter(
+    ({ sessionFrom }) => sessionFrom === "server_sign_in",
+  );
+  // The lines of the stops, which only a scan of the directory lifts again.
+  const stops = suspended
+    ? new Map<string, HistoryLine>()
+    : await recordHistory.readLatestWithCause(
+        tx,
+        "app_connection",
+        signedIn.map(({ id }) => id),
+        "CONNECTOR_ERROR",
+      );
+  for (const { id } of signedIn) {
+    const connection = (await connections.lockById(id))!;
+    if (suspended && connection.status === "connected") {
+      const after = { status: "reconnect", reconnectCause: "authentication_failed" } as const;
+      await connections.update(id, after);
+      await appendStatusHistory(ctx, tx, { kind: "CONNECTOR_ERROR", ref }, connection, after);
+      await accountChangeRepository(tx).failRunningOfConnection(
+        id,
+        "authentication_failed",
+        new Date(),
+      );
+    } else if (
+      !suspended &&
+      connection.status === "reconnect" &&
+      connection.reconnectCause === "authentication_failed" &&
+      stops.get(id)?.cause.ref === ref
+    ) {
+      const after = { status: "connected", reconnectCause: null } as const;
+      await connections.update(id, after);
+      await appendStatusHistory(ctx, tx, { kind: "FOUND_BY_SCAN", ref }, connection, after);
+    }
+  }
 }
 
 /** Replaces the connection's secrets and sets it connected, as `AppConnectionService.reconnect` says. */

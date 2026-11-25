@@ -1,0 +1,19 @@
+/** English copy for a connection that signs in as the integration user, under `apps.*`. */
+export const appsIntegrationUserEn = {
+  "apps.couldnt.integrationUserSuspended":
+    "{app} stopped: the integration user is suspended in Google.",
+  "apps.couldnt.integrationUserRefused": "{app} did not accept the integration user’s sign-in.",
+  "apps.couldnt.integrationUserNotAdmin":
+    "The integration user is no longer an admin in {app}. If it is not a member, invite it as an admin.",
+  "apps.couldnt.integrationUserCheck":
+    "A check, such as a CAPTCHA, stopped Broccoli Access from signing in to {app} as the integration user. Only a person can pass it.",
+  "apps.couldnt.integrationUserElsewhere":
+    "The integration user’s sign-in reaches another workspace, not {workspace}.",
+  "apps.couldnt.reconnectIntegrationUser":
+    "Sign the integration user in to {app} again, then try again.",
+  "apps.reconnect.failsUntilIntegrationUser":
+    "Changes in {app} fail until the integration user signs in again.",
+  "apps.reconnect.integrationUserButton": "Sign in again as the integration user",
+  "apps.reconnect.integrationUserSuspendedHint":
+    "Restore the integration user in Google, then sign in again.",
+} as const;

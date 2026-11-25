@@ -22,6 +22,7 @@ import {
   reconnect,
   type Reconnection,
   type ReconnectReason,
+  syncIntegrationUserStops,
   turnToReconnect,
 } from "./connectionReconnects";
 
@@ -85,8 +86,22 @@ export interface AppConnectionService {
       error: ConnectorErrorCode;
       ref: string;
       secretsUsed: Record<string, unknown> | null;
+      /** The error is what signing in again answered, so a check also counts as a cause. */
+      afterRenewal?: boolean;
     },
   ) => Promise<boolean>;
+  /**
+   * After the directory's scan `ref`: with the integration user `suspended` there, turns every
+   * connected connection made by its sign-in to `reconnect` with `authentication_failed`, failing
+   * its running changes; with it active, turns those that this scan's suspension stopped back to
+   * `connected`, never one in `reconnect` for another reason. Appends the history, joining `tx`.
+   * System only.
+   */
+  syncIntegrationUserStops: (
+    ctx: SecurityContext,
+    tx: Tx,
+    scan: { suspended: boolean; ref: string },
+  ) => Promise<void>;
   /**
    * Replaces the connection's secrets, with who made their app session, and sets it `connected`
    * without a cause, joining `tx`; appends an `EDITED_DIRECTLY` line when its status changed, and
@@ -216,6 +231,7 @@ export function createAppConnectionService({
       return true;
     },
     turnToReconnect: (ctx, tx, failure) => turnToReconnect(secretBox, ctx, tx, failure),
+    syncIntegrationUserStops,
     reconnect: (ctx, tx, reconnection) => reconnect(secretBox, ctx, tx, reconnection),
     readReconnectReasons: (db, connectionIds) => readReconnectReasons(db, connectionIds),
     readConnection: (db, connector) => appConnectionRepository(db).findByConnector(connector),

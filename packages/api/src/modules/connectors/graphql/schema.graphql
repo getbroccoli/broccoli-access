@@ -44,6 +44,8 @@ type ContainerConnection {
   noticeAcceptedAt: DateTime
   "Who made its app session; null for a connection without one, such as one with an API key."
   sessionFrom: AppSessionSource
+  "Whether the connection signs in as the integration user while the directory's last scan found it suspended: its calls stop, and it shows Reconnect."
+  integrationUserSuspended: Boolean!
   "The connector it connects through."
   connector: ContainerConnector!
 }

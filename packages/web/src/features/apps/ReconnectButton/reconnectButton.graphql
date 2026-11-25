@@ -4,6 +4,11 @@ fragment ReconnectButton_connector on ContainerConnector {
   connectionFields {
     kind
   }
+  signsInAsIntegrationUser
+  connection {
+    id
+    sessionFrom
+  }
   ...ConnectContainerConnectorDialog_connector
 }
 

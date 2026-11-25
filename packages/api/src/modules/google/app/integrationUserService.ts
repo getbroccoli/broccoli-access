@@ -12,7 +12,10 @@ import {
   parseIntegrationUserEmail,
 } from "../domain";
 import { openConsentState } from "../helpers";
-import { findIntegrationAccountEmail } from "./findIntegrationAccountEmail";
+import {
+  findIntegrationAccountEmail,
+  isIntegrationUserSuspended,
+} from "./findIntegrationAccountEmail";
 import type { ScannedMembers } from "../ports";
 import type { GoogleConnectionDependencies } from "./googleConnectionService";
 import { createDirectoryUser, verifyWriteGrant, type WriteGrant } from "./integrationUserDirectory";
@@ -70,7 +73,14 @@ export interface IntegrationUserService {
    * Signs in to the app of the container's `connector` as the integration user and answers the
    * connection with its new session, or why not. Its secrets go to the container only. Admins only.
    */
-  signInToApp: (ctx: SecurityContext, connector: string) => Promise<AppSignIn>;
+  signInToApp: (
+    ctx: SecurityContext,
+    connector: string,
+    /** The stored connection when renewing its session; left out for a first sign-in. */
+    renewing?: { settings: Record<string, unknown>; secrets: Record<string, unknown> },
+  ) => Promise<AppSignIn>;
+  /** Whether the directory's last scan found the integration user suspended. Trusted read. */
+  isSuspendedInDirectory: (db: Orm | Tx) => Promise<boolean>;
   /** The integration user as Settings shows it, its id the directory's; null before it exists. Owner only. */
   readIntegrationUser: (
     ctx: SecurityContext,
@@ -186,10 +196,11 @@ export function createIntegrationUserService(
       }
       signIn.start();
     },
-    signInToApp(ctx, connector) {
+    signInToApp(ctx, connector, renewing) {
       ctx.require("MANAGE_WORKSPACE");
-      return signInToApp(signInDependencies, connector);
+      return signInToApp(signInDependencies, connector, renewing);
     },
+    isSuspendedInDirectory: (db) => isIntegrationUserSuspended(db, dependencies),
     async readIntegrationUser(ctx) {
       ctx.require("MANAGE_WORKSPACE");
       const found = await integrationUserRepository(orm).find();

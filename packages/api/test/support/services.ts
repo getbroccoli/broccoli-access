@@ -1,6 +1,6 @@
 import { createBeforeCommitBus, transactor, type Orm, type Transact } from "../../src/core/db";
 import { createEventBus } from "../../src/core/events";
-import type { ConnectorRegistry } from "../../src/core/connectors";
+import type { ConnectorRegistry, SessionRenewals } from "../../src/core/connectors";
 import type { JobQueue } from "../../src/core/jobs";
 import { createMailSettingsService, type MailSettingsService } from "../../src/core/instance";
 import { createLogger, type Logger } from "../../src/core/logger";
@@ -48,6 +48,8 @@ import {
   type AccountChangeOptions,
   accountChanges,
 } from "./accountChanges";
+import { createSessionRenewals } from "../../src/modules/connectors";
+import { containerDependencies } from "./containerConnections";
 import { fakeMail } from "./fakeMail";
 import { TEST_SECRET_BOX } from "./testSecretBox";
 import { testTransactor } from "./testTransactor";
@@ -277,19 +279,21 @@ export function scans(
     relayUrl,
     jobs = recordingJobQueue().jobs,
     connectors,
+    renewals,
     transact = testTransactor(orm),
   }: {
     googleUrl?: string;
     relayUrl?: string;
     jobs?: JobQueue;
     connectors?: ConnectorRegistry;
+    renewals?: SessionRenewals;
     transact?: Transact;
   },
 ): ScanService {
+  const dependencies = containerDependencies(orm, transact, undefined, googleUrl);
   return createScanService({
-    orm,
-    transact,
-    logger: createLogger("silent"),
+    ...dependencies,
+    renewals: renewals ?? createSessionRenewals(dependencies),
     jobs,
     connectors: connectors ?? {
       list: () =>
@@ -302,14 +306,12 @@ export function scans(
         ]),
     },
     apps: {
-      ...createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
+      ...dependencies.connectedApps,
       ...createAppAccountService(),
       ...createAppInvitationService(),
       ...apps(orm),
     },
     directory: createDirectorySyncService(),
-    integrationUser: integrationUsers(orm, { googleUrl }),
-    wait: () => Promise.resolve(),
   });
 }
 

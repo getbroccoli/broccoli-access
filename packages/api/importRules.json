@@ -96,7 +96,7 @@
     "src/core/env": ["src/utils"],
     "src/core/readiness": [],
     "src/core/secrets": [],
-    "src/core/connectors": [],
+    "src/core/connectors": ["src/core/security"],
     "test/support": [
       "src/core/*",
       "src/core/instance/app",

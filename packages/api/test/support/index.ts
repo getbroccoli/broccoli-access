@@ -27,6 +27,11 @@ export {
   inviteIntegrationUserToFakeSlack,
   readyIntegrationUser,
 } from "./integrationUserConnect";
+export {
+  slackSession,
+  slackSessionForOwner,
+  suspendIntegrationUserInDirectory,
+} from "./slackSession";
 export { TEST_SECRET_BOX } from "./testSecretBox";
 export { storedFileIds } from "./storedFileIds";
 export {

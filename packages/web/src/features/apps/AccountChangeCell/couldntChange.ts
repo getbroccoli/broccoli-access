@@ -44,12 +44,17 @@ export function couldntChangeReason(
     credential: ConnectionFieldKind;
     /** Whether the connection needs reconnecting before the change can run again. */
     toReconnect: boolean;
+    /** Set for a connection that signs in as the integration user, with whether Google suspended it. */
+    integrationUser?: { suspended: boolean } | null;
   },
 ): string {
-  const { app, credential, toReconnect } = about;
-  const reconnect = toReconnect
-    ? ` ${t(credential === "APP_SESSION" ? "apps.couldnt.reconnectSession" : "apps.couldnt.reconnectKey", { app })}`
-    : "";
+  const { app, credential, toReconnect, integrationUser } = about;
+  const reconnectCopy = integrationUser
+    ? "apps.couldnt.reconnectIntegrationUser"
+    : credential === "APP_SESSION"
+      ? "apps.couldnt.reconnectSession"
+      : "apps.couldnt.reconnectKey";
+  const reconnect = toReconnect ? ` ${t(reconnectCopy, { app })}` : "";
   // Broccoli Access never reached an app without a connection, so it says nothing of the app.
   if (failure === "NO_CONNECTION") {
     return reasonOf(failure, about);
@@ -168,6 +173,8 @@ const RECONNECT_FAILURES: readonly AccountChangeFailure[] = [
   "AUTHENTICATION_FAILED",
   "PERMISSION_MISSING",
   "WRONG_WORKSPACE",
+  // Only signing in again as the integration user turns it to Reconnect; the status says whether it did.
+  "BLOCKED_BY_CHECK",
 ];
 
 const DISABLE_HINTS = {
@@ -226,14 +233,18 @@ function reasonOf(
     connectionUserEmail,
     credential,
     historical,
+    integrationUser,
   }: Parameters<typeof couldntChangeReason>[1],
 ): string {
   const withSession = credential === "APP_SESSION";
+  const causeAbout = { app, withSession, email: connectionUserEmail, workspace, integrationUser };
   switch (failure) {
     case "UNEXPECTED_RESPONSE":
       return t("apps.couldnt.unexpectedResponse", { app });
     case "BLOCKED_BY_CHECK":
-      return t("apps.couldnt.blockedByCheck", { app });
+      return integrationUser
+        ? reconnectCauseLine(failure, causeAbout)
+        : t("apps.couldnt.blockedByCheck", { app });
     case "APP_UNAVAILABLE":
       if (action === "INVITE")
         return t(
@@ -246,12 +257,7 @@ function reasonOf(
     case "AUTHENTICATION_FAILED":
     case "PERMISSION_MISSING":
     case "WRONG_WORKSPACE":
-      return reconnectCauseLine(failure, {
-        app,
-        withSession,
-        email: connectionUserEmail,
-        workspace,
-      });
+      return reconnectCauseLine(failure, causeAbout);
     case "ACCOUNT_NOT_FOUND":
       return t("apps.couldnt.accountNotFound", { app, name: person.name, email: person.email });
     case "NOT_ALLOWED":

@@ -162,6 +162,8 @@ it.for([
   ["AUTHENTICATION_FAILED", "RECONNECT", "SUSPEND", false, true],
   ["PERMISSION_MISSING", "RECONNECT", "SUSPEND", false, true],
   ["WRONG_WORKSPACE", "RECONNECT", "SUSPEND", false, true],
+  ["BLOCKED_BY_CHECK", "RECONNECT", "SUSPEND", false, true],
+  ["BLOCKED_BY_CHECK", "CONNECTED", "SUSPEND", true, false],
   ["AUTHENTICATION_FAILED", "CONNECTED", "SUSPEND", true, false],
   ["UNEXPECTED_RESPONSE", "RECONNECT", null, false, false],
 ] as const)(

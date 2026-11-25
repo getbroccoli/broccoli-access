@@ -3,16 +3,19 @@ import { useQuery } from "@apollo/client/react";
 import { ContainerConnectorsSettingsDocument } from "@/__generated__/graphql";
 import { t } from "@/i18n";
 import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
+import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 
 import { ContainerConnectorCard } from "./ContainerConnectorCard";
 
 /** Settings' Apps section: a card for each app the connectors container connects; none without one. */
-export function ContainerConnectorsSettings() {
+export function ContainerConnectorsSettings({ directoryScanning }: { directoryScanning: boolean }) {
   // A scan started elsewhere, such as on the app's page, changes the connection outside this cache.
   const query = useQuery(ContainerConnectorsSettingsDocument, { fetchPolicy: "cache-and-network" });
   const connectors = query.data?.containerConnectors ?? [];
   // A scan's results, such as its people count, commit with its end: read them once it ends.
   useRefetchAfterContainerConnectorScans(query.refetch);
+  // The directory's scan can stop or restore the apps that sign in as the integration user.
+  usePollWhileScanning(directoryScanning, query, query.refetch);
   if (connectors.length === 0) {
     return null;
   }

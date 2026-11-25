@@ -53,6 +53,16 @@ mutation ConnectWithIntegrationUser($input: ContainerConnectorConnectWithIntegra
               count
             }
           }
+          # What signing in again changes in the people's offers, as the other Reconnect returns it.
+          app {
+            id
+            users {
+              id
+              offeredChange
+              offersRemove
+              offersReconnect
+            }
+          }
         }
       }
       error {

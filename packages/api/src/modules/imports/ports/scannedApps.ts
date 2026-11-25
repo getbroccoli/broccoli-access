@@ -57,8 +57,18 @@ export interface ScannedApps {
       error: ConnectorErrorCode;
       ref: string;
       secretsUsed: Record<string, unknown> | null;
+      afterRenewal?: boolean;
     },
   ): Promise<boolean>;
+  /**
+   * After the directory's scan `ref`: stops the connections made by the integration user's sign-in
+   * while it is `suspended` there, and lifts the stops this suspension made once it is not.
+   */
+  syncIntegrationUserStops(
+    ctx: SecurityContext,
+    tx: Tx,
+    scan: { suspended: boolean; ref: string },
+  ): Promise<void>;
   /**
    * Makes the accounts `findingKind` saw exactly `accounts`, with history, joining `tx`; an account
    * in an app that another connection than `connectionId` reads keeps its status. Returns how many

@@ -10,6 +10,7 @@ import { type AppSessionHandOver, createAppSessionHandOvers } from "./appSession
 import { connectionOf, isOtherWorkspace, refuseOtherWorkspace } from "./connectionOf";
 import { connectWithIntegrationUser } from "./connectWithIntegrationUser";
 import { replaceSecrets, saveConnection, summaryOf } from "./saveConnection";
+import { createSessionRenewals } from "./sessionRenewals";
 import { testedConnection } from "./testedConnection";
 import {
   appSessionFieldOf,
@@ -102,6 +103,11 @@ export interface ContainerConnectionService {
     ctx: SecurityContext,
     requestId: string,
   ) => Promise<AppSessionHandOver | null>;
+  /**
+   * Whether the connection signs in as the integration user while the directory's last scan found
+   * it suspended, so its calls stop. Needs MANAGE_WORKSPACE.
+   */
+  readIntegrationUserSuspended: (ctx: SecurityContext, connectionId: string) => Promise<boolean>;
   /** The container's connectors in its order, each with its connection. Needs MANAGE_WORKSPACE. */
   listConnectors: (ctx: SecurityContext) => Promise<ConnectorWithConnection[]>;
   /** The connections through the container of those of `appIds` that have one, by app id. Needs MANAGE_WORKSPACE. */
@@ -190,6 +196,7 @@ export function createContainerConnectionService(
   const { orm, containerConnectors, connectedApps, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
   const handOvers = createAppSessionHandOvers({ secretBox: dependencies.secretBox, now });
+  const renewals = createSessionRenewals(dependencies);
   return {
     async connect(ctx, input) {
       ctx.require("MANAGE_WORKSPACE");
@@ -267,6 +274,10 @@ export function createContainerConnectionService(
     async readAppSessionHandOver(ctx, requestId) {
       ctx.require("MANAGE_WORKSPACE");
       return ctx.user && handOvers.read(ctx.user.userId, requestId);
+    },
+    readIntegrationUserSuspended(ctx, connectionId) {
+      ctx.require("MANAGE_WORKSPACE");
+      return renewals.isStopped(connectionId);
     },
     listConnectors(ctx) {
       ctx.require("MANAGE_WORKSPACE");

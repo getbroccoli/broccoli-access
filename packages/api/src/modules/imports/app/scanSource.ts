@@ -7,8 +7,12 @@ import {
   type ConnectorErrorCode,
   type ImportedAccount,
   type PendingInvitation,
+  callWithRenewal,
+  RenewalError,
+  RenewedSessionRefusedError,
   withConnectorRetries,
 } from "../../../core/connectors";
+import type { Tx } from "../../../core/db";
 import { createSetupStepService } from "../../../core/instance";
 import type { SecurityContext } from "../../../core/security";
 import { importSourceRepository } from "../db";
@@ -29,6 +33,8 @@ export interface ScanFailure {
   secretsUsed: Record<string, unknown> | null;
   /** Whether the connection may turn to Reconnect: one of the connectors container's. */
   reconnects: boolean;
+  /** Whether the failure is what signing in again answered, which turns Reconnect with a check too. */
+  afterRenewal: boolean;
 }
 
 /**
@@ -57,7 +63,8 @@ export async function scanSource(
       throw new ConnectorError("app_unavailable");
     }
     const target = { sourceId, connection, connector, used, revision };
-    if (!(await readAndSave(ctx, dependencies, target, progressBySource))) {
+    const saved = await readRenewing(ctx, dependencies, target, progressBySource);
+    if (!saved) {
       if (restarted)
         throw new ApplicationError("CONFLICT", "The roster changed on both scan attempts.");
       dependencies.logger.info({ sourceId }, "Restarting scan after an overlapping removal");
@@ -73,9 +80,42 @@ export async function scanSource(
       failure: error.code,
       directoryRevision: connector?.isDirectory ? revision : undefined,
       secretsUsed: used.secrets,
-      reconnects: connector?.isDirectory === false,
+      reconnects:
+        connector?.isDirectory === false && !(error instanceof RenewedSessionRefusedError),
+      afterRenewal: error instanceof RenewalError,
     };
   }
+}
+
+/**
+ * Reads and saves the scan, signing in again once when a call answers `authentication_failed` for
+ * a connection made by sign-in. A connection whose integration user the directory shows suspended
+ * makes no call at all.
+ */
+async function readRenewing(
+  ctx: SecurityContext,
+  dependencies: ScanDependencies,
+  target: ScanTarget,
+  progressBySource: Map<string, ScanProgress>,
+): Promise<boolean> {
+  const { renewals, logger } = dependencies;
+  const { sourceId, connection, connector, used } = target;
+  if (!connector.isDirectory && (await renewals.isStopped(connection.id))) {
+    logger.warn(
+      { sourceId, connectionId: connection.id },
+      "Scan not called: the integration user is suspended in the directory",
+    );
+    throw new ConnectorError("authentication_failed");
+  }
+  return callWithRenewal(() => readAndSave(ctx, dependencies, target, progressBySource), {
+    renewals,
+    ctx,
+    connectionId: connection.id,
+    secrets: () => used.secrets,
+    onRenewed: (renewed) => {
+      used.secrets = renewed;
+    },
+  });
 }
 
 /** The secrets the scan's calls use: the stored ones, then those it renewed and saved. */
@@ -174,6 +214,9 @@ async function saveScan(
     if (savedCount !== null && savedCount !== (await sources.countRecords(sourceId)).accounts)
       return null;
     await sources.replaceRecords(sourceId, accounts);
+    if (findings.connector.isDirectory) {
+      await followIntegrationUser(ctx, tx, dependencies, { sourceId, accounts });
+    }
     const { accountsSetToService } = await syncAccounts(ctx, tx, findings, dependencies);
     await sources.markScanned(sourceId, new Date());
     if (!source.readAt)
@@ -183,6 +226,22 @@ async function saveScan(
       findings.connector.isDirectory && (await setupSteps.finishScanStep(ctx, tx));
     return { saved: true, finishedSetupScan, accountsSetToService };
   });
+}
+
+/** Lets the connections made by the integration user's sign-in follow its status in the directory. */
+async function followIntegrationUser(
+  ctx: SecurityContext,
+  tx: Tx,
+  { integrationUser, apps }: ScanDependencies,
+  { sourceId, accounts }: { sourceId: string; accounts: readonly ImportedAccount[] },
+): Promise<void> {
+  const googleId = await integrationUser.readGoogleUserId(ctx, tx);
+  const member = accounts.find(({ sourceKey }) => sourceKey === googleId);
+  // Until the directory lists the integration user, nothing is known of it.
+  if (member) {
+    const suspended = member.values.status === "suspended";
+    await apps.syncIntegrationUserStops(ctx, tx, { suspended, ref: sourceId });
+  }
 }
 
 /** Every page's accounts, and the pending invitations any page carries. */

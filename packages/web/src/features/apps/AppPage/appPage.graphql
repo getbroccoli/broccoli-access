@@ -21,6 +21,7 @@ query AppPage($id: ID!) {
       adminUrl
       status
       sessionFrom
+      integrationUserSuspended
       reconnectReason {
         cause
       }
