@@ -129,10 +129,6 @@ export const appsEn = {
     "This account becomes active in this workspace again. You can disable it again later.",
   "apps.change.inviteEffect":
     "{app} sends {firstName} an invitation to join this workspace, unless they already have one or have joined. Their account shows here once {app} is scanned after they join.",
-  "apps.change.howItWorks":
-    "Broccoli Access makes the change with your {field}, then reads the account back from {app}.",
-  "apps.change.howInviteWorks":
-    "Broccoli Access asks {app} to send the invitation with your {field}, then reads it back from {app}.",
   "apps.change.cancel": "Cancel",
   "apps.change.continueToGoogle": "Continue to Google",
   "apps.change.googleAsks":

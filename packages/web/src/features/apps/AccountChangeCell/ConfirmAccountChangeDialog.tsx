@@ -27,7 +27,7 @@ import {
   useGoogleUserWrites,
 } from "@/lib/useGoogleUserWrites";
 
-import { connectingFieldName } from "../connectingFieldName";
+import { accountChangeActor } from "./accountChangeActor";
 import { changeTargetOf, useChangeAccount } from "./useChangeAccount";
 
 type Props = {
@@ -56,9 +56,13 @@ export function ConfirmAccountChangeDialog({
   const [open, setOpen] = useState(false);
   const { changeAccount, loading } = useChangeAccount();
   const { employee, app } = row;
-  const connector = app.containerConnection?.connector;
+  const actor = accountChangeActor(app);
   const name = `${employee.firstName} ${employee.lastName}`;
   const copy = COPY[action];
+  const howItWorks =
+    action === "INVITE" && app.containerConnection?.sessionFrom === "SERVER_SIGN_IN"
+      ? "apps.change.howInviteAsIntegrationUserWorks"
+      : copy.howItWorks;
   const google = useGoogleUserWrites();
   // Setup's consent only reads: the first change of a Google account goes through Google's
   // consent, and the owner asks again once back.
@@ -134,14 +138,7 @@ export function ConfirmAccountChangeDialog({
           {asksGoogle && <span>{t("apps.change.googleAsks")}</span>}
           {blocked && google === "unsupported" && <span>{t("apps.change.googleNeedsOwnApp")}</span>}
           {blocked && google === "failed" && <span>{t("apps.change.googleCheckFailed")}</span>}
-          {connector && (
-            <span className="text-xs">
-              {t(copy.howItWorks, {
-                field: connectingFieldName(connector.connectionFields),
-                app: app.name,
-              })}
-            </span>
-          )}
+          {actor && <span className="text-xs">{t(howItWorks, { actor, app: app.name })}</span>}
         </AlertDialogDescription>
         <AlertDialogFooter>
           <AlertDialogCancel>{t("apps.change.cancel")}</AlertDialogCancel>

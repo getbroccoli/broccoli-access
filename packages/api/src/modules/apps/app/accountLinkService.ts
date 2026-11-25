@@ -84,14 +84,14 @@ export function createAccountLinkService(
       requireOwner(ctx);
       const page = await listPage(dependencies, args, "personal");
       if (!page.edges.length) return { ...page, edges: [] };
-      const [names, activeIds] = await Promise.all([
+      const [names, directoryEmployeeIds] = await Promise.all([
         readMemberNames(
           dependencies,
           page.edges.map(({ node }) => node),
         ),
-        findEmployeesInDirectory(orm, dependencies.connectors, { status: "active" }),
+        findEmployeesInDirectory(orm, dependencies.connectors),
       ]);
-      const suggest = employeeMatcher(await employees.readEmployees(ctx, activeIds));
+      const suggest = employeeMatcher(await employees.readEmployees(ctx, directoryEmployeeIds));
       return {
         ...page,
         edges: page.edges.map(({ cursor, node: { id, app, email, status, connectionId } }) => {

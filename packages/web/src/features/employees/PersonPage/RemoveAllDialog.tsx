@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { accountChangeActor } from "@/features/apps";
 import { t } from "@/i18n";
 
 type Person = NonNullable<PersonPageQuery["employee"]>;
@@ -63,12 +64,23 @@ export function RemoveAllDialog({ person }: { person: Person }) {
             </AlertDialogTitle>
           </AlertDialogHeader>
           <ul className="max-h-64 divide-y divide-border overflow-y-auto rounded-xl border border-border text-sm">
-            {(accounts ?? []).map(({ id, email, app }) => (
-              <li key={id} className="flex gap-3 px-4 py-3">
-                <span className="w-32 font-semibold">{app.name}</span>
-                <span className="break-words text-muted-foreground">{email}</span>
-              </li>
-            ))}
+            {(accounts ?? []).map(({ id, email, app }) => {
+              const actor = accountChangeActor(app);
+              return (
+                <li
+                  key={id}
+                  className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 px-4 py-3"
+                >
+                  <span className="break-words font-semibold">{app.name}</span>
+                  <div className="break-words text-muted-foreground">
+                    <div>{email}</div>
+                    {actor && (
+                      <div className="text-xs">{t("apps.change.actorLine", { actor })}</div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
           <AlertDialogDescription className="rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 font-bold text-red-900">
             {t("apps.change.removeWarning")}

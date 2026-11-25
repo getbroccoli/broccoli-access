@@ -7,8 +7,10 @@ import {
   EMPLOYEE,
   expect,
   OWNER,
+  ownerHandOver,
   scannedLinear,
   serveAccountList,
+  storedImportSources,
   SYSTEM,
   test,
   type TestSeed,
@@ -71,7 +73,7 @@ test("stops offering a Google-only account when the first app scan finds no memb
   ).rejects.toMatchObject({ code: "CONFLICT" });
 });
 
-test("suggests only active directory employees from the scanned account's display name", async ({
+test("suggests directory employees from the scanned account's display name", async ({
   orm,
   seed,
   fakeConnectors,
@@ -106,11 +108,49 @@ test("suggests only active directory employees from the scanned account's displa
   });
   expect(nodeFor("hannah@acme.example")).toMatchObject({
     displayName: "Hannah Weber",
-    suggestedEmployeeId: null,
+    suggestedEmployeeId: hannah.id,
   });
   expect(nodeFor("david@acme.example")).toMatchObject({
     displayName: "David Okafor",
     suggestedEmployeeId: null,
+  });
+});
+
+test("suggests a suspended directory employee for a Slack account with a matching name and private email", async ({
+  orm,
+  seed,
+  fakeConnectors,
+}) => {
+  const owner = await seed.owner();
+  const { service, handOver, scans } = await ownerHandOver(orm, fakeConnectors, undefined, owner);
+  const { connection } = await service.connect(owner, {
+    connector: "slack",
+    appSession: handOver.appSession,
+    noticeAccepted: true,
+  });
+  const source = (await storedImportSources(orm)).find(
+    ({ connectionId }) => connectionId === connection!.id,
+  )!;
+  const directoryId = await seedDirectory(seed);
+  const ana = await seed.employee({
+    firstName: "Ana",
+    lastName: "Ruiz",
+    email: "ana@acme.example",
+  });
+  await seed.appAccount({
+    appId: directoryId,
+    employeeId: ana.id,
+    email: ana.email,
+    status: "suspended",
+    foundVia: ["google_directory"],
+  });
+  await scans.runScan(SYSTEM, source.id);
+
+  const { edges } = await accountLinks(orm).listAccountsWithoutPerson(owner, {});
+
+  expect(edges.find(({ node }) => node.email === "ana.ruiz@gmail.example")?.node).toMatchObject({
+    displayName: "Ana Ruiz",
+    suggestedEmployeeId: ana.id,
   });
 });
 

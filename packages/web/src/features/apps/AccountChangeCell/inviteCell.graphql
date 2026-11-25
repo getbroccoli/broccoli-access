@@ -26,6 +26,7 @@ fragment InviteCell_appInvite on AppInvite {
     containerConnection {
       id
       status
+      ...AccountChangeActor_connection @unmask
       scan {
         id
         sourceName
@@ -33,11 +34,6 @@ fragment InviteCell_appInvite on AppInvite {
       }
       connector {
         id
-        connectionFields {
-          key
-          label
-          secret
-        }
         ...ReconnectButton_connector
       }
     }

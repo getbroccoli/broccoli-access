@@ -144,6 +144,7 @@ query AccountsWithoutPerson($after: String, $first: Int = 100) {
           containerConnection {
             adminUrl
             id
+            ...AccountChangeActor_connection @unmask
             connector {
               id
               canDisableAccounts
