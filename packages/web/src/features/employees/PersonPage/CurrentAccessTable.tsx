@@ -18,7 +18,7 @@ export function CurrentAccessTable({ person }: { person: Person }) {
   const invites = new Map(person.appInvites.map((invite) => [invite.app.id, invite]));
   const showSources =
     person.templates.edges.length > 0 ||
-    person.personApps.edges.some(({ node }) => node.state === "EXTRA");
+    person.personApps.edges.some(({ node }) => node.state === "EXTRA" || node.choice);
   const rows = person.personApps.edges
     .map((edge) => edge.node)
     .toSorted((a, b) => a.app.name.localeCompare(b.app.name));
@@ -67,7 +67,7 @@ export function CurrentAccessTable({ person }: { person: Person }) {
               <PersonAppRow
                 key={account?.id ?? row.app.id}
                 row={row}
-                employeeId={person.id}
+                person={person}
                 account={account}
                 showEmail={!!account && (held.length > 1 || account.email !== person.email)}
                 first={index === 0}

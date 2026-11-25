@@ -20,7 +20,8 @@ export interface AssignmentRepository {
   sources(
     pairs: readonly EmployeeAppPair[],
   ): Promise<(EmployeeAppPair & { role: string | null })[]>;
-  saveRolePick(pair: EmployeeAppPair, role: string | null): Promise<void>;
+  /** Replaces whatever choice the person had for the app. */
+  saveChoice(choice: EmployeeAppChoice): Promise<void>;
   peoplePage(
     templateId: string,
     after: string | null,
@@ -30,7 +31,7 @@ export interface AssignmentRepository {
   reviews(appIds: readonly string[]): Promise<EmployeeAppPair[]>;
   clearChoices(
     pairs: EmployeeAppPair[],
-    choice: "role_picked" | "to_review",
+    choice: EmployeeAppChoice["choice"],
   ): Promise<EmployeeAppPair[]>;
 }
 
@@ -90,13 +91,13 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
             appIds && anyOf(employeeAppChoices.appId, appIds),
           ),
         ),
-    async saveRolePick(pair, role) {
+    async saveChoice(choice) {
       await orm
         .insert(employeeAppChoices)
-        .values({ ...pair, choice: "role_picked", role })
+        .values(choice)
         .onConflictDoUpdate({
           target: [PAIR.employeeId, PAIR.appId],
-          set: { choice: "role_picked", role },
+          set: { choice: choice.choice, role: choice.role },
         });
     },
     async listedApps(ids) {

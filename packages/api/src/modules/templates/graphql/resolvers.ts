@@ -6,6 +6,7 @@ import type { SecurityContext } from "../../../core/security";
 import {
   perRequest,
   mutationPayload,
+  type GraphqlContext,
   toEnum,
   type RequestLoader,
   type Resolvers,
@@ -47,6 +48,9 @@ export function createResolvers(
       }),
     };
   };
+  const changedEmployee = async (context: GraphqlContext, employeeId: string) => ({
+    employee: (await readEmployees(context.getActor(), [employeeId]))[0] ?? null,
+  });
   const rosters = perRequest(() => ({
     remaining: 10000,
     cache: new Map<string, ReturnType<typeof readRoster>>(),
@@ -101,6 +105,7 @@ export function createResolvers(
           : [],
       accountStatus: ({ accountStatus }) => accountStatus && toEnum(accountStatus),
       state: ({ state }) => state && toEnum(state),
+      choice: ({ choice }) => choice && toEnum(`${choice}_for_person`),
     },
     Query: {
       template: (_parent, { id }, context) => services.readTemplate(context.getActor(), id),
@@ -134,6 +139,24 @@ export function createResolvers(
             }),
           }),
           ["CONFLICT", "INVALID_INPUT", "NOT_FOUND"],
+        ),
+      addPersonApp: (_parent, { input }, context) =>
+        mutationPayload<ResolversTypes["PersonAppAddPayload"]>(
+          async () =>
+            changedEmployee(context, await services.addPersonApp(context.getActor(), input)),
+          ["CONFLICT", "INVALID_INPUT", "NOT_FOUND"],
+        ),
+      removePersonApp: (_parent, { input }, context) =>
+        mutationPayload<ResolversTypes["PersonAppRemovePayload"]>(
+          async () =>
+            changedEmployee(context, await services.removePersonApp(context.getActor(), input)),
+          ["CONFLICT", "INVALID_INPUT", "NOT_FOUND"],
+        ),
+      undoPersonAppChoice: (_parent, { input }, context) =>
+        mutationPayload<ResolversTypes["PersonAppUndoChoicePayload"]>(
+          async () =>
+            changedEmployee(context, await services.undoPersonAppChoice(context.getActor(), input)),
+          ["INVALID_INPUT", "NOT_FOUND"],
         ),
       assign: (_parent, { input }, context) =>
         mutationPayload<ResolversTypes["TemplateAssignPayload"]>(

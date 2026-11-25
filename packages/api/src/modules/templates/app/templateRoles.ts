@@ -92,7 +92,7 @@ export function createTemplateRoles({
           throw new ApplicationError("CONFLICT", "This app has no role conflict.");
         if (!roles.has(role)) throw invalidInput([{ field: "role", code: "invalid" }]);
         const pair = { employeeId, appId };
-        await assignmentRepository(tx).saveRolePick(pair, role);
+        await assignmentRepository(tx).saveChoice({ ...pair, choice: "role_picked", role });
         await recordRolePicks(ctx, tx, [{ ...pair, role }], "picked");
       });
       logger.info({ employeeId, appId }, "Employee app role picked");
@@ -139,13 +139,13 @@ async function roleFacts(tx: Tx, employeeId: string, appId: string) {
   return { roles: new Set(sources.map(({ role }) => role)), choice };
 }
 
-function checkedAppId(input: string) {
+export function checkedAppId(input: string) {
   const appId = parseUuid(input);
   if (!appId) throw invalidInput([{ field: "appId", code: "invalid" }]);
   return appId;
 }
 
-async function checkedRole(
+export async function checkedRole(
   ctx: SecurityContext,
   apps: AppsById,
   appId: string,

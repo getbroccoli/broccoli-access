@@ -52,6 +52,7 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
             }
           }
           role
+          choice
           state
         }
       }
@@ -151,6 +152,90 @@ mutation PickPersonAppRole($input: TemplatePickRoleInput!) {
   templates {
     pickRole(input: $input) {
       role
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+# shortcut: reads up to 10,000 approved apps at once for "Add app"; search them once a company
+# approves more.
+query PersonAppOptions($employeeId: ID!) {
+  employee(id: $employeeId) {
+    id
+    personApps(first: 10000) {
+      edges {
+        node {
+          choice
+          app {
+            id
+          }
+          templates {
+            id
+          }
+        }
+      }
+    }
+  }
+  apps(status: APPROVED, first: 10000) {
+    edges {
+      node {
+        id
+        name
+        catalogKey
+        connected
+        roles {
+          key
+          name
+          isDefault
+        }
+      }
+    }
+  }
+}
+
+mutation AddPersonApp($input: PersonAppAddInput!) {
+  templates {
+    addPersonApp(input: $input) {
+      employee {
+        id
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation RemovePersonApp($input: PersonAppRemoveInput!) {
+  templates {
+    removePersonApp(input: $input) {
+      employee {
+        id
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation UndoPersonAppChoice($input: PersonAppUndoChoiceInput!) {
+  templates {
+    undoPersonAppChoice(input: $input) {
+      employee {
+        id
+      }
       error {
         __typename
         ... on Error {

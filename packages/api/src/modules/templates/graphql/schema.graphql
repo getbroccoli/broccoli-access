@@ -87,8 +87,17 @@ type PersonApp {
   roleSources: [TemplateRoleSource!]!
   "The role given by the templates or picked by the owner, or null for the default or a conflict."
   role: String
-  "Expected access compared with the held account: active access is Active or Extra, a pending invitation is Invited, and an expected app without either is Missing, even for a disabled account. Other disabled accounts are Suspended. Null for invitation controls alone. Employee.appAccounts supplies the underlying account status and actions."
+  "The owner's own choice for this person, while it changes what they should have or keeps an active account Extra; null otherwise."
+  choice: PersonAppChoice
+  "Expected access compared with the held account: active access is Active or Extra, a pending invitation is Invited, and an expected app without either is Missing, even for a disabled account. Other disabled accounts are Suspended. Null for invitation controls alone, and for an app removed for this person that they have no account or pending invitation in. Employee.appAccounts supplies the underlying account status and actions."
   state: PersonAppState
+}
+
+enum PersonAppChoice {
+  "The owner gave this person the app though none of their templates gives it."
+  ADDED_FOR_PERSON
+  "The owner kept the app from this person though a template of theirs gives it."
+  REMOVED_FOR_PERSON
 }
 
 type TemplateRoleSource {
@@ -138,6 +147,46 @@ input TemplatePickRoleInput {
   role: String
 }
 
+input PersonAppAddInput {
+  employeeId: ID!
+  "The id of one of the company's approved apps that none of the person's templates gives."
+  appId: ID!
+  "A role key of the app's connector; left out or null for the app's default."
+  role: String
+}
+
+input PersonAppRemoveInput {
+  employeeId: ID!
+  "The id of an app that one of the person's templates gives."
+  appId: ID!
+}
+
+input PersonAppUndoChoiceInput {
+  employeeId: ID!
+  appId: ID!
+}
+
+"The person, who should now have the app, or why it was refused. No account changes."
+type PersonAppAddPayload {
+  employee: Employee
+  error: PersonAppAddError
+}
+union PersonAppAddError = InvalidInputError | NotFoundError | ConflictError
+
+"The person, who should no longer have the app, or why it was refused. Their account in it stays."
+type PersonAppRemovePayload {
+  employee: Employee
+  error: PersonAppRemoveError
+}
+union PersonAppRemoveError = InvalidInputError | NotFoundError | ConflictError
+
+"The person, with the choice for this one app cleared, or why it was refused. No account changes."
+type PersonAppUndoChoicePayload {
+  employee: Employee
+  error: PersonAppUndoChoiceError
+}
+union PersonAppUndoChoiceError = InvalidInputError | NotFoundError
+
 type TemplateSetAppRolePayload {
   template: Template
   error: TemplateSetAppRoleError
@@ -156,6 +205,12 @@ type TemplatesMutations {
   setAppRole(input: TemplateSetAppRoleInput!): TemplateSetAppRolePayload!
   "Settles a role conflict for this person and app. Owner only."
   pickRole(input: TemplatePickRoleInput!): TemplatePickRolePayload!
+  "Says one person should have an app that none of their templates gives; no template or account changes. Owner only."
+  addPersonApp(input: PersonAppAddInput!): PersonAppAddPayload!
+  "Says one person should not have an app a template of theirs gives; no template or account changes. Owner only."
+  removePersonApp(input: PersonAppRemoveInput!): PersonAppRemovePayload!
+  "Clears the addition or removal of one app for one person; without such a choice it changes nothing. Owner only."
+  undoPersonAppChoice(input: PersonAppUndoChoiceInput!): PersonAppUndoChoicePayload!
   "Gives this template to a person active in the directory. Owner only."
   assign(input: TemplateAssignInput!): TemplateAssignPayload!
   "Takes this template off the employee. Owner only."
