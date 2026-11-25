@@ -7,7 +7,7 @@ import {
   createdGoogleUsers,
   consentAtGoogle,
   readGoogleConnection,
-  finishSetupWithPreselectedApps,
+  finishSetupWithDemoApps,
   SCAN_NOW,
 } from "#test/support";
 
@@ -15,7 +15,7 @@ connectorTest(
   "the integration user signs in with two steps and stays out of People",
   async ({ env, fakeGoogle }) => {
     const { browser } = await env.signInAsOwner();
-    await finishSetupWithPreselectedApps(browser);
+    await finishSetupWithDemoApps(browser);
     const before = await readGoogleConnection(browser);
     expect(await readSettings(browser)).toEqual(EMPTY_SETTINGS);
 

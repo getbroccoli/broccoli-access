@@ -26,7 +26,7 @@ The setup page has three steps: Connect Google Workspace, Scan your workspace, S
 ### 2. Scan and select your apps
 
 - The scan shows its progress: people read, apps found, and sign-in logs read for the last 6 months.
-- Then the Applications page opens on the Discovered tab with a banner: "Last step: select the apps your company uses". Each app shows its people, how it was found, and since when ("Before <date>" when the grant is older than Google's log). The biggest apps are selected; the owner changes the selection and presses "Approve n and finish".
+- Applications opens on Discovered with the banner "Last step: select the apps your company uses". Each app shows its people, how it was found and since when ("Before <date>" when the grant is older than Google's log). Apps with a managing connector show "Manageable" and start selected. The owner can change the selection before pressing "Approve n and finish".
 - Google Workspace itself is approved when it is connected.
 - **Done when:** the selected apps are approved, every other app is ignored, and setup is done.
 

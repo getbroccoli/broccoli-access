@@ -5,11 +5,12 @@ import {
   expect,
   test as baseTest,
   connectorTest as test,
-  finishSetupWithPreselectedApps,
+  finishSetupWithDemoApps,
   LINEAR_INPUT,
   NOTION_INPUT,
   testNotion,
   scannedApps,
+  startSimpleHttpServer,
   TestEnv,
 } from "#test/support";
 
@@ -37,7 +38,7 @@ test("the owner connects Linear and reads its seven employees with their status"
     },
   ]);
 
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const response = await browser.graphql(CONNECT, { input: LINEAR_INPUT });
 
   const connected = (await response.json()) as {
@@ -102,7 +103,7 @@ test("the owner connects Linear and reads its seven employees with their status"
 
 test("reconnects Linear over GraphQL and returns the connected status", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const response = await browser.graphql(CONNECT, { input: LINEAR_INPUT });
   const connected = (await response.json()) as {
     data: { connectors: { connect: { containerConnector: { connection: { id: string } } } } };
@@ -135,7 +136,7 @@ test("reconnects Linear over GraphQL and returns the connected status", async ({
 
 test("Applications offers Linear to connect, then shows it connected", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
 
   const before = await browser.graphql(APPLICATIONS);
   expect(await before.json()).toEqual({
@@ -257,19 +258,35 @@ baseTest.for([
 );
 
 baseTest(
-  "the server starts and lists no connectors when the container is unavailable",
+  "loads discovered apps promptly when the connectors container hangs",
   async ({ fakeGoogle }) => {
+    const container = await startSimpleHttpServer((request, response) => {
+      if (request.url !== "/v1/connectors") response.writeHead(404).end();
+    });
+    onTestFinished(() => container.stop());
     const env = await TestEnv.start({
       googleUrl: fakeGoogle.url,
-      connectorsUrl: "http://127.0.0.1:0",
+      connectorsUrl: container.url,
     });
     onTestFinished(() => env.stop());
     const { browser } = await env.signInAsOwner();
+    const discovered = await scannedApps(browser);
 
-    const response = await browser.graphql("{ containerConnectors { id } }");
+    const startedAt = performance.now();
+    const response = await browser.graphql(`{
+      apps(status: DISCOVERED) { edges { node { id name preselected } } }
+    }`);
+    const body: unknown = await response.json();
+    const elapsedMs = performance.now() - startedAt;
 
-    expect(await response.json()).toEqual({ data: { containerConnectors: [] } });
+    expect(elapsedMs).toBeLessThan(8_000);
+    expect(body).toEqual({
+      data: {
+        apps: { edges: discovered.map((app) => ({ node: { ...app, preselected: false } })) },
+      },
+    });
   },
+  90_000,
 );
 
 const APPLICATIONS = `{

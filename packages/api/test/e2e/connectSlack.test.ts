@@ -6,7 +6,7 @@ import {
   pairChrome,
   TestEnv,
   signInToFakeSlack,
-  finishSetupWithPreselectedApps,
+  finishSetupWithDemoApps,
 } from "#test/support";
 
 test("the owner connects Slack with the session the paired Chrome hands over", async ({
@@ -16,7 +16,7 @@ test("the owner connects Slack with the session the paired Chrome hands over", a
   const env = await TestEnv.start({ googleUrl: fakeGoogle.url, connectorsUrl: fakeConnectors.url });
   onTestFinished(() => env.stop());
   const { token, browser } = await pairChrome(env);
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const url = new URL("/api/extension/app-sessions/slack", env.url);
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
   const description = await fetch(url, { headers });

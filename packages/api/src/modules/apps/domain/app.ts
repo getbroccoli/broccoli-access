@@ -75,14 +75,6 @@ export function planAppMatches<T extends KnownApp>(
   return { created, updated };
 }
 
-/**
- * Whether setup's selection of the company's apps starts with this one: at least a fifth of the
- * directory's people have an account in it.
- */
-export function isPreselected(appPeople: number, directoryPeople: number): boolean {
-  return appPeople > 0 && appPeople * PRESELECTED_SHARE_DIVISOR >= directoryPeople;
-}
-
 /** The fields history keeps of an app, from `before` to `after`; null for none. */
 export function appChanges(before: AppFields | null, after: AppFields | null): FieldChange[] {
   const fields = (app: AppFields | null) => ({
@@ -100,9 +92,6 @@ export function appChanges(before: AppFields | null, after: AppFields | null): F
       : [{ field, oldValue: old[field], newValue: current[field] }],
   );
 }
-
-/** A fifth of the people: enough to call an app one the company uses, not one a few tried. */
-const PRESELECTED_SHARE_DIVISOR = 5;
 
 /** The fields whose changes history keeps, in the order a history line lists them. */
 const APP_HISTORY_FIELDS = ["name", "domain", "catalogKey", "externalIds", "status"] as const;

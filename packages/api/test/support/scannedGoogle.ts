@@ -1,5 +1,6 @@
 import { expect } from "vitest";
 
+import { ACME_DEMO_APPS } from "./approvedGoogleSetup";
 import type { Browser } from "./browser";
 
 export async function readGoogleConnection(browser: Browser) {
@@ -24,10 +25,12 @@ export async function readGoogleConnection(browser: Browser) {
   return body.data.setup.googleWorkspace;
 }
 
-/** Finishes setup after the scan, approving the preselected apps. */
-export async function finishSetupWithPreselectedApps(browser: Browser) {
+/** Finishes setup after the scan, approving the fixture's demo apps. */
+export async function finishSetupWithDemoApps(browser: Browser) {
   const discovered = await scannedApps(browser);
-  const approvedAppIds = discovered.filter(({ preselected }) => preselected).map(({ id }) => id);
+  const approvedAppIds = discovered
+    .filter(({ name }) => ACME_DEMO_APPS.includes(name))
+    .map(({ id }) => id);
   const response = await browser.graphql(
     `mutation ($input: SetupFinishInput!) {
       apps { finishSetup(input: $input) { setup { step } error { __typename } } }
@@ -40,14 +43,13 @@ export async function finishSetupWithPreselectedApps(browser: Browser) {
 }
 
 export async function scannedApps(browser: Browser) {
-  let discovered: { id: string; name: string; preselected: boolean }[] = [];
+  let discovered: { id: string; name: string }[] = [];
   await expect
     .poll(
       async () => {
         const response = await browser.graphql(`{
       apps(status: DISCOVERED) {
-        edges { node { id name domain status peopleCount foundVia since { at before } preselected } }
-        pageInfo { endCursor hasNextPage }
+        edges { node { id name } }
       }
       setup { step }
     }`);

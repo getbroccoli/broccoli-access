@@ -2,7 +2,7 @@ import { expect } from "vitest";
 
 import type { Browser } from "./browser";
 import { LINEAR_INPUT } from "./containerConnections";
-import { finishSetupWithPreselectedApps } from "./scannedGoogle";
+import { finishSetupWithDemoApps } from "./scannedGoogle";
 import type { TestEnv } from "./testEnv";
 
 interface AppUser {
@@ -29,7 +29,7 @@ export const CHANGE_ACCOUNT = `mutation ($input: AppUserChangeInput!) {
 
 export async function connectedLinear(env: TestEnv) {
   const { browser, user: owner } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const response = await browser.graphql(
     `mutation ($input: ContainerConnectorConnectInput!) {
     connectors { connect(input: $input) { containerConnector { id } error { __typename } } }

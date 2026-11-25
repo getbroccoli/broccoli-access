@@ -7,7 +7,7 @@ import {
   connectedLinear,
   connectorTest as test,
   expect,
-  finishSetupWithPreselectedApps,
+  finishSetupWithDemoApps,
 } from "#test/support";
 
 test("the owner offboards a person and sees their suspended directory account and the changes in Activity", async ({
@@ -111,7 +111,7 @@ test("Google consent returns the owner to their page and enables directory write
   env,
 }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const settings = "{ setup { googleWorkspace { canChangeUsers } } }";
   expect(await (await browser.graphql(settings)).json()).toEqual({
     data: { setup: { googleWorkspace: { canChangeUsers: false } } },

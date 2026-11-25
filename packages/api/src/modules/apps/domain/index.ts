@@ -5,7 +5,6 @@ export {
   type AppMatchPlan,
   type AppStatus,
   type FoundApp,
-  isPreselected,
   type KnownApp,
   type NewApp,
   planAppMatches,

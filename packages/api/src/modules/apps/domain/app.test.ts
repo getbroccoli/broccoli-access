@@ -1,18 +1,6 @@
 import { expect, it } from "vitest";
 
-import { isPreselected, planAppMatches, type KnownApp } from "./app";
-
-it("preselects an app used by exactly a fifth of the directory", () => {
-  expect(isPreselected(10, 50)).toBe(true);
-});
-
-it("does not preselect an app used by less than a fifth of the directory", () => {
-  expect(isPreselected(8, 42)).toBe(false);
-});
-
-it.each([0, 42])("does not preselect an app with no people in a directory of %s", (people) => {
-  expect(isPreselected(0, people)).toBe(false);
-});
+import { planAppMatches, type KnownApp } from "./app";
 
 it("keeps the known app for an external id even when the source names another catalog app", () => {
   const known: KnownApp = {

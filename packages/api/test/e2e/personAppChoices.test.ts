@@ -1,16 +1,10 @@
-import {
-  type Browser,
-  expect,
-  finishSetupWithPreselectedApps,
-  test,
-  type TestEnv,
-} from "#test/support";
+import { type Browser, expect, finishSetupWithDemoApps, test, type TestEnv } from "#test/support";
 
 test("the owner adds an app for one person, removes a template's app for them and undoes it", async ({
   env,
 }) => {
   const { browser, user: owner } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const employeeId = await ivanId(browser);
   const intranet = await approvedIntranet(env);
   const input = { employeeId, appId: intranet.id };
@@ -34,7 +28,7 @@ test("the owner adds an app for one person, removes a template's app for them an
 
 test("refuses a signed-out caller who adds an app for a person", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const employeeId = await ivanId(browser);
   const intranet = await approvedIntranet(env);
 

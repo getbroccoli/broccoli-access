@@ -2,7 +2,7 @@ import {
   expect,
   test,
   readGoogleConnection,
-  finishSetupWithPreselectedApps,
+  finishSetupWithDemoApps,
   suspendAtFakeGoogle,
 } from "#test/support";
 
@@ -11,7 +11,7 @@ test("lists and counts people suspended with access after Scan now", async ({
   fakeGoogle,
 }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const connection = await readGoogleConnection(browser);
   await suspendAtFakeGoogle(fakeGoogle.url, "elif@acme.example");
 

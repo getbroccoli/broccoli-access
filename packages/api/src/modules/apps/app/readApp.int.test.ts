@@ -244,11 +244,9 @@ async function scannedFigma(orm: Orm, googleUrl: string) {
   const scanFinishedAt = Date.now();
   const service = apps(orm);
   const discovered = await service.listApps(OWNER, { status: "discovered" });
-  const approvedAppIds = discovered.edges
-    .filter(({ node }) => node.preselected)
-    .map(({ node }) => node.id);
-  await service.finishSetup(OWNER, { approvedAppIds });
+  const figmaId = discovered.edges.find(({ node }) => node.name === "Figma")!.node.id;
+  await service.finishSetup(OWNER, { approvedAppIds: [figmaId] });
   const approved = await service.listApps(OWNER, { status: "approved" });
-  const figma = approved.edges.find(({ node }) => node.name === "Figma")!.node;
+  const figma = approved.edges.find(({ node }) => node.id === figmaId)!.node;
   return { service, figma, scanStartedAt, scanFinishedAt };
 }

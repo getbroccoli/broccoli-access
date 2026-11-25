@@ -118,7 +118,7 @@ export {
 export {
   SCAN_NOW,
   readGoogleConnection,
-  finishSetupWithPreselectedApps,
+  finishSetupWithDemoApps,
   scannedApps,
 } from "./scannedGoogle";
 export {

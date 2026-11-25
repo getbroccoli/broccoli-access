@@ -32,7 +32,7 @@ CALLBACK=$(curl -s -o /dev/null -w '%{redirect_url}' "${AUTH%%\?*}" \
 curl -c cookies -b cookies "$CALLBACK"
 ```
 
-A browser without the owner's session signs in again with "Sign in with Google" on `/login`, choosing Mia on the fake's consent page. After the scan, setup waits on Applications for the owner to select the company's apps; "Approve 6 and finish" finishes it and opens the app's other pages.
+A browser without the owner's session signs in again with "Sign in with Google" on `/login`, choosing Mia on the fake's consent page. After the scan, setup waits on Applications for the owner to select the company's apps. Slack is preselected and "Approve 1 and finish" finishes setup and opens the app's other pages.
 
 ## Send email
 

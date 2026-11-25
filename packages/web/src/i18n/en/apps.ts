@@ -19,6 +19,9 @@ export const appsEn = {
   "apps.stillHaveAccess": "{count} still have access",
   "apps.connect": "Connect",
   "apps.connected": "Connected",
+  "apps.manageable": "Manageable",
+  "apps.manageableDescription":
+    "Broccoli Access can manage accounts in this app once you connect it.",
   "apps.approve": "Approve",
   "apps.approveApp": "Approve {name}",
   "apps.ignore": "Ignore",

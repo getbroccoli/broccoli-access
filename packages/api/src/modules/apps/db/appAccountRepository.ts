@@ -71,8 +71,6 @@ export interface AppAccountRepository {
     facts: InAppFacts,
     appIds?: readonly string[],
   ): Promise<AppUserAccount[]>;
-  /** How many employees hold an account in any app. */
-  countEmployeesWithAccounts(): Promise<number>;
   /** The employees whose account matches the app and status when given; only those of `among` when given. */
   findEmployeeIdsWithStatus(
     appId: string | null,
@@ -245,12 +243,6 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
           ),
         )
         .orderBy(apps.name, appAccounts.id),
-    countEmployeesWithAccounts: async () => {
-      const [row] = await orm()
-        .select({ employees: countDistinct(appAccounts.employeeId) })
-        .from(appAccounts);
-      return row!.employees;
-    },
     findEmployeeIdsWithStatus: async (appId, status, among) => {
       const rows = await orm()
         .selectDistinct({ employeeId: appAccounts.employeeId })

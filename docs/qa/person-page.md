@@ -4,7 +4,7 @@ A manual check of a person's page, `/people/<id>`, against a development stack.
 
 ## Setup
 
-1. Start the stack with `pnpm dev --drop-db`, connect Google Workspace and finish setup with the six preselected apps, as in [QA setup](setup.md).
+1. Start the stack with `pnpm dev --drop-db` and connect Google Workspace as in [QA setup](setup.md). Keep Slack selected and also select Notion, Figma, Miro, Loom and Claude before finishing setup.
 2. Use the browser that finished setup, and open Ana Ruiz from People.
 
 ## Ana Ruiz, suspended with access

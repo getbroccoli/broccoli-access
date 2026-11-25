@@ -17,8 +17,6 @@ type App {
   foundVia: [String!]!
   "The earliest Since of its people's accounts; null without people."
   since: Since
-  "Whether setup's selection of the company's apps starts with it: at least a fifth of the directory's people have an account in it."
-  preselected: Boolean!
   "How many of its people still have an active account in it though the directory suspended them."
   suspendedWithAccessCount: Int!
   "Whether a connection reads it; a connected app stays approved, so it cannot be ignored."

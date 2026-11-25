@@ -6,7 +6,7 @@ import {
   connectedLinear,
   connectorTest,
   expect,
-  finishSetupWithPreselectedApps,
+  finishSetupWithDemoApps,
   grantAtFakeGoogle,
   linearMemberStatus,
   readGoogleConnection,
@@ -32,7 +32,7 @@ const MARKED = `query ($first: Int, $after: String) {
 
 test("the owner reads a suggested person and links the account over GraphQL", async ({ env }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const app = await env.seed.app({ name: "Design", catalogKey: null, status: "approved" });
   const account = await env.seed.appAccount({ appId: app.id, email: "chloe@private.example" });
   const people = await browser.graphql(
@@ -111,7 +111,7 @@ test("the owner marks both kinds of accounts and reads an edited note over Graph
   env,
 }) => {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const app = await env.seed.app({ name: "Design", catalogKey: null, status: "approved" });
   const account = await env.seed.appAccount({ appId: app.id });
   const row = {

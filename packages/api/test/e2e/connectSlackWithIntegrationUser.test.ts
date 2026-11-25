@@ -5,7 +5,7 @@ import {
   connectorTest,
   consentAtGoogle,
   expect,
-  finishSetupWithPreselectedApps,
+  finishSetupWithDemoApps,
   INTEGRATION_USER_EMAIL,
   inviteIntegrationUserToFakeSlack,
   type TestEnv,
@@ -129,7 +129,7 @@ const CONFIRM = `mutation ($input: ContainerConnectorConnectInput!) {
 /** The owner, past setup, with an integration user that signs in to Google with two steps. */
 async function ownerWithIntegrationUser(env: TestEnv): Promise<Browser> {
   const { browser } = await env.signInAsOwner();
-  await finishSetupWithPreselectedApps(browser);
+  await finishSetupWithDemoApps(browser);
   const started = await browser.post("/api/google/integration-user", {
     email: INTEGRATION_USER_EMAIL,
   });

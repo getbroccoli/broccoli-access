@@ -300,14 +300,11 @@ export function createContainerConnectionService(
     },
     async readManagingConnectors(ctx, catalogKeys) {
       ctx.require("MANAGE_WORKSPACE");
-      const connectors = await connectorsWithConnections(dependencies);
-      return new Map(
-        connectors
-          .filter(
-            ({ connector }) => catalogKeys.includes(connector.key) && canListAccounts(connector),
-          )
-          .map((managing) => [managing.connector.key, managing]),
+      const connectors = await connectorsWithConnections(
+        dependencies,
+        (connector) => catalogKeys.includes(connector.key) && canListAccounts(connector),
       );
+      return new Map(connectors.map((managing) => [managing.connector.key, managing]));
     },
     async listAppsToConnect(ctx) {
       ctx.require("MANAGE_WORKSPACE");
@@ -328,15 +325,14 @@ export function createContainerConnectionService(
 }
 
 /** The container's connectors in its order, each with its connection; null until connected. */
-async function connectorsWithConnections({
-  orm,
-  containerConnectors,
-  connectedApps,
-}: ContainerConnectionDependencies): Promise<ConnectorWithConnection[]> {
-  const [connectors, connections] = await Promise.all([
-    containerConnectors.list(),
-    connectedApps.readConnections(orm),
-  ]);
+async function connectorsWithConnections(
+  { orm, containerConnectors, connectedApps }: ContainerConnectionDependencies,
+  matches?: (connector: ContainerConnector) => boolean,
+): Promise<ConnectorWithConnection[]> {
+  const listed = await containerConnectors.list();
+  const connectors = matches ? listed.filter(matches) : listed;
+  if (connectors.length === 0) return [];
+  const connections = await connectedApps.readConnections(orm);
   return connectors.map((connector) => {
     const connection = connections.find((candidate) => candidate.connector === connector.key);
     return { connector, connection: connection ? summaryOf(connector, connection) : null };

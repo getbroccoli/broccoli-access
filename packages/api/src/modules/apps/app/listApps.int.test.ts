@@ -4,6 +4,7 @@ import {
   OWNER,
   EMPLOYEE,
   SYSTEM,
+  approvedGoogleSetup,
   apps,
   googleScanSetup,
   googleScanWithLinearGrant,
@@ -15,16 +16,9 @@ test("shows how many suspended people still have access to each approved app", a
   orm,
   fakeGoogle,
 }) => {
-  const { scans, sourceId } = await googleScanSetup(orm, fakeGoogle.url);
-  await scans.runScan(SYSTEM, sourceId);
-  const service = apps(orm);
-  const discovered = await service.listApps(OWNER, { status: "discovered" });
-  const approvedAppIds = discovered.edges
-    .filter(({ node }) => node.preselected)
-    .map(({ node }) => node.id);
-  await service.finishSetup(OWNER, { approvedAppIds });
+  await approvedGoogleSetup(orm, fakeGoogle.url);
 
-  const { edges } = await service.listApps(OWNER, { status: "approved" });
+  const { edges } = await apps(orm).listApps(OWNER, { status: "approved" });
 
   expect(edges.map(({ node }) => node)).toMatchObject([
     { name: "Google Workspace", peopleCount: 42, suspendedWithAccessCount: 0, connected: true },
@@ -87,25 +81,6 @@ test("lists discovered apps by most people first, then by name", async ({ orm, f
     since: { at: expect.any(Date) as unknown, before: expect.any(Boolean) as unknown },
   });
   expect(edges.find(({ node }) => node.name === "Grammarly")!.node.peopleCount).toBe(2);
-});
-
-test("preselects exactly the six apps used by at least a fifth of the directory", async ({
-  orm,
-  fakeGoogle,
-}) => {
-  const { scans, sourceId } = await googleScanSetup(orm, fakeGoogle.url);
-  await scans.runScan(SYSTEM, sourceId);
-
-  const { edges } = await apps(orm).listApps(OWNER, { status: "discovered" });
-
-  expect(edges.filter(({ node }) => node.preselected).map(({ node }) => node.name)).toEqual([
-    "Slack",
-    "Notion",
-    "Figma",
-    "Miro",
-    "Loom",
-    "Claude",
-  ]);
 });
 
 test("pages from the first twelve discovered apps to the remaining twenty-five without repeats", async ({

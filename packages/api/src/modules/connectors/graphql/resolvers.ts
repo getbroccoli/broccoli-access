@@ -88,7 +88,10 @@ export function createResolvers(connections: ContainerConnectionService): Resolv
     App: {
       containerConnection: (app, _args, context) => connectionsOfApps(context).load(app.id),
       managingConnector: (app, _args, context) =>
-        app.catalogKey ? managingConnectorsOfApps(context).load(app.catalogKey) : null,
+        app.catalogKey === null ? null : managingConnectorsOfApps(context).load(app.catalogKey),
+      preselected: async (app, _args, context) =>
+        app.catalogKey !== null &&
+        Boolean(await managingConnectorsOfApps(context).load(app.catalogKey)),
     },
     AppToConnect: {
       id: ({ catalogKey }) => catalogKey,
