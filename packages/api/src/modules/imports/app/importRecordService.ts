@@ -38,16 +38,15 @@ export function createImportRecordService(): ImportRecordService {
   return {
     findSourceId: async (db, connectionId) =>
       (await importSourceRepository(db).findByConnection(connectionId))?.id ?? null,
-    findMemberEmail: (db, connectionId, sourceKey) =>
-      importSourceRepository(db).findMemberEmail(connectionId, sourceKey),
+    findMemberEmail: async (db, connectionId, sourceKey) =>
+      (await importSourceRepository(db).findSourceAndMemberEmail(connectionId, sourceKey))?.email ??
+      null,
     async addInvitedMember(tx, connectionId, account) {
       const sources = importSourceRepository(tx);
-      const source = await sources.findByConnection(connectionId);
-      if (!source) return null;
-      const previousEmail = await sources.findMemberEmail(connectionId, account.sourceKey);
-      if (previousEmail === account.values.email) return null;
-      await sources.upsertMember(source.id, account);
-      return { previousEmail };
+      const prior = await sources.findSourceAndMemberEmail(connectionId, account.sourceKey);
+      if (!prior || prior.email === account.values.email) return null;
+      await sources.upsertMember(prior.sourceId, account);
+      return { previousEmail: prior.email };
     },
     removeMember: (tx, member) => importSourceRepository(tx).removeMember(member),
     findConnectionMembers: (db, members) =>

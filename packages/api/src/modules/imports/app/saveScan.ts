@@ -1,5 +1,5 @@
 import { ApplicationError } from "../../../core/applicationError";
-import type { ImportedAccount } from "../../../core/connectors";
+import { ConnectorError, type ImportedAccount } from "../../../core/connectors";
 import type { Tx } from "../../../core/db";
 import { createSetupStepService } from "../../../core/instance";
 import type { SecurityContext } from "../../../core/security";
@@ -47,6 +47,10 @@ export async function saveScan(
       rosterRevision !== (await dependencies.apps.readRosterRevision(tx, findings.connection.id))
     )
       return null;
+    // A changed roster can shift offset pages. Duplicate keys in a stable roster are invalid.
+    if (new Set(accounts.map(({ sourceKey }) => sourceKey)).size !== accounts.length) {
+      throw new ConnectorError("unexpected_response");
+    }
     await sources.replaceRecords(sourceId, accounts);
     if (findings.connector.isDirectory) {
       await followIntegrationUser(ctx, tx, dependencies, { sourceId, accounts });

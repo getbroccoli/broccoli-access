@@ -38,8 +38,11 @@ export interface ImportSourceRepository {
   removeMember(member: { connectionId: string; sourceKey: string; email: string }): Promise<void>;
   /** The accounts the source's last saved scan found. */
   findRecords(id: string): Promise<Pick<ImportedAccount, "sourceKey" | "raw">[]>;
-  /** The email of the member with this stable source key, or null if absent from the scan. */
-  findMemberEmail(connectionId: string, sourceKey: string): Promise<string | null>;
+  /** The connection's source and the email it holds for this member key, if present. */
+  findSourceAndMemberEmail(
+    connectionId: string,
+    sourceKey: string,
+  ): Promise<{ sourceId: string; email: string | null } | null>;
   /**
    * The source's account of the member whose key or session the connection uses; null without
    * one, as a version 1 record, which predates the flag, reads.
@@ -133,15 +136,23 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
         })
         .from(importRecords)
         .where(eq(importRecords.sourceId, id)),
-    findMemberEmail: async (connectionId, sourceKey) => {
+    findSourceAndMemberEmail: async (connectionId, sourceKey) => {
       const [record] = await orm()
-        .select({ email: sql<string>`${importRecords.values} ->> 'email'` })
-        .from(importRecords)
-        .innerJoin(importSources, eq(importSources.id, importRecords.sourceId))
-        .where(
-          and(eq(importSources.connectionId, connectionId), eq(importRecords.sourceKey, sourceKey)),
-        );
-      return record?.email ?? null;
+        .select({
+          sourceId: importSources.id,
+          email: sql<string | null>`${importRecords.values} ->> 'email'`,
+        })
+        .from(importSources)
+        .leftJoin(
+          importRecords,
+          and(
+            eq(importSources.id, importRecords.sourceId),
+            eq(importRecords.sourceKey, sourceKey),
+            eq(importRecords.type, "app_account"),
+          ),
+        )
+        .where(eq(importSources.connectionId, connectionId));
+      return record ?? null;
     },
     findConnectionUserEmail: async (connectionId) => {
       const [record] = await orm()

@@ -254,13 +254,9 @@ function containerSession(
       return { connection: answer.connection };
     },
     async invite(email, role) {
-      const reply = await client.runAction({
-        ...request(),
-        action: "invite",
-        account: { email, role },
-      });
-      if ("error" in reply && reply.answerLost) throw new ConnectorAnswerLostError();
-      const answer = answerOf(reply);
+      const answer = answerOf(
+        await client.runAction({ ...request(), action: "invite", account: { email, role } }),
+      );
       keep(answer.connection);
       // Success is the invitation, or the email's member, read back.
       if ((answer.invitation ?? answer.account?.values)?.email !== email) {
@@ -281,6 +277,7 @@ function containerSession(
 
 function answerOf<T>(answer: ContainerAnswer<T>): T {
   if ("error" in answer) {
+    if (answer.answerLost) throw new ConnectorAnswerLostError();
     throw new ConnectorError(answer.error);
   }
   return answer.answer;

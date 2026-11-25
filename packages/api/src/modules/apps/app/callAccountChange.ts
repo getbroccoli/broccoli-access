@@ -159,7 +159,8 @@ async function makeChange(
       change.email,
       change.role ?? undefined,
     );
-    // shortcut: the next scan reconciles an invite whose job ended before it saved the read-back.
+    // shortcut: a crash before commit leaves reconciliation to the next scan, record dispatched
+    // attempts if recovery must be immediate.
     return {
       connection,
       readBack: true,

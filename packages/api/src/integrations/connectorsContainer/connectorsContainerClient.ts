@@ -21,7 +21,13 @@ import {
 } from "@broccoli-access/connector-contract";
 import { z } from "zod";
 
-import { fetchBytes, fetchJson, urlUnder } from "../../utils";
+import {
+  AnswerTooLargeError,
+  fetchBytes,
+  fetchJson,
+  UnsuccessfulAnswerError,
+  urlUnder,
+} from "../../utils";
 
 /** The connectors container, spoken to over the connector contract. */
 export interface ConnectorsContainerClient {
@@ -50,7 +56,9 @@ interface ConnectorListing {
  * `app_unavailable`, an answer nobody understands `unexpected_response`.
  */
 export type ContainerAnswer<T, Code = CallErrorCode> =
-  { answer: T } | { error: Code; answerLost?: true };
+  | { answer: T }
+  | { error: Code; answerLost?: never }
+  | { error: "app_unavailable"; answerLost: true };
 
 /** The errors every call gives; `not_invited` comes only from signing in to an app as the integration user. */
 type CallErrorCode = Exclude<ConnectorErrorCode, "not_invited">;
@@ -139,9 +147,8 @@ async function call<T>(
   timeoutMs = CALL_TIMEOUT_MS,
 ): Promise<ContainerAnswer<T, ConnectorErrorCode>> {
   const bytes = await postJson(url, request, timeoutMs);
-  if (bytes === null) {
-    return { error: "app_unavailable", answerLost: true };
-  }
+  if (bytes === undefined) return { error: "app_unavailable", answerLost: true };
+  if (bytes === null) return { error: "app_unavailable" };
   const body = parsedJson(bytes);
   const error = ERROR_ANSWER.safeParse(body);
   if (error.success) {
@@ -151,8 +158,12 @@ async function call<T>(
   return answer.success ? { answer: answer.data } : { error: "unexpected_response" };
 }
 
-/** The answer's body; null when the container did not answer 200 in time. */
-async function postJson(url: URL, request: unknown, timeoutMs: number): Promise<Buffer | null> {
+/** The answer's body, null for a refused response, or undefined when no reply arrived. */
+async function postJson(
+  url: URL,
+  request: unknown,
+  timeoutMs: number,
+): Promise<Buffer | null | undefined> {
   try {
     return await fetchBytes(url, {
       timeoutMs,
@@ -165,10 +176,10 @@ async function postJson(url: URL, request: unknown, timeoutMs: number): Promise<
         redirect: "error",
       },
     });
-  } catch {
-    // Each failure here is the container's own: no answer in time, another status, a redirect or
-    // too large a body.
-    return null;
+  } catch (error) {
+    if (error instanceof UnsuccessfulAnswerError || error instanceof AnswerTooLargeError)
+      return null;
+    return undefined;
   }
 }
 

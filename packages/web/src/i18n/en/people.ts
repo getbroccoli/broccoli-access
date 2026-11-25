@@ -226,7 +226,7 @@ export const peopleEn = {
   "people.provision.byBroccoli": "Broccoli Access",
   "people.provision.byHand": "By hand",
   "people.provision.appsInvite":
-    "When Broccoli Access invites {firstName}, each app can give them access at once or send an invitation. New access and pending invitations show here.",
+    "When Broccoli Access invites {firstName}, each app can add them at once or send its own invitation email. After they accept an invitation, their account shows here once that app is scanned.",
   "people.provision.confirm": "Provision {count} apps",
   "people.provision.confirmOne": "Provision 1 app",
   "people.provision.failed": "Couldn’t provision {name}. Reload the page and try again.",

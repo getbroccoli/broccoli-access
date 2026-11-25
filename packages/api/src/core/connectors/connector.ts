@@ -134,7 +134,7 @@ export interface InviteResult {
   connection?: ConnectionUpdate;
   /** The email's member, when the connector read it back. */
   account?: ImportedAccount;
-  changed?: boolean;
+  changed: boolean;
 }
 
 /** New settings or secrets an answer carries; each object it carries replaces the stored one. */

@@ -44,7 +44,7 @@ export async function scannedNotion(
 export async function instantNotionInvite(
   orm: Orm,
   googleUrl: string,
-  options?: Pick<NotionInviteOptions, "replaceMemberOnInvite">,
+  options?: Omit<NotionInviteOptions, "instantInvite">,
 ) {
   const google = await googleScanSetup(orm, googleUrl);
   await google.scans.runScan(SYSTEM, google.sourceId);
@@ -76,4 +76,5 @@ async function connectNotion(
 type NotionInviteOptions = {
   instantInvite?: boolean;
   replaceMemberOnInvite?: string;
+  suspendedMemberEmail?: string;
 };

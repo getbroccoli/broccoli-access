@@ -67,30 +67,28 @@ export async function applyInvitedMember(
   const { appId, connectionId, email } = change;
   const saved = await members.addInvitedMember(tx, connectionId, account);
   if (!saved) return;
-  const affectedEmails = [email];
-  if (saved.previousEmail) {
-    const remaining = await members.findConnectionMembers(tx, {
-      connectionIds: [connectionId],
-      emails: [saved.previousEmail],
-    });
-    if (!remaining.length) affectedEmails.push(saved.previousEmail);
-  }
+  const { previousEmail } = saved;
+  const affectedEmails = previousEmail ? [email, previousEmail] : [email];
+  const remaining = previousEmail
+    ? await members.findConnectionMembers(tx, {
+        connectionIds: [connectionId],
+        emails: [previousEmail],
+      })
+    : [];
   const known = await appAccountRepository(tx).findByAppAndEmails(appId, affectedEmails);
-  const employeeIds = await findEmployeeIdsByEmail(ctx, tx, [email]);
+  const employeeIds = await findEmployeeIdsByEmail(ctx, tx, affectedEmails);
   const integrationEmail = await integrationUser.findIntegrationAccountEmail(tx);
   const plan = planAccountSync(known, {
     findingKind,
-    found: [
-      {
-        appId,
-        email,
-        employeeId: employeeIds.get(email) ?? null,
-        status: account.values.status,
-        isIntegrationUser: email === integrationEmail,
-        grantedAt: null,
-        grantedBefore: null,
-      },
-    ],
+    found: [account.values, ...remaining].map(({ email, status }) => ({
+      appId,
+      email,
+      status,
+      employeeId: employeeIds.get(email) ?? null,
+      isIntegrationUser: email === integrationEmail,
+      grantedAt: null,
+      grantedBefore: null,
+    })),
     now: new Date(),
     statusKeptIn: new Set(),
     statusKeptFor: new Set(),

@@ -58,8 +58,8 @@ export async function scanSource(
       throw new ConnectorError("app_unavailable");
     }
     const target = { sourceId, connection, connector, used, revision };
-    const saved = await readRenewing(ctx, dependencies, target, progressBySource);
-    if (!saved) {
+    const rosterChanged = await readRenewing(ctx, dependencies, target, progressBySource);
+    if (rosterChanged) {
       if (restarted)
         throw new ApplicationError("CONFLICT", "The roster changed on both scan attempts.");
       dependencies.logger.info(
@@ -170,9 +170,9 @@ async function readAndSave(
     invitations,
     ...read,
   });
-  if (!outcome) return false;
+  if (!outcome) return true;
   logScan(dependencies, sourceId, found, { accounts, invitations, photos: read.photos }, outcome);
-  return true;
+  return false;
 }
 
 /** Every page's accounts, and the pending invitations any page carries. */
@@ -196,10 +196,6 @@ async function readAllPages(
       seenCursors.add(cursor);
     }
   } while (cursor !== null);
-  // Each account is one record; a key seen twice is an answer the connector got wrong.
-  if (new Set(accounts.map(({ sourceKey }) => sourceKey)).size !== accounts.length) {
-    throw new ConnectorError("unexpected_response");
-  }
   return { accounts, invitations };
 }
 

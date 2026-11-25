@@ -1,4 +1,4 @@
-import { ACCOUNTS_LIST_ANSWER } from "@broccoli-access/connector-contract";
+import { ACCOUNTS_LIST_ANSWER, ACCOUNTS_LIST_REQUEST } from "@broccoli-access/connector-contract";
 import { callConnector, NOTION_CONNECTION } from "@broccoli-access/fake-apps/test/support";
 import { vi } from "vitest";
 
@@ -75,6 +75,68 @@ test("refreshes a stale roster when an instant invite and Remove leave the membe
   expect(await users.readUsersOfEmployees(owner, [ivan.id, chloe.employeeId])).toMatchObject([
     { ...input, email: ivan.email, status: "active", inApp: true },
   ]);
+});
+
+test("restarts an offset scan when an instant invite makes two pages overlap", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { owner, input, ivan, changes, connectionId, sourceId, url } = await instantNotionInvite(
+    orm,
+    fakeGoogle.url,
+  );
+  const { latestInvite } = await changes.inviteEmployee(owner, input);
+  const cursors: (string | null)[] = [];
+  const proxy = await serveAccountList(url, async (request, response) => {
+    const { cursor } = ACCOUNTS_LIST_REQUEST.parse(request.body);
+    const { accounts } = await readNotionRoster(url);
+    cursors.push(cursor);
+    // In newest-first order the new member shifts the last row of page one onto page two.
+    if (cursors.length === 1) await changes.runChange(SYSTEM, latestInvite!.id);
+    const offset = Number(cursor ?? 0);
+    const nextOffset = offset + 2;
+    response.json({
+      accounts: accounts.toReversed().slice(offset, nextOffset),
+      nextCursor: nextOffset < accounts.length ? String(nextOffset) : null,
+    });
+  });
+  const scan = scans(orm, { connectors: containerConnectors(proxy.url) });
+  await scan.scanNow(owner, connectionId);
+
+  await scan.runScan(SYSTEM, sourceId);
+
+  expect(await changes.readAccountChange(owner, latestInvite!.id)).toMatchObject({
+    status: "succeeded",
+  });
+  expect
+    .soft(await scan.readScan(owner, connectionId))
+    .toMatchObject({ status: "scanned", failure: null });
+  expect.soft(cursors).toEqual([null, "2", null, "2"]);
+  expect(await appUsers(orm).readUsersOfEmployees(owner, [ivan.id])).toMatchObject([
+    { ...input, email: ivan.email, status: "active", inApp: true },
+  ]);
+});
+
+test("rejects overlapping offset pages when the roster stays the same", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const { owner, connectionId, sourceId, url } = await instantNotionInvite(orm, fakeGoogle.url);
+  const { accounts } = await readNotionRoster(url);
+  const proxy = await serveAccountList(url, (request, response) => {
+    const { cursor } = ACCOUNTS_LIST_REQUEST.parse(request.body);
+    if (cursor === null) response.json({ accounts: accounts.slice(0, 2), nextCursor: "2" });
+    else response.json({ accounts: accounts.slice(1), nextCursor: null });
+  });
+  const scan = scans(orm, { connectors: containerConnectors(proxy.url) });
+  await scan.scanNow(owner, connectionId);
+
+  await scan.runScan(SYSTEM, sourceId);
+
+  expect(await scan.readScan(owner, connectionId)).toMatchObject({
+    status: "scan_failed",
+    failure: "unexpected_response",
+  });
 });
 
 async function readNotionRoster(url: string) {

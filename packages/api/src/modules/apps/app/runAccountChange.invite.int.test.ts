@@ -1,4 +1,5 @@
 import { ACTION_RUN_ANSWER, type ActionRunAnswer } from "@broccoli-access/connector-contract";
+import { callConnector, NOTION_CONNECTION } from "@broccoli-access/fake-apps/test/support";
 import express from "express";
 
 import {
@@ -73,6 +74,37 @@ test("a retried instant invite gives access when the first response was lost", a
   ]);
 });
 
+test.for([400, 404])(
+  "an HTTP %i invite response does not grant access on retry",
+  async (status, { orm, fakeGoogle }) => {
+    const { owner, input, ivan, changes, url } = await instantNotionInvite(orm, fakeGoogle.url);
+    const { body } = await callConnector(url, "actions/run", {
+      connector: "notion",
+      runtime: { kind: "server" },
+      connection: NOTION_CONNECTION,
+      action: "invite",
+      account: { email: ivan.email },
+    });
+    expect(ACTION_RUN_ANSWER.parse(body)).toMatchObject({
+      changed: true,
+      account: { values: { email: ivan.email, status: "active" } },
+    });
+    const { latestInvite } = await changes.inviteEmployee(owner, input);
+    let refused = false;
+    const proxy = express();
+    proxy.post("/v1/actions/run", (_request, response, next) => {
+      if (refused) return next();
+      refused = true;
+      response.sendStatus(status);
+    });
+    const server = await serveConnectorRoutes(url, proxy);
+
+    await accountChanges(orm, { connectorsUrl: server.url }).runChange(SYSTEM, latestInvite!.id);
+
+    expect(await appUsers(orm).readUsersOfEmployees(owner, [ivan.id])).toEqual([]);
+  },
+);
+
 test("a verified instant invite moves access when Notion reuses a listed member key for another email", async ({
   orm,
   fakeGoogle,
@@ -96,6 +128,32 @@ test("a verified instant invite moves access when Notion reuses a listed member 
   expect(
     await users.readUsersOfEmployees(owner, [ivan.id, previous!.employeeId], undefined, [appId]),
   ).toMatchObject([{ ...input, email: ivan.email, status: "active", inApp: true }]);
+});
+
+test("a reused member key leaves the old email suspended when only its suspended member remains", async ({
+  orm,
+  fakeGoogle,
+}) => {
+  const oldEmail = "chloe@acme.example";
+  const { owner, input, ivan, changes, appId } = await instantNotionInvite(orm, fakeGoogle.url, {
+    replaceMemberOnInvite: oldEmail,
+    suspendedMemberEmail: oldEmail,
+  });
+  const users = appUsers(orm);
+  const previous = (await users.readUsersOfApps(owner, [appId])).find(
+    ({ email }) => email === oldEmail,
+  );
+  expect(previous).toMatchObject({ email: oldEmail, status: "active", inApp: true });
+  const { latestInvite } = await changes.inviteEmployee(owner, input);
+
+  await changes.runChange(SYSTEM, latestInvite!.id);
+
+  expect(await users.readUsersOfEmployees(owner, [ivan.id], undefined, [appId])).toMatchObject([
+    { ...input, email: ivan.email, status: "active", inApp: true },
+  ]);
+  expect(
+    await users.readUsersOfEmployees(owner, [previous!.employeeId], undefined, [appId]),
+  ).toMatchObject([{ id: previous!.id, email: oldEmail, status: "suspended", inApp: true }]);
 });
 
 function serveInviteAnswer(
