@@ -52,7 +52,8 @@ function isExtensionBuilt(): boolean {
 function zipExtension(): Uint8Array {
   const files = readdirSync(EXTENSION_DIST, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
-    .map((entry) => join(entry.parentPath, entry.name));
+    .map((entry) => join(entry.parentPath, entry.name))
+    .sort();
   return zipSync(
     Object.fromEntries(
       // Zip paths use forward slashes on every system.
@@ -61,5 +62,7 @@ function zipExtension(): Uint8Array {
         readFileSync(path),
       ]),
     ),
+    // ZIP dates start in 1980. A fixed date keeps the archive stable across builds.
+    { mtime: new Date(1980, 0, 1) },
   );
 }

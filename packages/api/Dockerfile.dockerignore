@@ -3,6 +3,9 @@
 **/.turbo
 **/coverage
 .git
+# Keep edits to the root README and docs/ out of the build cache key.
+/README.md
+/docs
 .env
 .env.*
 !.env.example
