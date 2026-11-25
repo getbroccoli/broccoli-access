@@ -1,8 +1,9 @@
 /** English copy under `settings.*`. */
 export const settingsEn = {
   "settings.title": "Settings",
-  "settings.connections.title": "Connections",
-  "settings.connections.description": "Where Broccoli Access finds your people and their accounts.",
+  "settings.googleWorkspace.title": "Google Workspace",
+  "settings.googleWorkspace.description":
+    "Where Broccoli Access finds your people, and the user it signs in to apps with.",
   "settings.connections.broccoliApp": "Broccoli app",
   "settings.connections.ownApp": "Your Google app: {clientId}",
   "settings.connections.googleWorkspace": "Google Workspace",
@@ -102,8 +103,6 @@ export const settingsEn = {
   "settings.connections.directory": "Directory",
   "settings.apps.title": "Apps",
   "settings.apps.description":
-    "Connect an app to see its members, and disable or enable their accounts from here.",
-  "settings.apps.descriptionMixed":
     "Connect apps to see their members and manage access where supported.",
   "settings.apps.notConnected": "Not connected",
   "settings.apps.throughApi": "Through {app}’s API, with a {field} made by a {app} admin.",
@@ -134,15 +133,15 @@ export const settingsEn = {
   "settings.connectWay.none": "You have none yet. Create it once, for all apps.",
   "settings.connectWay.create": "Create integration user",
   "settings.connectWay.notSetUp":
-    "Its sign-in to Google isn’t set up yet. Finish it under Connections.",
-  "settings.connectWay.openConnections": "Open Connections",
+    "Its sign-in to Google isn’t set up yet. Finish it in Settings › Google Workspace.",
+  "settings.connectWay.openGoogleWorkspace": "Open Google Workspace",
   "settings.connectWay.continue": "Continue",
   "settings.connectWay.switch": "Switch",
   "settings.connectWay.switchTitle": "Switch {app} to the integration user",
   "settings.connectWay.loadFailed": "Couldn’t load the integration user. Close this and try again.",
   "settings.integrationUserConnect.failedStep": "Failed",
   "settings.integrationUserConnect.membersNotRead":
-    "{app} is connected, but its members couldn’t be read. Close this and look at {app} under Connections.",
+    "{app} is connected, but its members couldn’t be read. Close this and look at {app} in Settings › Apps.",
   "settings.integrationUserConnect.scanRunning":
     "{app} is being scanned. Try again when the scan ends.",
   "settings.integrationUserConnect.title": "Connecting {app}",
@@ -168,11 +167,11 @@ export const settingsEn = {
   "settings.integrationUserConnect.blockedByCheck":
     "Google or {app} showed a check, which Broccoli Access never gets around. Try again later.",
   "settings.integrationUserConnect.authenticationFailed":
-    "Google refused the integration user’s sign-in. Check the integration user under Connections, then try again.",
+    "Google refused the integration user’s sign-in. Check the integration user in Settings › Google Workspace, then try again.",
   "settings.integrationUserConnect.otherWorkspace":
     "The integration user signed in to another {app} workspace than the connected one, so the connection stays as it was. Make it an admin in the connected workspace, then try again.",
   "settings.integrationUserConnect.notSetUp":
-    "The integration user’s sign-in to Google isn’t set up yet. Finish it under Connections, then try again.",
+    "The integration user’s sign-in to Google isn’t set up yet. Finish it in Settings › Google Workspace, then try again.",
   "settings.integrationUserConnect.failed": "Couldn’t sign in to {app}. Try again.",
   "settings.appSession.stepExtension": "Extension",
   "settings.appSession.stepPair": "Pair",

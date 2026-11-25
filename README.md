@@ -67,5 +67,5 @@ data goes directly from Google to your server. Protected setup remembers your
 instance’s public address for shared Google sign-in; no extra URL setting is
 required. Existing installations remember it when an admin changes the Google
 app. Open setup through the intended public address. To move domains, set
-`SELF_HOSTED_PUBLIC_URL` to the new address; it overrides the saved one. Settings → Connections → Change
+`SELF_HOSTED_PUBLIC_URL` to the new address; it overrides the saved one. Settings → Google Workspace → Change
 Google app switches either way without deleting people or apps.

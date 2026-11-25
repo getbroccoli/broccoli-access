@@ -21,7 +21,7 @@ A manual check of a person's page, `/people/<id>`, against a development stack.
 
 ## Disable and Enable
 
-Approve Slack again on its page, connect Linear as in [Connections settings](connections-settings.md#apps), and wait for its scan; then open Ana's page again.
+Approve Slack again on its page, connect Linear as in [Apps settings](apps-settings.md#apps), and wait for its scan; then open Ana's page again.
 
 - [ ] The amber box reads "Ana is suspended in Google but still has accounts in 4 approved apps. Disable them here where the app is connected, and in the app itself where it isn’t.", and the table adds a Linear row, "Active" and ending with "Disable"; Figma, Notion and Slack still end with "No connection".
 - [ ] "Disable" on Linear asks "Disable Ana Ruiz in Linear?"; confirming runs as on Linear's page and ends with "Disabled", "Disabled just now", "Enable" and the toast; the row stays listed and the amber box reads "… accounts in 3 approved apps." without the second sentence, since none of those apps is connected.
@@ -49,7 +49,7 @@ Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page
 - [ ] After "Scan now" on Linear's page, his row still reads "Invited on <today>": the scan read the invitation in Linear.
 - [ ] After `curl -s -X POST "$FAKE/_fake/linear/invitations/ivan%40acme.example/expire"`, his row stays "Invited on <today>" until "Scan now" on Linear's page; then it offers "Invite" again.
 - [ ] Invite him again. After `curl -s -X POST "$FAKE/_fake/linear/invitations/ivan@acme.example/accept"` and "Scan now" on Linear's page, Ivan's Linear row reads "Active", "Linear members" and "Disable", and the invite row is gone.
-- [ ] With Slack connected (see [Connections settings](connections-settings.md#apps)), Ivan's page offers "Invite" on Slack too.
+- [ ] With [Slack connected](apps-settings.md#connect-slack-with-your-own-session), Ivan's page offers "Invite" on Slack too.
 - [ ] An invitation sent in Slack itself shows: after `curl -s -H 'content-type: application/json' -d '{"email": "ivan@acme.example"}' "$FAKE/_fake/slack/invitations"` and "Scan now" on Slack's page, his Slack row reads "Invited on <today>", the day the scan first saw it, with no "Invite". People still counts no Slack account for him.
 - [ ] After `curl -s -X POST "$FAKE/_fake/slack/invitations/ivan%40acme.example/expire"` and "Scan now" on Slack's page, his Slack row offers "Invite" again, and inviting him puts one invitation for ivan@acme.example in `.invitations.slack`.
 - [ ] Assign Linear users to Elif Demir. Her Linear row shows **Missing** and still offers **Invite**. After `fail unexpected_response` (see [the app page](app-page.md#when-a-change-fails)), inviting her to Linear ends with "Couldn’t invite" in red and "Try again". The dialog reads "Couldn’t invite Elif Demir to Linear", the reason ending "Nothing changed in Linear.", "Try again in a while, or invite Elif in Linear’s admin yourself and tell Broccoli Access.", "I did it by hand", "Open Linear admin" and "Try again".
@@ -75,7 +75,7 @@ Linear stays connected as above. Set `FAKE` as "Disable and Enable" in [App page
 A run of its own: start from [Setup](#setup), and also select Zoom before "Approve and finish". Create Everyone with Slack and Notion, and assign it to Ivan Petrov and to Lena Fischer, who are active in Google. Ivan has a Notion account and no Slack account.
 
 - [ ] On Ivan's page, the **×** at the end of the Notion row is named "Remove Notion for Ivan only". Choosing it strikes Notion through, shows **Removed by you** in **From** and offers **Undo**; **In the app** reads **Extra**, since Ivan has an active Notion account. The same on Slack, which he has no account in, reads **Not given**.
-- [ ] **+ Add app** lists the approved apps that none of Ivan's templates gives. Choosing Zoom adds a Zoom row with **Added by you**, **Missing** and **Undo**. With Linear connected as in [Connections settings](connections-settings.md#apps), Linear opens its roles; choosing Admin adds it with the role Admin, and **Invite** stays offered.
+- [ ] **+ Add app** lists the approved apps that none of Ivan's templates gives. Choosing Zoom adds a Zoom row with **Added by you**, **Missing** and **Undo**. With Linear connected as in [Apps settings](apps-settings.md#apps), Linear opens its roles; choosing Admin adds it with the role Admin, and **Invite** stays offered.
 - [ ] Lena's page still lists Notion and Slack from Everyone, without Zoom, and Everyone's page lists the same two apps.
 - [ ] **Undo** on Notion brings back Everyone in **From** and the row's earlier status. **Undo** on Zoom takes its row away.
 - [ ] Remove Notion for Ivan again, then take Everyone off him: Notion stays listed with **Removed by you**, **Extra** and **Undo**. **Undo** leaves it **Extra**, from **No template**.
@@ -86,7 +86,7 @@ A run of its own: start from [Setup](#setup), and also select Zoom before "Appro
 Connect Slack and Linear, assign a template to Chloé Martin, and set `GOOGLE` to the fake Google's address.
 
 - [ ] Chloé's page has "Offboard". It opens "Offboard Chloé Martin?" with her email, "Broccoli Access disables these now" listing Google Workspace with "Suspend" first, then Linear and Slack with "Disable", each ticked, and "You do these by hand" listing each app without a connection with "No connection".
-- [ ] While Settings › Connections shows that Google Workspace only reads users, the button reads "Continue to Google". After `curl -s -H 'content-type: application/json' -d '{"scope": "https://www.googleapis.com/auth/admin.directory.user"}' "$GOOGLE/_fake/consent/refuse-scope"`, Allow at Google comes back to the open dialog with "Google was not allowed to change users. Nobody was offboarded."; Activity has no new row and her template is still assigned.
+- [ ] While Settings › Google Workspace shows that Google Workspace only reads users, the button reads "Continue to Google". After `curl -s -H 'content-type: application/json' -d '{"scope": "https://www.googleapis.com/auth/admin.directory.user"}' "$GOOGLE/_fake/consent/refuse-scope"`, Allow at Google comes back to the open dialog with "Google was not allowed to change users. Nobody was offboarded."; Activity has no new row and her template is still assigned.
 - [ ] "Continue to Google" again, then Allow, comes back to the dialog with "Offboard Chloé". Confirming closes it: each row shows its progress, then "Disabled" with "Enable"; the header shows "Suspended in Google" and "Offboarded today"; Templates is empty; a notice lists the apps that need the owner, each with its reason; and no row shows Missing or Extra.
 - [ ] `curl -s "$GOOGLE/_fake/state"` counts one more suspended person, and `curl -s "$FAKE/_fake/state"` shows chloe@acme.example `suspended` in `.slack` and `.linear`.
 - [ ] Activity lists her three changes, each "Disable" with "Offboarding" below.
@@ -101,7 +101,7 @@ Connect Slack and Linear, assign a template to Chloé Martin, and set `GOOGLE` t
 
 ## Delete a person awaiting their Google account
 
-- [ ] On a fresh workspace with its own Google app and **Reads only** in Settings → Connections, start adding a person and cancel at Google's consent. The person's page offers Delete person. Cancel the deletion and check the person stays. Confirm it and check the person leaves People.
+- [ ] On a fresh workspace with its own Google app and **Reads only** in Settings → Google Workspace, start adding a person and cancel at Google's consent. The person's page offers Delete person. Cancel the deletion and check the person stays. Confirm it and check the person leaves People.
 - [ ] Open a person listed by Google Workspace. Their page offers Offboard and has no Delete person action.
 
 ## Not found
@@ -114,7 +114,7 @@ Connect Slack and Linear, assign a template to Chloé Martin, and set `GOOGLE` t
 
 ## Provision
 
-Start on a freshly seeded stack (`pnpm dev --drop-db`), since the checks above change the people these use. Connect Slack and Linear (see [Connections settings](connections-settings.md#apps)) and set `FAKE` as "Disable and Enable" in [App page](app-page.md) says. In Templates, create Everyone with Slack and Claude, and Engineer with Linear as Admin. Open Ivan Petrov, who has no Slack or Linear member and no Claude account, and assign both.
+Start on a freshly seeded stack (`pnpm dev --drop-db`), since the checks above change the people these use. Connect [Slack](apps-settings.md#connect-slack-with-your-own-session) and [Linear](apps-settings.md#apps) and set `FAKE` as "Disable and Enable" in [App page](app-page.md) says. In Templates, create Everyone with Slack and Claude, and Engineer with Linear as Admin. Open Ivan Petrov, who has no Slack or Linear member and no Claude account, and assign both.
 
 - [ ] Below Ivan's apps a bar reads "3 apps missing." with "Provision". Slack, Linear and Claude show **Missing**.
 - [ ] "Provision" asks "Provision Ivan Petrov?" with ivan@acme.example, and lists Claude with "By hand", Linear with "Admin" and "Broccoli Access", and Slack with "Member" and "Broccoli Access"; then "Each app Broccoli Access invites Ivan to sends its own invitation email.", "Invite Ivan in each app marked By hand yourself, then confirm it with By hand on this page.", "Cancel" and "Provision 3 apps". When every listed app is an invite the line reads "Each app sends Ivan its own invitation email." Cancel changes nothing.

@@ -47,11 +47,11 @@ Each journey ends with the check that proves it works. Screens are in the circle
 
 #### 3. Create the integration user
 
-- Settings › Connections says what the integration user is and offers to create it. The owner picks its address.
+- Settings › Google Workspace says what the integration user is and offers to create it. The owner picks its address.
 - Google asks the owner to let broccoli-access create and change users. broccoli-access creates the user with a password it makes and keeps encrypted.
-- broccoli-access then signs in to Google as the integration user by itself and sets up its two-step sign-in. If Google shows a check, Connections says "Needs you" with the reason.
+- broccoli-access then signs in to Google as the integration user by itself and sets up its two-step sign-in. If Google shows a check, the Google Workspace page says "Needs you" with the reason.
 - The integration user is not an employee, and its accounts in apps are marked as service accounts.
-- **Done when:** the owner creates `broccoli@acme.example`; the fake Google holds the user with two-step sign-in on; Connections shows it as ready; and it is not on the People page.
+- **Done when:** the owner creates `broccoli@acme.example`; the fake Google holds the user with two-step sign-in on; the Google Workspace page shows it as ready; and it is not on the People page.
 
 #### 4. Connect Slack with the integration user
 

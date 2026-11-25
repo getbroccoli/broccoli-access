@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
-import { type ConnectionsSettingsQuery } from "@/__generated__/graphql";
+import { type GoogleWorkspaceSettingsQuery } from "@/__generated__/graphql";
 import { ScanNowButton } from "@/components/ScanNowButton";
 import { buttonVariants } from "@/components/ui/button";
 import { t } from "@/i18n";
@@ -9,7 +9,7 @@ import { needsGoogleReconnect } from "@/lib/googleScan";
 import { formatLastScan } from "@/lib/lastScan";
 
 type Props = {
-  connection: NonNullable<ConnectionsSettingsQuery["setup"]["googleWorkspace"]>;
+  connection: NonNullable<GoogleWorkspaceSettingsQuery["setup"]["googleWorkspace"]>;
 };
 
 /** The Google Workspace connection: who connected it with which Google app, and its last scan. */
@@ -76,7 +76,7 @@ export function GoogleWorkspaceCard({ connection }: Props) {
       <div className="flex shrink-0 flex-wrap gap-2">
         <ScanNowButton connectionId={connection.id} isScanning={isScanning} className="pb-0" />
         <Link
-          to="/settings/connections/google-app"
+          to="/settings/google-workspace/google-app"
           className={cn(buttonVariants({ variant: "outline", size: "lg" }), "px-4")}
         >
           {needsReconnect ? t("apps.reconnect.button") : t("settings.connections.changeApp")}

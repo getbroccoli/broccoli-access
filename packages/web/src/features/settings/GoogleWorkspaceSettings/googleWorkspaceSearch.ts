@@ -12,7 +12,7 @@ const INTEGRATION_USER_ERRORS = [
 
 export type IntegrationUserError = (typeof INTEGRATION_USER_ERRORS)[number];
 
-/** The search params of `/settings/connections`: why the last creation failed, when it did. */
-export const connectionsSearch = z.object({
+/** The search params of `/settings/google-workspace`: why the last creation failed, when it did. */
+export const googleWorkspaceSearch = z.object({
   integrationUserError: z.enum(INTEGRATION_USER_ERRORS).optional().catch(undefined),
 });

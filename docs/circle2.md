@@ -25,7 +25,7 @@ Each journey ends with the check that proves it works.
 
 ### 1. Connect Linear
 
-- Settings > Connections > Connect Linear. The owner pastes a personal API key made by a Linear admin.
+- Settings > Apps > Connect Linear. The owner pastes a personal API key made by a Linear admin.
 - broccoli-access shows the workspace name, approves the Linear app and scans its members. Each member becomes an app account, found via "Linear", with its status.
 - **Done when:** after the key is pasted, the fake Linear's members show on Linear's app page with their status.
 

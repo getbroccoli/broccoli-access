@@ -2,7 +2,6 @@ query ContainerConnectorsSettings {
   containerConnectors {
     id
     name
-    canDisableAccounts
     signsInAsIntegrationUser
     connectionFields {
       kind

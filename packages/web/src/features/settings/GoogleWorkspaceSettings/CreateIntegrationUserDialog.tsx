@@ -25,7 +25,7 @@ type Props = {
 
 /**
  * Create the integration user: the owner picks its address, then goes to Google to allow creating
- * users; Google's answer comes back to the API, which creates it and returns to Connections.
+ * users; Google's answer comes back to the API, which creates it and returns to Google Workspace.
  */
 export function CreateIntegrationUserDialog({ domain }: Props) {
   const [open, setOpen] = useState(false);

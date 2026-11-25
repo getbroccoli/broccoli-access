@@ -34,7 +34,7 @@ connectorTest(
     const callback = await consentAtGoogle(body.authorizationUrl);
     const finished = await browser.getManual(callback.href);
     expect(finished.status).toBe(302);
-    expect(finished.headers.get("location")).toBe("/settings/connections");
+    expect(finished.headers.get("location")).toBe("/settings/google-workspace");
     expect(await createdGoogleUsers(fakeGoogle.url)).toEqual([
       { primaryEmail: EMAIL, suspended: false, changePasswordAtNextLogin: false },
     ]);
@@ -127,7 +127,7 @@ connectorTest(
   },
 );
 
-test("cancelling at Google returns to Connections with read-only access and no integration user", async ({
+test("cancelling at Google returns to Google Workspace with read-only access and no integration user", async ({
   env,
 }) => {
   const { browser } = await env.signInAsOwner();
@@ -140,7 +140,7 @@ test("cancelling at Google returns to Connections with read-only access and no i
 
   expect(finished.status).toBe(302);
   expect(finished.headers.get("location")).toBe(
-    "/settings/connections?integrationUserError=cancelled",
+    "/settings/google-workspace?integrationUserError=cancelled",
   );
   expect(await readSettings(browser)).toEqual(EMPTY_SETTINGS);
 });

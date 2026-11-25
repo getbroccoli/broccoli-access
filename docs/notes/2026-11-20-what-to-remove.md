@@ -22,6 +22,6 @@ Not final: more may be added before the copy. Every removed table is listed in t
 ## Keep and change
 
 - People: become the People page and a person's page, which show their app accounts.
-- Settings: Connections and Email.
+- Settings: Google Workspace, Apps and Email.
 - Login: one "Sign in with Google" button.
 - Record history, files, mail settings, and the architecture, code quality, testing and thesaurus docs.

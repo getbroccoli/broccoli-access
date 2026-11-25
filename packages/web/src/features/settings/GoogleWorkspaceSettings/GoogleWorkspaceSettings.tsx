@@ -1,15 +1,13 @@
 import { useQuery } from "@apollo/client/react";
 
-import { ConnectionsSettingsDocument } from "@/__generated__/graphql";
+import { GoogleWorkspaceSettingsDocument } from "@/__generated__/graphql";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { PageHeader } from "@/shell";
 
-import { ContainerConnectorsSettings } from "../ContainerConnectorsSettings";
-import { ChromeExtensionCard } from "./ChromeExtensionCard";
-import type { IntegrationUserError } from "./connectionsSearch";
+import type { IntegrationUserError } from "./googleWorkspaceSearch";
 import { GoogleWorkspaceCard } from "./GoogleWorkspaceCard";
 import { IntegrationUserCard } from "./IntegrationUserCard";
 
@@ -18,10 +16,9 @@ type Props = {
   integrationUserError: IntegrationUserError | undefined;
 };
 
-/** Settings' Connections page: where Broccoli Access finds people and their accounts. */
-export function ConnectionsSettings({ integrationUserError }: Props) {
+export function GoogleWorkspaceSettings({ integrationUserError }: Props) {
   // A scan started elsewhere, such as in another tab, changes the connection outside this cache.
-  const query = useQuery(ConnectionsSettingsDocument, { fetchPolicy: "cache-and-network" });
+  const query = useQuery(GoogleWorkspaceSettingsDocument, { fetchPolicy: "cache-and-network" });
   const { data, error, refetch } = query;
   const connection = data?.setup.googleWorkspace;
   const isSettingUpSignIn =
@@ -32,8 +29,8 @@ export function ConnectionsSettings({ integrationUserError }: Props) {
   return (
     <div className="flex max-w-4xl flex-col">
       <PageHeader
-        title={t("settings.connections.title")}
-        description={t("settings.connections.description")}
+        title={t("settings.googleWorkspace.title")}
+        description={t("settings.googleWorkspace.description")}
       />
       <div className="flex flex-col gap-6">
         <section aria-labelledby="directory-title" className="flex flex-col gap-2.5">
@@ -69,9 +66,7 @@ export function ConnectionsSettings({ integrationUserError }: Props) {
             />
           </section>
         )}
-        <ContainerConnectorsSettings directoryScanning={isScanning} />
       </div>
-      <ChromeExtensionCard />
     </div>
   );
 }

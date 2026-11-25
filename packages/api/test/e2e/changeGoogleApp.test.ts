@@ -24,7 +24,7 @@ test("after changing the Google app the owner signs in with the new client", asy
   const callback = await consentAtGoogle(authorizationUrl);
   const finished = await browser.getManual(callback.href);
   expect(finished.status).toBe(302);
-  expect(finished.headers.get("location")).toBe("/settings/connections");
+  expect(finished.headers.get("location")).toBe("/settings/google-workspace");
   await browser.post("/api/auth/sign-out", {});
   const returning = env.browser();
   const signIn = await returning.getManual("/api/google/sign-in");
@@ -52,7 +52,7 @@ test("cancelling at Google keeps the old Google app", async ({ env, fakeGoogle }
 
   expect(finished.status).toBe(302);
   expect(finished.headers.get("location")).toBe(
-    "/settings/connections/google-app?changeError=cancelled",
+    "/settings/google-workspace/google-app?changeError=cancelled",
   );
   await browser.post("/api/auth/sign-out", {});
   const signIn = await env.browser().getManual("/api/google/sign-in");

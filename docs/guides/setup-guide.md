@@ -12,9 +12,9 @@ instance to another domain, `SELF_HOSTED_PUBLIC_URL` overrides the saved address
 
 # The Chrome extension
 
-Connecting Slack needs the Broccoli Access extension in the owner's Chrome. Download it from your instance, in the first step of Connect Slack or in **Settings → Connections → Chrome extension**, and load it unpacked as the steps there say. A company-managed Chrome may block Developer mode, which loading it unpacked needs, or unknown extensions; then ask IT to allow Developer mode and the extension's ID, shown there too.
+Connecting Slack with your own session needs the Broccoli Access extension in the owner's Chrome. Download it from **Settings → Apps → Chrome extension**, and load it unpacked as the steps there say. A company-managed Chrome may block Developer mode, which loading it unpacked needs, or unknown extensions; then ask IT to allow Developer mode and the extension's ID, shown there too.
 
-An unpacked extension doesn't update itself. After updating Broccoli Access, download it again from **Settings → Connections → Chrome extension**, unzip it over the same folder and press the extension's Reload in `chrome://extensions`, which keeps its pairing.
+An unpacked extension doesn't update itself. After updating Broccoli Access, download it again from **Settings → Apps → Chrome extension**, unzip it over the same folder and press the extension's Reload in `chrome://extensions`, which keeps its pairing.
 
 The extension downloads and pairs only at an https address, because your Slack session travels to Broccoli Access through it. Plain http works only on the same computer (`localhost`, `127.0.0.1` or `[::1]`), such as `http://localhost:8080`.
 

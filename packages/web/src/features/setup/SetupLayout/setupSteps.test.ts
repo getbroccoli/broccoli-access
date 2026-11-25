@@ -163,7 +163,7 @@ it("sends the owner selecting apps from People to Apps", () => {
 
 it("opens Google app recovery for the signed-in owner during the first scan", () => {
   const me = { id: "owner" };
-  const path = "/settings/connections/google-app";
+  const path = "/settings/google-workspace/google-app";
 
   expect(
     requireFinishedSetup({
@@ -178,7 +178,7 @@ it("keeps unrelated settings behind the first scan", () => {
   try {
     requireFinishedSetup({
       context: { me: { id: "owner" }, holdsSetup: false, setupStep: "SCAN" },
-      location: { href: "/settings/connections", pathname: "/settings/connections" },
+      location: { href: "/settings/google-workspace", pathname: "/settings/google-workspace" },
     });
   } catch (error) {
     caught = error;

@@ -10,6 +10,7 @@ import {
   type Callback,
   cancelledOrFailed,
   consentCookie,
+  GOOGLE_WORKSPACE_SETTINGS_PAGE,
   type GoogleRoutes,
   logRefusal,
   requireSecurity,
@@ -80,9 +81,7 @@ const SCAN_PAGE = "/setup/scan";
 
 const HOME = "/";
 
-const CONNECTIONS_PAGE = "/settings/connections";
-
-const CHANGE_APP_PAGE = "/settings/connections/google-app";
+const CHANGE_APP_PAGE = "/settings/google-workspace/google-app";
 
 const NOT_SETUP_HOLDER = "Only the browser holding setup can connect Google.";
 
@@ -231,7 +230,7 @@ async function startAppChange(
   }
 }
 
-/** The owner's new Google app: back to Connections, or to the change's page with why it failed. */
+/** The owner's new Google app: back to Google Workspace, or to the change page with why it failed. */
 async function finishAppChange(
   { connection, http, logger }: GoogleRoutes,
   { request, response, answer }: Callback,
@@ -253,7 +252,7 @@ async function finishAppChange(
       browserToken: parseCookies(request.headers.cookie ?? "").get(CHANGE_APP_COOKIE) ?? null,
       now: new Date(),
     });
-    response.redirect(302, CONNECTIONS_PAGE);
+    response.redirect(302, GOOGLE_WORKSPACE_SETTINGS_PAGE);
   } catch (error) {
     const failure = appChangeFailureOf(error);
     logRefusal(logger, error, failure, "Google app change refused");

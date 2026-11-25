@@ -48,9 +48,9 @@ export function ContainerConnectorCard({ connector }: Props) {
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 id={titleId} className="text-base font-semibold">
+          <h2 id={titleId} className="text-base font-semibold">
             {connector.name}
-          </h3>
+          </h2>
           <ConnectorStatusBadge connection={connection} />
           <SessionSourceBadge sessionFrom={connection?.sessionFrom} />
         </div>

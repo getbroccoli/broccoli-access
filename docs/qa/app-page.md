@@ -30,13 +30,13 @@ A manual check of an app's page, `/apps/<id>`, against a development stack.
 Open Slack from Applications.
 
 - [ ] After "Approved", an outlined "Can disable" pill with a person-minus icon reads "Broccoli Access can disable and enable accounts in this app" on hover.
-- [ ] Next to "Ignore", "Connect Slack" opens the Connect Slack dialog of Settings → Connections (see "Connect Slack" in [Connections settings](connections-settings.md)); once connected, the page shows Slack's members without a reload.
+- [ ] Next to "Ignore", "Connect Slack" opens the Connect Slack dialog of Settings → Apps (see "Connect Slack" in [Apps settings](apps-settings.md)); once connected, the page shows Slack's members without a reload.
 - [ ] Under the header, a grey note reads "Connect Slack to see every member and disable or enable their accounts from here. Until then, Broccoli Access sees only who signs in to Slack with Google."
 - [ ] Figma's and Google Workspace's pages have none of the three.
 
 ## A connected app
 
-Connect Linear in Settings → Connections as in [Connections settings](connections-settings.md#apps), then open Linear from Applications.
+Connect Linear in Settings → Apps as in [Apps settings](apps-settings.md#apps), then open Linear from Applications.
 
 - [ ] The header reads "Linear" with "Approved", "Can disable" and "Connected", "linear.app · the Acme workspace. Scanned today at HH:MM." below, and "Open Linear admin ↗" and "Scan now" on the right; "Open Linear admin" opens `https://linear.app/acme/settings/members` in a new tab.
 - [ ] The cards read "Users 7" and "Suspended in Google, still has access 1".
@@ -96,7 +96,7 @@ On Linear's page as above. Enable David and Gabriel again after the queueing che
 
 ## Slack as the integration user
 
-Slack connected as the integration user, as in the Connections checklist.
+Slack connected as the integration user, as in the [Apps settings checklist](apps-settings.md#connect-slack-with-the-integration-user).
 
 - [ ] After `curl -s -X POST "$FAKE/_fake/slack/sessions/expire"`, disabling Ana on Slack's page ends with "Disabled" and the header stays "Connected": the session was renewed by itself.
 - [ ] After the expiry and a planned `blocked_by_check` on `connections/sign-in`, disabling Ana ends with "Couldn’t disable"; the header reads "Reconnect" with an amber banner naming the integration user and the check, and "Sign in again as the integration user"; "Couldn’t disable" explains the same and offers that button.
