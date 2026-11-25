@@ -219,10 +219,10 @@ async function finishSucceeded(
     }
     const changes = accountChangeRepository(tx);
     const stored = await changes.lockById(change.id);
-    // A concurrent Reconnect fails queued changes, including this already-dispatched removal.
+    // A concurrent Reconnect can fail a dispatched change before its verified result arrives.
     const failedDuringCall =
       stored?.status === "failed" &&
-      change.action === "remove" &&
+      (change.action === "remove" || invitedMember !== undefined) &&
       stored.attempts.length === 0 &&
       stored.error &&
       reconnectCauseOf(stored.error, { afterRenewal: true });

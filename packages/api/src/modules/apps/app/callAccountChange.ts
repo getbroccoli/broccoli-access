@@ -2,6 +2,7 @@ import {
   type ConnectionUpdate,
   type Connector,
   callWithRenewal,
+  ConnectorAnswerLostError,
   ConnectorError,
   type ConnectorErrorCode,
   type ConnectorSession,
@@ -57,7 +58,7 @@ export async function callChange(
     );
     return { ...NOT_CALLED, secretsUsed: secrets, error: "authentication_failed", reconnects };
   }
-  const progress = { calledServer: false, inUse: secrets };
+  const progress = { calledServer: false, inviteAnswerLost: false, inUse: secrets };
   try {
     const result = await callWithRenewal(() => callOnce(dependencies, change, call, progress), {
       renewals,
@@ -105,21 +106,32 @@ interface ChangeCall {
   reconnects: boolean;
 }
 
+interface CallProgress {
+  calledServer: boolean;
+  inviteAnswerLost: boolean;
+  inUse: Record<string, unknown>;
+}
+
 /** One attempt with the secrets in use, trying a rate-limited or unavailable call again. */
 async function callOnce(
   { wait, logger }: RunDependencies,
   change: RunnableChange,
   { connector, connection }: ChangeCall,
-  progress: { calledServer: boolean; inUse: Record<string, unknown> },
+  progress: CallProgress,
 ) {
   const session = await connector.openSession({
     settings: connection.settings,
     secrets: progress.inUse,
   });
   return withConnectorRetries(
-    () => {
+    async () => {
       progress.calledServer = true;
-      return makeChange(session, change);
+      try {
+        return await makeChange(session, change, progress.inviteAnswerLost);
+      } catch (error) {
+        if (error instanceof ConnectorAnswerLostError) progress.inviteAnswerLost = true;
+        throw error;
+      }
     },
     {
       wait,
@@ -140,9 +152,20 @@ async function callOnce(
 async function makeChange(
   session: ConnectorSession,
   change: RunnableChange,
+  inviteAnswerLost: boolean,
 ): Promise<{ readBack: boolean; connection?: ConnectionUpdate; account?: ImportedAccount }> {
   if (change.action === "invite") {
-    return { ...(await session.invite!(change.email, change.role ?? undefined)), readBack: true };
+    const { connection, account, changed } = await session.invite!(
+      change.email,
+      change.role ?? undefined,
+    );
+    // shortcut: the next scan reconciles an invite whose job ended before it saved the read-back.
+    return {
+      connection,
+      readBack: true,
+      account:
+        (changed || inviteAnswerLost) && account?.values.status === "active" ? account : undefined,
+    };
   }
   // A change to an existing account always copies the member's source key.
   const account = { sourceKey: change.sourceKey!, email: change.email };

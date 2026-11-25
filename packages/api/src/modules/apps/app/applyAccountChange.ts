@@ -58,16 +58,25 @@ export async function applyAccountChange(
 
 /** Saves the invite's read-back through the same account and history path as a scan. */
 export async function applyInvitedMember(
-  { members, employees, integrationUser }: AccountChangeDependencies,
+  { members, findEmployeeIdsByEmail, integrationUser }: AccountChangeDependencies,
   ctx: SecurityContext,
   tx: Tx,
   change: RunnableChange,
   { account, findingKind }: InvitedMember,
 ): Promise<void> {
-  if (!(await members.addInvitedMember(tx, change.connectionId, account))) return;
-  const { appId, email } = change;
-  const known = await appAccountRepository(tx).findByAppAndEmail(appId, email);
-  const [employee] = await employees.readEmployeesByEmails(ctx, [email], tx);
+  const { appId, connectionId, email } = change;
+  const saved = await members.addInvitedMember(tx, connectionId, account);
+  if (!saved) return;
+  const affectedEmails = [email];
+  if (saved.previousEmail) {
+    const remaining = await members.findConnectionMembers(tx, {
+      connectionIds: [connectionId],
+      emails: [saved.previousEmail],
+    });
+    if (!remaining.length) affectedEmails.push(saved.previousEmail);
+  }
+  const known = await appAccountRepository(tx).findByAppAndEmails(appId, affectedEmails);
+  const employeeIds = await findEmployeeIdsByEmail(ctx, tx, [email]);
   const integrationEmail = await integrationUser.findIntegrationAccountEmail(tx);
   const plan = planAccountSync(known, {
     findingKind,
@@ -75,7 +84,7 @@ export async function applyInvitedMember(
       {
         appId,
         email,
-        employeeId: employee?.id ?? null,
+        employeeId: employeeIds.get(email) ?? null,
         status: account.values.status,
         isIntegrationUser: email === integrationEmail,
         grantedAt: null,

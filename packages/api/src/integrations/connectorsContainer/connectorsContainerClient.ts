@@ -49,7 +49,8 @@ interface ConnectorListing {
  * A call's answer, or the connector error it stands for: the container failing is
  * `app_unavailable`, an answer nobody understands `unexpected_response`.
  */
-export type ContainerAnswer<T, Code = CallErrorCode> = { answer: T } | { error: Code };
+export type ContainerAnswer<T, Code = CallErrorCode> =
+  { answer: T } | { error: Code; answerLost?: true };
 
 /** The errors every call gives; `not_invited` comes only from signing in to an app as the integration user. */
 type CallErrorCode = Exclude<ConnectorErrorCode, "not_invited">;
@@ -139,7 +140,7 @@ async function call<T>(
 ): Promise<ContainerAnswer<T, ConnectorErrorCode>> {
   const bytes = await postJson(url, request, timeoutMs);
   if (bytes === null) {
-    return { error: "app_unavailable" };
+    return { error: "app_unavailable", answerLost: true };
   }
   const body = parsedJson(bytes);
   const error = ERROR_ANSWER.safeParse(body);

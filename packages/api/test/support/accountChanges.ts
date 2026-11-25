@@ -9,7 +9,7 @@ import type { JobQueue } from "../../src/core/jobs";
 import { createSessionRenewals } from "../../src/modules/connectors";
 import { createAccountChangeService, createAppConnectionService } from "../../src/modules/apps";
 import { readInviteRole, type TemplateService } from "../../src/modules/templates";
-import { createEmployeeReadService } from "../../src/modules/employees";
+import { createDirectorySyncService, createEmployeeReadService } from "../../src/modules/employees";
 import { directoryMatches } from "../../src/modules";
 import { createGoogleWorkspaceConnector } from "../../src/modules/google";
 import { createImportRecordService } from "../../src/modules/imports";
@@ -70,6 +70,7 @@ export function accountChangeDependencies(
     jobs,
     connectors,
     members,
+    findEmployeeIdsByEmail: createDirectorySyncService().findEmployeeIdsByEmail,
     employees: createEmployeeReadService({ orm, accounts: apps(orm) }),
   };
 }

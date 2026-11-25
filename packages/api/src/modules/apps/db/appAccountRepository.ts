@@ -29,7 +29,7 @@ export interface AppAccountRepository {
   lockForSync(): Promise<void>;
   /** The accounts with these ids; an unknown id is left out. */
   findByIds(ids: readonly string[]): Promise<AppAccount[]>;
-  findByAppAndEmail(appId: string, email: string): Promise<AppAccount[]>;
+  findByAppAndEmails(appId: string, emails: readonly string[]): Promise<AppAccount[]>;
   /** The account, locked until the transaction ends; null for an unknown id. */
   lockById(
     id: string,
@@ -118,11 +118,11 @@ export function appAccountRepository(db: Orm | Tx): AppAccountRepository {
       await orm().execute(sql`lock table ${appAccounts} in share row exclusive mode`);
     },
     findByIds: (ids) => orm().select(columns).from(appAccounts).where(anyOf(appAccounts.id, ids)),
-    findByAppAndEmail: (appId, email) =>
+    findByAppAndEmails: (appId, emails) =>
       orm()
         .select(columns)
         .from(appAccounts)
-        .where(and(eq(appAccounts.appId, appId), eq(appAccounts.email, email))),
+        .where(and(eq(appAccounts.appId, appId), anyOf(appAccounts.email, emails))),
     lockById: async (id, facts) => {
       const [account] = await orm()
         .select({ ...columns, inApp: facts ? inApp(facts) : sql<null>`null` })

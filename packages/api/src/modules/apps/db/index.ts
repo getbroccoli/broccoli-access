@@ -15,7 +15,7 @@ export {
   UNLINKED_SORT_VALUES,
 } from "./appAccountRepository";
 export { accountChanges } from "./accountChangesTable";
-export { findAccountsChangedSince, hasInstantInviteSince } from "./accountChangesSince";
+export { findAccountsChangedSince, readRosterRevision } from "./accountChangeScanQueries";
 export { ACCOUNT_CHANGE_SORT_VALUES, accountChangeRepository } from "./accountChangeRepository";
 export { directoryChangeRepository } from "./directoryChangeRepository";
 export { appInvitations } from "./appInvitationsTable";

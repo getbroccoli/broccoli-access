@@ -8,6 +8,7 @@ export {
   canListAccounts,
   canRemoveAccounts,
   CONNECTOR_ERROR_CODES,
+  ConnectorAnswerLostError,
   ConnectorError,
   listsInvitations,
   offersInviteRole,

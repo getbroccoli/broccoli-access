@@ -53,6 +53,23 @@ export function describeInviteConformance(url: string, fixture: ConnectorFixture
   });
 }
 
+/** The repeated-invite rule shared by the conformance run and its regression tests. */
+export function expectRepeatedInvite(
+  first: ActionRunAnswer,
+  second: ActionRunAnswer,
+  email: string,
+): void {
+  expect([first.changed, second.changed]).toEqual([true, false]);
+  if (first.account) {
+    expect(first.account.values).toMatchObject({ email, status: "active" });
+    expect(second.account?.sourceKey).toBe(first.account.sourceKey);
+    expect(second.account?.values.email).toBe(email);
+    return;
+  }
+  expect(invitationReadBack(first).email).toBe(email);
+  expect(invitationReadBack(second)).toEqual(invitationReadBack(first));
+}
+
 /** A role key no connector lists. */
 const UNLISTED_ROLE = "conformance_unlisted_role";
 
@@ -68,15 +85,7 @@ async function checkRepeatedInvite(
   const first = await invite(flow, invitee);
   const second = await invite(flow, invitee);
 
-  expect([first.changed, second.changed]).toEqual([true, false]);
-  if (first.account) {
-    expect(first.account.values).toMatchObject({ email: invitee.email, status: "active" });
-    expect(second.account?.sourceKey).toBe(first.account.sourceKey);
-    return;
-  }
-  expect(invitationReadBack(first).email).toBe(invitee.email);
-  // The retry reads back the invitation the first call sent.
-  expect(invitationReadBack(second)).toEqual(invitationReadBack(first));
+  expectRepeatedInvite(first, second, invitee.email);
 }
 
 async function checkListedInvitation(

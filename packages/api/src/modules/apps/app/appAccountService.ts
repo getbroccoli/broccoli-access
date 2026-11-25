@@ -5,7 +5,7 @@ import {
   appAccountRepository,
   appConnectionRepository,
   findAccountsChangedSince,
-  hasInstantInviteSince,
+  readRosterRevision,
 } from "../db";
 import {
   type AppAccount,
@@ -47,8 +47,8 @@ export interface AppAccountService {
    * System only.
    */
   holdAccountSyncs: (ctx: SecurityContext, tx: Tx) => Promise<void>;
-  /** Whether an invite through the connection saved a member since `since`. Trusted read. */
-  hasInstantInviteSince: (db: Orm | Tx, connectionId: string, since: Date) => Promise<boolean>;
+  /** The count of committed roster changes through this connection. Trusted read. */
+  readRosterRevision: (db: Orm | Tx, connectionId: string) => Promise<number>;
   /** How many people have an account in the app, and how many of those are suspended. Trusted read: no `ctx`. */
   countAccounts: (db: Orm | Tx, appId: string) => Promise<{ people: number; suspended: number }>;
   /** How many apps hold an account `findingKind` saw in its last scan. Trusted read: no `ctx`. */
@@ -86,7 +86,7 @@ export function createAppAccountService(): AppAccountService {
       ctx.requireSystem();
       await appAccountRepository(tx).lockForSync();
     },
-    hasInstantInviteSince,
+    readRosterRevision,
     countAccounts: (db, appId) => appAccountRepository(db).countPeople(appId),
     countAppsFoundVia: (db, findingKind) => appAccountRepository(db).countAppsFoundVia(findingKind),
   };

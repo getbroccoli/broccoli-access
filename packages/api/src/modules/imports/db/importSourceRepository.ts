@@ -33,8 +33,8 @@ export interface ImportSourceRepository {
   markScanning(id: string): Promise<void>;
   /** Makes the source's records exactly `accounts`. */
   replaceRecords(id: string, accounts: readonly ImportedAccount[]): Promise<void>;
-  /** Stores one member without overwriting a record that a scan saved. */
-  insertMember(id: string, account: ImportedAccount): Promise<boolean>;
+  /** Saves one member, replacing the record with the same source key. */
+  upsertMember(id: string, account: ImportedAccount): Promise<void>;
   removeMember(member: { connectionId: string; sourceKey: string; email: string }): Promise<void>;
   /** The accounts the source's last saved scan found. */
   findRecords(id: string): Promise<Pick<ImportedAccount, "sourceKey" | "raw">[]>;
@@ -100,15 +100,15 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
         await orm().insert(importRecords).values(batch);
       }
     },
-    insertMember: async (id, account) => {
-      const [saved] = await orm()
+    upsertMember: async (id, account) => {
+      const row = memberRecord(id, account);
+      await orm()
         .insert(importRecords)
-        .values(memberRecord(id, account))
-        .onConflictDoNothing({
+        .values(row)
+        .onConflictDoUpdate({
           target: [importRecords.sourceId, importRecords.type, importRecords.sourceKey],
-        })
-        .returning({ id: importRecords.id });
-      return saved !== undefined;
+          set: { raw: row.raw, values: row.values, typeVersion: row.typeVersion },
+        });
     },
     removeMember: async ({ connectionId, sourceKey, email }) => {
       const source = orm()

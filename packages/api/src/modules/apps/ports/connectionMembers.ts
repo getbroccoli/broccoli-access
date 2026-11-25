@@ -3,8 +3,12 @@ import type { Orm, Tx } from "../../../core/db";
 
 /** The members read from each connection, and when each connection last finished a scan. */
 export interface ConnectionMembers {
-  /** Stores a member added by Invite unless a scan already saved its source key. Joins `tx`. */
-  addInvitedMember(tx: Tx, connectionId: string, account: ImportedAccount): Promise<boolean>;
+  /** Saves the invited member, returning its replaced email if any. Null when already saved. */
+  addInvitedMember(
+    tx: Tx,
+    connectionId: string,
+    account: ImportedAccount,
+  ): Promise<{ previousEmail: string | null } | null>;
   /** Forgets only the member removed from this connection. Joins the account change transaction. */
   removeMember(
     tx: Tx,

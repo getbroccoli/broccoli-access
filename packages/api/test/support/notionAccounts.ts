@@ -18,8 +18,8 @@ export const NOTION_INPUT = {
   values: [{ key: "apiKey", value: NOTION_CONNECTION.secrets.apiKey }],
 };
 
-export async function testNotion(actions: readonly NotionAction[], { instantInvite = false } = {}) {
-  const notion = await startNotionConnector(actions, undefined, { instantInvite });
+export async function testNotion(actions: readonly NotionAction[], options?: NotionInviteOptions) {
+  const notion = await startNotionConnector(actions, undefined, options);
   onTestFinished(notion.stop);
   return notion;
 }
@@ -41,10 +41,17 @@ export async function scannedNotion(
   return { changes: accountChanges(orm, { connectorsUrl: url, googleUrl }), chloe, own };
 }
 
-export async function instantNotionInvite(orm: Orm, googleUrl: string) {
+export async function instantNotionInvite(
+  orm: Orm,
+  googleUrl: string,
+  options?: Pick<NotionInviteOptions, "replaceMemberOnInvite">,
+) {
   const google = await googleScanSetup(orm, googleUrl);
   await google.scans.runScan(SYSTEM, google.sourceId);
-  const notion = await connectNotion(orm, ["invite"], { instantInvite: true });
+  const notion = await connectNotion(orm, ["invite", "remove"], {
+    ...options,
+    instantInvite: true,
+  });
   await notion.scans.runScan(SYSTEM, notion.sourceId);
   const ivan = (await storedEmployees(orm)).find(({ email }) => email === "ivan@acme.example")!;
   const input = { employeeId: ivan.id, appId: notion.appId };
@@ -55,7 +62,7 @@ export async function instantNotionInvite(orm: Orm, googleUrl: string) {
 async function connectNotion(
   orm: Orm,
   actions: readonly NotionAction[],
-  options?: { instantInvite?: boolean },
+  options?: NotionInviteOptions,
 ) {
   const { url } = await testNotion(actions, options);
   const { service, scans } = containerConnections(orm, url);
@@ -65,3 +72,8 @@ async function connectNotion(
   const source = (await storedImportSources(orm)).find((row) => row.connectionId === connectionId)!;
   return { url, scans, connectionId, appId, sourceId: source.id };
 }
+
+type NotionInviteOptions = {
+  instantInvite?: boolean;
+  replaceMemberOnInvite?: string;
+};

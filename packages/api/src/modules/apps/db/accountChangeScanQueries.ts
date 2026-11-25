@@ -1,7 +1,7 @@
-import { and, eq, gte, isNotNull, or } from "drizzle-orm";
+import { and, count, eq, gte, or } from "drizzle-orm";
 
 import { anyOf, type Orm, ormOf, type Tx } from "../../../core/db";
-import { accountChanges } from "./accountChangesTable";
+import { accountChanges, COMPLETED_ROSTER_CHANGE } from "./accountChangesTable";
 
 /** Accounts whose Disable or Enable is running or succeeded at or after `since`. */
 export async function findAccountsChangedSince(
@@ -25,24 +25,11 @@ export async function findAccountsChangedSince(
   return rows.map(({ appAccountId }) => appAccountId!);
 }
 
-/** Whether an instant invite succeeded through this connection at or after `since`. */
-export async function hasInstantInviteSince(
-  db: Orm | Tx,
-  connectionId: string,
-  since: Date,
-): Promise<boolean> {
+/** The committed roster changes are retained, so their count is a monotonic revision. */
+export async function readRosterRevision(db: Orm | Tx, connectionId: string): Promise<number> {
   const [row] = await ormOf(db)
-    .select({ id: accountChanges.id })
+    .select({ revision: count() })
     .from(accountChanges)
-    .where(
-      and(
-        eq(accountChanges.connectionId, connectionId),
-        eq(accountChanges.action, "invite"),
-        eq(accountChanges.status, "succeeded"),
-        isNotNull(accountChanges.sourceKey),
-        gte(accountChanges.finishedAt, since),
-      ),
-    )
-    .limit(1);
-  return row !== undefined;
+    .where(and(eq(accountChanges.connectionId, connectionId), COMPLETED_ROSTER_CHANGE));
+  return row!.revision;
 }

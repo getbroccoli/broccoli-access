@@ -8,8 +8,12 @@ export interface ImportRecordService {
   findSourceId(db: Orm | Tx, connectionId: string): Promise<string | null>;
   /** The email of the connection’s member with this stable id, from its last saved scan. */
   findMemberEmail(db: Orm | Tx, connectionId: string, sourceKey: string): Promise<string | null>;
-  /** Stores a member added by Invite unless a scan already saved its source key. Joins `tx`. */
-  addInvitedMember(tx: Tx, connectionId: string, account: ImportedAccount): Promise<boolean>;
+  /** Saves the invited member, returning its replaced email if any. Null when already saved. */
+  addInvitedMember(
+    tx: Tx,
+    connectionId: string,
+    account: ImportedAccount,
+  ): Promise<{ previousEmail: string | null } | null>;
   /** Forgets only the member removed from this connection. Joins the account change transaction. */
   removeMember(
     tx: Tx,
@@ -39,7 +43,11 @@ export function createImportRecordService(): ImportRecordService {
     async addInvitedMember(tx, connectionId, account) {
       const sources = importSourceRepository(tx);
       const source = await sources.findByConnection(connectionId);
-      return source ? sources.insertMember(source.id, account) : false;
+      if (!source) return null;
+      const previousEmail = await sources.findMemberEmail(connectionId, account.sourceKey);
+      if (previousEmail === account.values.email) return null;
+      await sources.upsertMember(source.id, account);
+      return { previousEmail };
     },
     removeMember: (tx, member) => importSourceRepository(tx).removeMember(member),
     findConnectionMembers: (db, members) =>

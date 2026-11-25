@@ -13,7 +13,6 @@ import {
   withConnectorRetries,
 } from "../../../core/connectors";
 import type { SecurityContext } from "../../../core/security";
-import { importSourceRepository } from "../db";
 import type { ScanCounts, ScanProgress } from "../domain";
 import { readChangedPhotos } from "./readChangedPhotos";
 import type { ScannedApps } from "../ports";
@@ -143,9 +142,9 @@ async function readAndSave(
   const { sourceId, connection, connector } = scanned;
   const renewing = { connectionId: connection.id, used };
   const readStartedAt = new Date();
-  const savedCount = connector.isDirectory
+  const rosterRevision = connector.isDirectory
     ? null
-    : (await importSourceRepository(dependencies.orm).countRecords(sourceId)).accounts;
+    : await dependencies.apps.readRosterRevision(dependencies.orm, connection.id);
   const retrying = <T>(call: () => Promise<T>) => withRetries(dependencies, sourceId, call);
   const session = await retrying(() =>
     connector.openSession({ settings: connection.settings, secrets: used.secrets }),
@@ -166,7 +165,7 @@ async function readAndSave(
   });
   const outcome = await saveScan(ctx, dependencies, {
     ...scanned,
-    savedCount,
+    rosterRevision,
     readStartedAt,
     invitations,
     ...read,

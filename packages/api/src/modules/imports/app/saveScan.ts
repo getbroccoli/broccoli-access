@@ -1,5 +1,5 @@
 import { ApplicationError } from "../../../core/applicationError";
-import { canInvite, type ImportedAccount } from "../../../core/connectors";
+import type { ImportedAccount } from "../../../core/connectors";
 import type { Tx } from "../../../core/db";
 import { createSetupStepService } from "../../../core/instance";
 import type { SecurityContext } from "../../../core/security";
@@ -18,10 +18,10 @@ export async function saveScan(
   dependencies: ScanDependencies,
   findings: ScanFindings & {
     revision: string;
-    savedCount: number | null;
+    rosterRevision: number | null;
   },
 ): Promise<{ saved: boolean; finishedSetupScan: boolean; accountsSetToService: number } | null> {
-  const { sourceId, accounts, savedCount } = findings;
+  const { sourceId, accounts, rosterRevision } = findings;
   return dependencies.transact(async (tx) => {
     const sources = importSourceRepository(tx);
     const source = await sources.lockById(sourceId);
@@ -41,15 +41,10 @@ export async function saveScan(
       // The job retries from a fresh connection; stale findings must never reach app history.
       throw new ApplicationError("CONFLICT", "The directory connection changed during the scan.");
     }
-    // A Remove and an Invite can leave the roster the same size.
+    // Membership changes and scans share the account sync lock.
     if (
-      (savedCount !== null && savedCount !== (await sources.countRecords(sourceId)).accounts) ||
-      (canInvite(findings.connector) &&
-        (await dependencies.apps.hasInstantInviteSince(
-          tx,
-          findings.connection.id,
-          findings.readStartedAt,
-        )))
+      rosterRevision !== null &&
+      rosterRevision !== (await dependencies.apps.readRosterRevision(tx, findings.connection.id))
     )
       return null;
     await sources.replaceRecords(sourceId, accounts);

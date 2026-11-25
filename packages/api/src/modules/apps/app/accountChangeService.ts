@@ -242,13 +242,12 @@ export interface AccountChangeDependencies {
   directoryConnectors: DirectoryConnectors;
   findPeopleAwaitingDirectory(db: Orm | Tx, ids: readonly string[]): Promise<Set<string>>;
   /** The employees module, which owns their emails, which invites go to. */
-  employees: EmployeesByName & {
-    readEmployeesByEmails(
-      ctx: SecurityContext,
-      emails: readonly string[],
-      db: Tx,
-    ): Promise<{ id: string }[]>;
-  };
+  employees: EmployeesByName;
+  findEmployeeIdsByEmail: (
+    ctx: SecurityContext,
+    db: Tx,
+    emails: readonly string[],
+  ) => Promise<Map<string, string>>;
   /** Whose accounts never offer a change. */
   integrationUser: IntegrationUser;
   /** Signs in again for a connection made by the integration user's sign-in. */

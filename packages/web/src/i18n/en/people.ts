@@ -8,7 +8,7 @@ export const peopleEn = {
   "people.differences.provisionTitle": "Provision {app}?",
   "people.differences.provisionDescription": "Review how each person gets access.",
   "people.differences.provisioning": "Provisioning…",
-  "people.differences.invites": "Send invitation",
+  "people.differences.invites": "Give access or send an invitation",
   "people.differences.fixRole": "Review their expected role",
   "people.differences.byHand": "Invite by hand after confirming",
   "people.differences.finishByHand":
@@ -226,9 +226,7 @@ export const peopleEn = {
   "people.provision.byBroccoli": "Broccoli Access",
   "people.provision.byHand": "By hand",
   "people.provision.appsInvite":
-    "Each app gives {firstName} access at once or sends an invitation. This page shows the result for each app.",
-  "people.provision.someAppsInvite":
-    "For each invite Broccoli Access makes, the app gives {firstName} access at once or sends an invitation. This page shows the result.",
+    "When Broccoli Access invites {firstName}, each app can give them access at once or send an invitation. New access and pending invitations show here.",
   "people.provision.confirm": "Provision {count} apps",
   "people.provision.confirmOne": "Provision 1 app",
   "people.provision.failed": "Couldn’t provision {name}. Reload the page and try again.",

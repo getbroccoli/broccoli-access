@@ -25,7 +25,7 @@ export async function startNotionConnector(
     port = 0,
     onlySuspendedMember = false,
     instantInvite = false,
-    existingMemberInvite,
+    replaceMemberOnInvite,
     onUnlistedRuntimeAction,
   }: {
     host?: string;
@@ -76,7 +76,7 @@ export async function startNotionConnector(
       return response.sendStatus(400);
     response.json(
       takeError(call.data.action) ??
-        changeMember(call.data, members, invitations, { instantInvite, existingMemberInvite }),
+        changeMember(call.data, members, invitations, { instantInvite, replaceMemberOnInvite }),
     );
   });
   const server = app.listen(port, host);
@@ -153,26 +153,28 @@ function notionMembers(ownMember: string | null, onlySuspendedMember: boolean): 
 
 type InviteOptions = {
   instantInvite?: boolean;
-  existingMemberInvite?: (account: ListedAccount) => { changed: boolean; account: ListedAccount };
+  replaceMemberOnInvite?: string;
 };
 
 function changeMember(
   call: ActionRunRequest,
   members: ListedAccount[],
   invitations: Set<string>,
-  { instantInvite, existingMemberInvite }: InviteOptions,
+  { instantInvite, replaceMemberOnInvite }: InviteOptions,
 ) {
   const { email } = call.account;
   const member = members.find(({ values }) => values.email === email);
   if (call.action === "invite") {
-    if (member) return existingMemberInvite?.(member) ?? { changed: false, account: member };
+    if (member) return { changed: false, account: member };
     if (instantInvite) {
+      const replaced = members.findIndex(({ values }) => values.email === replaceMemberOnInvite);
       const account: ListedAccount = {
-        sourceKey: `notion-${email}`,
+        sourceKey: members[replaced]?.sourceKey ?? `notion-${email}`,
         raw: {},
         values: { email, displayName: email, status: "active", isConnectionUser: false },
       };
-      members.push(account);
+      if (replaced < 0) members.push(account);
+      else members[replaced] = account;
       return { changed: true, account };
     }
     const changed = !invitations.has(email);

@@ -5,6 +5,7 @@ import {
   type ConnectionField,
   type ConnectionUpdate,
   type Connector,
+  ConnectorAnswerLostError,
   ConnectorError,
   type ConnectorSession,
   type ImportedAccount,
@@ -253,20 +254,25 @@ function containerSession(
       return { connection: answer.connection };
     },
     async invite(email, role) {
-      const answer = answerOf(
-        await client.runAction({ ...request(), action: "invite", account: { email, role } }),
-      );
+      const reply = await client.runAction({
+        ...request(),
+        action: "invite",
+        account: { email, role },
+      });
+      if ("error" in reply && reply.answerLost) throw new ConnectorAnswerLostError();
+      const answer = answerOf(reply);
       keep(answer.connection);
       // Success is the invitation, or the email's member, read back.
       if ((answer.invitation ?? answer.account?.values)?.email !== email) {
         throw new ConnectorError("unexpected_response");
       }
-      const account = answer.changed ? answer.account : undefined;
-      if (account && account.values.status !== "active") {
+      const { account, changed } = answer;
+      if (changed && account && account.values.status !== "active") {
         throw new ConnectorError("unexpected_response");
       }
       return {
         connection: answer.connection,
+        changed,
         account: account && importedAccount({ ...account, raw: {} }, name),
       };
     },
