@@ -131,7 +131,5 @@ it("asks the owner to check the account after a refused Remove when the connecto
     about,
   );
 
-  expect(hint).toBe(
-    "Trying again won’t help. Scan Linear to check Ana’s account, or remove Ana from Linear yourself and tell Broccoli Access.",
-  );
+  expect(hint).toBe("Scan Linear or remove Ana by hand.");
 });

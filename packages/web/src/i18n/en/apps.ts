@@ -55,8 +55,7 @@ export const appsEn = {
   "apps.page.canDisableTitle": "Broccoli Access can disable and enable accounts in this app",
   "apps.page.connectHint":
     "Connect {app} to see every member and disable or enable their accounts from here. Until then, Broccoli Access sees only who signs in to {app} with Google.",
-  "apps.page.connectReadHint":
-    "Connect {app} to see every member. Until then, Broccoli Access sees only who signs in to {app} with Google.",
+  "apps.page.connectReadHint": "Connect {app} to see every member.",
   "apps.page.openAdmin": "Open {app} admin",
   "apps.page.showMore": "Show {count} more",
   "apps.page.noUsers": "No app accounts linked to people yet.",
@@ -229,8 +228,7 @@ export const appsEn = {
     "Trying again won’t help. If someone with more rights in {app} makes the change there, tell Broccoli Access.",
   "apps.couldnt.hintRemoveRefused":
     "Trying again won’t help. Scan {app} to see whether {firstName} is still disabled, or remove {firstName} from {app} yourself and tell Broccoli Access.",
-  "apps.couldnt.hintActiveRemoveRefused":
-    "Trying again won’t help. Scan {app} to check {firstName}’s account, or remove {firstName} from {app} yourself and tell Broccoli Access.",
+  "apps.couldnt.hintActiveRemoveRefused": "Scan {app} or remove {firstName} by hand.",
   "apps.couldnt.hintScan":
     "Trying again won’t help. Scan {app} to bring its member list up to date.",
   "apps.couldnt.hintScanAfterReconnect":
