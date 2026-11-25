@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 import {
   askGoogleForUserWrites,
+  googleUserWritesBlock,
   GOOGLE_WORKSPACE,
   useGoogleUserWrites,
 } from "@/lib/useGoogleUserWrites";
@@ -70,6 +71,7 @@ export function ConfirmAccountChangeDialog({
   const asksGoogle = isGoogle && google === "needs_consent";
   // Wait until Google's permission is known before starting a change.
   const blocked = isGoogle && google !== "allowed" && !asksGoogle;
+  const googleBlock = blocked && googleUserWritesBlock(google);
   const confirm = async () => {
     setOpen(false);
     if (!asksGoogle) {
@@ -136,6 +138,7 @@ export function ConfirmAccountChangeDialog({
         <AlertDialogDescription className="flex flex-col gap-3">
           <span>{t(copy.effect, { firstName: employee.firstName, app: app.name })}</span>
           {asksGoogle && <span>{t("apps.change.googleAsks")}</span>}
+          {googleBlock && <span>{t(googleBlock)}</span>}
           {blocked && google === "failed" && <span>{t("apps.change.googleCheckFailed")}</span>}
           {actor && <span className="text-xs">{t(howItWorks, { actor, app: app.name })}</span>}
         </AlertDialogDescription>

@@ -46,8 +46,8 @@ import {
 export interface IntegrationUserService {
   /**
    * For the owner: Google's consent address for the one scope that creates users, added to what
-   * the Google app was granted, its `state` carrying the address picked, encrypted for
-   * `browserToken`, a new token the caller keeps in this browser until Google answers. Refuses an
+   * the Google app was granted. The consent binds the chosen address to this browser until Google
+   * answers. Refuses an
    * address outside the workspace's domain with INVALID_INPUT, another caller with FORBIDDEN, and
    * with CONFLICT before Google Workspace is connected or once the integration user exists.
    */

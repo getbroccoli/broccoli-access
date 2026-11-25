@@ -74,16 +74,15 @@ export async function startWriteConsent(
   { publicOrigin, now, ...details }: WriteConsentStart,
 ): Promise<WriteConsentDestination> {
   const nonce = randomConsentToken();
-  const consent = { ...details, nonce, revision };
   if (settings.googleApp === "broccoli_google_app") {
     const relay = requireGoogleRelay(relayUrl);
     const callbackOrigin = await sharedConsentOrigin(orm, publicUrl);
     const codeVerifier = randomConsentToken();
     // The relay caps state length. Bind the email or return path to the same proof in the cookie.
-    const browserToken = sealConsentState(secretBox, consent, { browserToken: codeVerifier, now });
+    const browserToken = sealConsentState(secretBox, details, { browserToken: codeVerifier, now });
     const state = sealConsentState(
       secretBox,
-      { flow: consent.flow, revision, nonce, codeVerifier },
+      { flow: details.flow, revision, nonce, codeVerifier },
       { browserToken, now },
     );
     const authorizationUrl = relay.authorize({
@@ -96,7 +95,7 @@ export async function startWriteConsent(
     return { authorizationUrl, browserToken, callbackOrigin };
   }
   const browserToken = randomConsentToken();
-  const state = sealConsentState(secretBox, consent, { browserToken, now });
+  const state = sealConsentState(secretBox, { ...details, nonce, revision }, { browserToken, now });
   const { authorizationEndpoint } = await google.discover();
   const authorizationUrl = consentUrl(
     authorizationEndpoint,
@@ -121,11 +120,13 @@ export function openWriteConsent(
   const opened = openConsentState(secretBox, state, { browserToken, now });
   if (opened?.flow !== "create_integration_user" && opened?.flow !== "allow_user_writes")
     return null;
-  if (!("codeVerifier" in opened)) return opened;
+  const { revision, nonce } = opened;
+  if (!revision || !nonce) return null;
+  if (!("codeVerifier" in opened)) return { ...opened, revision, nonce };
   const { codeVerifier } = opened;
   const details = openConsentState(secretBox, browserToken, { browserToken: codeVerifier, now });
   return details?.flow === opened.flow && !("codeVerifier" in details)
-    ? { ...details, codeVerifier }
+    ? { ...details, codeVerifier, nonce, revision }
     : null;
 }
 
@@ -207,7 +208,10 @@ type WriteConsentStart = { publicOrigin: string; now: Date } & (
   | { flow: "allow_user_writes"; returnTo: string }
 );
 
-export type WriteConsent = WriteConsentState | (WriteConsentState & { codeVerifier: string });
+type VersionedWriteConsent = WriteConsentState & { nonce: string; revision: string };
+
+export type WriteConsent =
+  VersionedWriteConsent | (VersionedWriteConsent & { codeVerifier: string });
 
 interface WriteConsentAnswer {
   code?: string;

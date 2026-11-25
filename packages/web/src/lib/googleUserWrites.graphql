@@ -1,9 +1,11 @@
 query GoogleUserWrites {
   setup {
     id
+    broccoliGoogleAppAvailable
     googleWorkspace {
       id
       canChangeUsers
+      googleApp
     }
   }
 }

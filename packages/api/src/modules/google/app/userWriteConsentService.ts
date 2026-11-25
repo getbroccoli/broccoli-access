@@ -19,8 +19,8 @@ import {
 export interface UserWriteConsentService {
   /**
    * For the owner: Google's consent address for the one scope that changes users, added to what
-   * the Google app was granted, its `state` carrying `returnTo`, encrypted for `browserToken`, a
-   * new token the caller keeps in this browser until Google answers. Refuses a `returnTo` that is
+   * the Google app was granted. The consent binds `returnTo` to this browser until Google answers.
+   * Refuses a `returnTo` that is
    * no path of this instance with INVALID_INPUT, another caller with FORBIDDEN, and with CONFLICT
    * before Google Workspace is connected.
    */

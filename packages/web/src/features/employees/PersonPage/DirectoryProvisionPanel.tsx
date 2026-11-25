@@ -27,6 +27,7 @@ import { t } from "@/i18n";
 import {
   askGoogleForUserWrites,
   directoryProvisionFailure,
+  googleUserWritesBlock,
   GOOGLE_WORKSPACE,
   useGoogleUserWrites,
 } from "@/lib/useGoogleUserWrites";
@@ -61,6 +62,8 @@ export function DirectoryProvisionPanel({ person, confirmAfterConsent, refetch }
 
   const canStart = google === "allowed" || google === "needs_consent";
   const offersStart = state.status !== "RUNNING" && !person.directoryAccount;
+  const permissionNote =
+    google === "needs_consent" ? "people.provision.beforeConsent" : googleUserWritesBlock(google);
   async function start() {
     if (google === "allowed") {
       setOpen(true);
@@ -76,13 +79,20 @@ export function DirectoryProvisionPanel({ person, confirmAfterConsent, refetch }
     <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted px-4 py-3">
       <p role="status" className="text-sm">
         {t(provisionMessage(state))}
+        {offersStart && permissionNote && ` ${t(permissionNote)}`}
       </p>
       {!askingGoogle && (state.canDelete || offersStart) && (
         <div className="flex gap-2">
           {state.canDelete && <DeletePersonButton person={person} refetch={refetch} />}
           {offersStart && (
             <Button type="button" disabled={!canStart} onClick={() => void start()}>
-              {t(state.status === "FAILED" ? "people.error.retry" : "people.provision.button")}
+              {t(
+                google === "needs_consent"
+                  ? "apps.change.continueToGoogle"
+                  : state.status === "FAILED"
+                    ? "people.error.retry"
+                    : "people.provision.button",
+              )}
             </Button>
           )}
         </div>

@@ -1,6 +1,7 @@
 query GoogleWorkspaceSettings {
   setup {
     id
+    broccoliGoogleAppAvailable
     googleWorkspace {
       id
       googleApp

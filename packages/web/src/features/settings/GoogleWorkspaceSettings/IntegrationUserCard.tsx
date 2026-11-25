@@ -21,10 +21,11 @@ type Props = {
   domain: string;
   /** Why the last creation failed, from Google's redirect back. */
   failure: IntegrationUserError | undefined;
+  creationBlock: MessageKey | undefined;
 };
 
 /** The integration user: what it is with the offer to create it, or the one created. */
-export function IntegrationUserCard({ integrationUser, domain, failure }: Props) {
+export function IntegrationUserCard({ integrationUser, domain, failure, creationBlock }: Props) {
   if (integrationUser) {
     return <CreatedIntegrationUserCard integrationUser={integrationUser} />;
   }
@@ -44,13 +45,14 @@ export function IntegrationUserCard({ integrationUser, domain, failure }: Props)
           <li>{t("settings.integrationUser.offerKeepsWorking")}</li>
           <li>{t("settings.integrationUser.offerSuspend")}</li>
         </ul>
+        {creationBlock && <p>{t(creationBlock)}</p>}
         {failure && (
           <p role="alert" className="text-destructive">
             {t(FAILURE_MESSAGES[failure])}
           </p>
         )}
       </div>
-      <CreateIntegrationUserDialog domain={domain} />
+      {!creationBlock && <CreateIntegrationUserDialog domain={domain} />}
     </article>
   );
 }

@@ -65,9 +65,9 @@ export interface SignInState {
 export interface IntegrationUserCreationState {
   flow: "create_integration_user";
   email: string;
-  /** The connection's stored version at the start; an answer to another version is refused. */
-  revision: string;
-  nonce: string;
+  /** The connection's stored version at the start, kept in compact state for the relay. */
+  revision?: string;
+  nonce?: string;
   /** Epoch milliseconds after which Google's answer is refused. */
   expiresAt: number;
 }
@@ -77,9 +77,9 @@ export interface UserWriteConsentState {
   flow: "allow_user_writes";
   /** The instance's own path the owner goes back to. */
   returnTo: string;
-  /** The connection's stored version at the start; an answer to another version is refused. */
-  revision: string;
-  nonce: string;
+  /** The connection's stored version at the start, kept in compact state for the relay. */
+  revision?: string;
+  nonce?: string;
   /** Epoch milliseconds after which Google's answer is refused. */
   expiresAt: number;
 }
@@ -213,15 +213,15 @@ const CONSENT_STATE = z.discriminatedUnion("flow", [
   z.object({
     flow: z.literal("create_integration_user"),
     email: z.string(),
-    revision: z.string(),
-    nonce: z.string(),
+    revision: z.string().optional(),
+    nonce: z.string().optional(),
     expiresAt: z.number(),
   }),
   z.object({
     flow: z.literal("allow_user_writes"),
     returnTo: z.string(),
-    revision: z.string(),
-    nonce: z.string(),
+    revision: z.string().optional(),
+    nonce: z.string().optional(),
     expiresAt: z.number(),
   }),
 ]);
