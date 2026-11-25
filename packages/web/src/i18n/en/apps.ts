@@ -229,6 +229,8 @@ export const appsEn = {
     "Trying again won’t help. If someone with more rights in {app} makes the change there, tell Broccoli Access.",
   "apps.couldnt.hintRemoveRefused":
     "Trying again won’t help. Scan {app} to see whether {firstName} is still disabled, or remove {firstName} from {app} yourself and tell Broccoli Access.",
+  "apps.couldnt.hintActiveRemoveRefused":
+    "Trying again won’t help. Scan {app} to check {firstName}’s account, or remove {firstName} from {app} yourself and tell Broccoli Access.",
   "apps.couldnt.hintScan":
     "Trying again won’t help. Scan {app} to bring its member list up to date.",
   "apps.couldnt.hintScanAfterReconnect":

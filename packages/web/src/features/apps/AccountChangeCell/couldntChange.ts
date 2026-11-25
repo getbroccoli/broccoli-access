@@ -143,11 +143,26 @@ export function couldntChangeHint(
   failure: AccountChangeFailure,
   action: AccountChangeAction,
   { tryAgain, scanNow, reconnect }: FailedChangeOptions,
-  { firstName, app, roleConflict }: { firstName: string; app: string; roleConflict?: boolean },
+  {
+    firstName,
+    app,
+    roleConflict,
+    canDisableAccounts,
+  }: {
+    firstName: string;
+    app: string;
+    roleConflict?: boolean;
+    canDisableAccounts?: boolean;
+  },
 ): string {
   if (failure === "NOT_ALLOWED") {
-    // Broccoli Access itself refuses a Remove whose member a scan saw active again.
-    if (action === "REMOVE") return t("apps.couldnt.hintRemoveRefused", { firstName, app });
+    if (action === "REMOVE")
+      return t(
+        canDisableAccounts === false
+          ? "apps.couldnt.hintActiveRemoveRefused"
+          : "apps.couldnt.hintRemoveRefused",
+        { firstName, app },
+      );
     return t("apps.couldnt.hintByHandOnly", { app });
   }
   if (failure === "ACCOUNT_NOT_FOUND") {

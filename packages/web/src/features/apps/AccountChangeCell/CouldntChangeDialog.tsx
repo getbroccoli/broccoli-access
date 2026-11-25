@@ -148,6 +148,7 @@ export function CouldntChangeDialog({
                 firstName,
                 roleConflict: row.roleConflict,
                 app: app.name,
+                canDisableAccounts: connection?.connector.canDisableAccounts,
               })}
             </p>
           )}

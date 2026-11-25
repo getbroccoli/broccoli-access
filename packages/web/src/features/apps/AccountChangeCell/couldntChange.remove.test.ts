@@ -121,3 +121,17 @@ it("points a refused Remove to a scan or removing by hand, not to someone with m
     "Trying again won’t help. Scan Linear to see whether Hannah is still disabled, or remove Hannah from Linear yourself and tell Broccoli Access.",
   );
 });
+
+it("asks the owner to check the account after a refused Remove when the connector cannot disable accounts", () => {
+  const about = { firstName: "Ana", app: "Linear", canDisableAccounts: false };
+  const hint = couldntChangeHint(
+    "NOT_ALLOWED",
+    "REMOVE",
+    { tryAgain: false, byHand: true, scanNow: false, reconnect: false },
+    about,
+  );
+
+  expect(hint).toBe(
+    "Trying again won’t help. Scan Linear to check Ana’s account, or remove Ana from Linear yourself and tell Broccoli Access.",
+  );
+});
