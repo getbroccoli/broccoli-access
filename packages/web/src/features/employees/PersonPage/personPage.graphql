@@ -81,6 +81,49 @@ query PersonPage($id: ID!, $templatesAfter: String, $appsAfter: String) {
       ...AccountChangeCell_appUser
       ...AppAccountStatusCell_appUser
     }
+    # The same fields as `appAccounts`, so its row joins theirs.
+    directoryAccount {
+      email
+      offeredChange
+      id
+      status
+      foundVia
+      since {
+        at
+        before
+      }
+      app {
+        id
+        name
+        catalogKey
+        canChangeAccounts
+      }
+      latestChange {
+        action
+        id
+        status
+      }
+      ...AccountChangeCell_appUser
+      ...AppAccountStatusCell_appUser
+    }
+    offboarding {
+      offboardedAt
+      accountsToDisable {
+        id
+        app {
+          id
+          name
+          catalogKey
+        }
+      }
+      byHandWork {
+        reason
+        app {
+          id
+          name
+        }
+      }
+    }
     appInvites {
       id
       invitedAt
@@ -233,6 +276,22 @@ mutation RemovePersonApp($input: PersonAppRemoveInput!) {
 mutation UndoPersonAppChoice($input: PersonAppUndoChoiceInput!) {
   templates {
     undoPersonAppChoice(input: $input) {
+      employee {
+        id
+      }
+      error {
+        __typename
+        ... on Error {
+          message
+        }
+      }
+    }
+  }
+}
+
+mutation OffboardEmployee($input: EmployeeOffboardInput!) {
+  apps {
+    offboardEmployee(input: $input) {
       employee {
         id
       }

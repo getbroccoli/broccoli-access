@@ -14,7 +14,11 @@ type Person = NonNullable<PersonPageQuery["employee"]>;
 
 /** The person's expected and actual apps, with the existing controls for their accounts and invitations. */
 export function CurrentAccessTable({ person }: { person: Person }) {
-  const accounts = Map.groupBy(person.appAccounts, (account) => account.app.id);
+  const accounts = Map.groupBy(
+    // The directory account joins the others, so its row has Disable and Enable too.
+    [...(person.directoryAccount ? [person.directoryAccount] : []), ...person.appAccounts],
+    (account) => account.app.id,
+  );
   const invites = new Map(person.appInvites.map((invite) => [invite.app.id, invite]));
   const showSources =
     person.templates.edges.length > 0 ||

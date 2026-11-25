@@ -28,7 +28,14 @@ const APP: DataTableColumn<AccountChangeRow> = {
 const CHANGE: DataTableColumn<AccountChangeRow> = {
   id: "change",
   header: t("apps.activity.column.change"),
-  cell: ({ action }) => t(ACTIONS[action]),
+  cell: ({ action, startedFrom }) => (
+    <span className="flex flex-col whitespace-nowrap">
+      <span>{t(ACTIONS[action])}</span>
+      {startedFrom === "OFFBOARDING" && (
+        <span className="text-xs text-muted-foreground">{t("apps.activity.fromOffboarding")}</span>
+      )}
+    </span>
+  ),
 };
 
 const ASKED: DataTableColumn<AccountChangeRow> = {
@@ -55,7 +62,7 @@ const OUTCOME: DataTableColumn<AccountChangeRow> = {
   cell: (change) => <ChangeOutcome change={change} />,
 };
 
-/** Who and which app, Disable, Enable or Invite, who asked and when, and how it ended. */
+/** Who and which app, Disable, Enable or Invite and where it started, who asked and when, and how it ended. */
 export const ACTIVITY_COLUMNS = [PERSON, APP, CHANGE, ASKED, OUTCOME];
 
 /** Disable, Enable or Invite, as the buttons name them. */

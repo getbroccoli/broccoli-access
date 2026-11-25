@@ -33,6 +33,10 @@ export interface AssignmentRepository {
     pairs: EmployeeAppPair[],
     choice: EmployeeAppChoice["choice"],
   ): Promise<EmployeeAppPair[]>;
+  /** Deletes every assignment of the employee; returns the ids of the templates taken off. */
+  takeOffAll(employeeId: string): Promise<string[]>;
+  /** Deletes every app choice of the employee; returns the choices deleted. */
+  clearChoicesOf(employeeId: string): Promise<EmployeeAppChoice[]>;
 }
 
 interface Assignment {
@@ -159,6 +163,18 @@ export function assignmentRepository(db: Orm | Tx): AssignmentRepository {
           ),
         )
         .returning(PAIR),
+    async takeOffAll(employeeId) {
+      const rows = await orm
+        .delete(employeeTemplates)
+        .where(eq(employeeTemplates.employeeId, employeeId))
+        .returning({ templateId: employeeTemplates.templateId });
+      return rows.map(({ templateId }) => templateId);
+    },
+    clearChoicesOf: (employeeId) =>
+      orm
+        .delete(employeeAppChoices)
+        .where(eq(employeeAppChoices.employeeId, employeeId))
+        .returning(),
   };
 }
 

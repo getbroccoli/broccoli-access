@@ -12,6 +12,7 @@ export { ActivityPage } from "./ActivityPage";
 export {
   AppAccountStatusCell,
   AppPage,
+  appPageSearch,
   StatusBadge,
   InviteStatusCell,
   loadAppPage,

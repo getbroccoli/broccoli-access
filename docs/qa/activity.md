@@ -16,6 +16,7 @@ A manual check of the Activity page, which lists every Disable, Enable, Remove a
 - [ ] Ana's "Couldn’t disable" opens "Couldn’t disable Ana Ruiz in Linear" with "Asked by Mia Novak today at <time>.", the reason "Linear doesn’t allow this change. Linear refuses it for some members, such as the workspace’s owner. Nothing changed in Linear.", "Open Linear admin" and "Close", and no Try again or "I did it by hand": those stay on her account's row (see [App page](app-page.md#when-a-change-fails)).
 - [ ] With the fake slowed (`curl -s -H 'content-type: application/json' -d '{"milliseconds": 5000}' "$FAKE/_fake/delay"`), confirm a Disable on Linear's page and open Activity from the left menu at once: the change shows as "Disabling in Linear…" with a spinner, then "On the server" without a reload.
 - [ ] Invite Ivan Petrov to Linear from his person page (see [A person's page](person-page.md#invite)): Activity's first row reads Ivan Petrov with ivan@acme.example, Linear, "Invite", "Mia Novak" and "Today at" the time asked, and "On the server".
+- [ ] After offboarding a person (see [A person's page](person-page.md#offboard)), each of their changes reads "Disable" with "Offboarding" below.
 - [ ] Chloé's name opens her person page.
 
 ## Removing a disabled account

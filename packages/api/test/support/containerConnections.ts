@@ -9,6 +9,7 @@ import { ACME_LINEAR, type RunningFakeConnectors } from "@broccoli-access/fake-a
 import express, { type RequestHandler } from "express";
 import { onTestFinished } from "vitest";
 
+import type { SecurityContext } from "../../src/core/security";
 import type { Orm, Transact } from "../../src/core/db";
 import { createLogger } from "../../src/core/logger";
 import { createAppConnectionService } from "../../src/modules/apps";
@@ -127,17 +128,22 @@ export async function serveConnectorRoutes(fakeUrl: string, app: express.Express
 }
 
 /** The owner's session issued by this test's fake, handed over to the real service. */
-export async function ownerHandOver(orm: Orm, fake: RunningFakeConnectors, now?: () => Date) {
+export async function ownerHandOver(
+  orm: Orm,
+  fake: RunningFakeConnectors,
+  now?: () => Date,
+  owner: SecurityContext = OWNER,
+) {
   const services = containerConnections(orm, fake.url, undefined, now);
   const appSession = await signInToFakeSlack(fake);
   const requestId = "owner-request";
   await services.service.handOverAppSession({
     requestId,
-    userId: OWNER.user!.userId,
+    userId: owner.user!.userId,
     connector: "slack",
     appSession,
   });
-  const handOver = await services.service.readAppSessionHandOver(OWNER, requestId);
+  const handOver = await services.service.readAppSessionHandOver(owner, requestId);
   assert.ok(handOver);
   return { ...services, handOver, requestId, appSession };
 }

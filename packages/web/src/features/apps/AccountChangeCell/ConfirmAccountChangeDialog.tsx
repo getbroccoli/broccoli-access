@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 
 import type {
   AccountChangeAction,
@@ -20,6 +21,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
+import {
+  askGoogleForUserWrites,
+  GOOGLE_WORKSPACE,
+  useGoogleUserWrites,
+} from "@/lib/useGoogleUserWrites";
 
 import { connectingFieldName } from "../connectingFieldName";
 import { changeTargetOf, useChangeAccount } from "./useChangeAccount";
@@ -46,9 +52,20 @@ export function ConfirmAccountChangeDialog({ row, action, accountEmail, expected
   const connector = app.containerConnection?.connector;
   const name = `${employee.firstName} ${employee.lastName}`;
   const copy = COPY[action];
-  const confirm = () => {
+  const google = useGoogleUserWrites();
+  // Setup's consent only reads: the first change of a Google account goes through Google's
+  // consent, and the owner asks again once back.
+  const isGoogle = app.catalogKey === GOOGLE_WORKSPACE;
+  const asksGoogle = isGoogle && google === "needs_consent";
+  // Never asked for while Google's permission is unknown, or cannot be asked for.
+  const blocked = isGoogle && google !== "allowed" && !asksGoogle;
+  const confirm = async () => {
     setOpen(false);
-    void changeAccount(changeTargetOf(row, action), action);
+    if (!asksGoogle) {
+      await changeAccount(changeTargetOf(row, action), action);
+    } else if (!(await askGoogleForUserWrites(window.location.pathname))) {
+      toast.error(t("apps.change.googleStartFailed"));
+    }
   };
 
   return (
@@ -103,6 +120,9 @@ export function ConfirmAccountChangeDialog({ row, action, accountEmail, expected
         </dl>
         <AlertDialogDescription className="flex flex-col gap-3">
           <span>{t(copy.effect, { firstName: employee.firstName, app: app.name })}</span>
+          {asksGoogle && <span>{t("apps.change.googleAsks")}</span>}
+          {blocked && google === "unsupported" && <span>{t("apps.change.googleNeedsOwnApp")}</span>}
+          {blocked && google === "failed" && <span>{t("apps.change.googleCheckFailed")}</span>}
           {connector && (
             <span className="text-xs">
               {t(copy.howItWorks, {
@@ -114,8 +134,8 @@ export function ConfirmAccountChangeDialog({ row, action, accountEmail, expected
         </AlertDialogDescription>
         <AlertDialogFooter>
           <AlertDialogCancel>{t("apps.change.cancel")}</AlertDialogCancel>
-          <AlertDialogAction type="button" onClick={confirm}>
-            {t(copy.confirm, { app: app.name })}
+          <AlertDialogAction type="button" disabled={blocked} onClick={() => void confirm()}>
+            {asksGoogle ? t("apps.change.continueToGoogle") : t(copy.confirm, { app: app.name })}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

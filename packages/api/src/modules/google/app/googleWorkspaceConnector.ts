@@ -22,7 +22,8 @@ import {
 
 /**
  * The Google Workspace connector: reads the directory's users, and the apps each granted access
- * with Google, dated from the token log, with the connection's refresh token.
+ * with Google, dated from the token log, with the connection's refresh token; suspends and
+ * restores a user once the admin allowed changing users.
  */
 export function createGoogleWorkspaceConnector(addresses: {
   /** `GOOGLE_OPENID_CONFIGURATION_URL`. */
@@ -36,7 +37,7 @@ export function createGoogleWorkspaceConnector(addresses: {
     key: GOOGLE_WORKSPACE,
     version: 1,
     name: APP_NAME,
-    capabilities: ["list_accounts"],
+    capabilities: ["list_accounts", "suspend", "reactivate"],
     runtimes: ["server"],
     findingKinds: { ownAppAccounts: "google_directory", otherAppAccounts: "google_sign_in" },
     isDirectory: true,
@@ -48,7 +49,7 @@ export function createGoogleWorkspaceConnector(addresses: {
     settings: GOOGLE_WORKSPACE_SETTINGS,
     secrets: GOOGLE_WORKSPACE_SECRETS,
     async openSession(connection) {
-      const { clientId, previousClientIds, googleApp } = parseGoogleWorkspaceSettings(
+      const { clientId, previousClientIds, googleApp, adminEmail } = parseGoogleWorkspaceSettings(
         connection.settings,
       );
       const accessToken =
@@ -77,11 +78,30 @@ export function createGoogleWorkspaceConnector(addresses: {
               ownClientIds: new Set([clientId, ...previousClientIds]),
               log: await readGrantLog(),
             });
-            const accounts = [...page.users.map(directoryAccount), ...grants];
+            const accounts = [
+              ...page.users.map((user) => directoryAccount(user, adminEmail)),
+              ...grants,
+            ];
             return { accounts, nextCursor: page.nextPageToken };
           }),
         readPhoto: (userId) =>
           asConnectorError(directoryError, async () => google.readPhoto(accessToken, userId)),
+        runAction: (action, { sourceKey, email }) =>
+          asConnectorError(directoryError, async () => {
+            // Also for a scan record older than its `isConnectionUser`: the connection would end.
+            if (action === "suspend" && isConnectionAdmin(email, adminEmail)) {
+              throw new ConnectorError("not_allowed");
+            }
+            const user = await google.setUserSuspended(
+              accessToken,
+              sourceKey,
+              action === "suspend",
+            );
+            if (!user) {
+              throw new ConnectorError("account_not_found");
+            }
+            return { status: user.suspended ? "suspended" : "active" };
+          }),
       };
     },
     // Google gives a user's photo etag only to a user with a photo.
@@ -198,8 +218,11 @@ function grantKey(userId: string, clientId: string): string {
   return `${userId}:${clientId}`;
 }
 
-/** A directory user as an account of Google Workspace itself. */
-function directoryAccount(user: GoogleUser): ImportedAccount {
+/**
+ * A directory user as an account of Google Workspace itself; the admin whose refresh token the
+ * connection uses is its own user, so nobody suspends the account every scan and change runs as.
+ */
+function directoryAccount(user: GoogleUser, adminEmail: string): ImportedAccount {
   return {
     sourceKey: user.id,
     raw: user.raw,
@@ -213,11 +236,14 @@ function directoryAccount(user: GoogleUser): ImportedAccount {
       appExternalId: null,
       grantedAt: null,
       grantedBefore: null,
-      // Google Workspace never offers Disable, so no member needs telling apart.
       displayName: null,
-      isConnectionUser: false,
+      isConnectionUser: isConnectionAdmin(user.email, adminEmail),
     },
   };
+}
+
+function isConnectionAdmin(email: string, adminEmail: string): boolean {
+  return email.toLowerCase() === adminEmail.toLowerCase();
 }
 
 /** Runs a call to Google, turning any failure into the connector error it means. */
@@ -228,6 +254,9 @@ async function asConnectorError<T>(
   try {
     return await call();
   } catch (error) {
+    if (error instanceof ConnectorError) {
+      throw error;
+    }
     throw new ConnectorError(connectorErrorCode(error, errorOfStatus));
   }
 }

@@ -1,0 +1,10 @@
+query GoogleUserWrites {
+  setup {
+    id
+    googleWorkspace {
+      id
+      canChangeUsers
+      googleApp
+    }
+  }
+}

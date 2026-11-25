@@ -154,6 +154,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
         }),
       },
       people,
+      employees.readEmployees,
     ),
     extensionModule({ ...core, appSessions: containerConnections }),
     templatesModule(templates, employees.readEmployees, people),

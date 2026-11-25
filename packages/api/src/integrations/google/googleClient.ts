@@ -22,6 +22,12 @@ export interface GoogleClient {
   findUser(accessToken: string, userId: string): Promise<GoogleUser | null>;
   /** Creates a user who keeps the password given; Google refuses a taken address with a 409. */
   createUser(accessToken: string, user: NewGoogleUser): Promise<GoogleUser>;
+  /** Suspends or restores the user and answers the user as Google then has it; null for an unknown one. */
+  setUserSuspended(
+    accessToken: string,
+    userId: string,
+    suspended: boolean,
+  ): Promise<GoogleUser | null>;
   /** One page of the customer's users, from a null page token; `nextPageToken` is null on the last. */
   listUsers(accessToken: string, pageToken: string | null): Promise<GoogleUserPage>;
   /**
@@ -191,19 +197,21 @@ export function createGoogleClient({
       return null;
     },
     createUser: async (accessToken, { email, givenName, familyName, password }) => {
-      const body = {
+      const user = await writeUser(directoryUrl("users"), accessToken, "POST", {
         primaryEmail: email,
         name: { givenName, familyName },
         password,
         changePasswordAtNextLogin: false,
-      };
-      const user = await fetchRequired(directoryUrl("users"), RAW_RECORD, {
-        method: "POST",
-        headers: { ...bearer(accessToken).headers, "content-type": "application/json" },
-        body: JSON.stringify(body),
       });
-      return toGoogleUser(DIRECTORY_USER.parse(user), user);
+      if (!user) {
+        throw new Error("Google answered 404 to a new user");
+      }
+      return user;
     },
+    setUserSuspended: (accessToken, userId, suspended) =>
+      writeUser(directoryUrl(`users/${encodeURIComponent(userId)}`), accessToken, "PUT", {
+        suspended,
+      }),
     listUsers: (accessToken, pageToken) => readUserPage(directoryUrl, accessToken, pageToken),
     readPhoto: async (accessToken, userId) => {
       const url = directoryUrl(`users/${encodeURIComponent(userId)}/photos/thumbnail`);
@@ -300,6 +308,21 @@ async function readUserPage(
  * The photo's bytes, when they are the JPEG, PNG or GIF Google declares, which browsers show and
  * never run as a page, and stay within `MAX_PHOTO_BYTES`.
  */
+/** Sends a user write and answers the user as Google then has it; null for a 404. */
+async function writeUser(
+  url: URL,
+  accessToken: string,
+  method: "POST" | "PUT",
+  body: Record<string, unknown>,
+): Promise<GoogleUser | null> {
+  const user = await fetchGoogleJson(url, RAW_RECORD, {
+    method,
+    headers: { ...bearer(accessToken).headers, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return user && toGoogleUser(DIRECTORY_USER.parse(user), user);
+}
+
 function parsePhoto({ mimeType, photoData }: z.infer<typeof USER_PHOTO>): GooglePhoto {
   // Node's base64url decoder also reads the `*` and `.` padding Google's web-safe base64 allows.
   const content = Buffer.from(photoData, "base64url");

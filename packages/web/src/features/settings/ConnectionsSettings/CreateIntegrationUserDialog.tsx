@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useState } from "react";
 
 import { FieldError } from "@/components/form";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { t, type MessageKey } from "@/i18n";
 import { postJson } from "@/lib/postJson";
+import { useRestoredFromBackCache } from "@/lib/useRestoredFromBackCache";
 
 type Props = {
   /** The workspace's domain, which the address is in. */
@@ -33,15 +34,8 @@ export function CreateIntegrationUserDialog({ domain }: Props) {
   const [failure, setFailure] = useState<StartFailure | null>(null);
 
   // Back from Google can restore this page as it was left, still waiting for a start that ended.
-  useEffect(() => {
-    const stopWaiting = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        setStarting(false);
-      }
-    };
-    window.addEventListener("pageshow", stopWaiting);
-    return () => window.removeEventListener("pageshow", stopWaiting);
-  }, []);
+  const stopWaiting = useCallback(() => setStarting(false), []);
+  useRestoredFromBackCache(stopWaiting);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

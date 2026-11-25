@@ -29,7 +29,15 @@ export interface AccountChange {
   requestedAt: Date;
   /** When it stopped `running`. */
   finishedAt: Date | null;
+  startedFrom: AccountChangeStart;
+  /** The person an offboarding is for; null when it started from the account. */
+  employeeId: string | null;
 }
+
+/** Where the owner's click was: on the account's or invite's own row, or on Offboard. */
+export const ACCOUNT_CHANGE_STARTS = ["account", "offboarding"] as const;
+
+export type AccountChangeStart = (typeof ACCOUNT_CHANGE_STARTS)[number];
 
 /** Disable (`suspend`), Enable (`reactivate`) Remove (`remove`) or Invite (`invite`). */
 export type AccountChangeAction = AccountAction | "invite" | "remove";

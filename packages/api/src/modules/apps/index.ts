@@ -2,7 +2,7 @@ import { readSdl } from "../../core/graphql";
 import type { ModuleManifest } from "../../core/moduleManifest";
 import { PrincipalSecurityContext } from "../../core/security";
 import type { AccountLinkService, AccountChangeService, AppService, AppUserService } from "./app";
-import { createResolvers } from "./graphql";
+import { createResolvers, type ReadEmployees } from "./graphql";
 
 // Public values.
 export {
@@ -33,11 +33,12 @@ export type {
 export function appsModule(
   services: AppService & AppUserService & AccountChangeService & AccountLinkService,
   people: Parameters<typeof createResolvers>[1],
+  readEmployees: ReadEmployees,
 ): ModuleManifest {
   return {
     name: "apps",
     typeDefs: readSdl(import.meta.url, "./graphql/schema.graphql"),
-    resolvers: createResolvers(services, people),
+    resolvers: createResolvers(services, people, readEmployees),
     jobs: {
       "apps.runAccountChange": {
         run: ({ changeId }) => services.runChange(SYSTEM, changeId),

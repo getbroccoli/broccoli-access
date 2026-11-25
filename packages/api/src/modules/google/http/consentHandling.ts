@@ -5,7 +5,12 @@ import type { Logger } from "../../../core/logger";
 import type { ModuleHttp } from "../../../core/moduleManifest";
 import type { SecurityContext } from "../../../core/security";
 import { UnsuccessfulAnswerError } from "../../../utils";
-import type { GoogleConnectionService, GoogleSignInService, IntegrationUserService } from "../app";
+import type {
+  GoogleConnectionService,
+  GoogleSignInService,
+  IntegrationUserService,
+  UserWriteConsentService,
+} from "../app";
 import {
   EmailTakenError,
   GOOGLE_CALLBACK_PATH,
@@ -22,6 +27,7 @@ export interface GoogleRoutes {
   connection: GoogleConnectionService;
   signIn: GoogleSignInService;
   integrationUsers: IntegrationUserService;
+  userWrites: UserWriteConsentService;
   http: ModuleHttp;
   logger: Logger;
 }

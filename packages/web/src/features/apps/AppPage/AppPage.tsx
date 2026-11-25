@@ -1,7 +1,8 @@
 import { useQuery } from "@apollo/client/react";
-import { useParams } from "@tanstack/react-router";
+import { useParams, useSearch } from "@tanstack/react-router";
 
 import { AppPageDocument } from "@/__generated__/graphql";
+import { GoogleUserWritesNotice } from "@/components/GoogleUserWritesNotice";
 import { t } from "@/i18n";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
@@ -18,6 +19,7 @@ const FIRST_USERS = 8;
 /** An app: its status and actions, how many use it and keep access though suspended, and its users. */
 export function AppPage() {
   const { appId } = useParams({ from: "/_authenticated/apps_/$appId" });
+  const { googleUserWrites } = useSearch({ from: "/_authenticated/apps_/$appId" });
   // The route's loader has just read the page into the cache.
   const pageQuery = useQuery(AppPageDocument, { variables: { id: appId } });
   const { data, refetch } = pageQuery;
@@ -43,6 +45,7 @@ export function AppPage() {
     <div className="flex flex-col gap-6">
       {/* Connecting changes what only the server computes: the status, connection and users. */}
       <AppHeader app={app} onConnected={() => void refetch()} />
+      {googleUserWrites && <GoogleUserWritesNotice outcome={googleUserWrites} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <CountCard label={t("nav.people")} count={app.peopleCount} />
         <CountCard

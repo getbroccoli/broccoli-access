@@ -172,6 +172,8 @@ export function importSourceRepository(db: Orm | Tx): ImportSourceRepository {
           and(
             anyOf(importSources.connectionId, connectionIds),
             sql`(${importRecords.values} ->> 'email') = any(${sql.param([...emails])}::text[])`,
+            // A record of another app, such as a Google sign-in's grant, is no member of this one.
+            sql`(${importRecords.values} ->> 'appExternalId') is null`,
           ),
         ),
     countRecords: async (id) => {

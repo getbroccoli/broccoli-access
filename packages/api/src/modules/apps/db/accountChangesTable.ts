@@ -4,7 +4,11 @@ import { check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizz
 import { user } from "../../../core/auth";
 import { CONNECTOR_ERROR_CODES } from "../../../core/connectors";
 import { jsonb } from "../../../core/db";
-import { ACCOUNT_CHANGE_STATUSES, type AccountChangeAttempt } from "../domain";
+import {
+  ACCOUNT_CHANGE_STARTS,
+  ACCOUNT_CHANGE_STATUSES,
+  type AccountChangeAttempt,
+} from "../domain";
 import { appAccounts } from "./appAccountsTable";
 import { appConnections } from "./appConnectionsTable";
 import { apps } from "./appsTable";
@@ -41,6 +45,9 @@ export const accountChanges = pgTable(
       .references(() => user.id),
     requestedAt: timestamp("requested_at", { withTimezone: true }).notNull(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
+    startedFrom: text("started_from", { enum: ACCOUNT_CHANGE_STARTS }).notNull().default("account"),
+    /** The employee an offboarding is for; its foreign key is in the migration, as employees are another module's. */
+    employeeId: uuid("employee_id"),
   },
   (table) => [
     // One at a time: an app account has at most one running change.
@@ -60,6 +67,10 @@ export const accountChanges = pgTable(
       "account_changes_status",
       sql`${table.status} in ('running', 'succeeded', 'failed', 'done_by_hand')`,
     ),
+    check("account_changes_started_from", sql`${table.startedFrom} in ('account', 'offboarding')`),
+    index("account_changes_offboarded_employee")
+      .on(table.employeeId, table.requestedAt)
+      .where(sql`${table.startedFrom} = 'offboarding'`),
     check(
       "account_changes_error",
       sql`${table.error} in ('authentication_failed', 'permission_missing', 'rate_limited', 'app_unavailable', 'unexpected_response', 'blocked_by_check', 'account_not_found', 'wrong_workspace', 'not_allowed', 'owner_browser_lost')`,

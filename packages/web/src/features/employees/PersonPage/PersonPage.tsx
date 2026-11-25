@@ -1,24 +1,31 @@
 import { usePersonPage } from "./usePersonPage";
 import { CaretLeft } from "@phosphor-icons/react";
-import { Link, useParams, useRouteContext } from "@tanstack/react-router";
+import { Link, useNavigate, useParams, useRouteContext, useSearch } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/Avatar";
+import { GoogleUserWritesNotice } from "@/components/GoogleUserWritesNotice";
 import { useRefreshAfterChanges } from "@/features/apps";
 import { t } from "@/i18n";
+import { dayAndTime } from "@/lib/dayAndTime";
 import { usePollWhileScanning } from "@/lib/usePollWhileScanning";
 import { useRefetchAfterContainerConnectorScans } from "@/lib/useRefetchAfterContainerConnectorScans";
 
 import { AddPersonAppMenu } from "./AddPersonAppMenu";
+import { OffboardDialog } from "./OffboardDialog";
+import { OffboardedNotice } from "./OffboardedNotice";
 import { PersonTemplates } from "./PersonTemplates";
 import { CurrentAccessTable } from "./CurrentAccessTable";
 
 /**
  * A person: their status in Google, a warning while suspended with access, and their current
- * access, with the connected apps they may be invited to.
+ * access, with the connected apps they may be invited to; Offboard, and afterwards what still
+ * needs the owner.
  */
 export function PersonPage() {
-  const { employeeId } = useParams({ from: "/_authenticated/people_/$employeeId" });
+  const { employeeId } = useParams({ from: ROUTE });
+  const { offboard = false, skip, googleUserWrites } = useSearch({ from: ROUTE });
+  const navigate = useNavigate({ from: "/people/$employeeId" });
   const { me } = useRouteContext({ from: "/_authenticated" });
   // The route's loader has just read the page into the cache.
   const { pageQuery, more } = usePersonPage(employeeId);
@@ -28,7 +35,8 @@ export function PersonPage() {
   useRefetchAfterContainerConnectorScans(pageQuery.refetch);
   // A running change or invite moves its row; the page reads the person again until each ends.
   const isChanging =
-    (person?.appAccounts.some((account) => account.latestChange?.status === "RUNNING") ||
+    (person?.directoryAccount?.latestChange?.status === "RUNNING" ||
+      person?.appAccounts.some((account) => account.latestChange?.status === "RUNNING") ||
       person?.appInvites.some((invite) => invite.latestInvite?.status === "RUNNING")) ??
     false;
   usePollWhileScanning(isChanging, pageQuery);
@@ -47,6 +55,11 @@ export function PersonPage() {
     return null;
   }
   const appCount = person.approvedAppNames.length;
+  // Offboarding takes every template off; a template assigned again starts them anew.
+  const offboardedAt = person.templates.edges.length ? null : person.offboarding.offboardedAt;
+  const offboardedOn = offboardedAt ? dayAndTime(offboardedAt).day : null;
+  // Once offboarded, Offboard comes back only when an account can be disabled again.
+  const canOffboard = !offboardedAt || person.offboarding.accountsToDisable.length > 0;
   // Some of the apps they still have access to can be disabled from here.
   const canDisableHere = person.appAccounts.some(
     ({ offeredChange }) => offeredChange === "SUSPEND",
@@ -83,10 +96,38 @@ export function PersonPage() {
                 {t("people.person.suspendedInGoogle")}
               </span>
             )}
+            {offboardedAt && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground/70">
+                {offboardedOn
+                  ? t("people.offboard.offboardedOn", { day: offboardedOn })
+                  : t("people.offboard.offboardedToday")}
+              </span>
+            )}
           </div>
           <span className="truncate text-sm text-muted-foreground">{person.email}</span>
         </div>
+        {canOffboard && (
+          <Button
+            type="button"
+            variant="outline"
+            className="ml-auto shrink-0"
+            onClick={() => void navigate({ search: { offboard: true } })}
+          >
+            {t("people.offboard.button")}
+          </Button>
+        )}
       </div>
+      {/* Mounted while open, so each offboarding starts from every app ticked. */}
+      {offboard && (
+        <OffboardDialog
+          person={person}
+          googleUserWrites={googleUserWrites}
+          initialSkippedAppIds={skip?.split("_") ?? []}
+          onClose={() => void navigate({ search: {} })}
+        />
+      )}
+      {!offboard && googleUserWrites && <GoogleUserWritesNotice outcome={googleUserWrites} />}
+      {offboardedAt && <OffboardedNotice person={person} />}
       {person.suspendedWithAccess && (
         <p
           role="status"
@@ -125,3 +166,5 @@ export function PersonPage() {
     </div>
   );
 }
+
+const ROUTE = "/_authenticated/people_/$employeeId";

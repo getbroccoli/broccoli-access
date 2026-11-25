@@ -14,6 +14,7 @@ export type ConsentState =
   | SignInState
   | GoogleAppChangeState
   | IntegrationUserCreationState
+  | UserWriteConsentState
   | RelayConsentState;
 
 /** The relay's compact state carries the proof needed to redeem its one-use handoff. */
@@ -68,6 +69,18 @@ export interface IntegrationUserCreationState {
   expiresAt: number;
 }
 
+/** The owner allowing changes to the directory's users, carrying the page they came from. */
+export interface UserWriteConsentState {
+  flow: "allow_user_writes";
+  /** The instance's own path the owner goes back to. */
+  returnTo: string;
+  /** The connection's stored version at the start; an answer to another version is refused. */
+  revision: string;
+  nonce: string;
+  /** Epoch milliseconds after which Google's answer is refused. */
+  expiresAt: number;
+}
+
 /** How long a person has between starting a consent and Google's answer: ten minutes. */
 export const CONSENT_LIFETIME_MS = 10 * 60_000;
 
@@ -82,6 +95,7 @@ export function sealConsentState(
     | Omit<WorkspaceConsentState | GoogleAppChangeState, "expiresAt">
     | Omit<SignInState, "expiresAt">
     | Omit<IntegrationUserCreationState, "expiresAt">
+    | Omit<UserWriteConsentState, "expiresAt">
     | Omit<RelayConsentState, "expiresAt">,
   { browserToken, now }: { browserToken: string; now: Date },
 ): string {
@@ -194,6 +208,13 @@ const CONSENT_STATE = z.discriminatedUnion("flow", [
   z.object({
     flow: z.literal("create_integration_user"),
     email: z.string(),
+    revision: z.string(),
+    nonce: z.string(),
+    expiresAt: z.number(),
+  }),
+  z.object({
+    flow: z.literal("allow_user_writes"),
+    returnTo: z.string(),
     revision: z.string(),
     nonce: z.string(),
     expiresAt: z.number(),
