@@ -103,19 +103,21 @@ test("refuses an app user limit below one with a field error", async ({ env }) =
 }, 90_000);
 
 connectorTest(
-  "finishes setup with the only discovered app that has a managing connector",
+  "finishes setup with manageable apps even when they have no users",
   async ({ env }) => {
     const { browser } = await env.signInAsOwner();
     await scannedApps(browser);
+    await env.seed.app({ name: "Linear", domain: "linear.app", catalogKey: "linear" });
 
     const selection = await browser.graphql(`{
       apps(status: DISCOVERED) {
-        edges { node { id name preselected managingConnector { id } } }
+        edges { node { id name peopleCount preselected managingConnector { id } } }
       }
     }`);
     type DiscoveredApp = {
       id: string;
       name: string;
+      peopleCount: number;
       preselected: boolean;
       managingConnector: { id: string } | null;
     };
@@ -127,6 +129,7 @@ connectorTest(
     const selected = discovered.filter(({ preselected }) => preselected);
     expect(selected).toMatchObject([
       { name: "Slack", preselected: true, managingConnector: { id: "slack" } },
+      { name: "Linear", peopleCount: 0, preselected: true, managingConnector: { id: "linear" } },
     ]);
     expect(discovered.filter(({ managingConnector }) => managingConnector !== null)).toEqual(
       selected,
@@ -154,7 +157,7 @@ connectorTest(
       "{ appCounts { approved discovered ignored } setup { step } }",
     );
     expect(await counts.json()).toEqual({
-      data: { appCounts: { approved: 2, discovered: 0, ignored: 36 }, setup: { step: "DONE" } },
+      data: { appCounts: { approved: 3, discovered: 0, ignored: 36 }, setup: { step: "DONE" } },
     });
   },
   90_000,
