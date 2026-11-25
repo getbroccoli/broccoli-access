@@ -2,6 +2,7 @@
 export {
   ACCOUNT_STATUSES,
   ACCOUNT_VALUES_VERSION,
+  APP_SESSION_SOURCES,
   canChangeAccounts,
   canInvite,
   canRemoveAccounts,
@@ -9,6 +10,7 @@ export {
   ConnectorError,
   listsInvitations,
   offersInviteRole,
+  signsInAsIntegrationUser,
 } from "./connector";
 export { withConnectorRetries } from "./connectorRetries";
 
@@ -19,6 +21,7 @@ export type {
   AccountPhoto,
   AccountStatus,
   AccountValues,
+  AppSessionSource,
   ConnectionDetails,
   ConnectionField,
   ConnectionUpdate,

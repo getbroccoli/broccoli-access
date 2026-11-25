@@ -1,6 +1,11 @@
 import type { Orm } from "../../../core/db";
 import type { Logger } from "../../../core/logger";
 import type { SecretBox } from "../../../core/secrets";
+import type {
+  ConnectionSignInAnswer,
+  ConnectorErrorCode,
+} from "@broccoli-access/connector-contract";
+
 import type { ConnectorsContainerClient } from "../../../integrations/connectorsContainer";
 import { integrationUserRepository } from "../db";
 import {
@@ -26,8 +31,18 @@ export interface IntegrationUserSignInDependencies {
   secretBox: SecretBox;
   logger: Logger;
   /** The connectors container, whose browser signs in; null when none is configured. */
-  connectorsContainer: Pick<ConnectorsContainerClient, "setUpIntegrationUser"> | null;
+  connectorsContainer: Pick<
+    ConnectorsContainerClient,
+    "setUpIntegrationUser" | "signInToApp"
+  > | null;
 }
+
+/**
+ * The connection the connectors container made by signing in to an app as the integration user,
+ * or why it made none: the container's error, or `not_set_up` until the integration user signs in
+ * to Google with two steps.
+ */
+export type AppSignIn = ConnectionSignInAnswer | { failure: ConnectorErrorCode | "not_set_up" };
 
 export function createIntegrationUserSignInAttempts(
   dependencies: IntegrationUserSignInDependencies,
@@ -56,6 +71,36 @@ export function createIntegrationUserSignInAttempts(
         : { status: "sign_in_needs_owner", failure: lastFailure ?? "sign_in_did_not_finish" };
     },
   };
+}
+
+/** Signs in to the connector's app as the integration user, sending its secrets to the container only. */
+export async function signInToApp(
+  dependencies: IntegrationUserSignInDependencies,
+  connector: string,
+): Promise<AppSignIn> {
+  const { orm, connectorsContainer, logger } = dependencies;
+  const [user, secrets] = await Promise.all([
+    integrationUserRepository(orm).find(),
+    readSecrets(dependencies),
+  ]);
+  if (!user || secrets?.totpSecret === undefined) {
+    return { failure: "not_set_up" };
+  }
+  const { password, totpSecret } = secrets;
+  const signedIn = (await connectorsContainer?.signInToApp({
+    connector,
+    integrationUser: { email: user.email, password, totpSecret },
+    connection: null,
+  })) ?? { error: "app_unavailable" as const };
+  if ("error" in signedIn) {
+    logger.warn(
+      { connector, failure: signedIn.error },
+      "Integration user could not sign in to the app",
+    );
+    return { failure: signedIn.error };
+  }
+  logger.info({ connector }, "Integration user signed in to the app");
+  return signedIn.answer;
 }
 
 /** The integration user's secrets as its row holds them, bound to that table. */

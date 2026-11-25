@@ -113,6 +113,13 @@
       "when": 1795569881593,
       "tag": "0015_offboard_people",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795599101188,
+      "tag": "0016_app_connection_session_from",
+      "breakpoints": true
     }
   ]
 }

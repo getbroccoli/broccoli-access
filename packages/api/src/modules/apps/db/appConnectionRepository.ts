@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 
+import type { AppSessionSource } from "../../../core/connectors";
 import { anyOf, type Orm, ormOf, type Tx } from "../../../core/db";
 import type { ReconnectCause } from "../domain";
 import { appConnections } from "./appConnectionsTable";
@@ -17,6 +18,8 @@ export interface AppConnection {
   reconnectCause: ReconnectCause | null;
   /** When the owner accepted the connector's notice; null for a connector without one. */
   noticeAcceptedAt: Date | null;
+  /** Who made its app session; null for a connection without one. */
+  sessionFrom: AppSessionSource | null;
 }
 
 /** App connections in Postgres, through the pool or inside a transaction. */
@@ -30,11 +33,14 @@ export interface AppConnectionRepository {
     settings: Record<string, unknown>;
     encryptedSecrets: string;
     noticeAccepted?: { at: Date; by: string };
+    sessionFrom?: AppSessionSource;
   }): Promise<AppConnection>;
   /** Replaces the connection's fields that are set; null for an unknown id. */
   update(
     id: string,
-    connection: Partial<Pick<AppConnection, "settings" | "status" | "reconnectCause">> & {
+    connection: Partial<
+      Pick<AppConnection, "settings" | "status" | "reconnectCause" | "sessionFrom">
+    > & {
       encryptedSecrets?: string;
     },
   ): Promise<AppConnection | null>;
@@ -130,4 +136,5 @@ const columns = {
   status: appConnections.status,
   reconnectCause: appConnections.reconnectCause,
   noticeAcceptedAt: appConnections.noticeAcceptedAt,
+  sessionFrom: appConnections.sessionFrom,
 };

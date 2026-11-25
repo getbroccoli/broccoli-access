@@ -223,12 +223,21 @@ export class TestSeed {
     });
   }
 
-  async integrationUser(fields: { email: string; googleUserId: string; createdBy: string }) {
+  /** With a `totpSecret`, its two-step sign-in is set up. */
+  async integrationUser({
+    totpSecret,
+    ...fields
+  }: {
+    email: string;
+    googleUserId: string;
+    createdBy: string;
+    totpSecret?: string;
+  }) {
     await integrationUserRepository(this.orm).insert({
       ...fields,
       createdAt: new Date("2026-11-21T12:00:00Z"),
       encryptedSecrets: TEST_SECRET_BOX.encrypt(
-        JSON.stringify({ password: "acme-demo-password-for-the-integration-user" }),
+        JSON.stringify({ password: INTEGRATION_USER_PASSWORD, totpSecret }),
         "integration_user",
       ),
     });
@@ -275,3 +284,6 @@ export class TestSeed {
     };
   }
 }
+
+/** The password of the integration user the seed stores. */
+export const INTEGRATION_USER_PASSWORD = "acme-demo-password-for-the-integration-user";

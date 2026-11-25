@@ -99,6 +99,7 @@ export function createModules(core: ModuleDependencies, settings: ModuleSettings
     containerConnectors,
     connectedApps,
     scans,
+    integrationUser: integrationUsers,
   });
   const employees = createEmployeeReadService({ ...core, accounts: apps });
   const changes = createAccountChangeService({

@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { check, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { user } from "../../../core/auth";
+import { APP_SESSION_SOURCES } from "../../../core/connectors";
 import { jsonb } from "../../../core/db";
 import { APP_CONNECTION_STATUSES, RECONNECT_CAUSES } from "../domain";
 import { apps } from "./appsTable";
@@ -30,6 +31,8 @@ export const appConnections = pgTable(
     /** When and by whom the connector's notice was accepted; set exactly for a connector with one. */
     noticeAcceptedAt: timestamp("notice_accepted_at", { withTimezone: true }),
     noticeAcceptedBy: text("notice_accepted_by").references(() => user.id),
+    /** Who made its app session; set exactly for a connection with one. */
+    sessionFrom: text("session_from", { enum: APP_SESSION_SOURCES }),
   },
   (table) => [
     check("app_connections_status", sql`${table.status} in ('connected', 'reconnect')`),
@@ -44,6 +47,10 @@ export const appConnections = pgTable(
     check(
       "app_connections_notice_accepted",
       sql`(${table.noticeAcceptedAt} is null) = (${table.noticeAcceptedBy} is null)`,
+    ),
+    check(
+      "app_connections_session_from",
+      sql`${table.sessionFrom} in ('extension', 'server_sign_in')`,
     ),
   ],
 );

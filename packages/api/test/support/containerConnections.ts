@@ -20,7 +20,7 @@ import {
 import { recordingJobQueue } from "./recordingJobQueue";
 import { signInToFakeSlack } from "./signInToFakeSlack";
 import { startSimpleHttpServer } from "./simpleHttpServer";
-import { scans } from "./services";
+import { integrationUsers, scans } from "./services";
 import { storedAppConnections } from "./storedGoogleConnection";
 import { storedImportSources } from "./storedScan";
 import { OWNER } from "./testSecurityContext";
@@ -56,6 +56,8 @@ export function containerConnections(
     containerConnectors: connectors,
     connectedApps: createAppConnectionService({ secretBox: TEST_SECRET_BOX }),
     scans: scanService,
+    // No test of these creates the user, so no Google is called.
+    integrationUser: integrationUsers(orm, { googleUrl: "http://127.0.0.1:9", connectorsUrl: url }),
   });
   return { service, scans: scanService, sent };
 }
