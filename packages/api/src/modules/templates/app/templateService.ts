@@ -49,7 +49,8 @@ export interface TemplateService
   deleteTemplate: (ctx: SecurityContext, templateId: string) => Promise<void>;
   /**
    * Adds an approved app to the template; an app already in it changes nothing. Refuses an unknown
-   * template with NOT_FOUND, and an app that is unknown or not approved as invalid `appId`.
+   * template with NOT_FOUND, and an app that is unknown, not approved or the directory's as invalid
+   * `appId`: every person already has the directory's.
    */
   addApp: (ctx: SecurityContext, input: TemplateAppInput) => Promise<Template>;
   /**
@@ -168,7 +169,7 @@ export function createTemplateService({
         if (before.apps.some((member) => member.appId === app?.id)) {
           return { template: before, changed: false };
         }
-        if (!app || !isApproved) {
+        if (!app || !isApproved || app.id === (await apps.directoryAppId(tx))) {
           throw invalidInput([{ field: "appId", code: "invalid" }]);
         }
         await apps.lockAppsForReview(tx, [app.id]);

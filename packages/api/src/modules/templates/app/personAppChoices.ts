@@ -196,7 +196,7 @@ async function extraAccountIds(
     choice?.choice !== "to_review" &&
     (await repo.hasAssignment(employeeId)) &&
     (await repo.listedApps([appId])).has(appId);
-  if (!extraAppReason(choice?.choice, listed)) return [];
+  if (!extraAppReason(choice?.choice, listed, appId === (await apps.directoryAppId(tx)))) return [];
   const accounts = await apps.findEmployeeAccounts(tx, [employeeId], [appId]);
   return accounts.flatMap(({ id, status }) => (status === "active" ? [id] : []));
 }

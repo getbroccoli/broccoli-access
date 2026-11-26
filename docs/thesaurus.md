@@ -49,8 +49,8 @@ The words Broccoli Access's code and docs use, and what each one means. Only Bro
 - **Service account**: an app account that software uses, such as a bot or the integration user.
 - **External account**: an app account of someone outside the company, such as a contractor. It has a note and no person page.
 - **Template**: a named list of apps, each with a role, that the owner assigns to people. Not "policy", which sounds like a rule that runs by itself.
-- **Provision**: invite a person to every app they are missing, in one step.
-- **Difference**: where a person's accounts do not match their templates: **missing**, an app they should have, or **extra**, an account no template of theirs gives. Broccoli Access lists differences and never fixes one by itself.
+- **Provision**: start the Invite or Enable each app a person is missing needs, in one step, and list what the owner gives by hand, such as each app not connected.
+- **Difference**: where a person's accounts do not match their templates: **missing**, an app they should have, or **extra**, an account no template of theirs gives. An app they should have in an app without a connection, where no account of theirs is known, is **App not connected** instead: whether they lack it is unknown, so it is no difference. Broccoli Access lists differences and never fixes one by itself.
 - **Offboard**: disable every account of a person in one step and take their templates off.
 - **Connector factory**: a private repository where agents investigate an app, explore a test workspace of it, and check its connector against the real app every week.
 - **Parked**: an app in the connector factory that waits for a person, for a payment, a CAPTCHA or a phone check.

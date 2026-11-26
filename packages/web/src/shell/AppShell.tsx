@@ -1,4 +1,5 @@
-import { useRef, type ReactNode } from "react";
+import { useRouteContext } from "@tanstack/react-router";
+import { useRef, useState, type ReactNode } from "react";
 
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/class-names";
@@ -13,11 +14,18 @@ type Props = {
 
 /**
  * The window-sized app frame: navigation above or beside the Canvas, a card that
- * owns its own scroll. The document itself never scrolls.
+ * owns its own scroll. The document itself never scrolls. While setup waits for the owner
+ * to select the apps, every other page leads back to Applications, so the menu stays hidden
+ * and slides in once setup finishes.
  */
 export function AppShell({ children }: Props) {
   const main = useRef<HTMLElement>(null);
   const inSettings = useInSettings();
+  const { setupStep } = useRouteContext({ from: "/_authenticated" });
+  const selectingApps = setupStep === "SELECT_APPS";
+  // Only a menu this shell hid slides in, not one opened with the page.
+  const [revealMenu, setRevealMenu] = useState(selectingApps);
+  if (selectingApps && !revealMenu) setRevealMenu(true);
   useFocusHeadingOnNavigation(main);
 
   return (
@@ -28,7 +36,7 @@ export function AppShell({ children }: Props) {
           inSettings ? "bg-settings-backdrop" : "bg-app-backdrop",
         )}
       >
-        <LeftNav />
+        {!selectingApps && <LeftNav reveal={revealMenu} />}
         <main ref={main} className="flex min-h-0 min-w-0 flex-1 p-2 pt-0 md:p-3">
           <div
             className={cn(

@@ -20,15 +20,26 @@ const SETTINGS_ITEMS: NavItem[] = [
   { to: "/settings/email", label: t("settings.email.title") },
 ];
 
+type Props = {
+  /** Fades the menu in and, on wide screens, widens it from nothing as it appears. */
+  reveal?: boolean;
+};
+
 /**
  * The app menu, or the Settings menu while a settings page is open. On wide screens both
  * sit side by side in one strip that slides between them.
  */
-export function LeftNav() {
+export function LeftNav({ reveal = false }: Props) {
   const inSettings = useInSettings();
   const appItems = useAppItems();
   return (
-    <aside className="shrink-0 md:h-full md:w-56 md:overflow-hidden">
+    <aside
+      className={cn(
+        "shrink-0 md:h-full md:w-56 md:overflow-hidden",
+        reveal &&
+          "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-500 motion-safe:md:transition-[width] motion-safe:md:ease-[cubic-bezier(0.65,0,0.35,1)] motion-safe:md:starting:w-0",
+      )}
+    >
       <div
         className={cn(
           "md:flex md:h-full md:w-112 md:transition-transform md:duration-500 md:ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none",

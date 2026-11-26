@@ -5,6 +5,10 @@ import type { SecurityContext } from "../../../core/security";
 /** The accounts and outstanding invitations that the apps module recognises as belonging to a person. */
 export interface PersonAccess {
   activeInDirectory(db: Orm | Tx, employeeId: string): Promise<boolean>;
+  /** The directory's app, such as Google Workspace; null before it is connected. */
+  directoryAppId(db: Orm | Tx): Promise<string | null>;
+  /** The apps among these that a connection reads. */
+  connectedAppIds(db: Orm | Tx, appIds: readonly string[]): Promise<Set<string>>;
   lockAppsForReview(tx: Tx, ids: readonly string[]): Promise<{ id: string; name: string }[]>;
   findEmployeeAccounts(
     db: Orm | Tx,

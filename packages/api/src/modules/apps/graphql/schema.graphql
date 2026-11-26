@@ -196,7 +196,7 @@ type Employee {
   appAccounts: [AppUser!]!
   "The connected apps whose last scan found neither their work email nor a member the owner linked to them, where Invite or Reconnect is offered, an invite was asked, or a scan read their pending invitation, also in an app whose connection cannot invite; and the apps without a connection where Provision left their invite for the owner to make by hand. By app name. Admins only."
   appInvites: [AppInvite!]!
-  "What Provision offers for them now: one step for each app they are missing that it can give, in no particular order; none for a person who is not active in the directory. The steps still list an app whose templates disagree on its role; provisionEmployee refuses it until the owner picks one. Admins only."
+  "What Provision offers for them now: one step for each app they are missing or that is not connected that it can give, in no particular order; none for a person who is not active in the directory. The steps still list an app whose templates disagree on its role; provisionEmployee refuses it until the owner picks one. Admins only."
   provisionSteps: [ProvisionStep!]!
   "Their account in the directory, such as Google Workspace, whatever its status; null without one. Admins only."
   directoryAccount: AppUser
@@ -236,7 +236,7 @@ enum OffboardingByHandReason {
   CHANGE_IS_RUNNING
 }
 
-"What Provision does for one app a person is missing."
+"What Provision does for one app a person is missing or that is not connected."
 type ProvisionStep {
   app: App!
   action: ProvisionAction!

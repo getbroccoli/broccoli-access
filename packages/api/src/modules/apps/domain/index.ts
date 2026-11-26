@@ -55,7 +55,12 @@ export {
   byHandInviteStateOf,
   inviteStateOf,
 } from "./appInvite";
-export { type ProvisionAction, type ProvisionFacts, provisionActionOf } from "./provision";
+export {
+  lacksApp,
+  type ProvisionAction,
+  type ProvisionFacts,
+  provisionActionOf,
+} from "./provision";
 export {
   OFFBOARDING_BY_HAND_REASONS,
   type OffboardingAccount,

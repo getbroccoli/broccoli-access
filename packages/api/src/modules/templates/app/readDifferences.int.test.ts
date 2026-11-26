@@ -36,6 +36,18 @@ inviteTest(
 );
 
 inviteTest(
+  "leaves an app without a connection out of Missing, since nobody knows who lacks it",
+  async ({ workspace: { owner, templates, assignAppWithoutConnection } }) => {
+    await assignAppWithoutConnection();
+
+    expect(await templates.readDifferences(owner)).toMatchObject({
+      missing: [],
+      templateSummaries: new Map(),
+    });
+  },
+);
+
+inviteTest(
   "a queued invite appears by ID and stays Missing until the invite succeeds",
   async ({ workspace: { owner, input, service, templates, assignLinearRole } }) => {
     await assignLinearRole(null);

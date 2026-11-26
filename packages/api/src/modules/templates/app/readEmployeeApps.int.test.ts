@@ -60,7 +60,7 @@ test("lists a shared app once with both template sources and the apps each templ
     role: null,
     roleConflict: false,
     choice: null,
-    state: "missing",
+    state: "app_not_connected",
   });
   const shared = rows!.find(({ appId }) => appId === slack.id);
   expect.soft(shared).toMatchObject({

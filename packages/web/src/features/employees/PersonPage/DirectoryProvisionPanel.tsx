@@ -136,7 +136,11 @@ function ConfirmDirectoryProvision({ person, open, canProvision, onClose, refetc
   const edges = allLoaded ? person.personApps.edges : more.data?.employee?.personApps.edges;
   const apps = edges
     ?.map(({ node }) => node)
-    .filter(({ state, app }) => state === "MISSING" && app.catalogKey !== GOOGLE_WORKSPACE);
+    .filter(
+      ({ state, app }) =>
+        (state === "MISSING" || state === "APP_NOT_CONNECTED") &&
+        app.catalogKey !== GOOGLE_WORKSPACE,
+    );
   const conflict = apps?.find(({ roleConflict }) => roleConflict);
 
   function dismiss() {

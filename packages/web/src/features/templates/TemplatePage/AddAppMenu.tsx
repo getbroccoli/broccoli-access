@@ -11,7 +11,7 @@ import { t } from "@/i18n";
 type App = { id: string; name: string; catalogKey?: string | null };
 
 type Props = {
-  /** The company's approved apps that are not in the template yet. */
+  /** The company's approved apps that are not in the template yet, other than the directory's. */
   apps: readonly App[];
   /** While another change of the template's apps runs. */
   disabled: boolean;

@@ -56,7 +56,7 @@ input TemplateDeleteInput {
 input TemplateAddAppInput {
   "The template."
   id: ID!
-  "The id of one of the company's approved apps."
+  "The id of one of the company's approved apps other than the directory's, such as Google Workspace."
   appId: ID!
 }
 
@@ -96,7 +96,7 @@ type PersonApp {
   role: String
   "The owner's own choice for this person, while it changes what they should have or keeps an active account Extra; null otherwise."
   choice: PersonAppChoice
-  "Expected access compared with the held account: active access is Active or Extra, a pending invitation is Invited, and an expected app without either is Missing, even for a disabled account. Other disabled accounts are Suspended. Null for invitation controls alone, and for an app removed for this person that they have no account or pending invitation in. Employee.appAccounts supplies the underlying account status and actions."
+  "Expected access compared with the held account: active access is Active or Extra, a pending invitation is Invited, and an expected app without either is Missing, even for a disabled account, unless the app has no connection and no account of theirs is known, which is App not connected. The directory's active account is never Extra. Other disabled accounts are Suspended. Null for invitation controls alone, and for an app removed for this person that they have no account or pending invitation in. Employee.appAccounts supplies the underlying account status and actions."
   state: PersonAppState
 }
 
@@ -115,7 +115,10 @@ type TemplateRoleSource {
 enum PersonAppState {
   ACTIVE
   SUSPENDED
+  "They should have it and have no active account or pending invitation in it, and the app has a connection or a disabled account of theirs is known."
   MISSING
+  "They should have it, but the app has no connection and no account of theirs is known."
+  APP_NOT_CONNECTED
   INVITED
   EXTRA
 }
@@ -258,7 +261,7 @@ type TemplatesMutations {
   update(input: TemplateUpdateInput!): TemplateUpdatePayload!
   "Deletes a template, its list of apps and its assignments to people; the apps themselves and every account stay. Admins only."
   delete(input: TemplateDeleteInput!): TemplateDeletePayload!
-  "Adds an approved app to a template; an app already in it changes nothing. Admins only."
+  "Adds an approved app other than the directory's to a template; an app already in it changes nothing. Admins only."
   addApp(input: TemplateAddAppInput!): TemplateAddAppPayload!
   "Takes an app out of a template; an app that is not in it changes nothing. Admins only."
   takeOutApp(input: TemplateTakeOutAppInput!): TemplateTakeOutAppPayload!

@@ -107,6 +107,23 @@ test.for(["00000000-0000-4000-8000-000000000001", "not-an-id"])(
   },
 );
 
+test("refuses to add the directory's app, which every person already has", async ({
+  orm,
+  seed,
+}) => {
+  const template = await seed.template();
+  const directory = await seed.app({ catalogKey: "google_workspace", status: "approved" });
+  await seed.appConnection({ appId: directory.id, connector: "google_workspace" });
+
+  await expect(
+    templates(orm).addApp(OWNER, { id: template.id, appId: directory.id }),
+  ).rejects.toMatchObject({
+    code: "INVALID_INPUT",
+    fieldErrors: [{ field: "appId", code: "invalid" }],
+  });
+  expect(await storedTemplateApps(orm)).toEqual([]);
+});
+
 test("takes out an app and records its former name in the template history", async ({
   orm,
   seed,

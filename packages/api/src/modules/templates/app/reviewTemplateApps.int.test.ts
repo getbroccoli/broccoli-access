@@ -75,6 +75,33 @@ test("taking a template off keeps the other sources and records each new review 
   }
 });
 
+test("taking the directory's app out of a template leaves its account neither reviewed nor extra", async ({
+  orm,
+  seed,
+}) => {
+  const user = await seed.user({ email: "owner@example.com" });
+  const directory = await seed.app({ catalogKey: "google_workspace", status: "approved" });
+  await seed.appConnection({ appId: directory.id, connector: "google_workspace" });
+  const engineer = await seed.template({ appIds: [directory.id] });
+  // Another template still lists the app, which makes an unexpected active account extra.
+  await seed.template({ appIds: [directory.id] });
+  const ivan = await seed.employee();
+  await seed.employeeTemplate({
+    employeeId: ivan.id,
+    templateId: engineer.id,
+    assignedBy: user.id,
+  });
+  await seed.appAccount({ employeeId: ivan.id, appId: directory.id });
+
+  const service = templates(orm);
+  await service.takeOutApp(OWNER, { id: engineer.id, appId: directory.id });
+
+  expect(await storedEmployeeAppChoices(orm)).toEqual([]);
+  const [apps] = await service.readEmployeeApps(OWNER, [ivan.id]);
+  expect(apps).toMatchObject([{ appId: directory.id, state: "active" }]);
+  expect((await service.readDifferences(OWNER)).extra).toEqual([]);
+});
+
 test.for(["taking out the app", "deleting the template"] as const)(
   "%s marks each active account that loses its last source for review",
   async (operation, { orm, seed }) => {

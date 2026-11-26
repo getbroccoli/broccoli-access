@@ -4,13 +4,13 @@ test("the owner creates a template, changes its apps and name, lists it and dele
   env,
 }) => {
   const { browser } = await env.signInAsOwner();
-  const approved = await browser.graphql(
-    "{ apps(status: APPROVED) { edges { node { id name } } } }",
-  );
-  const { data } = (await approved.json()) as {
-    data: { apps: { edges: { node: { id: string; name: string } }[] } };
-  };
-  const { node: google } = data.apps.edges.find(({ node }) => node.name === "Google Workspace")!;
+  const { id: studioId, name } = await env.seed.app({
+    name: "Studio",
+    domain: "studio.example",
+    catalogKey: null,
+    status: "approved",
+  });
+  const studio = { id: studioId, name };
 
   const created = await browser.graphql(
     'mutation { templates { create(input: { name: "Engineer" }) { template { id name } error { __typename } } } }',
@@ -29,13 +29,13 @@ test("the owner creates a template, changes its apps and name, lists it and dele
 
   const added = await browser.graphql(
     "mutation ($input: TemplateAddAppInput!) { templates { addApp(input: $input) { template { apps { id app { id name } } } error { __typename } } } }",
-    { input: { id, appId: google.id } },
+    { input: { id, appId: studio.id } },
   );
   expect(await added.json()).toEqual({
     data: {
       templates: {
         addApp: {
-          template: { apps: [{ id: expect.any(String) as unknown, app: google }] },
+          template: { apps: [{ id: expect.any(String) as unknown, app: studio }] },
           error: null,
         },
       },
@@ -52,7 +52,7 @@ test("the owner creates a template, changes its apps and name, lists it and dele
 
   const removed = await browser.graphql(
     "mutation ($input: TemplateTakeOutAppInput!) { templates { takeOutApp(input: $input) { template { apps { id } } error { __typename } } } }",
-    { input: { id, appId: google.id } },
+    { input: { id, appId: studio.id } },
   );
   expect(await removed.json()).toEqual({
     data: { templates: { takeOutApp: { template: { apps: [] }, error: null } } },
@@ -194,6 +194,7 @@ test("the owner sees who is missing an app and keeps another person's extra acco
     catalogKey: null,
     status: "approved",
   });
+  await env.seed.appConnection({ appId: app.id, connector: "linear" });
   const template = await env.seed.assignedTemplateApp({
     employeeId: assigned.id,
     appId: app.id,
@@ -250,6 +251,7 @@ test("refuses employee history nested under missing access differences", async (
     catalogKey: null,
     status: "approved",
   });
+  await env.seed.appConnection({ appId: app.id, connector: "linear" });
   await env.seed.employeeAppChoice({ employeeId: employee.id, appId: app.id, choice: "added" });
 
   const response = await browser.graphql(`{

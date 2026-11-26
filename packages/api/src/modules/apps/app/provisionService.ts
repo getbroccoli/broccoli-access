@@ -12,6 +12,7 @@ import {
 import {
   type AccountChange,
   type ChangeStart,
+  lacksApp,
   type ProvisionAction,
   provisionActionOf,
 } from "../domain";
@@ -247,7 +248,7 @@ async function startSteps(
   request = { ...request, employee };
   const { page, steps } = await readSteps(dependencies, request, tx);
   const confirmed = page.personApps.filter(({ appId }) => appIds.includes(appId));
-  if (confirmed.some((app) => app.state === "missing" && app.roleConflict)) {
+  if (confirmed.some((app) => lacksApp(app.state) && app.roleConflict)) {
     throw new ApplicationError("CONFLICT", PICK_ROLE_FIRST);
   }
   if (
@@ -330,7 +331,7 @@ function stepsOf(page: PersonPage, connectedApps: Set<string>): ProvisionStep[] 
     const asked = account ? account.changeState!.latestChange : invite?.latestInvite;
     const latest = asked?.action === (account ? "reactivate" : "invite") ? asked : null;
     const action = provisionActionOf({
-      missing: state === "missing",
+      missing: lacksApp(state),
       activeInDirectory: page.activeInDirectory,
       connected: connectedApps.has(appId),
       enableOffered: account !== undefined,
