@@ -1,5 +1,6 @@
 // Public values.
 export { createGoogleClient } from "./googleClient";
+export type { GoogleUser } from "./directoryUser";
 
 export { createGoogleRelayClient, GoogleRelayError } from "./googleRelayClient";
 
@@ -9,6 +10,6 @@ export type {
   GoogleCustomer,
   GoogleToken,
   GoogleTokens,
-  GoogleUser,
+  NewGoogleUser,
   OpenIdConfiguration,
 } from "./googleClient";

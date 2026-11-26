@@ -30,6 +30,7 @@ import { integrationUserOf } from "../reconnectReason";
 import { ReconnectButton } from "../ReconnectButton";
 import { couldntChangeHint, couldntChangeReason, failedChangeOptions } from "./couldntChange";
 import { couldntChangeChipClassName, couldntChangeCopy } from "./couldntChangeCopy";
+import { ChangeAttempts } from "./ChangeAttempts";
 import { DoneByHandDialog } from "./DoneByHandDialog";
 import { type ChangeTarget, changeTargetOf, useChangeAccount } from "./useChangeAccount";
 
@@ -37,9 +38,8 @@ type Props = {
   /** A failed account change. */
   change: FragmentType<CouldntChangeDialog_AccountChangeFragment>;
   /**
-   * The row whose latest change it is, which Try again and I did it by hand act on: the account, or
-   * the employee's invite row, offering INVITE while Invite is offered; absent where the change is
-   * history, as on Activity, which shows only why.
+   * The row Try again and I did it by hand act on: the account, or the employee's invite row,
+   * offering INVITE while Invite is offered; absent where no row is known, which shows only why.
    */
   row?: {
     id: string;
@@ -59,6 +59,8 @@ type Props = {
   triggerClassName?: string;
   /** Opens the reason after the row loads it on click. */
   initiallyOpen?: boolean;
+  /** Called once the dialog closes, so a row that loaded it can read it afresh next time. */
+  onClose?: () => void;
 };
 
 /**
@@ -72,6 +74,7 @@ export function CouldntChangeDialog({
   onChanged,
   triggerClassName = couldntChangeChipClassName,
   initiallyOpen = false,
+  onClose,
 }: Props) {
   const fragment = useFragment({
     fragment: CouldntChangeDialog_AccountChangeFragmentDoc,
@@ -80,6 +83,10 @@ export function CouldntChangeDialog({
     from: changeRef,
   });
   const [shown, setShown] = useState<"reason" | "byHand" | null>(initiallyOpen ? "reason" : null);
+  const close = () => {
+    setShown(null);
+    onClose?.();
+  };
   const { changeAccount } = useChangeAccount();
   const [scanNow] = usePayloadMutation(ScanNowDocument);
   const change = fragment.complete ? fragment.data : null;
@@ -108,7 +115,7 @@ export function CouldntChangeDialog({
     historical: !row,
   });
   const tryAgain = (target: ChangeTarget) => {
-    setShown(null);
+    close();
     void changeAccount(
       target,
       change.action,
@@ -117,13 +124,16 @@ export function CouldntChangeDialog({
   };
   const target = row && rowTarget(row.id, change, name, row.onlyIfExtra);
   const scan = (connectionId: string) => {
-    setShown(null);
+    close();
     scanNow({ variables: { connectionId } }).catch(() => toast.error(t("scans.scanNowFailed")));
   };
 
   return (
     <>
-      <Dialog open={shown === "reason"} onOpenChange={(open) => setShown(open ? "reason" : null)}>
+      <Dialog
+        open={shown === "reason"}
+        onOpenChange={(open) => (open ? setShown("reason") : close())}
+      >
         <DialogTrigger
           render={<button type="button" className={triggerClassName} />}
           aria-label={t(copy.title, { name, app: app.name })}
@@ -146,6 +156,7 @@ export function CouldntChangeDialog({
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
             {reason}
           </p>
+          <ChangeAttempts attempts={change.attempts} />
           {row && (
             <p className="text-sm text-muted-foreground">
               {couldntChangeHint(change.failure, change.action, options, {
@@ -213,17 +224,19 @@ export function CouldntChangeDialog({
       </Dialog>
       <DoneByHandDialog
         open={shown === "byHand"}
-        onClose={() => setShown(null)}
+        onClose={close}
         change={change}
         person={{ name, firstName }}
         app={app.name}
+        // An app without a connection is never scanned for the account made by hand.
+        connected={change.failure !== "NO_CONNECTION"}
         onDone={onChanged}
       />
     </>
   );
 }
 
-/** History offers no action: Try again and I did it by hand act on an account's latest change. */
+/** Without a row there is nothing to act on. */
 const NO_OPTIONS = { tryAgain: false, byHand: false, scanNow: false, reconnect: false };
 
 type FailedChange = CouldntChangeDialog_AccountChangeFragment;

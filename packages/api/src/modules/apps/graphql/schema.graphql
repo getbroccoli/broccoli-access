@@ -72,6 +72,26 @@ type AccountChange {
   failure: AccountChangeFailure
   "Where the owner first asked for it: a Try again on its row keeps the start of the failed change it repeats."
   startedFrom: AccountChangeStart!
+  "Each way it was tried, in order: when, where it ran, and its error; null for the one that worked."
+  attempts: [AccountChangeAttempt!]!
+  "The account it changed, while it belongs to an employee and its app still lists it; null for an invite, an account without a person, and once a scan deleted the account."
+  appUser: AppUser
+}
+
+"One way an account change was tried."
+type AccountChangeAttempt {
+  at: DateTime!
+  runtime: AccountChangeRuntime!
+  "Its error; null when it worked."
+  failure: AccountChangeFailure
+}
+
+"Where an account change ran."
+enum AccountChangeRuntime {
+  "On the Broccoli Access server, through the app's API or the integration user."
+  SERVER
+  "In the owner's browser, through the extension and their app session."
+  OWNER_BROWSER
 }
 
 "Where the owner asked for an account change."

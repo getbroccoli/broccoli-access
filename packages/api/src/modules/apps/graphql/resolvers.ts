@@ -1,4 +1,5 @@
 import { accountLinkMutations } from "./accountLinkMutations";
+import { accountChangeResolvers } from "./accountChangeResolvers";
 import { accountWithoutPersonResolvers } from "./accountWithoutPersonResolvers";
 import { createChangeLoaders } from "./createChangeLoaders";
 import DataLoader from "dataloader";
@@ -155,17 +156,7 @@ export function createResolvers(
         );
       },
     },
-    AccountChange: {
-      action: ({ action }) => toEnum(action),
-      status: ({ status }) => toEnum(status),
-      app: (change, _args, context) => loaders.appsById(context).load(change.appId),
-      requestedBy: async ({ requestedBy }, _args, context) => ({
-        id: requestedBy,
-        name: await loaders.requesterNames(context).load(requestedBy),
-      }),
-      failure: ({ error }) => error && toEnum(error),
-      startedFrom: ({ startedFrom }) => toEnum(startedFrom),
-    },
+    AccountChange: accountChangeResolvers(loaders, services.readUsersOfApps),
     App: {
       roles: (app, _args, context) => loaders.roles(context).load(app.id),
       peopleCount: async (app, _args, context) => (await summary(app, context)).peopleCount,

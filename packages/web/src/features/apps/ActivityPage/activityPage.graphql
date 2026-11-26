@@ -29,7 +29,6 @@ query ActivityPage {
           email
           avatarUrl
         }
-        ...CouldntChangeDialog_accountChange
       }
     }
   }

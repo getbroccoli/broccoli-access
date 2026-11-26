@@ -1,30 +1,34 @@
 import { Check } from "@phosphor-icons/react";
+import { Link } from "@tanstack/react-router";
 
-import type { FragmentType } from "@apollo/client";
-
-import type {
-  AccountChangeAction,
-  AccountChangeFailure,
-  CouldntChangeDialog_AccountChangeFragment,
-} from "@/__generated__/graphql";
+import type { AccountChangeAction, AccountChangeFailure } from "@/__generated__/graphql";
 import { type MessageKey, t } from "@/i18n";
 import { dayAndTime } from "@/lib/dayAndTime";
 import { directoryProvisionFailure } from "@/lib/useGoogleUserWrites";
 
-import { ChangeProgress, CouldntChangeDialog } from "../AccountChangeCell";
+import { ChangeProgress } from "../AccountChangeCell";
+import { ActivityCouldntChange } from "./ActivityCouldntChange";
 import { type AccountChangeRow, createsDirectoryAccount } from "./accountChangeRow";
 
 type Props = {
   change: Pick<
     AccountChangeRow,
-    "action" | "status" | "changesAhead" | "failure" | "finishedAt" | "app"
-  > &
-    FragmentType<CouldntChangeDialog_AccountChangeFragment>;
+    | "id"
+    | "action"
+    | "status"
+    | "changesAhead"
+    | "failure"
+    | "finishedAt"
+    | "app"
+    | "email"
+    | "employee"
+  >;
 };
 
 /**
  * How a change ended: on the server, by hand after a failure, or not at all with its reason, which
- * opens why it failed; or its progress.
+ * opens why it failed and what helps; or its progress. A failed Google account creation leads to
+ * the person's page, which offers trying it again while it can.
  */
 export function ChangeOutcome({ change }: Props) {
   const { status, app } = change;
@@ -57,14 +61,25 @@ export function ChangeOutcome({ change }: Props) {
   }
   if (createsDirectoryAccount(change)) {
     return (
-      <span className="text-sm text-destructive">
-        {t(directoryProvisionFailure(change.failure))}
+      <span className="flex flex-col items-start gap-1">
+        <span className="text-sm text-destructive">
+          {t(directoryProvisionFailure(change.failure))}
+        </span>
+        {change.employee && (
+          <Link
+            to="/people/$employeeId"
+            params={{ employeeId: change.employee.id }}
+            className="text-sm font-medium underline underline-offset-2"
+          >
+            {t("apps.activity.retryOnPersonPage", { name: change.employee.firstName })}
+          </Link>
+        )}
       </span>
     );
   }
   return (
     <span className="flex flex-col items-start gap-1 whitespace-nowrap">
-      <CouldntChangeDialog change={change} triggerClassName={FAILED} />
+      <ActivityCouldntChange change={change} triggerClassName={FAILED} />
       {change.failure && (
         <span className="text-xs text-muted-foreground">
           {t(reasonKey(change.action, change.failure), { app: app.name })}

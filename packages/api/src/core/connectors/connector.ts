@@ -86,8 +86,13 @@ export interface ConnectorSession {
    * reads the invitation or the member back. A connector that lists `invite` has it.
    */
   invite?(email: string, role?: string): Promise<InviteResult>;
-  /** Creates a directory account with a first password that the person must change. */
+  /**
+   * Creates a directory account with a first password that the person must change. An account an
+   * earlier try created with the same `key` counts as created; nothing is written to it.
+   */
   createDirectoryAccount?(person: {
+    /** Derived from the password, so only a try that sent it can have created an account with it. */
+    key: string;
     email: string;
     firstName: string;
     lastName: string;

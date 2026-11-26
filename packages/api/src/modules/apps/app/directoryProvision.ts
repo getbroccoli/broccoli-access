@@ -16,7 +16,7 @@ import {
   appConnectionRepository,
   directoryChangeRepository,
 } from "../db";
-import type { AccountChange } from "../domain";
+import { type AccountChange, creationKeyOf } from "../domain";
 import type { AccountChangeDependencies } from "./accountChangeService";
 import { firstPasswordCutoff, requirePersonOwner } from "./addPersonService";
 import { createAppConnectionService } from "./appConnectionService";
@@ -88,7 +88,7 @@ export async function runDirectoryProvision(
   ) => Promise<void>,
 ): Promise<void> {
   ctx.requireSystem();
-  const { orm, logger, transact, secretBox } = dependencies;
+  const { orm, logger, transact } = dependencies;
   const change = await accountChangeRepository(orm).findById(changeId);
   if (!change?.connectionId || !change.employeeId) return;
   if (change.status !== "running" && change.status !== "succeeded") return;
@@ -96,7 +96,9 @@ export async function runDirectoryProvision(
   // A retried job can release the remaining apps after the directory outcome committed.
   if (change.status === "succeeded") return release(change, connectors);
 
-  const password = randomBytes(32).toString("base64url");
+  const password = await firstPasswordFor(dependencies, change);
+  // Another delivery has finished the change.
+  if (!password) return;
   const failure = await createDirectoryAccount(dependencies, ctx, connectors, change, password);
   const finishedAt = new Date();
   const save: SaveDirectoryOutcome = async (tx) => {
@@ -108,10 +110,6 @@ export async function runDirectoryProvision(
       error: failure,
       finishedAt,
     });
-    if (!failure) {
-      const encrypted = secretBox.encrypt(password, changeId);
-      await directoryChangeRepository(tx).saveFirstPassword(changeId, encrypted);
-    }
     return true;
   };
   const ids = {
@@ -127,6 +125,37 @@ export async function runDirectoryProvision(
   await releaseCreatedDirectoryAccount(transact, save, () => release(change, connectors, save));
   logger.info(ids, "Directory account created");
 }
+
+/**
+ * The person's first password: this change's own, stored before Google saw it, else the one an
+ * earlier try of theirs stored, else a new one. A failed try keeps its password for the next, and
+ * only a created account's can be revealed. Null once this change no longer runs, as after another
+ * delivery finished it.
+ */
+async function firstPasswordFor(
+  { transact, secretBox }: AccountChangeDependencies,
+  change: AccountChange,
+): Promise<string | null> {
+  return transact(async (tx) => {
+    if ((await accountChangeRepository(tx).lockById(change.id))?.status !== "running") return null;
+    const passwords = directoryChangeRepository(tx);
+    const own = await passwords.readFirstPassword(change.id);
+    if (own) return secretBox.decrypt(own, change.id);
+    const earlier = await passwords.findEarlierFirstPassword(
+      change.employeeId!,
+      change.connectionId!,
+      change.id,
+    );
+    const password = earlier
+      ? secretBox.decrypt(earlier.encrypted, earlier.id)
+      : randomBytes(FIRST_PASSWORD_BYTES).toString("base64url");
+    await passwords.saveFirstPassword(change.id, secretBox.encrypt(password, change.id));
+    return password;
+  });
+}
+
+/** 256 bits: no one guesses the first password before the person changes it. */
+const FIRST_PASSWORD_BYTES = 32;
 
 /** Keep the job retryable before asking Google to create the account. */
 async function requireProvisionConnectors(
@@ -214,9 +243,11 @@ async function createDirectoryAccount(
       secrets: stored.secrets,
     });
     if (!session.createDirectoryAccount) return "app_unavailable";
-    // A duplicate address can belong to an account created elsewhere. Only a confirmed
-    // creation releases the other apps, including after an interrupted Google call.
-    await withConnectorRetries(() => session.createDirectoryAccount!({ ...person, password }), {
+    // A duplicate address can belong to an account created elsewhere; the key tells an earlier
+    // try's account apart. Only a confirmed creation releases the other apps.
+    const key = creationKeyOf(password);
+    const create = () => session.createDirectoryAccount!({ ...person, key, password });
+    await withConnectorRetries(create, {
       wait,
       onRetry: (failure, attempt) =>
         logger.info(

@@ -131,6 +131,33 @@ it("gives a changed photo a new etag and drops it for a removed photo", async ({
   ).not.toHaveProperty("thumbnailPhotoEtag");
 });
 
+it.for(["id", "email"] as const)("shows one user by %s as the list does", async (key, { fake }) => {
+  const { access_token } = await signIn(fake.url, { scope: ADMIN_SCOPES });
+  const chloe = ACME.people.find(({ email }) => email === "chloe@acme.example")!;
+
+  const response = await fetch(
+    `${fake.url}/admin/directory/v1/users/${key === "id" ? chloe.id : chloe.email}`,
+    { headers: { authorization: `Bearer ${access_token}` } },
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    id: chloe.id,
+    primaryEmail: chloe.email,
+  });
+});
+
+it("answers an unknown user with Google's not-found body", async ({ fake }) => {
+  const { access_token } = await signIn(fake.url, { scope: ADMIN_SCOPES });
+
+  const response = await fetch(`${fake.url}/admin/directory/v1/users/missing@acme.example`, {
+    headers: { authorization: `Bearer ${access_token}` },
+  });
+
+  expect(response.status).toBe(404);
+  expect(await response.json()).toMatchObject({ error: { errors: [{ reason: "notFound" }] } });
+});
+
 it("returns the seeded customer in Google's shape", async ({ fake }) => {
   const tokens = await signIn(fake.url, { scope: ADMIN_SCOPES });
 

@@ -2,6 +2,11 @@ fragment CouldntChangeDialog_accountChange on AccountChange {
   id
   action
   failure
+  attempts {
+    at
+    runtime
+    failure
+  }
   finishedAt
   requestedAt
   requestedBy {

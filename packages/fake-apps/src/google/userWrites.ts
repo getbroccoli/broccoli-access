@@ -33,6 +33,9 @@ const NEW_USER = z.object({
   name: z.object({ givenName: z.string().min(1), familyName: z.string().min(1) }),
   password: z.string().min(PASSWORD_LENGTH.min).max(PASSWORD_LENGTH.max),
   changePasswordAtNextLogin: z.boolean().default(false),
+  externalIds: z
+    .array(z.object({ type: z.string(), customType: z.string().optional(), value: z.string() }))
+    .optional(),
 });
 
 const USER_UPDATE = z.object({ suspended: z.boolean() });
@@ -47,7 +50,7 @@ function createUser(context: FakeGoogleContext): RequestHandler {
     if (!body.success || !isInDomain(body.data.primaryEmail, state.customer.domain)) {
       return sendGoogleError(response, "invalid");
     }
-    const { primaryEmail, name, changePasswordAtNextLogin } = body.data;
+    const { primaryEmail, name, changePasswordAtNextLogin, externalIds } = body.data;
     if (findPerson(state, primaryEmail) !== undefined) {
       return sendGoogleError(response, "duplicate");
     }
@@ -62,6 +65,7 @@ function createUser(context: FakeGoogleContext): RequestHandler {
       creationTime: context.now().toISOString(),
       photo: null,
       changePasswordAtNextLogin,
+      ...(externalIds && { externalIds }),
       createdSinceReset: true,
     };
     state.createdUserCount += 1;

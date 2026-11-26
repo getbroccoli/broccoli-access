@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNotNull, lte } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, lte, ne } from "drizzle-orm";
 
 import { anyOf, type Orm, ormOf, type Tx } from "../../../core/db";
 import type { AccountChange } from "../domain";
@@ -9,7 +9,16 @@ export interface DirectoryChangeRepository {
     employeeIds: readonly string[],
     connectionId: string,
   ): Promise<Map<string, DirectoryInvite>>;
-  saveFirstPassword(changeId: string, encryptedFirstPassword: string): Promise<void>;
+  /** The change's stored first password; null without one. */
+  readFirstPassword(changeId: string): Promise<string | null>;
+  /** The latest first password another directory creation of the person stored; null without one. */
+  findEarlierFirstPassword(
+    employeeId: string,
+    connectionId: string,
+    changeId: string,
+  ): Promise<{ id: string; encrypted: string } | null>;
+  /** Stores the change's encrypted first password, or clears it with null. */
+  saveFirstPassword(changeId: string, encryptedFirstPassword: string | null): Promise<void>;
   takeFirstPassword(
     employeeId: string,
     connectionId: string,
@@ -51,6 +60,28 @@ export function directoryChangeRepository(db: Orm | Tx): DirectoryChangeReposito
           },
         ]),
       );
+    },
+    async readFirstPassword(id) {
+      const [row] = await orm
+        .select({ encrypted: firstPasswordColumn })
+        .from(changes)
+        .where(eq(changes.id, id));
+      return row?.encrypted ?? null;
+    },
+    async findEarlierFirstPassword(employeeId, connectionId, changeId) {
+      const [row] = await orm
+        .select({ id: changes.id, encrypted: firstPasswordColumn })
+        .from(changes)
+        .where(
+          and(
+            directoryInvites([employeeId], connectionId),
+            ne(changes.id, changeId),
+            isNotNull(firstPasswordColumn),
+          ),
+        )
+        .orderBy(desc(changes.requestedAt), desc(changes.id))
+        .limit(1);
+      return row?.encrypted ? { id: row.id, encrypted: row.encrypted } : null;
     },
     async saveFirstPassword(id, encryptedFirstPassword) {
       await orm.update(changes).set({ encryptedFirstPassword }).where(eq(changes.id, id));

@@ -16,7 +16,7 @@ import {
 } from "@/features/apps";
 import { t } from "@/i18n";
 import { formatSince } from "@/lib/since";
-import { isRoleBlocked } from "./roleBlocked";
+import { isRoleBlocked } from "@/features/apps";
 
 type Person = NonNullable<PersonPageQuery["employee"]>;
 type Props = {

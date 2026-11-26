@@ -68,3 +68,4 @@ export {
   type OffboardingByHandWork,
   offboardingPlanOf,
 } from "./offboarding";
+export { creationKeyOf } from "./creationKey";

@@ -13,6 +13,12 @@ export function forgetAppLists(cache: ApolloCache): void {
   cache.gc();
 }
 
+/** Drops Activity's list, so a change only the server places in it loads afresh. */
+export function forgetAccountChanges(cache: ApolloCache): void {
+  cache.evict({ id: "ROOT_QUERY", fieldName: "accountChanges" });
+  cache.gc();
+}
+
 /**
  * Drops what a Disable or Enable changes on other pages, which the server computes: the app lists'
  * "still have access" and the People badge, so they load afresh.
